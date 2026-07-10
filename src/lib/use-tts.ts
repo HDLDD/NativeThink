@@ -62,19 +62,69 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     optionsRef.current = options;
   });
 
-  // Load voices (Chrome loads them asynchronously)
+  // TTS support detection
+  const ttsSupported = 'speechSynthesis' in window;
+
+  // Load voices (Chrome loads them asynchronously; mobile especially needs post-load retry)
   useEffect(() => {
-    if (!('speechSynthesis' in window)) return;
+    if (!ttsSupported) return;
 
     const loadVoices = () => {
       const all = window.speechSynthesis.getVoices();
-      setVoices(all.filter((v) => v.lang.startsWith('en-')));
+      const enVoices = all.filter((v) => v.lang.startsWith('en-'));
+      if (enVoices.length > 0) {
+        setVoices(enVoices);
+      }
     };
 
+    // Mobile browsers may need multiple attempts — voices load lazily
     loadVoices();
     window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
-    return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-  }, []);
+    // Some mobile browsers fire 'voiceschanged' late or not at all — retry on first user interaction
+    const retryOnInteraction = () => {
+      loadVoices();
+      document.removeEventListener('touchstart', retryOnInteraction);
+      document.removeEventListener('click', retryOnInteraction);
+    };
+    document.addEventListener('touchstart', retryOnInteraction, { once: true });
+    document.addEventListener('click', retryOnInteraction, { once: true });
+
+    return () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+      document.removeEventListener('touchstart', retryOnInteraction);
+      document.removeEventListener('click', retryOnInteraction);
+    };
+  }, [ttsSupported]);
+
+  // On mobile, prime speech synthesis with a silent utterance on first user gesture.
+  // Mobile browsers block speak() calls that aren't in direct response to user input.
+  const primedRef = useRef(false);
+  const primeForMobile = useCallback(() => {
+    if (primedRef.current || !ttsSupported) return;
+    try {
+      const u = new SpeechSynthesisUtterance('');
+      u.volume = 0;
+      u.rate = 1;
+      window.speechSynthesis.speak(u);
+      primedRef.current = true;
+    } catch { /* ignore */ }
+  }, [ttsSupported]);
+
+  // Attach prime to first user interaction
+  useEffect(() => {
+    if (!ttsSupported || primedRef.current) return;
+    const prime = () => {
+      primeForMobile();
+      document.removeEventListener('touchstart', prime);
+      document.removeEventListener('click', prime);
+    };
+    document.addEventListener('touchstart', prime, { once: true });
+    document.addEventListener('click', prime, { once: true });
+    return () => {
+      document.removeEventListener('touchstart', prime);
+      document.removeEventListener('click', prime);
+    };
+  }, [ttsSupported, primeForMobile]);
 
   // Chrome keep-alive: prevent speech from stopping after ~15 seconds
   const startKeepAlive = useCallback(() => {
@@ -128,7 +178,14 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
   const speak = useCallback(
     (text: string, opts?: SpeakOptions) => {
-      if (!('speechSynthesis' in window)) return;
+      if (!ttsSupported) return;
+
+      // Ensure voices are loaded (mobile may have loaded them lazily)
+      const allVoices = window.speechSynthesis.getVoices();
+      if (allVoices.length > 0) {
+        const enVoices = allVoices.filter((v) => v.lang.startsWith('en-'));
+        if (enVoices.length > 0) setVoices(enVoices);
+      }
 
       // Cancel any ongoing speech
       window.speechSynthesis.cancel();
@@ -145,7 +202,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       utterance.pitch = opts?.pitch ?? settings.pitch;
       utterance.volume = opts?.volume ?? settings.volume;
 
-      // Voice selection
+      // Voice selection — fall back to any available voice on mobile
       const voice = getBestVoice(settings.selectedVoiceURI);
       if (voice) utterance.voice = voice;
 
@@ -168,12 +225,44 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       };
 
       utterance.onerror = (event) => {
-        // 'canceled' is expected after our own cancel() calls — don't treat as error
+        // 'canceled' / 'interrupted' → expected after our own cancel() calls
         if (event.error === 'canceled' || event.error === 'interrupted') {
           setIsSpeaking(false);
           setIsPaused(false);
           setCurrentWordIndex(-1);
           stopKeepAlive();
+          return;
+        }
+        // 'not-allowed' on mobile → user hasn't interacted yet; prime and retry once
+        if (event.error === 'not-allowed') {
+          primeForMobile();
+          // Retry after a short delay to let the priming take effect
+          setTimeout(() => {
+            try {
+              window.speechSynthesis.cancel();
+              const retry = new SpeechSynthesisUtterance(cleaned);
+              retry.lang = opts?.lang ?? 'en-US';
+              retry.rate = opts?.rate ?? settings.rate;
+              retry.pitch = opts?.pitch ?? settings.pitch;
+              retry.volume = opts?.volume ?? settings.volume;
+              const v = getBestVoice(settings.selectedVoiceURI);
+              if (v) retry.voice = v;
+              retry.onstart = utterance.onstart;
+              retry.onend = utterance.onend;
+              retry.onerror = () => {
+                setIsSpeaking(false);
+                setIsPaused(false);
+                setCurrentWordIndex(-1);
+                stopKeepAlive();
+              };
+              window.speechSynthesis.speak(retry);
+            } catch {
+              setIsSpeaking(false);
+              setIsPaused(false);
+              setCurrentWordIndex(-1);
+              stopKeepAlive();
+            }
+          }, 100);
           return;
         }
         setIsSpeaking(false);
@@ -193,7 +282,6 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
       utterance.onboundary = (event) => {
         if (event.charIndex !== undefined && currentTextRef.current) {
-          // Count words before charIndex to determine word index
           const textBefore = currentTextRef.current.slice(0, event.charIndex);
           const wordIdx = textBefore.trim() === '' ? 0 : textBefore.trim().split(/\s+/).length;
           setCurrentWordIndex(wordIdx);
@@ -203,10 +291,16 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         }
       };
 
-      window.speechSynthesis.speak(utterance);
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        // Fallback: some mobile browsers throw synchronously on speak()
+        setIsSpeaking(false);
+        optionsRef.current?.onError?.(new Event('speak-failed') as any);
+      }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [settings.rate, settings.pitch, settings.volume, settings.selectedVoiceURI, startKeepAlive, stopKeepAlive],
+    [ttsSupported, settings.rate, settings.pitch, settings.volume, settings.selectedVoiceURI, startKeepAlive, stopKeepAlive, primeForMobile],
   );
 
   return { speak, pause, resume, cancel, isSpeaking, isPaused, currentWordIndex, voices };

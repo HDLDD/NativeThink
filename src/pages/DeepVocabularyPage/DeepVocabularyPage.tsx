@@ -402,6 +402,17 @@ export default function DeepVocabularyPage() {
     }
   };
 
+  // Word list pagination: render 100 words at a time for mobile performance
+  const WORDS_PER_PAGE = 100;
+  const [wordPage, setWordPage] = useState(0);
+  const totalWordPages = Math.max(1, Math.ceil(filteredWords.length / WORDS_PER_PAGE));
+  const pagedWords = useMemo(
+    () => filteredWords.slice(wordPage * WORDS_PER_PAGE, (wordPage + 1) * WORDS_PER_PAGE),
+    [filteredWords, wordPage],
+  );
+  // Reset page when filters/search change
+  useEffect(() => { setWordPage(0); }, [filteredWords.length]);
+
   // A-Z index: letters that exist in filteredWords
   const azLetters = useMemo(() => {
     const present = new Set<string>();
@@ -416,9 +427,9 @@ export default function DeepVocabularyPage() {
   }, [filteredWords]);
 
   const scrollToLetter = (letter: string) => {
-    if (!wordListRef.current) return;
-    const el = wordListRef.current.querySelector(`[data-letter="${letter}"]`);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Find which page contains this letter's first word
+    const idx = filteredWords.findIndex((w) => w.word.charAt(0).toUpperCase() === letter);
+    if (idx >= 0) setWordPage(Math.floor(idx / WORDS_PER_PAGE));
   };
 
   return (
@@ -568,17 +579,17 @@ export default function DeepVocabularyPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0 relative">
-                  <div ref={wordListRef} className="space-y-1.5 max-h-[500px] overflow-y-auto pr-8">
+                  <div ref={wordListRef} className="space-y-1.5 pr-8" style={{ minHeight: '400px' }}>
                     {(() => {
                       let lastLetter = '';
-                      return filteredWords.map((w) => {
+                      return pagedWords.map((w) => {
                         const firstLetter = w.word.charAt(0).toUpperCase();
                         const showMarker = firstLetter !== lastLetter;
                         lastLetter = firstLetter;
                         return (
-                          <div key={w.word} data-letter={firstLetter} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 64px' }}>
+                          <div key={w.word} data-letter={firstLetter}>
                             {showMarker && (
-                              <div className="text-[10px] font-black text-[#00B894] uppercase tracking-widest px-1 pt-2 pb-1 sticky top-0 bg-white/90 dark:bg-card/90 backdrop-blur-sm z-[1]">
+                              <div className="text-[10px] font-black text-[#00B894] uppercase tracking-widest px-1 pt-2 pb-1 bg-white/90 dark:bg-card/90 backdrop-blur-sm z-[1]">
                                 {firstLetter}
                               </div>
                             )}
@@ -598,6 +609,22 @@ export default function DeepVocabularyPage() {
                     {filteredWords.length === 0 && (
                       <div className="text-center py-8 text-muted-foreground">
                         <Search className="size-8 mx-auto mb-2 opacity-30" /><p className="text-xs font-medium">没有匹配的单词</p>
+                      </div>
+                    )}
+                    {/* Page navigation */}
+                    {totalWordPages > 1 && (
+                      <div className="flex items-center justify-center gap-1 pt-3 border-t border-border/50 mt-3">
+                        <Button variant="ghost" size="sm" onClick={() => setWordPage((p) => Math.max(0, p - 1))} disabled={wordPage === 0}
+                          className="rounded-xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894] h-7">
+                          <ChevronLeft className="size-3.5" />
+                        </Button>
+                        <span className="text-[10px] font-black text-muted-foreground tabular-nums px-2">
+                          {wordPage + 1} / {totalWordPages}
+                        </span>
+                        <Button variant="ghost" size="sm" onClick={() => setWordPage((p) => Math.min(totalWordPages - 1, p + 1))} disabled={wordPage >= totalWordPages - 1}
+                          className="rounded-xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894] h-7">
+                          <ChevronRight className="size-3.5" />
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -820,7 +847,7 @@ export default function DeepVocabularyPage() {
                   <Card className="rounded-[32px] border-border shadow-sm">
                     <CardContent className="p-5">
                       <p className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-2">词库解析</p>
-                      <p className="text-sm text-foreground/80 font-medium leading-relaxed">{selectedWord.deepExplanation}</p>
+                      <p className="text-sm text-foreground/80 font-medium leading-relaxed">{selectedWord.deepExplanation || `${selectedWord.word}意为${selectedWord.meaning}。该词属于${selectedWord.level.toUpperCase()}级别词汇。`}</p>
                     </CardContent>
                   </Card>
                 </div>

@@ -305,7 +305,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                     <div className="flex flex-wrap gap-1.5 justify-center mb-4">
                       {cw.collocations.slice(0, 4).map((c, i) => <Badge key={i} className="rounded-full px-2 py-0.5 text-[9px] font-medium bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 border-none">{c}</Badge>)}
                     </div>
-                    <p className="text-xs text-muted-foreground font-medium line-clamp-2">{cw.deepExplanation}</p>
+                    <p className="text-xs text-muted-foreground font-medium line-clamp-2">{cw.deepExplanation || `${cw.word}意为${cw.meaning}。`}</p>
                   </>
                 )}
               </CardContent>
