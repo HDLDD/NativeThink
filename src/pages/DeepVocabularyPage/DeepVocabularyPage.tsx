@@ -351,13 +351,13 @@ export default function DeepVocabularyPage() {
     }
     return isLevelReady(lv);
   };
-  const [dataReady, setDataReady] = useState(() => setupDone || levelReady(selectedLevel));
+  const [dataReady, setDataReady] = useState(() => levelReady(selectedLevel));
   const [dataVersion, setDataVersion] = useState(0);
   useEffect(() => {
-    if (setupDone || levelReady(selectedLevel)) { setDataReady(true); setDataVersion((v) => v + 1); return; }
+    if (levelReady(selectedLevel)) { setDataReady(true); setDataVersion((v) => v + 1); return; }
     const levels = selectedLevel === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [selectedLevel];
     preloadLevels(levels).then(() => { setDataReady(true); setDataVersion((v) => v + 1); });
-  }, [selectedLevel, setupDone]);
+  }, [selectedLevel]);
 
   const markSetupDone = () => {
     try { safeStorage.setItem(SETUP_DONE_KEY, '1'); } catch { /* ignore */ }
