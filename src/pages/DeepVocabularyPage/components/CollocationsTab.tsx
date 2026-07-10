@@ -412,7 +412,7 @@ export default function CollocationsTab({
       {/* ================================================================ */}
       {/* LEFT COLUMN — Paginated collocation list */}
       {/* ================================================================ */}
-      <div className="col-span-12 lg:col-span-5">
+      <div className="col-span-12 lg:col-span-5 lg:sticky lg:top-40 self-start">
         <Card className="rounded-[32px] border-border shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3 mb-3">

@@ -17,8 +17,9 @@ const FL_LEVEL_COLORS: Record<string, string> = {
 };
 
 interface LevelInfo { key: string; label: string; }
-export default function FlashcardMode({ level, onLevelChange, levels, counts }: { level?: string; onLevelChange?: (key: string) => void; levels?: LevelInfo[]; counts?: Record<string, number>; }) {
+export default function FlashcardMode({ level, onLevelChange, levels, counts, reviewMode }: { level?: string; onLevelChange?: (key: string) => void; levels?: LevelInfo[]; counts?: Record<string, number>; reviewMode?: string }) {
   const currentLevel = level || 'all';
+  const isFullBook = reviewMode === 'full';
   const { addStudyMinutes } = useLearningStats();
   const { state, dueForReview, getNewWords, recordReview } = useWordLearning(currentLevel);
   const tts = useTTS();
@@ -40,6 +41,12 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     : (allCounts[currentLevel] || 0);
 
   const queue = useMemo(() => {
+    // Full book mode: random words from the entire level (ignores SM-2)
+    if (isFullBook) {
+      const words = getNewWords(50);
+      return words.length > 0 ? words : [];
+    }
+
     const seen = new Set<string>();
 
     // Priority 1: due for review
@@ -69,7 +76,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     const newWords = fillCount > 0 ? getNewWords(fillCount).filter((w) => !seen.has(w.word.toLowerCase())) : [];
 
     return [...dueWords, ...otherWords, ...newWords];
-  }, [dueForReview, state.progress, getNewWords]);
+  }, [dueForReview, state.progress, getNewWords, isFullBook]);
 
   // Auto-speak: 切换界面就停止上一次，读当前界面内容（正面读单词，反面读例句）
   // 用 ref 存 tts，避免 tts 对象变化导致 effect 反复触发、中断朗读

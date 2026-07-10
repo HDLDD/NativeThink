@@ -36,7 +36,7 @@ const MODE_COLORS: Record<ReviewMode, { accent: string; bg: string; gradient: st
 };
 
 interface LevelInfo { key: string; label: string; }
-export default function DailyLearningMode({ level, onLevelChange, levels, counts }: { level: string; onLevelChange?: (key: string) => void; levels?: LevelInfo[]; counts?: Record<string, number>; }) {
+export default function DailyLearningMode({ level, onLevelChange, levels, counts, simple }: { level: string; onLevelChange?: (key: string) => void; levels?: LevelInfo[]; counts?: Record<string, number>; simple?: boolean }) {
   const { state, dailyQuota, setDailyQuota, todayRemaining, dueForReview, getNewWords, recordReview, resetProgress } = useWordLearning(level);
   const tts = useTTS();
 
@@ -483,7 +483,8 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
         </div>
       </div>
 
-      {/* Learning mode selector + quota */}
+      {/* Learning mode selector + quota — hidden in simple mode */}
+      {!simple && (
       <Card className="rounded-2xl border-border shadow-sm">
         <CardContent className="p-3 space-y-3">
           {/* Mode selector */}
@@ -546,6 +547,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Learning session */}
       {sessionWords.length > 0 && currentWord ? (

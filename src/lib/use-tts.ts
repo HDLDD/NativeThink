@@ -103,8 +103,12 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   // iOS Safari's SpeechSynthesis is fundamentally broken (WKWebView bug — speak()
   // silently does nothing, no audio, no error). Use HTML5 audio fallback for iOS only.
   // Android Chrome / desktop: SpeechSynthesis works well with proper priming.
+  //
+  // forceAudioRef: set to true when SpeechSynthesis is detected as broken at runtime
+  // (e.g. Xiaomi browser where API exists but produces no sound).
   const ttsSupported = 'speechSynthesis' in window;
-  const useAudioEngine = isIOS() || !ttsSupported;
+  const forceAudioRef = useRef(false);
+  const useAudioEngine = isIOS() || !ttsSupported || forceAudioRef.current;
 
   // ── Refs shared by both engines ──
   const currentTextRef = useRef('');
@@ -117,6 +121,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const primedRef = useRef(false);
   const speakingUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const ssGenerationRef = useRef(0); // increments each speak() call — stale onerror handlers bail out
 
   // ── Common helpers ──
 

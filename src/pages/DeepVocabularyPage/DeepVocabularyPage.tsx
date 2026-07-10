@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, Play, Pause, SkipForward, Link2, ExternalLink, ArrowUpRight } from 'lucide-react';
+import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, Play, Pause, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -37,7 +37,7 @@ const LEVELS = [
 
 interface SetupStepProps {
   counts: Record<string, number>;
-  onComplete: (level: string, tab: string, dailyCount: number) => void;
+  onComplete: (level: string, tab: string, dailyCount: number, reviewMode?: string) => void;
   onContinue: () => void;
 }
 
@@ -50,9 +50,15 @@ const BOOKS = [
 ];
 
 const MODES = [
-  { key: 'daily', label: '每日学习', icon: '🧠', desc: '按计划每天学新词，AI 生成例句和深度解析' },
-  { key: 'flashcard', label: '闪卡复习', icon: '🔄', desc: '翻转卡片测试记忆，巩固已学词汇' },
-  { key: 'browse', label: '词库浏览', icon: '📖', desc: '自由浏览全部词汇，按条件筛选和搜索' },
+  { key: 'daily', label: '每日学习', icon: '🧠', desc: '按计划每天学新词' },
+  { key: 'flashcard', label: '复习检测', icon: '🔄', desc: 'SM-2 间隔记忆复习' },
+  { key: 'browse', label: '词库浏览', icon: '📖', desc: '自由浏览全部词汇' },
+  { key: 'collocations', label: '搭配学习', icon: '🔗', desc: '常用搭配与短语' },
+] as const;
+
+const REVIEW_MODES = [
+  { key: 'sm2', label: '已学单词 (SM-2)', icon: '🧠', desc: '按间隔记忆算法复习需要巩固的单词' },
+  { key: 'full', label: '整本随机', icon: '📚', desc: '随机抽取书内单词进行自测' },
 ] as const;
 
 const DAILY_COUNTS = [5, 10, 15, 20, 30];
@@ -62,14 +68,22 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
   const [chosenLevel, setChosenLevel] = useState('');
   const [chosenMode, setChosenMode] = useState('daily');
   const [dailyCount, setDailyCount] = useState(10);
+  const [reviewMode, setReviewMode] = useState('sm2');
 
   const handleBookSelect = (level: string) => {
     setChosenLevel(level);
     setStep(1);
   };
 
+  const handleModeSelect = (mode: string) => {
+    setChosenMode(mode);
+    if (mode === 'daily') setStep(2);
+    else if (mode === 'flashcard') setStep(2);
+    else onComplete(chosenLevel, mode, 10);
+  };
+
   const handleComplete = () => {
-    onComplete(chosenLevel, chosenMode, dailyCount);
+    onComplete(chosenLevel, chosenMode, dailyCount, chosenMode === 'flashcard' ? reviewMode : undefined);
   };
 
   const selectedBook = BOOKS.find((b) => b.key === chosenLevel);
@@ -137,7 +151,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">学习方式</p>
             <div className="space-y-2">
               {MODES.map(({ key, label, icon, desc }) => (
-                <button key={key} onClick={() => setChosenMode(key)}
+                <button key={key} onClick={() => handleModeSelect(key)}
                   className={cn('w-full rounded-[20px] p-4 text-left transition-all border-2',
                     chosenMode === key ? 'border-[#00B894] bg-emerald-50/50 dark:bg-emerald-500/10' : 'border-border hover:border-muted-foreground/30')}>
                   <div className="flex items-center gap-3">
@@ -153,21 +167,62 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">每日学习量</p>
-            <div className="flex gap-2">
-              {DAILY_COUNTS.map((n) => (
-                <button key={n} onClick={() => setDailyCount(n)}
-                  className={cn('flex-1 py-3 rounded-2xl text-sm font-black transition-all',
-                    dailyCount === n ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50' : 'bg-muted text-muted-foreground hover:bg-muted/80')}>{n}词</button>
-              ))}
-            </div>
-          </div>
-
           <div className="flex gap-2 pt-2">
             <Button variant="ghost" size="sm" onClick={() => setStep(0)} className="rounded-2xl text-xs">← 返回</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2a: Daily learning — choose daily count */}
+      {step === 2 && chosenMode === 'daily' && (
+        <div className="max-w-sm mx-auto space-y-6">
+          <div className="text-center space-y-1">
+            <p className="text-xs font-bold text-muted-foreground">已选：{selectedBook?.icon} {selectedBook?.label}</p>
+            <p className="text-xl font-black text-foreground">每日学习量</p>
+          </div>
+          <div className="flex gap-2">
+            {DAILY_COUNTS.map((n) => (
+              <button key={n} onClick={() => setDailyCount(n)}
+                className={cn('flex-1 py-3 rounded-2xl text-sm font-black transition-all',
+                  dailyCount === n ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50' : 'bg-muted text-muted-foreground hover:bg-muted/80')}>{n}词</button>
+            ))}
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="rounded-2xl text-xs">← 返回</Button>
             <Button onClick={handleComplete} className="flex-1 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50">
               🚀 开始学习
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2b: Review — choose sub-mode */}
+      {step === 2 && chosenMode === 'flashcard' && (
+        <div className="max-w-sm mx-auto space-y-6">
+          <div className="text-center space-y-1">
+            <p className="text-xs font-bold text-muted-foreground">已选：{selectedBook?.icon} {selectedBook?.label}</p>
+            <p className="text-xl font-black text-foreground">复习方式</p>
+          </div>
+          <div className="space-y-2">
+            {REVIEW_MODES.map(({ key, label, icon, desc }) => (
+              <button key={key} onClick={() => setReviewMode(key)}
+                className={cn('w-full rounded-[20px] p-4 text-left transition-all border-2',
+                  reviewMode === key ? 'border-[#6C5CE7] bg-violet-50/50 dark:bg-violet-500/10' : 'border-border hover:border-muted-foreground/30')}>
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">{icon}</span>
+                  <div>
+                    <p className="text-sm font-black text-foreground">{label}</p>
+                    <p className="text-[10px] text-muted-foreground">{desc}</p>
+                  </div>
+                  {reviewMode === key && <div className="ml-auto size-5 rounded-full bg-[#6C5CE7] text-white flex items-center justify-center text-[10px]">✓</div>}
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="rounded-2xl text-xs">← 返回</Button>
+            <Button onClick={handleComplete} className="flex-1 rounded-2xl bg-[#6C5CE7] hover:bg-[#5a4bd1] text-white font-black text-sm shadow-lg shadow-violet-200/50">
+              🚀 开始复习
             </Button>
           </div>
         </div>
@@ -255,12 +310,15 @@ export default function DeepVocabularyPage() {
   const allPartsOfSpeech = ALL_PARTS_OF_SPEECH;
 
   // ── Setup completion guard ──
-  // Once the user completes the wizard (or clicks "continue"), persist a flag so
-  // the wizard never reappears on subsequent visits — even if the in-memory cache
-  // was evicted or `isLevelReady('all')` returns false.
   const SETUP_DONE_KEY = '__nativethink_vocab_setup_done';
   const [setupDone, setSetupDone] = useState(() => {
     try { return safeStorage.getItem(SETUP_DONE_KEY) === '1'; } catch { return false; }
+  });
+  // Separate from setupDone: controls whether the wizard overlay is visible.
+  // First-time visitors see it automatically; returning users can reopen via "切换" button.
+  const [showWizard, setShowWizard] = useState(!setupDone);
+  const [reviewMode, setReviewMode] = useState(() => {
+    try { return safeStorage.getItem('__nativethink_review_mode') || 'sm2'; } catch { return 'sm2'; }
   });
 
   // ── Lazy data loading ──
@@ -280,6 +338,32 @@ export default function DeepVocabularyPage() {
   const markSetupDone = () => {
     try { safeStorage.setItem(SETUP_DONE_KEY, '1'); } catch { /* ignore */ }
     setSetupDone(true);
+  };
+
+  /** Re-open the wizard to switch word book / learning mode */
+  const handleOpenWizard = () => setShowWizard(true);
+
+  const handleWizardComplete = (level: string, mode: string, dailyCount: number, revMode?: string) => {
+    setSelectedLevel(level);
+    setTab(mode);
+    setMemory((p) => ({ ...p, level, tab: mode }));
+    try { safeStorage.setItem('__nativethink_daily_vocab_count', String(dailyCount)); } catch { /* ignore */ }
+    if (revMode) { setReviewMode(revMode); try { safeStorage.setItem('__nativethink_review_mode', revMode); } catch { /* ignore */ } }
+    markSetupDone();
+    setShowWizard(false);
+    const levels = level === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [level];
+    preloadLevels(levels).then(() => setDataReady(true));
+  };
+
+  const handleWizardContinue = () => {
+    const lastLevel = memory.level || 'cet4';
+    const lastTab = memory.tab || 'daily';
+    setSelectedLevel(lastLevel);
+    setTab(lastTab);
+    markSetupDone();
+    setShowWizard(false);
+    const levels = lastLevel === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [lastLevel];
+    preloadLevels(levels).then(() => setDataReady(true));
   };
 
   // Active filter count + reset
@@ -609,148 +693,144 @@ export default function DeepVocabularyPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-black italic text-foreground tracking-tight">词汇深度</h1>
-          <p className="text-muted-foreground text-xs font-medium">学习新词 + 科学复习 · SM-2 间隔记忆</p>
+          <p className="text-muted-foreground text-xs font-medium">
+            {LEVELS.find((l) => l.key === selectedLevel)?.label || '全部'} · {MODES.find((m) => m.key === tab)?.label || '学习'}
+          </p>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleOpenWizard}
+          className="rounded-2xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894] hover:bg-emerald-50 dark:hover:bg-emerald-500/10 gap-1.5"
+        >
+          <Settings className="size-3.5" />
+          切换词书
+        </Button>
       </div>
 
-      {/* 等级筛选滚轮 — only in browse mode */}
-      {tab === 'browse' && (
-        <>
-        <div className="relative flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => scrollSelector('left')} className="shrink-0 rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-[#00B894]"><ChevronLeft className="size-5" /></Button>
-          <div ref={scrollRef} className="flex gap-2 overflow-x-auto scroll-smooth py-2 px-1" style={{ scrollbarWidth: 'none' }}>
-            {LEVELS.map((l) => {
-              const c = l.key === 'all' ? totalWordCount : (counts[l.key] || 0);
-              return (
-                <button key={l.key} onClick={() => switchLevel(l.key)}
-                  className={cn('shrink-0 px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 whitespace-nowrap',
-                    selectedLevel === l.key ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30' : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground')}>
-                  {l.label}<span className="ml-1.5 text-[10px] opacity-70 font-bold">{c}</span>
-                </button>
-              );
-            })}
-          </div>
-          <Button variant="ghost" size="icon" onClick={() => scrollSelector('right')} className="shrink-0 rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-[#00B894]"><ChevronRight className="size-5" /></Button>
-        </div>
-        {/* Filter bar: compact chip-style */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {/* 词性 */}
-          <select value={posFilter} onChange={(e) => setPosFilter(e.target.value)}
-            className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold border-none outline-none focus:ring-2 focus:ring-[#00B894]/30 transition-colors',
-              posFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
-            <option value="all">词性</option>
-            {allPartsOfSpeech.map((pos) => (<option key={pos} value={pos}>{pos}</option>))}
-          </select>
-          {/* 语域 */}
-          <select value={registerFilter} onChange={(e) => setRegisterFilter(e.target.value)}
-            className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold border-none outline-none focus:ring-2 focus:ring-[#00B894]/30 transition-colors',
-              registerFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
-            <option value="all">语域</option>
-            <option value="formal">正式</option>
-            <option value="neutral">中性</option>
-            <option value="informal">非正式</option>
-          </select>
-          {/* 情感色彩 */}
-          <select value={emotionFilter} onChange={(e) => setEmotionFilter(e.target.value)}
-            className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold border-none outline-none focus:ring-2 focus:ring-[#00B894]/30 transition-colors',
-              emotionFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
-            <option value="all">情感</option>
-            <option value="positive">积极</option>
-            <option value="neutral">中性</option>
-            <option value="negative">消极</option>
-          </select>
-          {/* 有搭配词 */}
-          <button onClick={() => setCollocOnly(!collocOnly)}
-            className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all border-2',
-              collocOnly ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' : 'border-border bg-muted text-muted-foreground hover:border-muted-foreground/30')}>
-            有搭配词
-          </button>
-          {/* 中文无对应 */}
-          <button onClick={() => setNoChineseEquivOnly(!noChineseEquivOnly)}
-            className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all border-2',
-              noChineseEquivOnly ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' : 'border-border bg-muted text-muted-foreground hover:border-muted-foreground/30')}>
-            中文无对应
-          </button>
-          {/* 排序：A-Z → 序号 → 乱序 */}
-          <button
-            onClick={() => setSortMode((p) => p === 'az' ? 'frequency' : p === 'frequency' ? 'random' : 'az')}
-            className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all border-2',
-              sortMode === 'az' ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' :
-              sortMode === 'frequency' ? 'border-[#6C5CE7] bg-[#6C5CE7]/10 text-[#6C5CE7]' :
-              'border-amber-400 bg-amber-50 text-amber-500')}>
-            {sortMode === 'az' ? 'A-Z' : sortMode === 'frequency' ? '序号' : '乱序'}
-          </button>
-          {/* 重置 */}
-          {activeFilterCount > 0 && (
-            <button onClick={resetFilters}
-              className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all border-2 border-rose-200 dark:border-rose-500/20 flex items-center gap-1">
-              <X className="size-3" />{activeFilterCount}
-            </button>
-          )}
-          {/* 自动朗读 */}
-          <div className="flex items-center gap-1 ml-auto">
-            {autoPlaying ? (
-              <>
-                <span className="text-[10px] font-bold text-[#00B894] tabular-nums">{autoPlayIdx + 1}/{filteredWords.length}</span>
-                <Button variant="ghost" size="icon" onClick={stopAutoPlay} className="rounded-xl size-7 bg-rose-50 dark:bg-rose-500/15 text-rose-500 hover:bg-rose-100">
-                  <Pause className="size-3.5" />
-                </Button>
-              </>
-            ) : (
-              <Button variant="ghost" size="sm" onClick={startAutoPlay} disabled={filteredWords.length === 0} className="rounded-xl text-[10px] font-black uppercase tracking-wider bg-[#00B894]/10 text-[#00B894] hover:bg-[#00B894]/20 gap-1">
-                <Play className="size-3.5" />自动朗读
-              </Button>
-            )}
-          </div>
-        </div>
-        </>
-      )}
-
-      {!dataReady && !setupDone && (
+      {showWizard && (
         <VocabSetupWizard
           counts={counts}
-          onComplete={(level, mode, dailyCount) => {
-            setSelectedLevel(level);
-            setTab(mode);
-            setMemory((p) => ({ ...p, level, tab: mode }));
-            try { safeStorage.setItem('__nativethink_daily_vocab_count', String(dailyCount)); } catch { /* ignore */ }
-            markSetupDone();
-            const levels = level === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [level];
-            preloadLevels(levels).then(() => setDataReady(true));
-          }}
-          onContinue={() => {
-            const lastLevel = memory.level || 'cet4';
-            const lastTab = memory.tab || 'daily';
-            setSelectedLevel(lastLevel);
-            setTab(lastTab);
-            markSetupDone();
-            const levels = lastLevel === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [lastLevel];
-            preloadLevels(levels).then(() => setDataReady(true));
-          }}
+          onComplete={handleWizardComplete}
+          onContinue={handleWizardContinue}
         />
       )}
 
-      <Tabs value={tab} onValueChange={handleTabChange} className={cn('w-full', !dataReady && 'hidden')}>
-        <TabsList className="bg-muted p-1.5 rounded-3xl h-auto mb-6">
+      <Tabs value={tab} onValueChange={handleTabChange} className={cn('w-full', showWizard && 'hidden')}>
+        {/* Sticky header: browse level scroller + filter chips + tab buttons */}
+        <div className="sticky top-20 z-30 bg-background/95 backdrop-blur-md pb-3 -mx-1 px-1">
+          {/* 等级筛选滚轮 — only in browse mode */}
+          {tab === 'browse' && (
+            <>
+            <div className="relative flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={() => scrollSelector('left')} className="shrink-0 rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-[#00B894]"><ChevronLeft className="size-5" /></Button>
+              <div ref={scrollRef} className="flex gap-2 overflow-x-auto scroll-smooth py-2 px-1" style={{ scrollbarWidth: 'none' }}>
+                {LEVELS.map((l) => {
+                  const c = l.key === 'all' ? totalWordCount : (counts[l.key] || 0);
+                  return (
+                    <button key={l.key} onClick={() => switchLevel(l.key)}
+                      className={cn('shrink-0 px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 whitespace-nowrap',
+                        selectedLevel === l.key ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30' : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground')}>
+                      {l.label}<span className="ml-1.5 text-[10px] opacity-70 font-bold">{c}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => scrollSelector('right')} className="shrink-0 rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-[#00B894]"><ChevronRight className="size-5" /></Button>
+            </div>
+            {/* Filter bar: compact chip-style */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* 词性 */}
+              <select value={posFilter} onChange={(e) => setPosFilter(e.target.value)}
+                className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold border-none outline-none focus:ring-2 focus:ring-[#00B894]/30 transition-colors',
+                  posFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
+                <option value="all">词性</option>
+                {allPartsOfSpeech.map((pos) => (<option key={pos} value={pos}>{pos}</option>))}
+              </select>
+              {/* 语域 */}
+              <select value={registerFilter} onChange={(e) => setRegisterFilter(e.target.value)}
+                className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold border-none outline-none focus:ring-2 focus:ring-[#00B894]/30 transition-colors',
+                  registerFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
+                <option value="all">语域</option>
+                <option value="formal">正式</option>
+                <option value="neutral">中性</option>
+                <option value="informal">非正式</option>
+              </select>
+              {/* 情感色彩 */}
+              <select value={emotionFilter} onChange={(e) => setEmotionFilter(e.target.value)}
+                className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold border-none outline-none focus:ring-2 focus:ring-[#00B894]/30 transition-colors',
+                  emotionFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
+                <option value="all">情感</option>
+                <option value="positive">积极</option>
+                <option value="neutral">中性</option>
+                <option value="negative">消极</option>
+              </select>
+              {/* 有搭配词 */}
+              <button onClick={() => setCollocOnly(!collocOnly)}
+                className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all border-2',
+                  collocOnly ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' : 'border-border bg-muted text-muted-foreground hover:border-muted-foreground/30')}>
+                有搭配词
+              </button>
+              {/* 中文无对应 */}
+              <button onClick={() => setNoChineseEquivOnly(!noChineseEquivOnly)}
+                className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all border-2',
+                  noChineseEquivOnly ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' : 'border-border bg-muted text-muted-foreground hover:border-muted-foreground/30')}>
+                中文无对应
+              </button>
+              {/* 排序：A-Z → 序号 → 乱序 */}
+              <button
+                onClick={() => setSortMode((p) => p === 'az' ? 'frequency' : p === 'frequency' ? 'random' : 'az')}
+                className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all border-2',
+                  sortMode === 'az' ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' :
+                  sortMode === 'frequency' ? 'border-[#6C5CE7] bg-[#6C5CE7]/10 text-[#6C5CE7]' :
+                  'border-amber-400 bg-amber-50 text-amber-500')}>
+                {sortMode === 'az' ? 'A-Z' : sortMode === 'frequency' ? '序号' : '乱序'}
+              </button>
+              {/* 重置 */}
+              {activeFilterCount > 0 && (
+                <button onClick={resetFilters}
+                  className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all border-2 border-rose-200 dark:border-rose-500/20 flex items-center gap-1">
+                  <X className="size-3" />{activeFilterCount}
+                </button>
+              )}
+              {/* 自动朗读 */}
+              <div className="flex items-center gap-1 ml-auto">
+                {autoPlaying ? (
+                  <>
+                    <span className="text-[10px] font-bold text-[#00B894] tabular-nums">{autoPlayIdx + 1}/{filteredWords.length}</span>
+                    <Button variant="ghost" size="icon" onClick={stopAutoPlay} className="rounded-xl size-7 bg-rose-50 dark:bg-rose-500/15 text-rose-500 hover:bg-rose-100">
+                      <Pause className="size-3.5" />
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="ghost" size="sm" onClick={startAutoPlay} disabled={filteredWords.length === 0} className="rounded-xl text-[10px] font-black uppercase tracking-wider bg-[#00B894]/10 text-[#00B894] hover:bg-[#00B894]/20 gap-1">
+                    <Play className="size-3.5" />自动朗读
+                  </Button>
+                )}
+              </div>
+            </div>
+            </>
+          )}
+          <TabsList className="bg-muted p-1.5 rounded-3xl h-auto">
           <TabsTrigger value="daily" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-emerald-500 data-[state=active]:shadow-sm"><Brain className="size-4 mr-2" />学习</TabsTrigger>
           <TabsTrigger value="flashcard" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#6C5CE7] data-[state=active]:shadow-sm"><RotateCw className="size-4 mr-2" />复习</TabsTrigger>
           <TabsTrigger value="browse" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-sky-500 data-[state=active]:shadow-sm"><BookOpen className="size-4 mr-2" />词库浏览</TabsTrigger>
           <TabsTrigger value="collocations" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-amber-500 data-[state=active]:shadow-sm"><Link2 className="size-4 mr-2" />搭配学习</TabsTrigger>
         </TabsList>
-
+        </div>{/* end sticky header */}
 
         <TabsContent value="daily" className="mt-0">
-          <DailyLearningMode level={selectedLevel} onLevelChange={switchLevel} levels={LEVELS} counts={counts} />
+          <DailyLearningMode level={selectedLevel} onLevelChange={switchLevel} levels={LEVELS} counts={counts} simple />
         </TabsContent>
 
         <TabsContent value="flashcard" className="mt-0">
-          <FlashcardMode level={selectedLevel} onLevelChange={switchLevel} levels={LEVELS} counts={counts} />
+          <FlashcardMode level={selectedLevel} onLevelChange={switchLevel} levels={LEVELS} counts={counts} reviewMode={reviewMode} />
         </TabsContent>
 
         <TabsContent value="browse" className="mt-0">
           <div className="grid grid-cols-12 gap-6">
             {/* Left: word list */}
-            <div className="col-span-12 lg:col-span-5">
+            <div className="col-span-12 lg:col-span-5 lg:sticky lg:top-56 self-start">
               <Card className="rounded-[32px] border-border shadow-sm">
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-3 mb-3">
