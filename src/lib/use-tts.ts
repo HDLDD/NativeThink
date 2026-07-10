@@ -228,7 +228,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
   const playChunkWithFallback = useCallback(
     (chunks: string[], idx: number, rate: number, engineIdx: number) => {
-      const engines: Array<'cf' | 'edge' | 'google'> = ['edge', 'cf', 'google'];
+      const engines: Array<'cf' | 'edge' | 'google'> = ['cf', 'edge', 'google'];
       const engine = engines[engineIdx];
       if (!engine || abortedRef.current || idx >= chunks.length) {
         stopAudio();
@@ -429,7 +429,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         if (abortedRef.current) return;
         ssCancel();
         playChunkWithFallback(chunks, 0, rate, 0);
-      }, 1500);
+      }, 600);
       setTimeout(() => {
         if (abortedRef.current) return;
         speakSS(cleaned, rate, pitch, volume, lang, fallbackTimer);
