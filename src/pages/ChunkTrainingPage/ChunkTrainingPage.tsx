@@ -1755,7 +1755,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
             <CardContent>
               <div className="grid grid-cols-12 gap-4" style={{ height: '520px' }}>
                 {/* Left: Phrase list with meanings */}
-                <div className="col-span-5 flex flex-col min-h-0">
+                <div className="col-span-12 lg:col-span-5 flex flex-col min-h-0">
                   <div className="flex flex-wrap gap-0.5 mb-2 shrink-0">
                     {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => {
                       const has = sortedChunks.some((c) => c.content[0]?.toUpperCase() === letter);
@@ -1813,7 +1813,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                 </div>
 
                 {/* Right: Phrase detail */}
-                <div className="col-span-7 border-l border-border pl-4 flex flex-col min-h-0">
+                <div className="col-span-12 lg:col-span-7 lg:border-l lg:border-border lg:pl-4 flex flex-col min-h-0">
                   {selectedPhrase ? (
                     <div className="flex-1 flex flex-col min-h-0">
                       {/* Phrase header */}

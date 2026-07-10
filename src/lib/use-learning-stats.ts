@@ -15,6 +15,7 @@ export interface ILearningStats {
     conversation: number;
     shadowing: number;
     vocabulary: number;
+    writing: number;
   };
   totalDays: number;
   lastStudyDate: string;
@@ -37,6 +38,7 @@ const DEFAULT_STATS: ILearningStats = {
     conversation: 0,
     shadowing: 0,
     vocabulary: 0,
+    writing: 0,
   },
   totalDays: 0,
   lastStudyDate: formatDate(new Date()),

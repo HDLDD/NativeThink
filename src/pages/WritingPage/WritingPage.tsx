@@ -415,7 +415,7 @@ export default function WritingPage() {
     setFeedback('');
     setTimer(0);
     setTimerRunning(true);
-    addStudyMinutes(0.5, 'vocabulary');
+    addStudyMinutes(0.5, 'writing');
   };
 
   const handleSubmit = async () => {
@@ -425,7 +425,7 @@ export default function WritingPage() {
     setIsSubmitting(true);
     setFeedback('');
     setTimerRunning(false);
-    addStudyMinutes(3, 'think');
+    addStudyMinutes(3, 'writing');
 
     const controller = new AbortController();
     abortRef.current = controller;
