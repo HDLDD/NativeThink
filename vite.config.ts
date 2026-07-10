@@ -1,7 +1,23 @@
 import path from 'path'
+import type { Plugin } from 'vite'
 import { defineConfig } from '@lark-apaas/coding-preset-vite-react'
 
+// Replace platform template placeholders for standalone/Cloudflare deployment
+function fixHtmlPlaceholders(): Plugin {
+  return {
+    name: 'fix-html-placeholders',
+    enforce: 'post', // run after ogMetaPlugin replaces title with {{appName}}
+    transformIndexHtml(html) {
+      return html
+        .replace(/{{appName}}/g, 'NativeThink')
+        .replace(/{{appDescription}}/g, '英语母语思维训练')
+        .replace(/{{appAvatar}}/g, '/favicon.svg')
+    },
+  }
+}
+
 export default defineConfig({
+  plugins: [fixHtmlPlaceholders()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
