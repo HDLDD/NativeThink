@@ -256,13 +256,33 @@ export default function DeepVocabularyPage() {
   // Use pre-computed constants (avoids loading all word data just for metadata)
   const allPartsOfSpeech = ALL_PARTS_OF_SPEECH;
 
+  // ── Setup completion guard ──
+  // Once the user completes the wizard (or clicks "continue"), persist a flag so
+  // the wizard never reappears on subsequent visits — even if the in-memory cache
+  // was evicted or `isLevelReady('all')` returns false.
+  const SETUP_DONE_KEY = '__nativethink_vocab_setup_done';
+  const [setupDone, setSetupDone] = useState(() => {
+    try { return safeStorage.getItem(SETUP_DONE_KEY) === '1'; } catch { return false; }
+  });
+
   // ── Lazy data loading ──
-  const [dataReady, setDataReady] = useState(() => isLevelReady(selectedLevel) || isLevelReady('all'));
+  const levelReady = (lv: string) => {
+    if (lv === 'all') {
+      return ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'].every((l) => isLevelReady(l));
+    }
+    return isLevelReady(lv);
+  };
+  const [dataReady, setDataReady] = useState(() => setupDone || levelReady(selectedLevel));
   useEffect(() => {
-    if (isLevelReady(selectedLevel) || isLevelReady('all')) { setDataReady(true); return; }
+    if (setupDone || levelReady(selectedLevel)) { setDataReady(true); return; }
     const levels = selectedLevel === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [selectedLevel];
     preloadLevels(levels).then(() => setDataReady(true));
-  }, [selectedLevel]);
+  }, [selectedLevel, setupDone]);
+
+  const markSetupDone = () => {
+    try { safeStorage.setItem(SETUP_DONE_KEY, '1'); } catch { /* ignore */ }
+    setSetupDone(true);
+  };
 
   // Active filter count + reset
   const activeFilterCount = useMemo(() => {
@@ -317,7 +337,7 @@ export default function DeepVocabularyPage() {
       return arr;
     }
     return words;
-  }, [selectedLevel, searchQuery, sortMode, collocOnly, posFilter, registerFilter, emotionFilter, noChineseEquivOnly, browseLevels, browseMemoryFilter, memorizedWords]);
+  }, [selectedLevel, searchQuery, sortMode, collocOnly, posFilter, registerFilter, emotionFilter, noChineseEquivOnly, browseLevels, browseMemoryFilter, memorizedWords, dataReady]);
 
   // tts must be declared BEFORE it's used in the auto-play effect
   const tts = useTTS();
@@ -702,7 +722,7 @@ export default function DeepVocabularyPage() {
         </>
       )}
 
-      {!dataReady && (
+      {!dataReady && !setupDone && (
         <VocabSetupWizard
           counts={counts}
           onComplete={(level, mode, dailyCount) => {
@@ -710,6 +730,7 @@ export default function DeepVocabularyPage() {
             setTab(mode);
             setMemory((p) => ({ ...p, level, tab: mode }));
             try { safeStorage.setItem('__nativethink_daily_vocab_count', String(dailyCount)); } catch { /* ignore */ }
+            markSetupDone();
             const levels = level === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [level];
             preloadLevels(levels).then(() => setDataReady(true));
           }}
@@ -718,6 +739,7 @@ export default function DeepVocabularyPage() {
             const lastTab = memory.tab || 'daily';
             setSelectedLevel(lastLevel);
             setTab(lastTab);
+            markSetupDone();
             const levels = lastLevel === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [lastLevel];
             preloadLevels(levels).then(() => setDataReady(true));
           }}
