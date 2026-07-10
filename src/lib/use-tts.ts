@@ -339,8 +339,26 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
   const speakSS = useCallback((text: string, opts?: SpeakOptions) => {
     if (!ttsSupported) return;
-    window.speechSynthesis.cancel();
-    ssCancel();
+
+    // Bump generation so stale onerror/onend from previous utterances bail out
+    ssGenerationRef.current++;
+    const gen = ssGenerationRef.current;
+
+    // Only cancel if actually speaking — calling cancel() when idle can put
+    // Chrome's speech synthesis into a bad state that drops subsequent speak().
+    const isActive = window.speechSynthesis.speaking || window.speechSynthesis.pending;
+    if (isActive) {
+      window.speechSynthesis.cancel();
+    }
+
+    // Reset local state (inline, not via ssCancel which calls cancel again)
+    setIsSpeaking(false);
+    setIsPaused(false);
+    setCurrentWordIndex(-1);
+    stopKeepAlive();
+    clearSafetyTimer();
+    currentTextRef.current = '';
+    speakingUtteranceRef.current = null;
 
     const cleaned = cleanText(text);
     if (!cleaned) return;
@@ -358,28 +376,47 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     speakingUtteranceRef.current = utterance;
 
     const estimatedMs = estimateDurationMs(cleaned, rate);
-    safetyTimerRef.current = setTimeout(() => {
-      if (speakingUtteranceRef.current === utterance) {
-        setIsSpeaking(false);
-        setIsPaused(false);
-        setCurrentWordIndex(-1);
-        stopKeepAlive();
-        clearSafetyTimer();
-        currentTextRef.current = '';
-        speakingUtteranceRef.current = null;
+
+    // ── Start-timeout fallback ──
+    // Some browsers (Xiaomi, OEMs) expose SpeechSynthesis but it silently fails:
+    // onstart never fires, no audio, no error. Detect & permanently switch to
+    // audio engine for this session.
+    const startTimeout = setTimeout(() => {
+      if (speakingUtteranceRef.current === utterance && !isSpeaking) {
+        forceAudioRef.current = true;
+        window.speechSynthesis.cancel();
+        // Retry this utterance with audio engine
+        speakAudio(text, opts);
       }
-    }, estimatedMs + 3000);
+    }, 1000);
+
+    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
 
     utterance.onstart = () => {
+      clearTimeout(startTimeout);
+      if (ssGenerationRef.current !== gen) return;
       setIsSpeaking(true);
       setIsPaused(false);
       setCurrentWordIndex(0);
       startKeepAlive();
       optionsRef.current?.onStart?.();
+      // Arm safety timer once speech has started
+      safetyTimer = setTimeout(() => {
+        if (speakingUtteranceRef.current === utterance && ssGenerationRef.current === gen) {
+          setIsSpeaking(false);
+          setIsPaused(false);
+          setCurrentWordIndex(-1);
+          stopKeepAlive();
+          currentTextRef.current = '';
+          speakingUtteranceRef.current = null;
+        }
+      }, estimatedMs + 3000);
     };
 
     utterance.onend = () => {
-      clearSafetyTimer();
+      clearTimeout(startTimeout);
+      if (safetyTimer) clearTimeout(safetyTimer);
+      if (ssGenerationRef.current !== gen) return;
       setIsSpeaking(false);
       setIsPaused(false);
       setCurrentWordIndex(-1);
@@ -390,14 +427,26 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     };
 
     utterance.onerror = (event) => {
-      clearSafetyTimer();
+      clearTimeout(startTimeout);
+      if (safetyTimer) clearTimeout(safetyTimer);
+      if (ssGenerationRef.current !== gen) return;
       if (event.error === 'canceled' || event.error === 'interrupted') {
-        ssCancel();
+        setIsSpeaking(false);
+        setIsPaused(false);
+        setCurrentWordIndex(-1);
+        stopKeepAlive();
+        currentTextRef.current = '';
+        speakingUtteranceRef.current = null;
         return;
       }
       if (event.error === 'not-allowed') {
         primeForMobile();
-        ssCancel();
+        setIsSpeaking(false);
+        setIsPaused(false);
+        setCurrentWordIndex(-1);
+        stopKeepAlive();
+        currentTextRef.current = '';
+        speakingUtteranceRef.current = null;
         setTimeout(() => {
           try {
             window.speechSynthesis.cancel();
@@ -408,22 +457,36 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
             retry.volume = opts?.volume ?? settings.volume;
             const v = getBestVoice(settings.selectedVoiceURI);
             if (v) retry.voice = v;
-            retry.onstart = utterance.onstart;
-            retry.onend = utterance.onend;
-            retry.onerror = () => ssCancel();
-            retry.onboundary = utterance.onboundary;
-            retry.onpause = utterance.onpause;
-            retry.onresume = utterance.onresume;
+            retry.onstart = () => {
+              setIsSpeaking(true);
+              setIsPaused(false);
+              setCurrentWordIndex(0);
+              startKeepAlive();
+            };
+            retry.onend = () => {
+              setIsSpeaking(false);
+              setIsPaused(false);
+              setCurrentWordIndex(-1);
+              stopKeepAlive();
+            };
+            retry.onerror = () => {
+              setIsSpeaking(false);
+              setIsPaused(false);
+              setCurrentWordIndex(-1);
+              stopKeepAlive();
+            };
             speakingUtteranceRef.current = retry;
-            safetyTimerRef.current = setTimeout(() => {
-              if (speakingUtteranceRef.current === retry) ssCancel();
-            }, estimatedMs + 3000);
             window.speechSynthesis.speak(retry);
-          } catch { ssCancel(); }
+          } catch { /* ignore */ }
         }, 150);
         return;
       }
-      ssCancel();
+      setIsSpeaking(false);
+      setIsPaused(false);
+      setCurrentWordIndex(-1);
+      stopKeepAlive();
+      currentTextRef.current = '';
+      speakingUtteranceRef.current = null;
       optionsRef.current?.onError?.(event);
     };
 
@@ -442,15 +505,21 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     try {
       window.speechSynthesis.speak(utterance);
     } catch {
-      ssCancel();
+      clearTimeout(startTimeout);
+      setIsSpeaking(false);
+      setIsPaused(false);
+      setCurrentWordIndex(-1);
+      stopKeepAlive();
+      currentTextRef.current = '';
+      speakingUtteranceRef.current = null;
       optionsRef.current?.onError?.(new Event('speak-failed') as any);
     }
-  }, [ttsSupported, settings.rate, settings.pitch, settings.volume, settings.selectedVoiceURI, startKeepAlive, stopKeepAlive, primeForMobile, ssCancel, clearSafetyTimer]);
+  }, [ttsSupported, settings.rate, settings.pitch, settings.volume, settings.selectedVoiceURI, startKeepAlive, stopKeepAlive, primeForMobile, speakAudio, clearSafetyTimer]);
 
   // ── Public API — delegates to active engine ──
 
   const speak = useCallback((text: string, opts?: SpeakOptions) => {
-    if (useAudioEngine) {
+    if (useAudioEngine || forceAudioRef.current) {
       speakAudio(text, opts);
     } else {
       speakSS(text, opts);
