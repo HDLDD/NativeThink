@@ -18,7 +18,6 @@
     "@formkit/auto-animate": "^0.9.0",
     "@gsap/react": "^2.1.2",
     "@hookform/resolvers": "^5.2.2",
-    "@kingdanx/edge-tts-browser": "^1.0.0",
     "@lark-apaas/client-toolkit-lite": "^1.1.18",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",

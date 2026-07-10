@@ -40,14 +40,6 @@ export default defineConfig({
       '@shared': path.resolve(__dirname, 'shared'),
     },
   },
-  server: {
-    proxy: {
-      '/api/tts': {
-        target: 'https://nativethink.pages.dev',
-        changeOrigin: true,
-      },
-    },
-  },
   build: {
     rolldownOptions: {
       output: {
