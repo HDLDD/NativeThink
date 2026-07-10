@@ -12,11 +12,29 @@ import "./index.css";
  * can't trigger an infinite crash → reset → crash loop when running
  * outside the miaoda platform (e.g., local Vite dev server or GitHub Pages).
  */
+/**
+ * Check if running on the miaoda platform (has appId injected by platform runtime).
+ * On standalone deployments (Cloudflare, GitHub Pages, Vite dev), skip AppContainer
+ * entirely to avoid watermarks, missing-platform errors, and template placeholders.
+ */
+function isMiaodaPlatform(): boolean {
+  if (typeof window !== 'undefined') {
+    const appId = (window as any).appId;
+    // Platform injects a real appId (non-template string like "app_xxx")
+    return typeof appId === 'string' && appId.length > 0 && !appId.startsWith('{{');
+  }
+  return false;
+}
+
 function SafeShell({ children }: { children: React.ReactNode }) {
   const [appContainerFailed, setAppContainerFailed] = useState(false);
 
+  // Skip AppContainer on non-miaoda platforms — no watermarks, no platform features
+  if (!isMiaodaPlatform()) {
+    return <>{children}</>;
+  }
+
   if (appContainerFailed) {
-    // Degrade gracefully — skip platform container entirely.
     return <>{children}</>;
   }
 
