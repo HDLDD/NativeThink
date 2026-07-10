@@ -396,16 +396,18 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         playAudioChunks(chunks, 0, rate, 'cf');
       } else {
         // Desktop / Android: try SpeechSynthesis first (offline, instant).
-        // If onstart doesn't fire within 1.5s (Xiaomi/Huawei browsers where
-        // SpeechSynthesis exists but doesn't actually produce sound), fall back
-        // to Cloudflare Function → Edge-TTS via CDN proxy.
+        // Defer one tick to let ssCancel's cancel() fully resolve in the browser.
+        // Without this, Chrome drops the new utterance when switching words quickly.
         const fallbackTimer = setTimeout(() => {
           if (abortedRef.current) return;
           ssCancel();
           const chunks = chunkText(cleaned);
           playAudioChunks(chunks, 0, rate, 'cf');
         }, 1500);
-        speakSS(cleaned, rate, pitch, volume, lang, fallbackTimer);
+        setTimeout(() => {
+          if (abortedRef.current) return;
+          speakSS(cleaned, rate, pitch, volume, lang, fallbackTimer);
+        }, 0);
       }
     },
     [settings.rate, settings.pitch, settings.volume, ssCancel, speakSS, playAudioChunks],
