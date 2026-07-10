@@ -27,6 +27,7 @@ export default function TTSSettings() {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [open, setOpen] = useState(false);
 
+  // Load voices on mount + listen for changes
   useEffect(() => {
     const load = () => setVoices(getEnglishVoices());
     load();
@@ -35,6 +36,22 @@ export default function TTSSettings() {
       return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
     }
   }, []);
+
+  // Reload voices when popover opens (mobile WebViews often need a user-gesture
+  // context to populate the voice list, and voiceschanged may not fire reliably)
+  useEffect(() => {
+    if (open && voices.length === 0) {
+      const tryLoad = () => {
+        const available = getEnglishVoices();
+        if (available.length > 0) setVoices(available);
+      };
+      tryLoad();
+      // Retry after a short delay for slow-loading mobile browsers
+      const t1 = setTimeout(tryLoad, 300);
+      const t2 = setTimeout(tryLoad, 800);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+  }, [open, voices.length]);
 
   const testVoice = useCallback(() => {
     if (!('speechSynthesis' in window)) return;
@@ -99,6 +116,13 @@ export default function TTSSettings() {
                 <SelectItem value="__auto__" className="text-xs font-bold">
                   自动选择 (推荐)
                 </SelectItem>
+                {voices.length === 0 && (
+                  <div className="px-2 py-3 text-[10px] text-muted-foreground text-center leading-relaxed">
+                    暂无可用声音
+                    <br />
+                    <span className="opacity-60">打开弹窗后自动刷新...</span>
+                  </div>
+                )}
                 {voices.map((v) => (
                   <SelectItem key={v.voiceURI} value={v.voiceURI} className="text-xs font-medium">
                     {v.name} ({v.lang})
