@@ -219,6 +219,13 @@ export default function CollocationsTab({
     setCurrentPage(0);
   };
 
+  // Sync selectedLevels with parent's selectedLevel prop
+  useEffect(() => {
+    setSelectedLevels(new Set(selectedLevel === 'all' ? [...SUB_LEVELS] : [selectedLevel]));
+    setSelectedColloc(null);
+    setCurrentPage(0);
+  }, [selectedLevel]);
+
   const wordCounts = useMemo(() => getWordCounts(), []);
 
   // ===== Lazy compute: collocations for selected level(s) =====
@@ -425,42 +432,6 @@ export default function CollocationsTab({
                   {isEmpty ? '选择一个词库' : `${allCollocEntries.length} 个搭配 · ${memorizedCollocs.size} 已记 · ${totalWordsWithColloc} 个单词`}
                 </CardDescription>
               </div>
-            </div>
-
-            {/* Multi-select level selector */}
-            <div className="flex items-center gap-1 flex-wrap">
-              {SUB_LEVELS.map((key) => {
-                const lc = LEVEL_COLORS[key];
-                const active = selectedLevels.has(key);
-                const count = wordCounts[key] || 0;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => handleToggleLevel(key)}
-                    title={`${LEVEL_LABELS[key]}词库 · ${count} 个单词${active ? ' · 已选中' : ' · 点击选中'}`}
-                    className={cn(
-                      'px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1',
-                      active ? 'text-white shadow-sm' : 'bg-muted text-muted-foreground hover:bg-muted/80',
-                    )}
-                    style={active ? { backgroundColor: lc.hex } : undefined}
-                  >
-                    {active && <span className="text-[8px]">✓</span>}
-                    {LEVEL_LABELS[key]}
-                    <span className="text-[8px] opacity-70 font-bold">{count}</span>
-                  </button>
-                );
-              })}
-              <button
-                onClick={handleSelectAllLevels}
-                className={cn(
-                  'px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-200',
-                  selectedLevels.size >= SUB_LEVELS.length
-                    ? 'bg-emerald-500 text-white shadow-sm'
-                    : 'bg-muted text-muted-foreground hover:bg-emerald-50 hover:text-emerald-500',
-                )}
-              >
-                全选
-              </button>
             </div>
 
             {/* Memory filter + search */}
