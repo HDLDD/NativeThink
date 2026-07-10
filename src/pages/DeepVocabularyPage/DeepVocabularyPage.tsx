@@ -936,7 +936,7 @@ export default function DeepVocabularyPage() {
             <div className="col-span-12 lg:col-span-8">
               {selectedWord ? (
                 <div className="space-y-4">
-                  <Card className="rounded-[40px] border-border shadow-sm overflow-hidden">
+                  <Card className="rounded-[40px] border-2 border-emerald-200/50 shadow-sm overflow-hidden">
                     <CardContent className="p-8">
                       <div className="flex items-start justify-between gap-4 mb-6">
                         <div>
@@ -1019,7 +1019,7 @@ export default function DeepVocabularyPage() {
                     </CardContent>
                   </Card>
                   {selectedWord.examples.map((ex, i) => (
-                    <Card key={i} className="rounded-[32px] border-border shadow-sm">
+                    <Card key={i} className="rounded-[32px] border-2 border-emerald-100 dark:border-emerald-500/20 shadow-sm">
                       <CardContent className="p-5">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1">
@@ -1166,7 +1166,7 @@ export default function DeepVocabularyPage() {
                     </CardContent>
                   </Card>
                   {/* ===== 词库解析 ===== */}
-                  <Card className="rounded-[32px] border-border shadow-sm">
+                  <Card className="rounded-[32px] border-2 border-emerald-100 dark:border-emerald-500/20 shadow-sm">
                     <CardContent className="p-5">
                       <p className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-2">词库解析</p>
                       <p className="text-sm text-foreground/80 font-medium leading-relaxed">{selectedWord.deepExplanation || `${selectedWord.word}意为${selectedWord.meaning}。该词属于${selectedWord.level.toUpperCase()}级别词汇。`}</p>
