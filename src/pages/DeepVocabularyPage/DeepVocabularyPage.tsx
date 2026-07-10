@@ -232,6 +232,27 @@ export default function DeepVocabularyPage() {
   const [autoPlayIdx, setAutoPlayIdx] = useState(0);
   const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Browse tab: level filter, memory, page size
+  const SUB_LEVELS = ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] as const;
+  const [browseLevels, setBrowseLevels] = useState<Set<string>>(
+    () => new Set(selectedLevel === 'all' ? [...SUB_LEVELS] : [selectedLevel]),
+  );
+  const [browseMemoryFilter, setBrowseMemoryFilter] = useState<'all' | 'memorized' | 'unmemorized'>('all');
+  const [browsePageSize, setBrowsePageSize] = useState(20);
+  const [memorizedWords, setMemorizedWords] = useState<Set<string>>(() => {
+    try { const s = safeStorage.getItem('__nativethink_browse_memorized'); return s ? new Set(JSON.parse(s)) : new Set(); }
+    catch { return new Set(); }
+  });
+  const toggleMemorizedWord = (word: string) => {
+    setMemorizedWords((prev) => {
+      const next = new Set(prev);
+      const key = word.toLowerCase();
+      if (next.has(key)) next.delete(key); else next.add(key);
+      safeStorage.setItem('__nativethink_browse_memorized', JSON.stringify([...next]));
+      return next;
+    });
+  };
+
   // Use pre-computed constants (avoids loading all word data just for metadata)
   const allPartsOfSpeech = ALL_PARTS_OF_SPEECH;
 
@@ -262,6 +283,14 @@ export default function DeepVocabularyPage() {
     setNoChineseEquivOnly(false);
   };
 
+  // Browse level colors
+  const LEVEL_COLORS: Record<string, string> = {
+    cet4: '#00B894', cet6: '#0984E3', ielts: '#F59E0B', toefl: '#6C5CE7', advanced: '#64748B',
+  };
+  const LEVEL_LABELS: Record<string, string> = {
+    cet4: '四级', cet6: '六级', ielts: '雅思', toefl: '托福', advanced: '高阶',
+  };
+
   // filteredWords must be declared BEFORE it's used in startAutoPlay & useEffect
   const filteredWords = useMemo(() => {
     let words = queryWords({
@@ -272,9 +301,13 @@ export default function DeepVocabularyPage() {
       register: registerFilter !== 'all' ? registerFilter : undefined,
     });
     // Client-side filters
+    if (selectedLevel === 'all') words = words.filter((w) => browseLevels.has(w.level));
     if (collocOnly) words = words.filter((w) => w.collocations.length > 0);
     if (emotionFilter !== 'all') words = words.filter((w) => w.emotion === emotionFilter);
     if (noChineseEquivOnly) words = words.filter((w) => w.hasNoChineseEquivalent);
+    // Memory filter
+    if (browseMemoryFilter === 'memorized') words = words.filter((w) => memorizedWords.has(w.word.toLowerCase()));
+    else if (browseMemoryFilter === 'unmemorized') words = words.filter((w) => !memorizedWords.has(w.word.toLowerCase()));
     if (sortMode === 'random') {
       const arr = [...words];
       for (let i = arr.length - 1; i > 0; i--) {
@@ -284,7 +317,7 @@ export default function DeepVocabularyPage() {
       return arr;
     }
     return words;
-  }, [selectedLevel, searchQuery, sortMode, collocOnly, posFilter, registerFilter, emotionFilter, noChineseEquivOnly]);
+  }, [selectedLevel, searchQuery, sortMode, collocOnly, posFilter, registerFilter, emotionFilter, noChineseEquivOnly, browseLevels, browseMemoryFilter, memorizedWords]);
 
   // tts must be declared BEFORE it's used in the auto-play effect
   const tts = useTTS();
@@ -512,6 +545,20 @@ export default function DeepVocabularyPage() {
     }, 80);
   };
   const scrollSelector = (dir: 'left' | 'right') => { if (scrollRef.current) scrollRef.current.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' }); };
+
+  // Browse level toggle
+  const handleToggleBrowseLevel = (key: string) => {
+    setBrowseLevels((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        if (next.size > 1) next.delete(key);
+      } else next.add(key);
+      return next;
+    });
+  };
+  const handleSelectAllBrowseLevels = () => {
+    setBrowseLevels(new Set([...SUB_LEVELS]));
+  };
   const handleSelectWord = (w: IWordEntry) => {
     setSelectedWord(w);
     setMemory((p) => ({ ...p, word: w.word }));
@@ -543,35 +590,15 @@ export default function DeepVocabularyPage() {
     }
   };
 
-  // Word list pagination: render 20 words at a time for mobile-friendly scrolling
-  const WORDS_PER_PAGE = 20;
+  // Word list pagination with configurable page size
   const [wordPage, setWordPage] = useState(0);
-  const totalWordPages = Math.max(1, Math.ceil(filteredWords.length / WORDS_PER_PAGE));
+  const totalWordPages = Math.max(1, Math.ceil(filteredWords.length / browsePageSize));
   const pagedWords = useMemo(
-    () => filteredWords.slice(wordPage * WORDS_PER_PAGE, (wordPage + 1) * WORDS_PER_PAGE),
-    [filteredWords, wordPage],
+    () => filteredWords.slice(wordPage * browsePageSize, (wordPage + 1) * browsePageSize),
+    [filteredWords, wordPage, browsePageSize],
   );
   // Reset page when filters/search change
   useEffect(() => { setWordPage(0); }, [filteredWords.length]);
-
-  // A-Z index: letters that exist in filteredWords
-  const azLetters = useMemo(() => {
-    const present = new Set<string>();
-    filteredWords.forEach((w) => {
-      const first = w.word.charAt(0).toUpperCase();
-      if (/^[A-Z]$/.test(first)) present.add(first);
-    });
-    return 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((l) => ({
-      letter: l,
-      present: present.has(l),
-    }));
-  }, [filteredWords]);
-
-  const scrollToLetter = (letter: string) => {
-    // Find which page contains this letter's first word
-    const idx = filteredWords.findIndex((w) => w.word.charAt(0).toUpperCase() === letter);
-    if (idx >= 0) setWordPage(Math.floor(idx / WORDS_PER_PAGE));
-  };
 
   return (
     <div className="space-y-6">
@@ -716,81 +743,221 @@ export default function DeepVocabularyPage() {
 
         <TabsContent value="browse" className="mt-0">
           <div className="grid grid-cols-12 gap-6">
-            {/* Left: search + word list */}
-            <div className="col-span-12 lg:col-span-4">
-              <Card className="rounded-[32px] border-border shadow-sm relative">
-                <CardHeader className="pb-4">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="搜索单词（支持英文/中文/音标）…" className="bg-muted border-none pl-10 pr-4 py-2.5 rounded-2xl text-xs font-bold focus-visible:ring-2 focus-visible:ring-emerald-200 w-full" />
+            {/* Left: word list */}
+            <div className="col-span-12 lg:col-span-5">
+              <Card className="rounded-[32px] border-border shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="size-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] flex items-center justify-center">
+                      <BookOpen className="size-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg font-[900] italic text-foreground">词库浏览</CardTitle>
+                      <CardDescription className="text-xs font-medium mt-0.5">
+                        {filteredWords.length} 个单词 · {memorizedWords.size} 已记
+                      </CardDescription>
+                    </div>
+                  </div>
+
+                  {/* Level filter pills */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {SUB_LEVELS.map((key) => {
+                      const active = browseLevels.has(key);
+                      const count = WORD_COUNTS[key] || 0;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => handleToggleBrowseLevel(key)}
+                          title={`${LEVEL_LABELS[key]}词库 · ${count} 个单词${active ? ' · 已选中' : ' · 点击选中'}`}
+                          className={cn(
+                            'px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1',
+                            active ? 'text-white shadow-sm' : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                          )}
+                          style={active ? { backgroundColor: LEVEL_COLORS[key] } : undefined}
+                        >
+                          {active && <span className="text-[8px]">✓</span>}
+                          {LEVEL_LABELS[key]}
+                          <span className="text-[8px] opacity-70 font-bold">{count}</span>
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={handleSelectAllBrowseLevels}
+                      className={cn(
+                        'px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-200',
+                        browseLevels.size >= SUB_LEVELS.length
+                          ? 'bg-[#00B894] text-white shadow-sm'
+                          : 'bg-muted text-muted-foreground hover:bg-emerald-50 hover:text-[#00B894]',
+                      )}
+                    >
+                      全选
+                    </button>
+                  </div>
+
+                  {/* Memory filter + search */}
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="flex items-center gap-0.5 bg-muted rounded-xl p-0.5">
+                      {([
+                        { key: 'all', label: '全部' },
+                        { key: 'memorized', label: '已记' },
+                        { key: 'unmemorized', label: '未记' },
+                      ] as const).map(({ key, label }) => (
+                        <button
+                          key={key}
+                          onClick={() => setBrowseMemoryFilter(key)}
+                          className={cn(
+                            'px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all',
+                            browseMemoryFilter === key
+                              ? 'bg-white dark:bg-card text-[#00B894] shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Search */}
+                  <div className="relative mt-3">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={searchQuery}
+                      onChange={(e) => { setSearchQuery(e.target.value); setWordPage(0); }}
+                      placeholder="搜索单词（英文/中文/音标）…"
+                      className="pl-9 pr-8 py-2 rounded-xl bg-white dark:bg-card border-border text-xs font-bold focus-visible:ring-2 focus-visible:ring-emerald-200"
+                    />
+                    {searchQuery && (
+                      <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                        <X className="size-3.5" />
+                      </button>
+                    )}
                   </div>
                 </CardHeader>
-                <CardContent className="pt-0 relative">
-                  <div ref={wordListRef} className="space-y-1.5 pr-8" style={{ minHeight: '400px' }}>
-                    {(() => {
-                      let lastLetter = '';
-                      return pagedWords.map((w) => {
-                        const firstLetter = w.word.charAt(0).toUpperCase();
-                        const showMarker = firstLetter !== lastLetter;
-                        lastLetter = firstLetter;
-                        return (
-                          <div key={w.word} data-letter={firstLetter}>
-                            {showMarker && (
-                              <div className="text-[10px] font-black text-[#00B894] uppercase tracking-widest px-1 pt-2 pb-1 bg-white/90 dark:bg-card/90 backdrop-blur-sm z-[1]">
-                                {firstLetter}
+
+                <CardContent className="pt-0">
+                  {filteredWords.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Search className="size-10 mx-auto mb-2 opacity-20" />
+                      <p className="text-sm font-medium">没有匹配的单词</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Word list */}
+                      <div className="space-y-1 max-h-[480px] overflow-y-auto pr-1">
+                        {pagedWords.map((w) => {
+                          const isSelected = selectedWord?.word === w.word;
+                          const lc = LEVEL_COLORS[w.level] || '#00B894';
+                          const memorized = memorizedWords.has(w.word.toLowerCase());
+                          return (
+                            <button
+                              key={w.word}
+                              onClick={() => handleSelectWord(w)}
+                              className={cn(
+                                'w-full text-left p-3 rounded-2xl transition-all duration-200 border-2',
+                                isSelected
+                                  ? 'border-emerald-400 bg-emerald-50/50 dark:bg-emerald-500/10 shadow-sm'
+                                  : 'border-transparent bg-muted/30 hover:bg-muted hover:border-border',
+                              )}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); tts.speak(w.word, { rate: 0.85 }); }}
+                                      className="shrink-0 text-muted-foreground/40 hover:text-[#00B894] transition-colors"
+                                      title={`朗读 "${w.word}"`}
+                                    >
+                                      <Volume2 className="size-3.5" />
+                                    </button>
+                                    <span className="text-sm font-black text-foreground">{w.word}</span>
+                                    <span className="text-[10px] font-bold text-[#6C5CE7]">{w.partOfSpeech}</span>
+                                  </div>
+                                  <p className="text-[11px] text-muted-foreground font-medium mt-0.5 line-clamp-1">{w.meaning}</p>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); toggleMemorizedWord(w.word); }}
+                                    title={memorized ? '取消记忆' : '标记为已记'}
+                                    className={cn(
+                                      'p-0.5 rounded-lg transition-colors',
+                                      memorized ? 'text-[#00B894] hover:text-[#00B894]/70' : 'text-muted-foreground/30 hover:text-[#00B894]',
+                                    )}
+                                  >
+                                    <Brain className={cn('size-3.5', memorized && 'fill-[#00B894]/20')} />
+                                  </button>
+                                  <span
+                                    className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md shrink-0"
+                                    style={{ backgroundColor: lc + '18', color: lc }}
+                                  >
+                                    {LEVEL_LABELS[w.level]}
+                                  </span>
+                                </div>
                               </div>
-                            )}
-                            <button onClick={() => handleSelectWord(w)}
-                              className={cn('w-full text-left p-3 rounded-2xl transition-all duration-200',
-                                selectedWord?.word === w.word ? 'bg-[#00B894]/10 border border-[#00B894]/30' : 'bg-muted/30 border border-transparent hover:bg-muted hover:border-border')}>
-                              <div className="flex items-center justify-between gap-2">
-                                <h4 className="text-sm font-black italic text-foreground tracking-tight">{w.word}<span className="text-xs font-bold text-[#6C5CE7] ml-1.5 align-middle">{w.partOfSpeech}</span></h4>
-                                <Badge variant="secondary" className="shrink-0 text-[9px] font-black uppercase rounded-full px-2 py-0.5 bg-muted">{w.level}</Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground font-medium line-clamp-1 mt-0.5">{w.meaning}</p>
                             </button>
-                          </div>
-                        );
-                      });
-                    })()}
-                    {filteredWords.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Search className="size-8 mx-auto mb-2 opacity-30" /><p className="text-xs font-medium">没有匹配的单词</p>
+                          );
+                        })}
                       </div>
-                    )}
-                    {/* Page navigation */}
-                    {totalWordPages > 1 && (
-                      <div className="flex items-center justify-center gap-1 pt-3 border-t border-border/50 mt-3">
-                        <Button variant="ghost" size="sm" onClick={() => setWordPage((p) => Math.max(0, p - 1))} disabled={wordPage === 0}
-                          className="rounded-xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894] h-7">
-                          <ChevronLeft className="size-3.5" />
-                        </Button>
-                        <PageJumpInput current={wordPage + 1} total={totalWordPages} onJump={(pg) => setWordPage(pg - 1)} />
-                        <Button variant="ghost" size="sm" onClick={() => setWordPage((p) => Math.min(totalWordPages - 1, p + 1))} disabled={wordPage >= totalWordPages - 1}
-                          className="rounded-xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894] h-7">
-                          <ChevronRight className="size-3.5" />
-                        </Button>
+
+                      {/* Pagination: page size + auto-play + page nav */}
+                      <div className="flex items-center justify-between pt-3 mt-3 border-t border-border/50 gap-2">
+                        {/* Page size selector */}
+                        <div className="flex items-center gap-0.5">
+                          {[15, 30, 50].map((size) => (
+                            <button
+                              key={size}
+                              onClick={() => { setBrowsePageSize(size); setWordPage(0); }}
+                              className={cn(
+                                'px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors',
+                                browsePageSize === size
+                                  ? 'bg-emerald-100 dark:bg-emerald-500/20 text-[#00B894]'
+                                  : 'text-muted-foreground hover:text-foreground',
+                              )}
+                              title={`每页显示 ${size} 条`}
+                            >
+                              {size}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Auto-play + Page navigation */}
+                        <div className="flex items-center gap-1">
+                          {autoPlaying ? (
+                            <Button variant="ghost" size="icon" onClick={stopAutoPlay}
+                              className="rounded-xl size-7 bg-rose-50 dark:bg-rose-500/15 text-rose-500 hover:bg-rose-100">
+                              <Pause className="size-3.5" />
+                            </Button>
+                          ) : (
+                            <Button variant="ghost" size="sm" onClick={startAutoPlay} disabled={filteredWords.length === 0}
+                              className="rounded-xl text-[9px] font-black uppercase tracking-wider bg-[#00B894]/10 text-[#00B894] hover:bg-[#00B894]/20 gap-1 h-7">
+                              <Play className="size-3" />自动朗读
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* Page navigation */}
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost" size="sm"
+                            onClick={() => setWordPage((p) => Math.max(0, p - 1))}
+                            disabled={wordPage === 0}
+                            className="rounded-xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894] h-7 px-2"
+                          >
+                            <ChevronLeft className="size-3.5" />
+                          </Button>
+                          <PageJumpInput current={wordPage + 1} total={totalWordPages} onJump={(pg) => setWordPage(pg - 1)} />
+                          <Button
+                            variant="ghost" size="sm"
+                            onClick={() => setWordPage((p) => Math.min(totalWordPages - 1, p + 1))}
+                            disabled={wordPage >= totalWordPages - 1}
+                            className="rounded-xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894] h-7 px-2"
+                          >
+                            <ChevronRight className="size-3.5" />
+                          </Button>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                  {/* A-Z index bar */}
-                  <div className="absolute right-1 top-4 bottom-4 flex flex-col items-center justify-center gap-px z-10">
-                    {azLetters.map(({ letter, present }) => (
-                      <button
-                        key={letter}
-                        onClick={() => present && scrollToLetter(letter)}
-                        disabled={!present}
-                        className={cn(
-                          'text-[9px] font-black w-5 h-5 flex items-center justify-center rounded-sm transition-colors',
-                          present
-                            ? 'text-[#00B894] hover:bg-[#00B894]/10 cursor-pointer'
-                            : 'text-muted-foreground/30 cursor-default',
-                        )}
-                      >
-                        {letter}
-                      </button>
-                    ))}
-                  </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -811,6 +978,15 @@ export default function DeepVocabularyPage() {
                           <p className="text-lg text-foreground/80 font-medium">{selectedWord.meaning}</p>
                         </div>
                         <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="icon"
+                            onClick={() => toggleMemorizedWord(selectedWord.word)}
+                            title={memorizedWords.has(selectedWord.word.toLowerCase()) ? '取消记忆' : '标记为已记'}
+                            className={cn('rounded-2xl',
+                              memorizedWords.has(selectedWord.word.toLowerCase())
+                                ? 'text-[#00B894] hover:text-[#00B894]/70'
+                                : 'text-muted-foreground hover:text-[#00B894]')}>
+                            <Brain className={cn('size-5', memorizedWords.has(selectedWord.word.toLowerCase()) && 'fill-[#00B894]/20')} />
+                          </Button>
                           <Badge className="rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] border-none">{selectedWord.level.toUpperCase()}</Badge>
                           <Button variant="ghost" size="icon" onClick={() => toggleFavorite(selectedWord)}
                             className={cn('rounded-2xl', isFavorited(selectedWord.word, 'vocabulary') ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')}>
