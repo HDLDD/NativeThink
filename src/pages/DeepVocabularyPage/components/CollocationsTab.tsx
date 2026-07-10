@@ -559,6 +559,13 @@ export default function CollocationsTab({
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); tts.speak(entry.phrase, { rate: 0.85 }); }}
+                                className="shrink-0 text-muted-foreground/40 hover:text-[#00B894] transition-colors"
+                                title={`朗读 "${entry.phrase}"`}
+                              >
+                                <Volume2 className="size-3.5" />
+                              </button>
                               <span className="text-sm font-black text-foreground">{entry.phrase}</span>
                               <span
                                 className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md shrink-0"
