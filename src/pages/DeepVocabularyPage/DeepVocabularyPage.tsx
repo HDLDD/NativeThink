@@ -480,8 +480,8 @@ export default function DeepVocabularyPage() {
     }
   };
 
-  // Word list pagination: render 100 words at a time for mobile performance
-  const WORDS_PER_PAGE = 100;
+  // Word list pagination: render 20 words at a time for mobile-friendly scrolling
+  const WORDS_PER_PAGE = 20;
   const [wordPage, setWordPage] = useState(0);
   const totalWordPages = Math.max(1, Math.ceil(filteredWords.length / WORDS_PER_PAGE));
   const pagedWords = useMemo(
