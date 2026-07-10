@@ -64,17 +64,16 @@ function saveState(level: string, state: ILearningState) {
 
 function loadDailyQuota(level: string): number {
   try {
+    // 1. Per-level saved quota (set via DailyLearningMode UI)
     const v = safeStorage.getItem(dailyQuotaKey(level));
     if (v) return parseInt(v);
-    // Migration from legacy global key (only for 'all' level)
-    if (level === 'all') {
-      const legacy = safeStorage.getItem('__nativethink_daily_quota');
-      if (legacy) {
-        const val = parseInt(legacy);
-        safeStorage.setItem(dailyQuotaKey('all'), String(val));
-        safeStorage.removeItem('__nativethink_daily_quota');
-        return val;
-      }
+    // 2. Wizard-set daily count (global, set on setup completion)
+    const wizardVal = safeStorage.getItem('__nativethink_daily_vocab_count');
+    if (wizardVal) {
+      const n = parseInt(wizardVal);
+      // Migrate to per-level key
+      safeStorage.setItem(dailyQuotaKey(level), String(n));
+      return n;
     }
     return 20;
   } catch { return 20; }

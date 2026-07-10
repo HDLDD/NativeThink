@@ -372,6 +372,8 @@ export default function DeepVocabularyPage() {
     setTab(mode);
     setMemory((p) => ({ ...p, level, tab: mode }));
     try { safeStorage.setItem('__nativethink_daily_vocab_count', String(dailyCount)); } catch { /* ignore */ }
+    // Clear per-level quotas so the wizard value takes effect in useWordLearning
+    try { safeStorage.removeItem(`__nativethink_daily_quota_${level}`); } catch { /* ignore */ }
     if (revMode) { setReviewMode(revMode); try { safeStorage.setItem('__nativethink_review_mode', revMode); } catch { /* ignore */ } }
     markSetupDone();
     setShowWizard(false);
