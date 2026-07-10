@@ -112,7 +112,7 @@ export default function TTSSettings() {
               <SelectTrigger className="w-full rounded-xl text-xs font-bold h-10 border-border bg-muted/50">
                 <SelectValue placeholder="自动选择最佳声音" />
               </SelectTrigger>
-              <SelectContent className="rounded-xl max-h-64">
+              <SelectContent className="rounded-xl max-h-64 [&_[data-slot=select-viewport]]:h-auto [&_[data-slot=select-viewport]]:max-h-60">
                 <SelectItem value="__auto__" className="text-xs font-bold">
                   自动选择 (推荐)
                 </SelectItem>
