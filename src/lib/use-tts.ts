@@ -1,13 +1,16 @@
 /**
  * Shared TTS (Text-to-Speech) hook — single source of truth for all speech synthesis.
  *
- * Features:
- * - Auto-selects best English voice (respects user preference from settings)
- * - Applies cleanText() automatically
- * - Pause / resume / cancel control
- * - Chrome 15-second speech cutoff workaround
- * - Ref-based callbacks to avoid stale closures
- * - Rate/pitch/volume from persistent settings, overridable per speak() call
+ * Mobile-first design:
+ * - Primes speech synthesis with an *audible* short utterance on first user gesture.
+ *   (Silent utterances don't count for permission unlock on some mobile browsers.)
+ * - Falls back to browser-default voice when no English voice has loaded yet.
+ * - iOS Safari workaround: `onend` often never fires, so we run a safety timeout
+ *   that auto-clears state after estimated speech duration.
+ * - Pause / resume / cancel control.
+ * - Chrome 15-second speech cutoff workaround via keep-alive pausing.
+ * - Ref-based callbacks to avoid stale closures.
+ * - Rate/pitch/volume from persistent settings, overridable per speak() call.
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -45,6 +48,20 @@ export interface TTSHandle {
   voices: SpeechSynthesisVoice[];
 }
 
+/** Rough estimate: average English speech is ~150 words per minute at rate 1.0 */
+function estimateDurationMs(text: string, rate: number): number {
+  const words = text.split(/\s+/).length;
+  const wpm = 150 * rate;
+  return Math.max(1500, (words / wpm) * 60_000 + 800);
+}
+
+/** Detect iOS (including iPadOS 13+) */
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 export function useTTS(options?: UseTTSOptions): TTSHandle {
   const { settings, loaded } = useTTSSettings();
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -56,6 +73,9 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   const optionsRef = useRef<UseTTSOptions | undefined>(options);
   const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentTextRef = useRef<string>('');
+  const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const primedRef = useRef(false);
+  const speakingUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Keep options ref in sync
   useEffect(() => {
@@ -96,15 +116,17 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     };
   }, [ttsSupported]);
 
-  // On mobile, prime speech synthesis with a silent utterance on first user gesture.
-  // Mobile browsers block speak() calls that aren't in direct response to user input.
-  const primedRef = useRef(false);
+  // Prime speech synthesis on first user gesture.
+  // KEY: use a short *audible* word — silent utterances (volume=0) don't count as
+  // "speech" for permission purposes on some mobile browsers (especially iOS 16+).
   const primeForMobile = useCallback(() => {
     if (primedRef.current || !ttsSupported) return;
     try {
-      const u = new SpeechSynthesisUtterance('');
-      u.volume = 0;
-      u.rate = 1;
+      // Cancel any pending speech first (iOS requires clean state)
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance('a');
+      u.volume = 0.01; // nearly silent but technically audible — unlocks permission
+      u.rate = 2;      // speak it as fast as possible
       window.speechSynthesis.speak(u);
       primedRef.current = true;
     } catch { /* ignore */ }
@@ -144,23 +166,38 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     }
   }, []);
 
+  const clearSafetyTimer = useCallback(() => {
+    if (safetyTimerRef.current) {
+      clearTimeout(safetyTimerRef.current);
+      safetyTimerRef.current = null;
+    }
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopKeepAlive();
+      clearSafetyTimer();
       window.speechSynthesis?.cancel();
     };
-  }, [stopKeepAlive]);
+  }, [stopKeepAlive, clearSafetyTimer]);
 
-  const cancel = useCallback(() => {
-    stopKeepAlive();
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+  const resetState = useCallback(() => {
     setIsSpeaking(false);
     setIsPaused(false);
     setCurrentWordIndex(-1);
-  }, [stopKeepAlive]);
+    stopKeepAlive();
+    clearSafetyTimer();
+    currentTextRef.current = '';
+    speakingUtteranceRef.current = null;
+  }, [stopKeepAlive, clearSafetyTimer]);
+
+  const cancel = useCallback(() => {
+    resetState();
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, [resetState]);
 
   const pause = useCallback(() => {
     if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
@@ -182,29 +219,42 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
       // Ensure voices are loaded (mobile may have loaded them lazily)
       const allVoices = window.speechSynthesis.getVoices();
-      if (allVoices.length > 0) {
-        const enVoices = allVoices.filter((v) => v.lang.startsWith('en-'));
-        if (enVoices.length > 0) setVoices(enVoices);
-      }
+      const enVoices = allVoices.filter((v) => v.lang.startsWith('en-'));
+      if (enVoices.length > 0) setVoices(enVoices);
 
       // Cancel any ongoing speech
       window.speechSynthesis.cancel();
-      stopKeepAlive();
+      resetState();
 
       const cleaned = cleanText(text);
       if (!cleaned) return;
 
       currentTextRef.current = cleaned;
 
+      const rate = opts?.rate ?? settings.rate;
       const utterance = new SpeechSynthesisUtterance(cleaned);
       utterance.lang = opts?.lang ?? 'en-US';
-      utterance.rate = opts?.rate ?? settings.rate;
+      utterance.rate = rate;
       utterance.pitch = opts?.pitch ?? settings.pitch;
       utterance.volume = opts?.volume ?? settings.volume;
 
-      // Voice selection — fall back to any available voice on mobile
+      // Voice selection — if no English voice found, leave unset so the browser
+      // picks its default. On mobile, the default OS voice is better than silence.
       const voice = getBestVoice(settings.selectedVoiceURI);
       if (voice) utterance.voice = voice;
+
+      speakingUtteranceRef.current = utterance;
+
+      // ── iOS safety timer ──
+      // iOS Safari notoriously fails to fire `onend`. Set a timer that
+      // auto-clears speaking state after estimated duration + generous buffer.
+      const estimatedMs = estimateDurationMs(cleaned, rate);
+      safetyTimerRef.current = setTimeout(() => {
+        if (speakingUtteranceRef.current === utterance) {
+          // Speech *should* be done by now — clean up if iOS didn't fire onend
+          resetState();
+        }
+      }, estimatedMs + 3000);
 
       // Event handlers
       utterance.onstart = () => {
@@ -216,59 +266,58 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       };
 
       utterance.onend = () => {
+        clearSafetyTimer();
         setIsSpeaking(false);
         setIsPaused(false);
         setCurrentWordIndex(-1);
         stopKeepAlive();
         currentTextRef.current = '';
+        speakingUtteranceRef.current = null;
         optionsRef.current?.onEnd?.();
       };
 
       utterance.onerror = (event) => {
+        clearSafetyTimer();
         // 'canceled' / 'interrupted' → expected after our own cancel() calls
         if (event.error === 'canceled' || event.error === 'interrupted') {
-          setIsSpeaking(false);
-          setIsPaused(false);
-          setCurrentWordIndex(-1);
-          stopKeepAlive();
+          resetState();
           return;
         }
         // 'not-allowed' on mobile → user hasn't interacted yet; prime and retry once
         if (event.error === 'not-allowed') {
           primeForMobile();
+          resetState();
           // Retry after a short delay to let the priming take effect
           setTimeout(() => {
             try {
               window.speechSynthesis.cancel();
               const retry = new SpeechSynthesisUtterance(cleaned);
               retry.lang = opts?.lang ?? 'en-US';
-              retry.rate = opts?.rate ?? settings.rate;
+              retry.rate = rate;
               retry.pitch = opts?.pitch ?? settings.pitch;
               retry.volume = opts?.volume ?? settings.volume;
               const v = getBestVoice(settings.selectedVoiceURI);
               if (v) retry.voice = v;
               retry.onstart = utterance.onstart;
               retry.onend = utterance.onend;
-              retry.onerror = () => {
-                setIsSpeaking(false);
-                setIsPaused(false);
-                setCurrentWordIndex(-1);
-                stopKeepAlive();
-              };
+              retry.onerror = () => resetState();
+              retry.onboundary = utterance.onboundary;
+              retry.onpause = utterance.onpause;
+              retry.onresume = utterance.onresume;
+              speakingUtteranceRef.current = retry;
+              // Re-arm safety timer for retry
+              safetyTimerRef.current = setTimeout(() => {
+                if (speakingUtteranceRef.current === retry) resetState();
+              }, estimatedMs + 3000);
               window.speechSynthesis.speak(retry);
             } catch {
-              setIsSpeaking(false);
-              setIsPaused(false);
-              setCurrentWordIndex(-1);
-              stopKeepAlive();
+              resetState();
             }
-          }, 100);
+          }, 150);
           return;
         }
-        setIsSpeaking(false);
-        setIsPaused(false);
-        setCurrentWordIndex(-1);
-        stopKeepAlive();
+        // Other errors: just reset
+        resetState();
         optionsRef.current?.onError?.(event);
       };
 
@@ -295,12 +344,12 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         window.speechSynthesis.speak(utterance);
       } catch {
         // Fallback: some mobile browsers throw synchronously on speak()
-        setIsSpeaking(false);
+        resetState();
         optionsRef.current?.onError?.(new Event('speak-failed') as any);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ttsSupported, settings.rate, settings.pitch, settings.volume, settings.selectedVoiceURI, startKeepAlive, stopKeepAlive, primeForMobile],
+    [ttsSupported, settings.rate, settings.pitch, settings.volume, settings.selectedVoiceURI, startKeepAlive, stopKeepAlive, primeForMobile, resetState, clearSafetyTimer],
   );
 
   return { speak, pause, resume, cancel, isSpeaking, isPaused, currentWordIndex, voices };

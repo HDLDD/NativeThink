@@ -234,9 +234,6 @@ export default function DeepVocabularyPage() {
 
   // Browse tab: level filter, memory, page size
   const SUB_LEVELS = ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] as const;
-  const [browseLevels, setBrowseLevels] = useState<Set<string>>(
-    () => new Set(selectedLevel === 'all' ? [...SUB_LEVELS] : [selectedLevel]),
-  );
   const [browseMemoryFilter, setBrowseMemoryFilter] = useState<'all' | 'memorized' | 'unmemorized'>('all');
   const [browsePageSize, setBrowsePageSize] = useState(20);
   const [memorizedWords, setMemorizedWords] = useState<Set<string>>(() => {
@@ -321,7 +318,6 @@ export default function DeepVocabularyPage() {
       register: registerFilter !== 'all' ? registerFilter : undefined,
     });
     // Client-side filters
-    if (selectedLevel === 'all') words = words.filter((w) => browseLevels.has(w.level));
     if (collocOnly) words = words.filter((w) => w.collocations.length > 0);
     if (emotionFilter !== 'all') words = words.filter((w) => w.emotion === emotionFilter);
     if (noChineseEquivOnly) words = words.filter((w) => w.hasNoChineseEquivalent);
@@ -337,7 +333,7 @@ export default function DeepVocabularyPage() {
       return arr;
     }
     return words;
-  }, [selectedLevel, searchQuery, sortMode, collocOnly, posFilter, registerFilter, emotionFilter, noChineseEquivOnly, browseLevels, browseMemoryFilter, memorizedWords, dataReady]);
+  }, [selectedLevel, searchQuery, sortMode, collocOnly, posFilter, registerFilter, emotionFilter, noChineseEquivOnly, browseMemoryFilter, memorizedWords, dataReady]);
 
   // tts must be declared BEFORE it's used in the auto-play effect
   const tts = useTTS();
@@ -566,19 +562,6 @@ export default function DeepVocabularyPage() {
   };
   const scrollSelector = (dir: 'left' | 'right') => { if (scrollRef.current) scrollRef.current.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' }); };
 
-  // Browse level toggle
-  const handleToggleBrowseLevel = (key: string) => {
-    setBrowseLevels((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        if (next.size > 1) next.delete(key);
-      } else next.add(key);
-      return next;
-    });
-  };
-  const handleSelectAllBrowseLevels = () => {
-    setBrowseLevels(new Set([...SUB_LEVELS]));
-  };
   const handleSelectWord = (w: IWordEntry) => {
     setSelectedWord(w);
     setMemory((p) => ({ ...p, word: w.word }));
@@ -779,41 +762,6 @@ export default function DeepVocabularyPage() {
                         {filteredWords.length} 个单词 · {memorizedWords.size} 已记
                       </CardDescription>
                     </div>
-                  </div>
-
-                  {/* Level filter pills */}
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {SUB_LEVELS.map((key) => {
-                      const active = browseLevels.has(key);
-                      const count = WORD_COUNTS[key] || 0;
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => handleToggleBrowseLevel(key)}
-                          title={`${LEVEL_LABELS[key]}词库 · ${count} 个单词${active ? ' · 已选中' : ' · 点击选中'}`}
-                          className={cn(
-                            'px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1',
-                            active ? 'text-white shadow-sm' : 'bg-muted text-muted-foreground hover:bg-muted/80',
-                          )}
-                          style={active ? { backgroundColor: LEVEL_COLORS[key] } : undefined}
-                        >
-                          {active && <span className="text-[8px]">✓</span>}
-                          {LEVEL_LABELS[key]}
-                          <span className="text-[8px] opacity-70 font-bold">{count}</span>
-                        </button>
-                      );
-                    })}
-                    <button
-                      onClick={handleSelectAllBrowseLevels}
-                      className={cn(
-                        'px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-200',
-                        browseLevels.size >= SUB_LEVELS.length
-                          ? 'bg-[#00B894] text-white shadow-sm'
-                          : 'bg-muted text-muted-foreground hover:bg-emerald-50 hover:text-[#00B894]',
-                      )}
-                    >
-                      全选
-                    </button>
                   </div>
 
                   {/* Memory filter + search */}
