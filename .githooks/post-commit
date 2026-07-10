@@ -35,5 +35,8 @@ if [ -n "$DATE_LINE" ]; then
   fi
 fi
 
-# Stage the changelog for next commit
-git add "$CHANGELOG" 2>/dev/null || true
+# Copy to public/ for in-app display
+cp "$CHANGELOG" public/CHANGELOG.md 2>/dev/null || true
+
+# Stage both for next commit
+git add "$CHANGELOG" public/CHANGELOG.md 2>/dev/null || true

@@ -17,6 +17,7 @@ import AISettings from '@/components/AISettings';
 import TTSSettings from '@/components/TTSSettings';
 import HelpGuide from '@/components/HelpGuide';
 import FeedbackDialog from '@/components/FeedbackDialog';
+import ChangelogDialog from '@/components/ChangelogDialog';
 
 const GOAL_OPTIONS = [10, 20, 30, 45, 60];
 
@@ -132,6 +133,7 @@ export default function Header() {
               </DialogContent>
             </Dialog>
 
+            <ChangelogDialog />
             <FeedbackDialog />
             <HelpGuide />
             <AISettings />

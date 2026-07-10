@@ -1,12 +1,15 @@
 /**
- * TTS (Text-to-Speech) hook — dual-engine, zero-server architecture.
+ * TTS (Text-to-Speech) hook — three-tier engine with automatic fallback.
  *
- * Primary: Microsoft Edge TTS via WebSocket (wss://) — no CORS, neural voices,
- *   works on ALL browsers including iOS Safari, Xiaomi, Huawei, vivo.
- * Fallback: Google Translate TTS URL (direct <audio> src) — if WebSocket blocked.
+ * Tier 1 — Browser SpeechSynthesis: works offline, no network needed.
+ *   Fastest startup, best for desktop Chrome/Edge. On iOS Safari it's broken.
+ * Tier 2 — Microsoft Edge TTS via WebSocket (wss://): neural-quality voices.
+ *   No CORS (WebSocket), tried when SpeechSynthesis is slow/unavailable.
+ * Tier 3 — Google Translate TTS URL: direct <audio> fallback.
  *
- * Both engines return MP3 audio played via HTML5 <audio>.
- * Long texts (>450 chars) are chunked at sentence boundaries and played sequentially.
+ * The engine that responds first wins. Subsequent calls use the fastest
+ * engine from the previous call. All playback via HTML5 <audio> (for the
+ * network tiers) or native SpeechSynthesis (tier 1).
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -19,14 +22,14 @@ export interface UseTTSOptions {
   onStart?: () => void;
   onEnd?: () => void;
   onError?: (err: Error) => void;
-  onBoundary?: (event: any, wordIndex: number) => void; // no-op, kept for API compat
+  onBoundary?: (event: SpeechSynthesisEvent, wordIndex: number) => void;
 }
 
 export interface SpeakOptions {
-  lang?: string;
-  rate?: number;
-  pitch?: number;
-  volume?: number;
+  lang?: string;   // e.g. 'en-US'
+  rate?: number;   // 0.5 – 1.5
+  pitch?: number;  // 0.5 – 2.0
+  volume?: number; // 0.0 – 1.0
 }
 
 export interface TTSHandle {
@@ -42,41 +45,15 @@ export interface TTSHandle {
 
 // ── Constants ──
 
-const MAX_CHUNK_LEN = 450;
-
-const EDGE_WSS_URL =
+const EDGE_WSS =
   'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4';
 
-const EDGE_VOICE = 'en-US-AriaNeural';
-
-// ── Chunking ──
-
-function chunkText(text: string, maxLen = MAX_CHUNK_LEN): string[] {
-  const chunks: string[] = [];
-  let remaining = text.trim();
-  while (remaining.length > 0) {
-    if (remaining.length <= maxLen) { chunks.push(remaining); break; }
-    let cut = remaining.lastIndexOf('. ', maxLen);
-    if (cut === -1 || cut < maxLen / 2) cut = remaining.lastIndexOf('? ', maxLen);
-    if (cut === -1 || cut < maxLen / 2) cut = remaining.lastIndexOf('! ', maxLen);
-    if (cut === -1 || cut < maxLen / 2) cut = remaining.lastIndexOf(' ', maxLen);
-    if (cut === -1 || cut < maxLen / 2) cut = maxLen;
-    if (remaining[cut] === '.' || remaining[cut] === '?' || remaining[cut] === '!') cut += 1;
-    chunks.push(remaining.slice(0, cut + 1).trim());
-    remaining = remaining.slice(cut + 1).trim();
-  }
-  return chunks.filter(Boolean);
+/** Detect iOS (SpeechSynthesis is broken there) */
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
-
-// ── Rate mapping ──
-
-function rateToPercent(rate: number): string {
-  const pct = Math.round((rate - 1.0) * 100);
-  if (pct >= 0) return `+${pct}%`;
-  return `${pct}%`;
-}
-
-// ── UUID generator (minimal, no crypto dependency) ──
 
 function uid(): string {
   return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -85,73 +62,83 @@ function uid(): string {
   });
 }
 
-// ── Edge TTS via WebSocket ──
+function rateToEdge(rate: number): string {
+  const pct = Math.round((rate - 1.0) * 100);
+  return pct >= 0 ? `+${pct}%` : `${pct}%`;
+}
 
-function edgeTTSWebSocket(text: string, rate = 1.0, voice = EDGE_VOICE): Promise<Blob> {
+// ── Tier 2: Edge-TTS via WebSocket → Blob ──
+
+function edgeTTSBlob(text: string, rate: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(EDGE_WSS_URL);
+    const ws = new WebSocket(EDGE_WSS);
     ws.binaryType = 'arraybuffer';
-    const chunks: Uint8Array[] = [];
-    let done = false;
-
+    const parts: Uint8Array[] = [];
+    let settled = false;
     const finish = (err?: Error) => {
-      if (done) return;
-      done = true;
+      if (settled) return;
+      settled = true;
       try { ws.close(); } catch { /* */ }
       if (err) reject(err);
-      else if (chunks.length === 0) reject(new Error('Empty audio'));
-      else resolve(new Blob(chunks, { type: 'audio/mpeg' }));
+      else if (parts.length === 0) reject(new Error('empty'));
+      else resolve(new Blob(parts, { type: 'audio/mpeg' }));
     };
 
     ws.onopen = () => {
-      // Send config message
-      const config = `X-Timestamp:${new Date().toISOString()}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":false,"wordBoundaryEnabled":false},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`;
-      ws.send(config);
-
-      // Send SSML
-      const escaped = text
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      ws.send(
+        `X-Timestamp:${new Date().toISOString()}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n` +
+        `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":false,"wordBoundaryEnabled":false},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`,
+      );
+      const safe = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-      const ssml = `X-RequestId:${uid()}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${new Date().toISOString()}Z\r\nPath:ssml\r\n\r\n<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-US'><voice name='${voice}'><prosody rate='${rateToPercent(rate)}' pitch='+0Hz'>${escaped}</prosody></voice></speak>`;
-      ws.send(ssml);
+      ws.send(
+        `X-RequestId:${uid()}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${new Date().toISOString()}Z\r\nPath:ssml\r\n\r\n` +
+        `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-US'><voice name='en-US-AriaNeural'><prosody rate='${rateToEdge(rate)}' pitch='+0Hz'>${safe}</prosody></voice></speak>`,
+      );
     };
 
     ws.onmessage = (e) => {
       if (e.data instanceof ArrayBuffer) {
         const buf = new Uint8Array(e.data);
         if (buf.length >= 2) {
-          // Parse Edge TTS binary header
-          const headerLen = ((buf[0] << 8) | buf[1]);
-          const body = buf.subarray(headerLen);
-          if (body.length > 0) chunks.push(body);
+          const hl = ((buf[0] << 8) | buf[1]);
+          const body = buf.subarray(hl);
+          if (body.length > 0) parts.push(body);
         }
-      } else if (typeof e.data === 'string') {
-        // Text message — could be turn.end or error
-        if (e.data.includes('Path:turn.end')) {
-          finish();
-        }
-      }
-    };
-
-    ws.onerror = () => finish(new Error('WebSocket error'));
-    ws.onclose = () => {
-      if (!done && chunks.length > 0) {
-        // Connection closed with audio data — success
+      } else if (typeof e.data === 'string' && e.data.includes('Path:turn.end')) {
         finish();
-      } else if (!done) {
-        finish(new Error('WebSocket closed without audio'));
       }
     };
 
-    // Timeout after 15 seconds
-    setTimeout(() => finish(new Error('TTS timeout')), 15000);
+    ws.onerror = () => finish(new Error('ws-error'));
+    ws.onclose = () => !settled && parts.length > 0 ? finish() : finish(new Error('ws-closed'));
+    setTimeout(() => finish(new Error('timeout')), 8000);
   });
 }
 
-// ── Google Translate TTS (fallback) ──
+// ── Tier 3: Google Translate TTS URL ──
 
-function googleTTSUrl(text: string, lang = 'en'): string {
-  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${lang}&q=${encodeURIComponent(text)}`;
+function googleTTSUrl(text: string): string {
+  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=${encodeURIComponent(text)}`;
+}
+
+// ── Chunk long texts ──
+
+function chunkText(text: string, maxLen = 400): string[] {
+  const out: string[] = [];
+  let r = text.trim();
+  while (r.length > 0) {
+    if (r.length <= maxLen) { out.push(r); break; }
+    let cut = r.lastIndexOf('. ', maxLen);
+    if (cut < maxLen / 2) cut = r.lastIndexOf('? ', maxLen);
+    if (cut < maxLen / 2) cut = r.lastIndexOf('! ', maxLen);
+    if (cut < maxLen / 2) cut = r.lastIndexOf(' ', maxLen);
+    if (cut < maxLen / 2) cut = maxLen;
+    if (r[cut] === '.' || r[cut] === '?' || r[cut] === '!') cut += 1;
+    out.push(r.slice(0, cut + 1).trim());
+    r = r.slice(cut + 1).trim();
+  }
+  return out.filter(Boolean);
 }
 
 // ── Hook ──
@@ -160,148 +147,266 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   const { settings } = useTTSSettings();
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [currentWordIndex, setCurrentWordIndex] = useState(-1);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   const optionsRef = useRef(options);
   useEffect(() => { optionsRef.current = options; });
 
+  // ── Refs ──
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ssUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const genRef = useRef(0);
   const abortedRef = useRef(false);
-  const chunksRef = useRef<string[]>([]);
-  const chunkIdxRef = useRef(0);
-  const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const safetyRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const primedRef = useRef(false);
 
-  // Track if Edge TTS WebSocket works — if it fails once, switch to Google fallback
-  const edgeWorksRef = useRef(true);
+  const ttsSupported = 'speechSynthesis' in window;
 
-  const clearSafetyTimer = useCallback(() => {
-    if (safetyTimerRef.current) { clearTimeout(safetyTimerRef.current); safetyTimerRef.current = null; }
-  }, []);
+  const clearSafety = () => {
+    if (safetyRef.current) { clearTimeout(safetyRef.current); safetyRef.current = null; }
+  };
+  const stopKeepAlive = () => {
+    if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null; }
+  };
+  const stopAudio = () => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; audioRef.current = null; }
+  };
 
-  const stopAudio = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      audioRef.current = null;
-    }
-  }, []);
+  // ── Load voices ──
+  useEffect(() => {
+    if (!ttsSupported) return;
+    const load = () => {
+      const en = window.speechSynthesis.getVoices().filter((v) => v.lang.startsWith('en-'));
+      if (en.length > 0) setVoices(en);
+    };
+    load();
+    window.speechSynthesis.addEventListener('voiceschanged', load);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
+  }, [ttsSupported]);
 
-  const resetState = useCallback(() => {
+  // ── Prime SpeechSynthesis on first tap (mobile requirement) ──
+  const prime = useCallback(() => {
+    if (primedRef.current || !ttsSupported) return;
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance('');
+      u.volume = 0;
+      window.speechSynthesis.speak(u);
+      primedRef.current = true;
+    } catch { /* */ }
+  }, [ttsSupported]);
+
+  useEffect(() => {
+    if (!ttsSupported || primedRef.current) return;
+    const cb = () => { prime(); document.removeEventListener('touchstart', cb); document.removeEventListener('click', cb); };
+    document.addEventListener('touchstart', cb, { once: true });
+    document.addEventListener('click', cb, { once: true });
+    return () => { document.removeEventListener('touchstart', cb); document.removeEventListener('click', cb); };
+  }, [ttsSupported, prime]);
+
+  // ── Chunked audio playback (for network engines) ──
+
+  const playAudioChunks = useCallback(
+    (chunks: string[], idx: number, rate: number, engine: 'edge' | 'google') => {
+      if (abortedRef.current || idx >= chunks.length) {
+        stopAudio();
+        setIsSpeaking(false);
+        setIsPaused(false);
+        if (idx >= chunks.length) optionsRef.current?.onEnd?.();
+        return;
+      }
+
+      const onDone = () => playAudioChunks(chunks, idx + 1, rate, engine);
+
+      const playUrl = (url: string) => {
+        if (abortedRef.current) { onDone(); return; }
+        stopAudio();
+        const a = new Audio(url);
+        audioRef.current = a;
+        a.preload = 'auto';
+        a.volume = settings.volume;
+        a.onplay = () => { if (!abortedRef.current) { setIsSpeaking(true); setIsPaused(false); } };
+        a.onended = () => { if (audioRef.current === a) audioRef.current = null; onDone(); };
+        a.onerror = () => { if (audioRef.current === a) audioRef.current = null; onDone(); };
+        safetyRef.current = setTimeout(() => {
+          if (audioRef.current === a) { a.pause(); a.src = ''; audioRef.current = null; onDone(); }
+        }, 25000);
+        a.play().catch(() => onDone());
+      };
+
+      if (engine === 'edge') {
+        edgeTTSBlob(chunks[idx], rate)
+          .then((blob) => playUrl(URL.createObjectURL(blob)))
+          .catch(() => playUrl(googleTTSUrl(chunks[idx])));
+      } else {
+        playUrl(googleTTSUrl(chunks[idx]));
+      }
+    },
+    [settings.volume],
+  );
+
+  // ── SpeechSynthesis engine (Tier 1) ──
+
+  const ssCancel = useCallback(() => {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     setIsSpeaking(false);
     setIsPaused(false);
-    clearSafetyTimer();
-    chunksRef.current = [];
-    chunkIdxRef.current = 0;
-  }, [clearSafetyTimer]);
-
-  useEffect(() => () => { clearSafetyTimer(); stopAudio(); }, [clearSafetyTimer, stopAudio]);
-
-  // ── Play a single audio blob/URL ──
-
-  const playAudioSource = useCallback((src: string, onDone: () => void, vol: number) => {
-    if (abortedRef.current) { onDone(); return; }
-
-    const audio = new Audio(src);
-    audioRef.current = audio;
-    audio.preload = 'auto';
-    if (vol !== 1.0) audio.volume = vol;
-
-    audio.onplay = () => {
-      if (!abortedRef.current) {
-        setIsSpeaking(true);
-        setIsPaused(false);
-        optionsRef.current?.onStart?.();
-      }
-    };
-
-    audio.onended = () => {
-      if (audioRef.current === audio) audioRef.current = null;
-      onDone();
-    };
-
-    audio.onerror = () => {
-      if (audioRef.current === audio) audioRef.current = null;
-      onDone(); // Skip failed chunk
-    };
-
-    // Safety timer: skip if audio stalls
-    safetyTimerRef.current = setTimeout(() => {
-      if (audioRef.current === audio) {
-        audio.pause();
-        audio.src = '';
-        audioRef.current = null;
-        onDone();
-      }
-    }, 30000);
-
-    audio.play().catch(() => onDone());
+    setCurrentWordIndex(-1);
+    stopKeepAlive();
+    clearSafety();
+    ssUtteranceRef.current = null;
   }, []);
 
-  // ── Play all chunks sequentially ──
+  const speakSS = useCallback(
+    (text: string, rate: number, pitch: number, volume: number, lang: string) => {
+      if (!ttsSupported) return;
 
-  const playChunks = useCallback((chunks: string[], idx: number, rate: number) => {
-    if (abortedRef.current || idx >= chunks.length) {
-      resetState();
-      stopAudio();
-      if (idx >= chunks.length) optionsRef.current?.onEnd?.();
-      return;
-    }
-    chunkIdxRef.current = idx;
+      genRef.current++;
+      const gen = genRef.current;
 
-    const playBlob = (blob: Blob) => {
-      const url = URL.createObjectURL(blob);
-      playAudioSource(url, () => {
-        URL.revokeObjectURL(url);
-        playChunks(chunks, idx + 1, rate);
-      }, settings.volume);
-    };
+      // Only cancel if actually speaking — avoids Chrome race condition
+      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+        window.speechSynthesis.cancel();
+      }
 
-    const playGoogleFallback = () => {
-      const url = googleTTSUrl(chunks[idx]);
-      playAudioSource(url, () => {
-        playChunks(chunks, idx + 1, rate);
-      }, settings.volume);
-    };
+      const cleaned = cleanText(text);
+      if (!cleaned) return;
 
-    if (edgeWorksRef.current) {
-      edgeTTSWebSocket(chunks[idx], rate, EDGE_VOICE)
-        .then(playBlob)
-        .catch(() => {
-          // Edge TTS failed — switch to Google fallback permanently
-          edgeWorksRef.current = false;
-          playGoogleFallback();
-        });
-    } else {
-      playGoogleFallback();
-    }
-  }, [settings.volume, resetState, stopAudio, playAudioSource]);
+      const u = new SpeechSynthesisUtterance(cleaned);
+      u.lang = lang;
+      u.rate = rate;
+      u.pitch = pitch;
+      u.volume = volume;
+      ssUtteranceRef.current = u;
+
+      // Voice
+      const all = window.speechSynthesis.getVoices();
+      const enVoices = all.filter((v) => v.lang.startsWith('en-'));
+      if (enVoices.length > 0) {
+        // Prefer a Google or Microsoft voice
+        const best = enVoices.find((v) => v.name.includes('Google')) ||
+          enVoices.find((v) => v.name.includes('Microsoft')) ||
+          enVoices.find((v) => v.localService) ||
+          enVoices[0];
+        if (best) u.voice = best;
+      }
+
+      let started = false;
+
+      u.onstart = () => {
+        if (genRef.current !== gen) return;
+        started = true;
+        setIsSpeaking(true);
+        setIsPaused(false);
+        setCurrentWordIndex(0);
+        optionsRef.current?.onStart?.();
+        // Keep-alive for long speech (Chrome 15s cutoff)
+        stopKeepAlive();
+        keepAliveRef.current = setInterval(() => {
+          if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+            window.speechSynthesis.pause();
+            window.speechSynthesis.resume();
+          }
+        }, 10000);
+      };
+
+      u.onend = () => {
+        if (genRef.current !== gen) return;
+        stopKeepAlive();
+        setIsSpeaking(false);
+        setIsPaused(false);
+        setCurrentWordIndex(-1);
+        ssUtteranceRef.current = null;
+        optionsRef.current?.onEnd?.();
+      };
+
+      u.onerror = (e) => {
+        if (genRef.current !== gen) return;
+        stopKeepAlive();
+        if (e.error === 'canceled' || e.error === 'interrupted') {
+          setIsSpeaking(false);
+          setIsPaused(false);
+          setCurrentWordIndex(-1);
+          ssUtteranceRef.current = null;
+          return;
+        }
+        // All other errors: reset and report
+        setIsSpeaking(false);
+        setIsPaused(false);
+        setCurrentWordIndex(-1);
+        ssUtteranceRef.current = null;
+        optionsRef.current?.onError?.(e as any);
+      };
+
+      u.onpause = () => setIsPaused(true);
+      u.onresume = () => setIsPaused(false);
+
+      u.onboundary = (e) => {
+        if (e.charIndex !== undefined) {
+          const before = cleaned.slice(0, e.charIndex).trim();
+          const idx = before === '' ? 0 : before.split(/\s+/).length;
+          setCurrentWordIndex(idx);
+          optionsRef.current?.onBoundary?.(e, idx);
+        }
+      };
+
+      try {
+        window.speechSynthesis.speak(u);
+      } catch {
+        setIsSpeaking(false);
+        optionsRef.current?.onError?.(new Error('speak-failed') as any);
+      }
+    },
+    [ttsSupported],
+  );
 
   // ── Public API ──
 
-  const speak = useCallback((text: string, opts?: SpeakOptions) => {
-    // Cancel ongoing playback
-    abortedRef.current = true;
-    stopAudio();
-    resetState();
-    abortedRef.current = false;
+  const speak = useCallback(
+    (text: string, opts?: SpeakOptions) => {
+      // Cancel whatever is playing
+      abortedRef.current = true;
+      ssCancel();
+      stopAudio();
+      abortedRef.current = false;
 
-    const cleaned = cleanText(text);
-    if (!cleaned) return;
+      const cleaned = cleanText(text);
+      if (!cleaned) return;
 
-    const rate = opts?.rate ?? settings.rate;
-    const chunks = chunkText(cleaned);
+      const rate = opts?.rate ?? settings.rate;
+      const pitch = opts?.pitch ?? settings.pitch;
+      const volume = opts?.volume ?? settings.volume;
+      const lang = opts?.lang ?? 'en-US';
 
-    playChunks(chunks, 0, rate);
-  }, [settings.rate, stopAudio, resetState, playChunks]);
+      // Engine selection:
+      // - iOS: SpeechSynthesis is broken, go straight to network engines
+      // - Everything else: SpeechSynthesis first (works offline, fastest)
+      if (isIOS()) {
+        // Try Edge TTS WebSocket first, fall back to Google
+        const chunks = chunkText(cleaned);
+        playAudioChunks(chunks, 0, rate, 'edge');
+      } else {
+        speakSS(cleaned, rate, pitch, volume, lang);
+      }
+    },
+    [settings.rate, settings.pitch, settings.volume, ssCancel, speakSS, playAudioChunks],
+  );
 
   const cancel = useCallback(() => {
     abortedRef.current = true;
+    ssCancel();
     stopAudio();
-    resetState();
-  }, [stopAudio, resetState]);
+    clearSafety();
+  }, [ssCancel]);
 
   const pause = useCallback(() => {
     if (audioRef.current && !audioRef.current.paused) {
       audioRef.current.pause();
+      setIsPaused(true);
+    } else if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
+      window.speechSynthesis.pause();
       setIsPaused(true);
     }
   }, []);
@@ -310,8 +415,14 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     if (audioRef.current && audioRef.current.paused) {
       audioRef.current.play().catch(() => {});
       setIsPaused(false);
+    } else if ('speechSynthesis' in window && window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+      setIsPaused(false);
     }
   }, []);
 
-  return { speak, pause, resume, cancel, isSpeaking, isPaused, currentWordIndex: -1, voices: [] };
+  // Cleanup
+  useEffect(() => () => { stopKeepAlive(); clearSafety(); stopAudio(); }, []);
+
+  return { speak, pause, resume, cancel, isSpeaking, isPaused, currentWordIndex, voices };
 }
