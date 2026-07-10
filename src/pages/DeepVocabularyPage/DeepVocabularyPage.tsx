@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
 import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, Play, Pause, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -69,6 +69,12 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
   const [chosenMode, setChosenMode] = useState('daily');
   const [dailyCount, setDailyCount] = useState(10);
   const [reviewMode, setReviewMode] = useState('sm2');
+
+  // Background preload all word data while user decides — eliminates post-wizard wait
+  useEffect(() => {
+    const allLevels = ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'];
+    preloadLevels(allLevels);
+  }, []);
 
   const handleBookSelect = (level: string) => {
     setChosenLevel(level);
@@ -258,6 +264,7 @@ export default function DeepVocabularyPage() {
     collocOnly: false,
   });
   const [searchQuery, setSearchQuery] = usePageMemoryDebounced('vocab-search', '');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [selectedLevel, setSelectedLevel] = useState(memory.level);
   const [selectedWord, setSelectedWord] = useState<IWordEntry | null>(null);
   const [tab, setTab] = useState(memory.tab);
@@ -414,7 +421,7 @@ export default function DeepVocabularyPage() {
   const filteredWords = useMemo(() => {
     let words = queryWords({
       level: selectedLevel === 'all' ? undefined : selectedLevel,
-      search: searchQuery || undefined,
+      search: deferredSearchQuery || undefined,
       sortBy: sortMode === 'az' ? 'alphabetical' : sortMode === 'frequency' ? 'frequency' : undefined,
       pos: posFilter !== 'all' ? posFilter : undefined,
       register: registerFilter !== 'all' ? registerFilter : undefined,
@@ -435,7 +442,7 @@ export default function DeepVocabularyPage() {
       return arr;
     }
     return words;
-  }, [selectedLevel, searchQuery, sortMode, collocOnly, posFilter, registerFilter, emotionFilter, noChineseEquivOnly, browseMemoryFilter, memorizedWords, dataReady, dataVersion]);
+  }, [selectedLevel, deferredSearchQuery, sortMode, collocOnly, posFilter, registerFilter, emotionFilter, noChineseEquivOnly, browseMemoryFilter, memorizedWords, dataReady, dataVersion]);
 
   // tts must be declared BEFORE it's used in the auto-play effect
   const tts = useTTS();
@@ -733,7 +740,13 @@ export default function DeepVocabularyPage() {
         />
       )}
 
-      <Tabs value={tab} onValueChange={handleTabChange} className={cn('w-full', showWizard && 'hidden')}>
+      {!showWizard && !dataReady && (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="size-6 text-[#00B894] animate-spin mr-2" />
+          <span className="text-sm font-bold text-muted-foreground">加载词库数据中…</span>
+        </div>
+      )}
+      <Tabs value={tab} onValueChange={handleTabChange} className={cn('w-full', (!dataReady || showWizard) && 'hidden')}>
         {/* Sticky header: browse level scroller + filter chips + tab buttons */}
         <div className="sticky top-20 z-30 bg-background/95 backdrop-blur-md pb-3 -mx-1 px-1">
           {/* 等级筛选滚轮 — only in browse mode */}
