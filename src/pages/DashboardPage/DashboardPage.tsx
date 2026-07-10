@@ -249,13 +249,14 @@ export default function DashboardPage() {
     didSaveRef.current = true;
   }, [dailyChunk]);
 
-  // History: store up to 30 days of daily chunks
+  // History: store daily chunks for cross-month calendar access
+  const todayDate = new Date();
   const [history, setHistory] = useState<{ date: string; content: string; meaning: string; example: string }[]>(() => {
     try { const s = safeStorage.getItem('__nativethink_daily_history'); return s ? JSON.parse(s) : []; } catch { return []; }
   });
   const [showHistory, setShowHistory] = useState(false);
-  const [historyMonth, setHistoryMonth] = useState(() => new Date().getMonth());
-  const [historyYear, setHistoryYear] = useState(() => new Date().getFullYear());
+  const [historyMonth, setHistoryMonth] = useState(() => todayDate.getMonth());
+  const [historyYear, setHistoryYear] = useState(() => todayDate.getFullYear());
 
   const historyByDate = useMemo(() => {
     const map: Record<string, typeof history> = {};
@@ -289,7 +290,7 @@ export default function DashboardPage() {
       // 去重：同一天不重复保存相同内容的句子
       const alreadySaved = prev.some((h) => h.date === today && h.content === chunk.content);
       if (alreadySaved) return prev;
-      const updated = [{ date: today, content: chunk.content, meaning: chunk.meaning, example: chunk.example }, ...prev].slice(0, 60);
+      const updated = [{ date: today, content: chunk.content, meaning: chunk.meaning, example: chunk.example }, ...prev].slice(0, 1000);
       safeStorage.setItem('__nativethink_daily_history', JSON.stringify(updated));
       return updated;
     });
