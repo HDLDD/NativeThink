@@ -1,0 +1,39 @@
+#!/bin/sh
+# Auto-append commit subject line to CHANGELOG.md
+set -e
+
+CHANGELOG="CHANGELOG.md"
+COMMIT_MSG=$(git log -1 --format="%s")
+COMMIT_DATE=$(git log -1 --format="%ad" --date=short)
+COMMIT_HASH=$(git log -1 --format="%h")
+
+# Check if changelog exists
+if [ ! -f "$CHANGELOG" ]; then
+  echo "# NativeThink 开发日志\n" > "$CHANGELOG"
+fi
+
+# Check if today's date header already exists
+TODAY_HEADER="### $COMMIT_DATE"
+if ! grep -q "$TODAY_HEADER" "$CHANGELOG"; then
+  # Insert new date header after the title line
+  if grep -q "^## [0-9]" "$CHANGELOG"; then
+    # Find the first date header and insert before it
+    FIRST_DATE=$(grep -n "^## [0-9]" "$CHANGELOG" | head -1 | cut -d: -f1)
+    sed -i "${FIRST_DATE}i\\\n## $COMMIT_DATE\n" "$CHANGELOG"
+  else
+    echo -e "\n## $COMMIT_DATE\n" >> "$CHANGELOG"
+  fi
+fi
+
+# Append commit message as bullet after the date header
+# Insert after the date header line
+DATE_LINE=$(grep -n "^## $COMMIT_DATE" "$CHANGELOG" | head -1 | cut -d: -f1)
+if [ -n "$DATE_LINE" ]; then
+  # Check if this commit message is already in the log
+  if ! grep -q "$COMMIT_MSG" "$CHANGELOG"; then
+    sed -i "${DATE_LINE}a\\- $COMMIT_MSG (\`$COMMIT_HASH\`)" "$CHANGELOG"
+  fi
+fi
+
+# Stage the changelog for next commit
+git add "$CHANGELOG" 2>/dev/null || true
