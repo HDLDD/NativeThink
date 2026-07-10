@@ -933,7 +933,7 @@ export default function DeepVocabularyPage() {
             </div>
 
             {/* Right: word detail */}
-            <div className="col-span-12 lg:col-span-8">
+            <div className="col-span-12 lg:col-span-7">
               {selectedWord ? (
                 <div className="space-y-4">
                   <Card className="rounded-[40px] border-2 border-emerald-200/50 shadow-sm overflow-hidden">
