@@ -34,10 +34,10 @@ const LEVELS = [
   { key: 'advanced', label: '高阶' },
 ];
 
-interface WordbookSelectorProps {
+interface SetupStepProps {
   counts: Record<string, number>;
-  onSelect: (level: string) => void;
-  onSelectLast: () => void;
+  onComplete: (level: string, tab: string, dailyCount: number) => void;
+  onContinue: () => void;
 }
 
 const BOOKS = [
@@ -48,66 +48,129 @@ const BOOKS = [
   { key: 'advanced', label: '高阶词汇', icon: '📓', color: '#2D3436', desc: 'GRE/SAT/考研高阶词汇', gradient: 'from-slate-50 to-gray-50 dark:from-slate-500/10 dark:to-gray-500/10' },
 ];
 
-function WordbookSelector({ counts, onSelect, onSelectLast }: WordbookSelectorProps) {
+const MODES = [
+  { key: 'daily', label: '每日学习', icon: '🧠', desc: '按计划每天学新词，AI 生成例句和深度解析' },
+  { key: 'flashcard', label: '闪卡复习', icon: '🔄', desc: '翻转卡片测试记忆，巩固已学词汇' },
+  { key: 'browse', label: '词库浏览', icon: '📖', desc: '自由浏览全部词汇，按条件筛选和搜索' },
+] as const;
+
+const DAILY_COUNTS = [5, 10, 15, 20, 30];
+
+function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
+  const [step, setStep] = useState(0);
+  const [chosenLevel, setChosenLevel] = useState('');
+  const [chosenMode, setChosenMode] = useState('daily');
+  const [dailyCount, setDailyCount] = useState(10);
+
+  const handleBookSelect = (level: string) => {
+    setChosenLevel(level);
+    setStep(1);
+  };
+
+  const handleComplete = () => {
+    onComplete(chosenLevel, chosenMode, dailyCount);
+  };
+
+  const selectedBook = BOOKS.find((b) => b.key === chosenLevel);
+
   return (
-    <div className="py-8 px-2">
-      <div className="text-center mb-8 space-y-2">
-        <h2 className="text-2xl font-black italic text-foreground">
-          选择你的词书 📚
-        </h2>
-        <p className="text-sm text-muted-foreground font-medium">
-          选择一本词书开始学习，之后可随时切换
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl mx-auto">
-        {BOOKS.map(({ key, label, icon, color, desc, gradient }) => (
-          <button
-            key={key}
-            onClick={() => onSelect(key)}
-            className={cn(
-              'group relative rounded-[28px] p-5 text-left transition-all duration-300',
-              'bg-gradient-to-br border border-border/50 shadow-sm',
-              'hover:shadow-lg hover:-translate-y-1 active:scale-[0.98]',
-              gradient,
-            )}
-          >
-            <div className="flex items-start gap-3">
-              <span className="text-3xl">{icon}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-base font-black text-foreground group-hover:text-[#00B894] transition-colors">
-                  {label}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
-                <p className="text-[10px] font-bold mt-2 opacity-50">
-                  {counts[key]?.toLocaleString() || '—'} 词
-                </p>
-              </div>
+    <div className="min-h-[60vh] flex flex-col justify-center py-6 px-2">
+      {/* Step indicators */}
+      <div className="flex items-center justify-center gap-2 mb-8">
+        {['词书', '方式', '开始'].map((label, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <div className={cn(
+              'size-8 rounded-full flex items-center justify-center text-xs font-black transition-all',
+              i <= step ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50' : 'bg-muted text-muted-foreground',
+            )}>
+              {i < step ? '✓' : i + 1}
             </div>
-          </button>
+            <span className={cn('text-xs font-bold', i <= step ? 'text-foreground' : 'text-muted-foreground')}>{label}</span>
+            {i < 2 && <div className={cn('w-8 h-0.5 rounded', i < step ? 'bg-[#00B894]' : 'bg-muted')} />}
+          </div>
         ))}
-
-        {/* "All" option */}
-        <button
-          onClick={() => onSelect('all')}
-          className="col-span-1 sm:col-span-2 group rounded-[28px] p-5 text-center transition-all duration-300 border-2 border-dashed border-border/50 hover:border-[#00B894] hover:bg-emerald-50/30 dark:hover:bg-emerald-500/5"
-        >
-          <p className="text-sm font-black text-muted-foreground group-hover:text-[#00B894] transition-colors">
-            📖 全部词库 · {Object.values(counts).reduce((a, b) => a + b, 0).toLocaleString()} 词
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-1">加载较慢，建议选择单本词书</p>
-        </button>
       </div>
 
-      {/* Continue with last selection */}
-      <div className="text-center mt-6">
-        <button
-          onClick={onSelectLast}
-          className="text-xs font-bold text-muted-foreground hover:text-[#00B894] transition-colors"
-        >
-          继续上次的选择 →
-        </button>
-      </div>
+      {/* Step 0: Choose Wordbook */}
+      {step === 0 && (
+        <div className="space-y-4">
+          <div className="text-center mb-6 space-y-1">
+            <h2 className="text-xl font-black italic text-foreground">选择你的词书 📚</h2>
+            <p className="text-xs text-muted-foreground">选择一本词书开始学习</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
+            {BOOKS.map(({ key, label, icon, desc, gradient }) => (
+              <button key={key} onClick={() => handleBookSelect(key)}
+                className={cn('group rounded-[24px] p-4 text-left transition-all duration-300 bg-gradient-to-br border border-border/50 shadow-sm hover:shadow-lg hover:-translate-y-1 active:scale-[0.98]', gradient)}>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{icon}</span>
+                  <div>
+                    <p className="text-sm font-black text-foreground">{label}</p>
+                    <p className="text-[10px] text-muted-foreground">{desc}</p>
+                    <p className="text-[10px] font-bold mt-1 opacity-50">{counts[key]?.toLocaleString() || '—'} 词</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+            <button onClick={() => handleBookSelect('all')}
+              className="col-span-full rounded-[24px] p-4 text-center transition-all border-2 border-dashed border-border/50 hover:border-[#00B894] hover:bg-emerald-50/30 dark:hover:bg-emerald-500/5">
+              <p className="text-sm font-black text-muted-foreground">📖 全部词库 · {Object.values(counts).reduce((a, b) => a + b, 0).toLocaleString()} 词</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">加载较慢，建议选择单本词书</p>
+            </button>
+          </div>
+          <div className="text-center mt-4">
+            <button onClick={onContinue} className="text-xs font-bold text-muted-foreground hover:text-[#00B894]">继续上次的选择 →</button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 1: Choose Mode + Daily Count */}
+      {step === 1 && (
+        <div className="max-w-sm mx-auto space-y-6">
+          <div className="text-center space-y-1">
+            <p className="text-xs font-bold text-muted-foreground">已选词书</p>
+            <p className="text-sm font-black text-foreground">{selectedBook?.icon} {selectedBook?.label} · {counts[chosenLevel]?.toLocaleString() || Object.values(counts).reduce((a, b) => a + b, 0).toLocaleString()} 词</p>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">学习方式</p>
+            <div className="space-y-2">
+              {MODES.map(({ key, label, icon, desc }) => (
+                <button key={key} onClick={() => setChosenMode(key)}
+                  className={cn('w-full rounded-[20px] p-4 text-left transition-all border-2',
+                    chosenMode === key ? 'border-[#00B894] bg-emerald-50/50 dark:bg-emerald-500/10' : 'border-border hover:border-muted-foreground/30')}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{icon}</span>
+                    <div>
+                      <p className="text-sm font-black text-foreground">{label}</p>
+                      <p className="text-[10px] text-muted-foreground">{desc}</p>
+                    </div>
+                    {chosenMode === key && <div className="ml-auto size-5 rounded-full bg-[#00B894] text-white flex items-center justify-center text-[10px]">✓</div>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">每日学习量</p>
+            <div className="flex gap-2">
+              {DAILY_COUNTS.map((n) => (
+                <button key={n} onClick={() => setDailyCount(n)}
+                  className={cn('flex-1 py-3 rounded-2xl text-sm font-black transition-all',
+                    dailyCount === n ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50' : 'bg-muted text-muted-foreground hover:bg-muted/80')}>{n}词</button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Button variant="ghost" size="sm" onClick={() => setStep(0)} className="rounded-2xl text-xs">← 返回</Button>
+            <Button onClick={handleComplete} className="flex-1 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50">
+              🚀 开始学习
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -613,17 +676,21 @@ export default function DeepVocabularyPage() {
       )}
 
       {!dataReady && (
-        <WordbookSelector
+        <VocabSetupWizard
           counts={counts}
-          onSelect={(level) => {
+          onComplete={(level, mode, dailyCount) => {
             setSelectedLevel(level);
-            setMemory((p) => ({ ...p, level }));
+            setTab(mode);
+            setMemory((p) => ({ ...p, level, tab: mode }));
+            try { safeStorage.setItem('__nativethink_daily_vocab_count', String(dailyCount)); } catch { /* ignore */ }
             const levels = level === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [level];
             preloadLevels(levels).then(() => setDataReady(true));
           }}
-          onSelectLast={() => {
+          onContinue={() => {
             const lastLevel = memory.level || 'cet4';
+            const lastTab = memory.tab || 'daily';
             setSelectedLevel(lastLevel);
+            setTab(lastTab);
             const levels = lastLevel === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [lastLevel];
             preloadLevels(levels).then(() => setDataReady(true));
           }}
