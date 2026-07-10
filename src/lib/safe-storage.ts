@@ -45,7 +45,7 @@ function getUserId(): string {
 
   // Try platform SDK direct call
   try {
-    // @ts-ignore — dynamic import would be better, but this is sync-safe
+    // @ts-expect-error — dynamic import would be better, but this is sync-safe
     const platformUser = (window as any).__PLATFORM_USER__;
     if (platformUser?.user_id) return platformUser.user_id;
   } catch { /* ignore */ }

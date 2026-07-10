@@ -234,7 +234,7 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
         rate: playbackRate,
       });
     }
-  }, [currentSentenceIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentSentenceIdx]);  
 
   const prevSentence = useCallback(() => {
     tts.cancel();

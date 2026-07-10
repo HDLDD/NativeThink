@@ -274,10 +274,9 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       genRef.current++;
       const gen = genRef.current;
 
-      // Only cancel if actually speaking — avoids Chrome race condition
-      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
-        window.speechSynthesis.cancel();
-      }
+      // NOTE: cancel is handled by ssCancel() in speak() — don't cancel here.
+      // Double cancel causes Chrome race condition where the new utterance
+      // gets dropped, especially when switching words quickly.
 
       const cleaned = cleanText(text);
       if (!cleaned) { clearTimeout(fallbackTimer); return; }
