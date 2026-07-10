@@ -240,8 +240,9 @@ export default function DashboardPage() {
     if (didSaveRef.current) return;
     const today = new Date().toISOString().slice(0, 10);
     setHistory((prev) => {
-      if (prev[0]?.date === today) return prev;
-      const updated = [{ date: today, content: dailyChunk.content, meaning: dailyChunk.meaning, example: dailyChunk.example }, ...prev].slice(0, 30);
+      const alreadySaved = prev.some((h) => h.date === today && h.content === dailyChunk.content);
+      if (alreadySaved) return prev;
+      const updated = [{ date: today, content: dailyChunk.content, meaning: dailyChunk.meaning, example: dailyChunk.example }, ...prev].slice(0, 60);
       safeStorage.setItem('__nativethink_daily_history', JSON.stringify(updated));
       return updated;
     });
@@ -285,8 +286,10 @@ export default function DashboardPage() {
   const saveToHistory = (chunk: typeof dailyChunk) => {
     const today = new Date().toISOString().slice(0, 10);
     setHistory((prev) => {
-      const filtered = prev.filter((h) => h.date !== today);
-      const updated = [{ date: today, content: chunk.content, meaning: chunk.meaning, example: chunk.example }, ...filtered].slice(0, 30);
+      // 去重：同一天不重复保存相同内容的句子
+      const alreadySaved = prev.some((h) => h.date === today && h.content === chunk.content);
+      if (alreadySaved) return prev;
+      const updated = [{ date: today, content: chunk.content, meaning: chunk.meaning, example: chunk.example }, ...prev].slice(0, 60);
       safeStorage.setItem('__nativethink_daily_history', JSON.stringify(updated));
       return updated;
     });
@@ -648,7 +651,10 @@ export default function DashboardPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  if (!favorited) {
+                  if (favorited) {
+                    const fav = favorites.find((f) => f.content === dailyChunk.content && f.type === 'chunk');
+                    if (fav) removeFavorite(fav.id);
+                  } else {
                     addFavorite({
                       type: 'chunk',
                       content: dailyChunk.content,
