@@ -402,27 +402,27 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       const volume = opts?.volume ?? settings.volume;
       const lang = opts?.lang ?? 'en-US';
 
+      const chunks = chunkText(cleaned);
+
       if (isIOS()) {
-        // iOS: SpeechSynthesis broken → Cloudflare Function (Edge-TTS via CDN proxy)
-        const chunks = chunkText(cleaned);
-        playAudioChunks(chunks, 0, rate, 'cf');
-      } else {
-        // Desktop / Android: try SpeechSynthesis first (offline, instant).
-        // Defer one tick to let ssCancel's cancel() fully resolve in the browser.
-        // Without this, Chrome drops the new utterance when switching words quickly.
-        const fallbackTimer = setTimeout(() => {
-          if (abortedRef.current) return;
-          ssCancel();
-          const chunks = chunkText(cleaned);
-          playAudioChunks(chunks, 0, rate, 'cf');
-        }, 1500);
-        setTimeout(() => {
-          if (abortedRef.current) return;
-          speakSS(cleaned, rate, pitch, volume, lang, fallbackTimer);
-        }, 0);
+        // iOS: SpeechSynthesis broken — skip straight to network engines
+        playChunkWithFallback(chunks, 0, rate, 0);
+        return;
       }
+
+      // Desktop / Android: try SpeechSynthesis first (offline, instant)
+      // Defer one tick to let ssCancel's cancel() fully resolve in the browser
+      const fallbackTimer = setTimeout(() => {
+        if (abortedRef.current) return;
+        ssCancel();
+        playChunkWithFallback(chunks, 0, rate, 0);
+      }, 1500);
+      setTimeout(() => {
+        if (abortedRef.current) return;
+        speakSS(cleaned, rate, pitch, volume, lang, fallbackTimer);
+      }, 0);
     },
-    [settings.rate, settings.pitch, settings.volume, ssCancel, speakSS, playAudioChunks],
+    [settings.rate, settings.pitch, settings.volume, ssCancel, speakSS, playChunkWithFallback],
   );
 
   const cancel = useCallback(() => {
