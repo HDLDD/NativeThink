@@ -1,206 +1,157 @@
-// Wordbank query engine - search, filter, sort words
+// Wordbank query engine — lazy-loading edition
+// Data files are dynamically imported per-level. Components preload via `preloadLevel()` / `preloadAll()`
+// then use sync wrappers once `isLevelReady()` returns true.
 import type { IWordEntry, IWordQuery } from './schema';
-import { CET4_WORDS } from './data/cet4';
-import { CET6_WORDS } from './data/cet6';
-import { IELTS_WORDS } from './data/ielts';
-import { TOEFL_WORDS } from './data/toefl';
-import { ADVANCED_WORDS } from './data/advanced';
 
-/** Clean text for display and TTS: unescape backslash-apostrophe and remove stray slashes */
+// ── Pre-computed constants (no data loading needed) ──
+export const WORD_COUNTS: Record<string, number> = {
+  cet4: 4542, cet6: 7404, ielts: 6609, toefl: 10367, advanced: 18471,
+};
+
+export const ALL_PARTS_OF_SPEECH: string[] = [
+  'adj', 'adv', 'art', 'aux', 'conj', 'det', 'int', 'n', 'num', 'pref', 'prep', 'pron', 'suf', 'v',
+];
+
+// ── Helpers ──
 function cleanSlash(s: string): string {
-  return s
-    .replace(/\\'/g, "'")
-    .replace(/\//g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return s.replace(/\\'/g, "'").replace(/\//g, ' ').replace(/\s+/g, ' ').trim();
 }
-
-/** Clean word entry data by removing '/' from meaning and examples */
 function cleanWordEntry(w: IWordEntry): IWordEntry {
   return {
     ...w,
     meaning: cleanSlash(w.meaning),
-    examples: w.examples.map((ex) => ({
-      en: cleanSlash(ex.en),
-      zh: cleanSlash(ex.zh),
-    })),
+    examples: w.examples.map((ex) => ({ en: cleanSlash(ex.en), zh: cleanSlash(ex.zh) })),
   };
 }
 
-// Registry of all word sources (ordered by level, lowest first)
-const ALL_SOURCES: { name: string; level: string; words: IWordEntry[] }[] = [
-  { name: 'CET4', level: 'cet4', words: CET4_WORDS },
-  { name: 'CET6', level: 'cet6', words: CET6_WORDS },
-  { name: 'IELTS', level: 'ielts', words: IELTS_WORDS },
-  { name: 'TOEFL', level: 'toefl', words: TOEFL_WORDS },
-  { name: 'ADVANCED', level: 'advanced', words: ADVANCED_WORDS },
-];
+// ── Dynamic level loaders ──
+const ALL_LEVELS = ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] as const;
 
-const LEVEL_ORDER = ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'];
+const _levelCache: Record<string, IWordEntry[]> = {};
+const _loaded: Set<string> = new Set();
+const _loading: Map<string, Promise<void>> = new Map();
 
-// ── Caches: cleanWordEntry is expensive (spread + map), cache the results ──
-let _allWordsCache: IWordEntry[] | null = null;
-const _levelWordsCache: Record<string, IWordEntry[]> = {};
-let _wordIndexCache: Map<string, IWordEntry> | null = null;
+async function loadLevel(level: string): Promise<void> {
+  if (_loaded.has(level)) return;
+  if (_loading.has(level)) { await _loading.get(level); return; }
 
-function invalidateCaches() {
-  _allWordsCache = null;
-  _wordIndexCache = null;
-  for (const k of Object.keys(_levelWordsCache)) delete _levelWordsCache[k];
+  const p = (async () => {
+    let mod: Record<string, IWordEntry[]>;
+    switch (level) {
+      case 'cet4': mod = await import('./data/cet4'); break;
+      case 'cet6': mod = await import('./data/cet6'); break;
+      case 'ielts': mod = await import('./data/ielts'); break;
+      case 'toefl': mod = await import('./data/toefl'); break;
+      case 'advanced': mod = await import('./data/advanced'); break;
+      default: return;
+    }
+    const key = Object.keys(mod).find((k) => k.toUpperCase().includes('WORDS'));
+    const words: IWordEntry[] = key ? (mod as any)[key] : [];
+    _levelCache[level] = words.map(cleanWordEntry);
+    _loaded.add(level);
+  })();
+
+  _loading.set(level, p);
+  try { await p; } finally { _loading.delete(level); }
 }
 
-function getWordIndex(): Map<string, IWordEntry> {
-  if (_wordIndexCache) return _wordIndexCache;
-  _wordIndexCache = new Map();
-  for (const w of getAllWords()) {
-    _wordIndexCache.set(w.word.toLowerCase(), w);
-  }
-  return _wordIndexCache;
+let _allReady = false;
+async function loadAll(): Promise<void> {
+  if (_allReady) return;
+  await Promise.all(ALL_LEVELS.map(loadLevel));
+  _allReady = true;
 }
 
-/** Get words from a specific level file (no cross-level dedup). Results are cached. */
-function getLevelWords(level: string): IWordEntry[] {
-  if (_levelWordsCache[level]) return _levelWordsCache[level];
-  const src = ALL_SOURCES.find((s) => s.level === level);
-  if (!src) return [];
-  const cleaned = src.words.map(cleanWordEntry);
-  _levelWordsCache[level] = cleaned;
-  return cleaned;
+// ── Public: preload API ──
+
+export function isLevelReady(level: string): boolean { return _loaded.has(level); }
+export function isAllReady(): boolean { return _allReady; }
+
+/** Preload one or more levels (returns promise — await in useEffect). */
+export function preloadLevels(levels: string[]): Promise<void> {
+  return Promise.all(levels.map(loadLevel)).then(() => {});
 }
 
-/** Get all words from all sources (deduplicated by word, lowest level kept). Results are cached. */
-export function getAllWords(): IWordEntry[] {
-  if (_allWordsCache) return _allWordsCache;
+/** Preload every level. */
+export function preloadAll(): Promise<void> { return loadAll(); }
+
+// ── Public: sync query API (only works after preload) ──
+
+/** Get cached words for a single level. Returns empty array before preload. */
+export function getLevelWords(level: string): IWordEntry[] {
+  return _levelCache[level] || [];
+}
+
+/** Get all cached deduplicated words. */
+function getAllWords(): IWordEntry[] {
   const seen = new Set<string>();
   const result: IWordEntry[] = [];
-  for (const src of ALL_SOURCES) {
-    for (const w of src.words) {
+  for (const lvl of ALL_LEVELS) {
+    const words = _levelCache[lvl] || [];
+    for (const w of words) {
       const key = w.word.toLowerCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        result.push(cleanWordEntry(w));
-      }
+      if (!seen.has(key)) { seen.add(key); result.push(w); }
     }
   }
-  _allWordsCache = result;
   return result;
 }
 
-/** Query words with filters. Uses cached word data and single-pass filtering. */
+export function getWordCounts(): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const lvl of ALL_LEVELS) { counts[lvl] = (_levelCache[lvl] || []).length; }
+  return counts;
+}
+
 export function queryWords(params: IWordQuery = {}): IWordEntry[] {
-  // Get the base word pool (now cached)
   let words: IWordEntry[];
 
   if (params.level) {
-    const inputLevels = Array.isArray(params.level) ? params.level : [params.level];
-    if (inputLevels.length === 1 && inputLevels[0] !== 'all') {
-      words = getLevelWords(inputLevels[0]);
+    const levels = Array.isArray(params.level) ? params.level : [params.level];
+    if (levels.length === 1 && levels[0] !== 'all') {
+      words = [...getLevelWords(levels[0])];
     } else {
-      const levelSet = new Set(inputLevels);
+      const levelSet = new Set(levels);
       const seen = new Set<string>();
       words = [];
-      for (const src of ALL_SOURCES) {
-        if (!levelSet.has(src.level)) continue;
-        for (const w of getLevelWords(src.level)) {
+      for (const lvl of ALL_LEVELS) {
+        if (!levelSet.has(lvl)) continue;
+        for (const w of getLevelWords(lvl)) {
           const key = w.word.toLowerCase();
-          if (!seen.has(key)) {
-            seen.add(key);
-            words.push(w);
-          }
+          if (!seen.has(key)) { seen.add(key); words.push(w); }
         }
       }
     }
   } else {
-    words = getAllWords();
+    words = [...getAllWords()];
   }
 
-  // Build a single filter predicate combining all active conditions
-  const hasTopic = !!params.topic;
-  const hasSearch = !!params.search;
-  const hasFreqMin = params.frequencyMin != null;
-  const hasFreqMax = params.frequencyMax != null;
-  const hasRegister = !!params.register;
-  const hasPos = !!params.pos;
-
-  if (hasTopic || hasSearch || hasFreqMin || hasFreqMax || hasRegister || hasPos) {
-    const topic = params.topic!;
-    const q = params.search?.toLowerCase();
-    const freqMin = params.frequencyMin!;
-    const freqMax = params.frequencyMax!;
-    const register = params.register!;
-    const pos = params.pos!;
-
+  const q = params.search?.toLowerCase();
+  if (params.topic || q || params.frequencyMin != null || params.frequencyMax != null || params.register || params.pos) {
     words = words.filter((w) => {
-      if (hasTopic && !w.topics.includes(topic)) return false;
-      if (hasSearch && !(w.word.toLowerCase().includes(q!) || w.meaning.includes(q!) || w.phonetic.includes(q!))) return false;
-      if (hasFreqMin && w.frequencyRank < freqMin) return false;
-      if (hasFreqMax && w.frequencyRank > freqMax) return false;
-      if (hasRegister && w.register !== register) return false;
-      if (hasPos && !w.partOfSpeech.includes(pos)) return false;
+      if (params.topic && !w.topics.includes(params.topic)) return false;
+      if (q && !(w.word.toLowerCase().includes(q) || w.meaning.includes(q) || w.phonetic.includes(q))) return false;
+      if (params.frequencyMin != null && w.frequencyRank < params.frequencyMin) return false;
+      if (params.frequencyMax != null && w.frequencyRank > params.frequencyMax) return false;
+      if (params.register && w.register !== params.register) return false;
+      if (params.pos && !w.partOfSpeech.includes(params.pos)) return false;
       return true;
     });
   }
 
-  // Sort
-  if (params.sortBy === 'frequency') {
-    words.sort((a, b) => a.frequencyRank - b.frequencyRank);
-  } else if (params.sortBy === 'alphabetical') {
-    words.sort((a, b) => a.word.localeCompare(b.word));
-  } else if (params.sortBy === 'level') {
-    const order: Record<string, number> = { cet4: 0, cet6: 1, ielts: 2, toefl: 3, advanced: 4 };
-    words.sort((a, b) => (order[a.level] || 0) - (order[b.level] || 0));
+  if (params.sortBy === 'frequency') words.sort((a, b) => a.frequencyRank - b.frequencyRank);
+  else if (params.sortBy === 'alphabetical') words.sort((a, b) => a.word.localeCompare(b.word));
+  else if (params.sortBy === 'level') {
+    const ord: Record<string, number> = { cet4: 0, cet6: 1, ielts: 2, toefl: 3, advanced: 4 };
+    words.sort((a, b) => (ord[a.level] || 0) - (ord[b.level] || 0));
   }
 
-  // Pagination
-  if (params.offset) {
-    words = words.slice(params.offset);
-  }
-  if (params.limit) {
-    words = words.slice(0, params.limit);
-  }
-
+  if (params.offset) words = words.slice(params.offset);
+  if (params.limit) words = words.slice(0, params.limit);
   return words;
 }
 
-/** Get unique topics across all words */
-export function getAllTopics(): string[] {
-  const topics = new Set<string>();
-  getAllWords().forEach((w) => w.topics.forEach((t) => topics.add(t)));
-  return Array.from(topics).sort();
-}
-
-/** Get words grouped by level (deduplicated across levels) */
-export function getWordsByLevel(): Record<string, IWordEntry[]> {
-  const groups: Record<string, IWordEntry[]> = {};
-  getAllWords().forEach((w) => {
-    if (!groups[w.level]) groups[w.level] = [];
-    groups[w.level].push(w);
-  });
-  return groups;
-}
-
-/** Get word count per level (each level's file word count, independent vocabulary sets) */
-export function getWordCounts(): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const src of ALL_SOURCES) {
-    counts[src.level] = src.words.length;
-  }
-  return counts;
-}
-
-// Pre-computed counts (avoids pulling full word data for simple level counting)
-export const WORD_COUNTS: Record<string, number> = {
-  cet4: 4542,
-  cet6: 7404,
-  ielts: 6609,
-  toefl: 10367,
-  advanced: 18471,
-};
-
-/** Get a random selection of words. Uses cached data. */
 export function getRandomWords(count: number, level?: string): IWordEntry[] {
   const pool = level ? getLevelWords(level) : getAllWords();
-  // Fisher-Yates partial shuffle: only shuffle `count` picks
   const arr = [...pool];
   for (let i = 0; i < Math.min(count, arr.length); i++) {
     const j = i + Math.floor(Math.random() * (arr.length - i));
@@ -209,7 +160,33 @@ export function getRandomWords(count: number, level?: string): IWordEntry[] {
   return arr.slice(0, count);
 }
 
-/** Search a single word by exact match. O(1) using cached index. */
-export function findWord(word: string): IWordEntry | undefined {
-  return getWordIndex().get(word.toLowerCase());
+let _wordIndex: Map<string, IWordEntry> | null = null;
+function rebuildIndex() {
+  _wordIndex = new Map();
+  for (const w of getAllWords()) _wordIndex.set(w.word.toLowerCase(), w);
 }
+
+export function findWord(word: string): IWordEntry | undefined {
+  if (!_wordIndex) rebuildIndex();
+  return _wordIndex!.get(word.toLowerCase());
+}
+
+// Re-export getAllWords for external consumers (used by CollocationsTab etc.)
+export { getAllWords };
+
+export function getAllTopics(): string[] {
+  const topics = new Set<string>();
+  for (const w of getAllWords()) w.topics.forEach((t) => topics.add(t));
+  return Array.from(topics).sort();
+}
+
+export function getWordsByLevel(): Record<string, IWordEntry[]> {
+  const groups: Record<string, IWordEntry[]> = {};
+  for (const w of getAllWords()) {
+    if (!groups[w.level]) groups[w.level] = [];
+    groups[w.level].push(w);
+  }
+  return groups;
+}
+
+export type { IWordEntry, IWordQuery };

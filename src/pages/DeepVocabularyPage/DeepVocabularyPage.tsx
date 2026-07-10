@@ -15,7 +15,7 @@ import { cn, cleanText, extractJson } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
 import { toast } from 'sonner';
 import type { IWordEntry } from '@/data/wordbank/schema';
-import { queryWords, getAllWords, getWordCounts } from '@/data/wordbank';
+import { queryWords, preloadLevels, isLevelReady, WORD_COUNTS, ALL_PARTS_OF_SPEECH } from '@/data/wordbank';
 import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
 import FlashcardMode from './components/FlashcardMode';
 import DailyLearningMode from './components/DailyLearningMode';
@@ -56,7 +56,8 @@ export default function DeepVocabularyPage() {
   const [noChineseEquivOnly, setNoChineseEquivOnly] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wordListRef = useRef<HTMLDivElement>(null);
-  const counts = useMemo(() => getWordCounts(), []);
+  const counts = WORD_COUNTS;
+  const totalWordCount = useMemo(() => Object.values(WORD_COUNTS).reduce((a, b) => a + b, 0), []);
 
   // Per-level memory: remember selected word & scroll position for each level
   const [levelMemory, setLevelMemory] = useState<Record<string, { word: string; scrollTop: number }>>(() => {
@@ -90,11 +91,16 @@ export default function DeepVocabularyPage() {
   const [autoPlayIdx, setAutoPlayIdx] = useState(0);
   const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const allPartsOfSpeech = useMemo(() => {
-    const set = new Set<string>();
-    getAllWords().forEach((w) => set.add(w.partOfSpeech));
-    return Array.from(set).sort();
-  }, []);
+  // Use pre-computed constants (avoids loading all word data just for metadata)
+  const allPartsOfSpeech = ALL_PARTS_OF_SPEECH;
+
+  // ── Lazy data loading ──
+  const [dataReady, setDataReady] = useState(() => isLevelReady(selectedLevel) || isLevelReady('all'));
+  useEffect(() => {
+    if (isLevelReady(selectedLevel) || isLevelReady('all')) { setDataReady(true); return; }
+    const levels = selectedLevel === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [selectedLevel];
+    preloadLevels(levels).then(() => setDataReady(true));
+  }, [selectedLevel]);
 
   // Active filter count + reset
   const activeFilterCount = useMemo(() => {
@@ -431,7 +437,7 @@ export default function DeepVocabularyPage() {
           <Button variant="ghost" size="icon" onClick={() => scrollSelector('left')} className="shrink-0 rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-[#00B894]"><ChevronLeft className="size-5" /></Button>
           <div ref={scrollRef} className="flex gap-2 overflow-x-auto scroll-smooth py-2 px-1" style={{ scrollbarWidth: 'none' }}>
             {LEVELS.map((l) => {
-              const c = l.key === 'all' ? getAllWords().length : (counts[l.key] || 0);
+              const c = l.key === 'all' ? totalWordCount : (counts[l.key] || 0);
               return (
                 <button key={l.key} onClick={() => switchLevel(l.key)}
                   className={cn('shrink-0 px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 whitespace-nowrap',
