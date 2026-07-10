@@ -992,9 +992,40 @@ export default function DeepVocabularyPage() {
                     <CardContent className="p-8">
                       <div className="flex items-start justify-between gap-4 mb-6">
                         <div>
-                          <div className="flex items-center gap-3 mb-3">
+                          <div className="flex items-center gap-2 mb-3">
+                            {/* Prev/Next word navigation */}
+                            <Button variant="ghost" size="icon"
+                              onClick={() => {
+                                const idx = filteredWords.findIndex((w) => w.word === selectedWord.word);
+                                if (idx > 0) {
+                                  const newPage = Math.floor((idx - 1) / browsePageSize);
+                                  if (newPage !== wordPage) setWordPage(newPage);
+                                  setSelectedWord(filteredWords[idx - 1]);
+                                }
+                              }}
+                              disabled={filteredWords.findIndex((w) => w.word === selectedWord.word) <= 0}
+                              className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+                              title="上一个单词"
+                            >
+                              <ChevronLeft className="size-4" />
+                            </Button>
                             <h2 className="text-4xl font-black italic text-foreground tracking-tight">{selectedWord.word}</h2>
                             <Button variant="ghost" size="icon" onClick={() => tts.speak(selectedWord.word, { rate: 0.9 })} className="rounded-2xl bg-muted text-muted-foreground hover:text-[#00B894]"><Volume2 className="size-5" /></Button>
+                            <Button variant="ghost" size="icon"
+                              onClick={() => {
+                                const idx = filteredWords.findIndex((w) => w.word === selectedWord.word);
+                                if (idx < filteredWords.length - 1) {
+                                  const newPage = Math.floor((idx + 1) / browsePageSize);
+                                  if (newPage !== wordPage) setWordPage(newPage);
+                                  setSelectedWord(filteredWords[idx + 1]);
+                                }
+                              }}
+                              disabled={filteredWords.findIndex((w) => w.word === selectedWord.word) >= filteredWords.length - 1}
+                              className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+                              title="下一个单词"
+                            >
+                              <ChevronRight className="size-4" />
+                            </Button>
                           </div>
                           <p className="text-sm text-muted-foreground font-medium mb-1">{selectedWord.phonetic} · <span className="text-[#6C5CE7] font-bold text-sm">{selectedWord.partOfSpeech}</span></p>
                           <p className="text-lg text-foreground/80 font-medium">{selectedWord.meaning}</p>

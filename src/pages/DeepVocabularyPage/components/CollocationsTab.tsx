@@ -711,7 +711,23 @@ export default function CollocationsTab({
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4 mb-6">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-2 mb-3">
+                      {/* Prev/Next phrase navigation */}
+                      <Button variant="ghost" size="icon"
+                        onClick={() => {
+                          const idx = filteredEntries.findIndex((e) => e.phrase.toLowerCase() === selectedEntry.phrase.toLowerCase());
+                          if (idx > 0) {
+                            const newPage = Math.floor((idx - 1) / pageSize);
+                            if (newPage !== currentPage) { setCurrentPage(newPage); persistState({ page: newPage }); }
+                            setSelectedColloc(filteredEntries[idx - 1].phrase);
+                          }
+                        }}
+                        disabled={filteredEntries.findIndex((e) => e.phrase.toLowerCase() === selectedEntry.phrase.toLowerCase()) <= 0}
+                        className="rounded-xl size-7 text-muted-foreground hover:text-amber-500 shrink-0"
+                        title="上一个搭配"
+                      >
+                        <ChevronLeft className="size-4" />
+                      </Button>
                       <h2 className="text-3xl font-black italic text-foreground tracking-tight">{selectedEntry.phrase}</h2>
                       <Button
                         variant="ghost" size="icon"
@@ -719,6 +735,21 @@ export default function CollocationsTab({
                         className="rounded-2xl bg-muted text-muted-foreground hover:text-[#00B894]"
                       >
                         <Volume2 className="size-5" />
+                      </Button>
+                      <Button variant="ghost" size="icon"
+                        onClick={() => {
+                          const idx = filteredEntries.findIndex((e) => e.phrase.toLowerCase() === selectedEntry.phrase.toLowerCase());
+                          if (idx < filteredEntries.length - 1) {
+                            const newPage = Math.floor((idx + 1) / pageSize);
+                            if (newPage !== currentPage) { setCurrentPage(newPage); persistState({ page: newPage }); }
+                            setSelectedColloc(filteredEntries[idx + 1].phrase);
+                          }
+                        }}
+                        disabled={filteredEntries.findIndex((e) => e.phrase.toLowerCase() === selectedEntry.phrase.toLowerCase()) >= filteredEntries.length - 1}
+                        className="rounded-xl size-7 text-muted-foreground hover:text-amber-500 shrink-0"
+                        title="下一个搭配"
+                      >
+                        <ChevronRight className="size-4" />
                       </Button>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
