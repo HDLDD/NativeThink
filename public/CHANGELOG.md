@@ -1,5 +1,9 @@
 # NativeThink 开发日志
 
+
+## 2026-07-11
+- Fix: 学习目标随词书设定 — wizard dailyCount → useWordLearning per-level quota (`843c278`)
+
 ## 2026-07-11
 
 ### 词书 & 引导流程
