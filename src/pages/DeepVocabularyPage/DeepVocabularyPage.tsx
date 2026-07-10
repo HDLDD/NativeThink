@@ -34,6 +34,84 @@ const LEVELS = [
   { key: 'advanced', label: '高阶' },
 ];
 
+interface WordbookSelectorProps {
+  counts: Record<string, number>;
+  onSelect: (level: string) => void;
+  onSelectLast: () => void;
+}
+
+const BOOKS = [
+  { key: 'cet4', label: '四级词汇', icon: '📗', color: '#00B894', desc: '大学英语四级考试核心词汇', gradient: 'from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10' },
+  { key: 'cet6', label: '六级词汇', icon: '📘', color: '#0984E3', desc: '大学英语六级考试核心词汇', gradient: 'from-blue-50 to-sky-50 dark:from-blue-500/10 dark:to-sky-500/10' },
+  { key: 'ielts', label: '雅思词汇', icon: '📙', color: '#E17055', desc: 'IELTS 雅思考试核心词汇', gradient: 'from-orange-50 to-amber-50 dark:from-orange-500/10 dark:to-amber-500/10' },
+  { key: 'toefl', label: '托福词汇', icon: '📕', color: '#6C5CE7', desc: 'TOEFL 托福考试核心词汇', gradient: 'from-violet-50 to-purple-50 dark:from-violet-500/10 dark:to-purple-500/10' },
+  { key: 'advanced', label: '高阶词汇', icon: '📓', color: '#2D3436', desc: 'GRE/SAT/考研高阶词汇', gradient: 'from-slate-50 to-gray-50 dark:from-slate-500/10 dark:to-gray-500/10' },
+];
+
+function WordbookSelector({ counts, onSelect, onSelectLast }: WordbookSelectorProps) {
+  return (
+    <div className="py-8 px-2">
+      <div className="text-center mb-8 space-y-2">
+        <h2 className="text-2xl font-black italic text-foreground">
+          选择你的词书 📚
+        </h2>
+        <p className="text-sm text-muted-foreground font-medium">
+          选择一本词书开始学习，之后可随时切换
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl mx-auto">
+        {BOOKS.map(({ key, label, icon, color, desc, gradient }) => (
+          <button
+            key={key}
+            onClick={() => onSelect(key)}
+            className={cn(
+              'group relative rounded-[28px] p-5 text-left transition-all duration-300',
+              'bg-gradient-to-br border border-border/50 shadow-sm',
+              'hover:shadow-lg hover:-translate-y-1 active:scale-[0.98]',
+              gradient,
+            )}
+          >
+            <div className="flex items-start gap-3">
+              <span className="text-3xl">{icon}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-black text-foreground group-hover:text-[#00B894] transition-colors">
+                  {label}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                <p className="text-[10px] font-bold mt-2 opacity-50">
+                  {counts[key]?.toLocaleString() || '—'} 词
+                </p>
+              </div>
+            </div>
+          </button>
+        ))}
+
+        {/* "All" option */}
+        <button
+          onClick={() => onSelect('all')}
+          className="col-span-1 sm:col-span-2 group rounded-[28px] p-5 text-center transition-all duration-300 border-2 border-dashed border-border/50 hover:border-[#00B894] hover:bg-emerald-50/30 dark:hover:bg-emerald-500/5"
+        >
+          <p className="text-sm font-black text-muted-foreground group-hover:text-[#00B894] transition-colors">
+            📖 全部词库 · {Object.values(counts).reduce((a, b) => a + b, 0).toLocaleString()} 词
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-1">加载较慢，建议选择单本词书</p>
+        </button>
+      </div>
+
+      {/* Continue with last selection */}
+      <div className="text-center mt-6">
+        <button
+          onClick={onSelectLast}
+          className="text-xs font-bold text-muted-foreground hover:text-[#00B894] transition-colors"
+        >
+          继续上次的选择 →
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function DeepVocabularyPage() {
   const { addFavorite, removeFavorite, isFavorited, favorites } = useFavorites();
   const { isConfigured, chat: aiChat } = useAI();
@@ -535,19 +613,21 @@ export default function DeepVocabularyPage() {
       )}
 
       {!dataReady && (
-        <div className="space-y-4 py-8 animate-pulse">
-          <div className="h-8 w-48 bg-muted rounded-2xl mx-auto" />
-          <div className="h-8 w-64 bg-muted rounded-2xl mx-auto" />
-          <div className="grid grid-cols-12 gap-4 mt-6">
-            <div className="col-span-12 lg:col-span-4 space-y-2">
-              <div className="h-80 bg-muted rounded-[32px]" />
-            </div>
-            <div className="col-span-12 lg:col-span-8 space-y-3">
-              <div className="h-60 bg-muted rounded-[32px]" />
-              <div className="h-40 bg-muted rounded-[32px]" />
-            </div>
-          </div>
-        </div>
+        <WordbookSelector
+          counts={counts}
+          onSelect={(level) => {
+            setSelectedLevel(level);
+            setMemory((p) => ({ ...p, level }));
+            const levels = level === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [level];
+            preloadLevels(levels).then(() => setDataReady(true));
+          }}
+          onSelectLast={() => {
+            const lastLevel = memory.level || 'cet4';
+            setSelectedLevel(lastLevel);
+            const levels = lastLevel === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [lastLevel];
+            preloadLevels(levels).then(() => setDataReady(true));
+          }}
+        />
       )}
 
       <Tabs value={tab} onValueChange={handleTabChange} className={cn('w-full', !dataReady && 'hidden')}>
