@@ -38,7 +38,7 @@ jobs:
         env:
           # GitHub Pages serves from /<repo-name>/ by default.
           # Set CLIENT_BASE_PATH so React Router's basename matches.
-          CLIENT_BASE_PATH: /native-thinking
+          CLIENT_BASE_PATH: /NativeThink
         run: |
           npx vite build --outDir dist/client --base "${CLIENT_BASE_PATH}/"
           # Copy HTML to root
