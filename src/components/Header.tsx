@@ -55,7 +55,7 @@ export default function Header() {
               Welcome back
             </div>
             <h1 className="text-xl font-black italic tracking-tight text-foreground">
-              继续你的母语之旅 ✨
+              NativeThink ✨
             </h1>
           </div>
         </div>
