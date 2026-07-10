@@ -70,7 +70,14 @@ export function useLearningStats() {
     try {
       const savedStats = safeStorage.getItem(STATS_KEY);
       if (savedStats) {
-        setStats(JSON.parse(savedStats));
+        // Merge saved data with defaults to fill missing fields (e.g., 'writing' added later)
+        const parsed = JSON.parse(savedStats);
+        const merged = {
+          ...DEFAULT_STATS,
+          ...parsed,
+          moduleProgress: { ...DEFAULT_STATS.moduleProgress, ...(parsed.moduleProgress || {}) },
+        };
+        setStats(merged);
       }
       const savedCalendar = safeStorage.getItem(CALENDAR_KEY);
       if (savedCalendar) {
