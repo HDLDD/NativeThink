@@ -263,12 +263,12 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts, re
 
       <div className="flex justify-center">
         <AnimatePresence mode="wait">
-          <motion.div key={cw.word + (isFlipped ? '-back' : '-front')} initial={{ opacity: 0, x: dir * 120 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -dir * 120 }} transition={{ type: 'spring', stiffness: 260, damping: 24 }} className="w-full max-w-md cursor-pointer" onClick={() => flip()}>
-            <Card className={cn('rounded-[40px] border-2 shadow-xl transition-all min-h-[340px] flex flex-col justify-center', isFlipped ? 'border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-50' : 'border-border bg-card')}>
-              <CardContent className="p-10 text-center">
+          <motion.div key={cw.word + (isFlipped ? '-back' : '-front')} initial={{ opacity: 0, x: dir * 120 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -dir * 120 }} transition={{ type: 'spring', stiffness: 260, damping: 24 }} className="w-full max-w-sm cursor-pointer" onClick={() => flip()}>
+            <Card className={cn('rounded-[32px] border-2 shadow-xl transition-all min-h-[260px] flex flex-col justify-center', isFlipped ? 'border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-50' : 'border-border bg-card')}>
+              <CardContent className="p-8 text-center">
                 {!isFlipped ? (
                   <>
-                    <Badge className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground mb-8">
+                    <Badge className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground mb-6">
                       {currentIdx + 1} / {queue.length}
                       {state.progress[cw.word.toLowerCase()] && (
                         <span className="ml-1.5 text-[#6C5CE7]">
@@ -276,25 +276,25 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts, re
                         </span>
                       )}
                     </Badge>
-                    <div className="flex items-center justify-center gap-3 mb-3">
-                      <h2 className="text-5xl font-black italic text-foreground tracking-tight">{cw.word}</h2>
+                    <div className="flex items-center justify-center gap-3 mb-2">
+                      <h2 className="text-4xl font-black italic text-foreground tracking-tight">{cw.word}</h2>
                       <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(cw.word, { rate: 0.9 }); }} className="rounded-2xl bg-muted text-muted-foreground hover:text-[#00B894]"><Volume2 className="size-5" /></Button>
                     </div>
                     <p className="text-sm font-bold text-[#6C5CE7] mb-1">{cw.partOfSpeech}</p>
-                    <p className="text-base text-muted-foreground font-medium">{cw.phonetic}</p>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-6"><Sparkles className="size-3.5 inline mr-1 text-[#00B894]" />点击翻转查看释义</p>
+                    <p className="text-sm text-muted-foreground font-medium">{cw.phonetic}</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-4"><Sparkles className="size-3.5 inline mr-1 text-[#00B894]" />点击翻转查看释义</p>
                   </>
                 ) : (
                   <>
-                    <Badge className="rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wider bg-indigo-100 dark:bg-indigo-500/20 text-indigo-500 mb-6">释义 · {cw.partOfSpeech}</Badge>
-                    <p className="text-2xl font-black text-foreground mb-2">{cw.meaning}</p>
-                    <div className="flex items-center justify-center gap-2 mb-4">
+                    <Badge className="rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wider bg-indigo-100 dark:bg-indigo-500/20 text-indigo-500 mb-4">释义 · {cw.partOfSpeech}</Badge>
+                    <p className="text-xl font-black text-foreground mb-2">{cw.meaning}</p>
+                    <div className="flex items-center justify-center gap-2 mb-3">
                       <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-[9px] font-bold bg-muted">{cw.register === 'formal' ? '正式' : cw.register === 'informal' ? '非正式' : '中性'}</Badge>
                       <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-[9px] font-bold bg-muted">#{cw.frequencyRank}</Badge>
                       <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-[9px] font-bold bg-muted">{cw.level.toUpperCase()}</Badge>
                     </div>
                     {cw.examples[0] && (
-                      <div className="p-4 rounded-2xl bg-white/60 dark:bg-foreground/10 border border-indigo-100 mb-4">
+                      <div className="p-3 rounded-2xl bg-white/60 dark:bg-foreground/10 border border-indigo-100 mb-3">
                         <div className="flex items-start gap-2">
                           <p className="text-sm text-foreground/80 italic font-medium flex-1">"{cleanText(cw.examples[0].en)}"</p>
                           <Button
@@ -306,10 +306,10 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts, re
                             <Volume2 className="size-3.5" />
                           </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-2">{cleanText(cw.examples[0].zh)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{cleanText(cw.examples[0].zh)}</p>
                       </div>
                     )}
-                    <div className="flex flex-wrap gap-1.5 justify-center mb-4">
+                    <div className="flex flex-wrap gap-1.5 justify-center mb-3">
                       {cw.collocations.slice(0, 4).map((c, i) => <Badge key={i} className="rounded-full px-2 py-0.5 text-[9px] font-medium bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 border-none">{c}</Badge>)}
                     </div>
                     <p className="text-xs text-muted-foreground font-medium line-clamp-2">{cw.deepExplanation || `${cw.word}意为${cw.meaning}。`}</p>
