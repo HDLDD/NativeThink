@@ -1,15 +1,14 @@
 /**
- * TTS (Text-to-Speech) hook — three-tier engine with automatic fallback.
+ * TTS (Text-to-Speech) hook — platform-aware, multi-engine.
  *
- * Tier 1 — Browser SpeechSynthesis: works offline, no network needed.
- *   Fastest startup, best for desktop Chrome/Edge. On iOS Safari it's broken.
- * Tier 2 — Microsoft Edge TTS via WebSocket (wss://): neural-quality voices.
- *   No CORS (WebSocket), tried when SpeechSynthesis is slow/unavailable.
- * Tier 3 — Google Translate TTS URL: direct <audio> fallback.
+ * Desktop (Chrome/Edge/Firefox):
+ *   Primary: Browser SpeechSynthesis — offline, instant, works everywhere.
+ *   Fallback: 1.5s start-timeout → Cloudflare Function → direct WebSocket.
  *
- * The engine that responds first wins. Subsequent calls use the fastest
- * engine from the previous call. All playback via HTML5 <audio> (for the
- * network tiers) or native SpeechSynthesis (tier 1).
+ * Mobile / iOS:
+ *   Primary: Cloudflare Pages Function (/api/tts) proxies Edge-TTS via
+ *     Cloudflare's global network (not blocked by GFW). CDN-cached, ~10ms replay.
+ *   Fallback: Direct Edge-TTS WebSocket → Google TTS URL.
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -122,6 +121,12 @@ function googleTTSUrl(text: string): string {
   return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=${encodeURIComponent(text)}`;
 }
 
+// ── Tier 2b: Cloudflare Function (Edge-TTS proxy) ──
+
+function cfTtsUrl(text: string, rate: number): string {
+  return `/api/tts?text=${encodeURIComponent(text)}&rate=${rate.toFixed(2)}`;
+}
+
 // ── Chunk long texts ──
 
 function chunkText(text: string, maxLen = 400): string[] {
@@ -209,7 +214,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   // ── Chunked audio playback (for network engines) ──
 
   const playAudioChunks = useCallback(
-    (chunks: string[], idx: number, rate: number, engine: 'edge' | 'google') => {
+    (chunks: string[], idx: number, rate: number, engine: 'cf' | 'edge' | 'google') => {
       if (abortedRef.current || idx >= chunks.length) {
         stopAudio();
         setIsSpeaking(false);
@@ -236,7 +241,10 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         a.play().catch(() => onDone());
       };
 
-      if (engine === 'edge') {
+      if (engine === 'cf') {
+        // Cloudflare Function — simplest, most reliable
+        playUrl(cfTtsUrl(chunks[idx], rate));
+      } else if (engine === 'edge') {
         edgeTTSBlob(chunks[idx], rate)
           .then((blob) => playUrl(URL.createObjectURL(blob)))
           .catch(() => playUrl(googleTTSUrl(chunks[idx])));
@@ -384,19 +392,19 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       const lang = opts?.lang ?? 'en-US';
 
       if (isIOS()) {
-        // iOS: SpeechSynthesis is broken, go straight to network engines
+        // iOS: SpeechSynthesis broken → Cloudflare Function (Edge-TTS via CDN proxy)
         const chunks = chunkText(cleaned);
-        playAudioChunks(chunks, 0, rate, 'edge');
+        playAudioChunks(chunks, 0, rate, 'cf');
       } else {
-        // Desktop / Android: try SpeechSynthesis first.
-        // If onstart doesn't fire within 1.5s (common on Xiaomi/Huawei browsers),
-        // fall back to network engines.
+        // Desktop / Android: try SpeechSynthesis first (offline, instant).
+        // If onstart doesn't fire within 1.5s (Xiaomi/Huawei browsers where
+        // SpeechSynthesis exists but doesn't actually produce sound), fall back
+        // to Cloudflare Function → Edge-TTS via CDN proxy.
         const fallbackTimer = setTimeout(() => {
           if (abortedRef.current) return;
-          // SpeechSynthesis didn't start — cancel it and switch
           ssCancel();
           const chunks = chunkText(cleaned);
-          playAudioChunks(chunks, 0, rate, 'edge');
+          playAudioChunks(chunks, 0, rate, 'cf');
         }, 1500);
         speakSS(cleaned, rate, pitch, volume, lang, fallbackTimer);
       }
