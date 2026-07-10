@@ -523,13 +523,30 @@ export default function DeepVocabularyPage() {
         </>
       )}
 
-      <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
+      {!dataReady && (
+        <div className="space-y-4 py-8 animate-pulse">
+          <div className="h-8 w-48 bg-muted rounded-2xl mx-auto" />
+          <div className="h-8 w-64 bg-muted rounded-2xl mx-auto" />
+          <div className="grid grid-cols-12 gap-4 mt-6">
+            <div className="col-span-12 lg:col-span-4 space-y-2">
+              <div className="h-80 bg-muted rounded-[32px]" />
+            </div>
+            <div className="col-span-12 lg:col-span-8 space-y-3">
+              <div className="h-60 bg-muted rounded-[32px]" />
+              <div className="h-40 bg-muted rounded-[32px]" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Tabs value={tab} onValueChange={handleTabChange} className={cn('w-full', !dataReady && 'hidden')}>
         <TabsList className="bg-muted p-1.5 rounded-3xl h-auto mb-6">
           <TabsTrigger value="daily" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-emerald-500 data-[state=active]:shadow-sm"><Brain className="size-4 mr-2" />学习</TabsTrigger>
           <TabsTrigger value="flashcard" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#6C5CE7] data-[state=active]:shadow-sm"><RotateCw className="size-4 mr-2" />复习</TabsTrigger>
           <TabsTrigger value="browse" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-sky-500 data-[state=active]:shadow-sm"><BookOpen className="size-4 mr-2" />词库浏览</TabsTrigger>
           <TabsTrigger value="collocations" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-amber-500 data-[state=active]:shadow-sm"><Link2 className="size-4 mr-2" />搭配学习</TabsTrigger>
         </TabsList>
+
 
         <TabsContent value="daily" className="mt-0">
           <DailyLearningMode level={selectedLevel} onLevelChange={switchLevel} levels={LEVELS} counts={counts} />
