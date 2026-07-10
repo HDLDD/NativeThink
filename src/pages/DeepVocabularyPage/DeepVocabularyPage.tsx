@@ -498,7 +498,7 @@ export default function DeepVocabularyPage() {
     const key = phrase.toLowerCase();
     const cached = collocCache[key];
 
-    // Instant: show cached result
+    // Show phrase instantly with empty meaning (feels fast), fill details when ready
     if (cached) {
       setCollocDetail({ phrase, meaning: cached.meaning, examples: cached.examples });
       setCollocOpen(true);
@@ -506,9 +506,12 @@ export default function DeepVocabularyPage() {
     }
 
     if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
-    setCollocLoading(true);
-    setCollocDetail(null);
+
+    // Open dialog immediately with the phrase — user sees instant feedback
+    setCollocDetail({ phrase, meaning: '', examples: [] });
     setCollocOpen(true);
+    setCollocLoading(true);
+
     try {
       const result = await aiChat(
         [
@@ -535,6 +538,45 @@ export default function DeepVocabularyPage() {
     } catch (e: any) { toast.error(e?.message || '查询失败'); }
     finally { setCollocLoading(false); }
   };
+
+  // Pre-fetch collocations when a word is selected (background, no UI impact)
+  useEffect(() => {
+    if (!selectedWord || !isConfigured) return;
+    const uncached = selectedWord.collocations.filter((c) => !collocCache[c.toLowerCase()]);
+    if (uncached.length === 0) return;
+    // Fetch one at a time to avoid overwhelming the API
+    let cancelled = false;
+    (async () => {
+      for (const phrase of uncached) {
+        if (cancelled) break;
+        const key = phrase.toLowerCase();
+        try {
+          const result = await aiChat(
+            [
+              { role: 'system', content: `You are an English teacher. Analyze the given English phrase/collocation. Return ONLY valid JSON (no markdown): {"phrase": "the phrase", "meaning": "Chinese meaning and usage explanation", "examples": [{"en": "example sentence", "zh": "Chinese translation"}, ...]} Generate 2 example sentences with translations.` },
+              { role: 'user', content: `Look up: "${phrase}"` },
+            ],
+            { temperature: 0.5, maxTokens: 512 },
+          );
+          const parsed = extractJson<{ phrase?: string; meaning?: string; examples?: { en: string; zh: string }[] }>(result);
+          if (parsed.meaning || (parsed.examples && parsed.examples.length > 0)) {
+            setCollocCache((prev) => {
+              const next = {
+                ...prev,
+                [key]: {
+                  meaning: parsed.meaning || '暂无释义',
+                  examples: (parsed.examples || []).filter((e) => e.en && e.zh),
+                },
+              };
+              safeStorage.setItem('__nativethink_colloc_cache', JSON.stringify(next));
+              return next;
+            });
+          }
+        } catch { /* pre-fetch failures are silent */ }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedWord, isConfigured]);
 
   /** Quick inline translation — returns Chinese meaning only (no dialog) */
   const handleTranslateCollocQuick = async (phrase: string): Promise<string> => {
