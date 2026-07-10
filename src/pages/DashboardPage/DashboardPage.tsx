@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/dialog';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useFavorites } from '@/lib/use-favorites';
-import { MOCK_CHUNKS } from '@/data/chunks';
+import type { IChunk } from '@/data/chunks';
 import { cn, cleanText } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
 import { toast } from 'sonner';
@@ -229,15 +229,37 @@ export default function DashboardPage() {
   const tts = useTTS();
   const { isConfigured, chat: aiChat } = useAI();
 
-  const pickRandomChunk = () => MOCK_CHUNKS[Math.floor(Math.random() * MOCK_CHUNKS.length)];
-  const [dailyChunk, setDailyChunk] = useState(pickRandomChunk);
+  // Placeholder shown while chunk data loads lazily (avoids 146KB in main bundle)
+  const PLACEHOLDER_CHUNK: IChunk = {
+    id: '__placeholder__', content: 'Loading...', meaning: '加载中…', category: 'daily',
+    usage: '', example: 'Loading daily chunk...', difficulty: 'beginner', tags: [],
+  };
+
+  // Lazy-load chunk data (146KB) — avoids bloating the main bundle for a single daily quote
+  const [mockChunks, setMockChunks] = useState<IChunk[]>([]);
+  useEffect(() => {
+    import('@/data/chunks').then((m) => setMockChunks(m.MOCK_CHUNKS));
+  }, []);
+
+  const pickRandomChunk = (): IChunk => {
+    if (mockChunks.length === 0) return PLACEHOLDER_CHUNK;
+    return mockChunks[Math.floor(Math.random() * mockChunks.length)];
+  };
+  const [dailyChunk, setDailyChunk] = useState<IChunk>(PLACEHOLDER_CHUNK);
+  // Set initial daily chunk once chunks are loaded
+  useEffect(() => {
+    if (mockChunks.length > 0 && dailyChunk.id === '__placeholder__') {
+      setDailyChunk(mockChunks[Math.floor(Math.random() * mockChunks.length)]);
+    }
+  }, [mockChunks, dailyChunk]);
   const [chunkLoading, setChunkLoading] = useState(false);
   const [exampleZh, setExampleZh] = useState('');
 
-  // Save initial chunk to history on mount (only once)
+  // Save initial chunk to history on mount (only once, after chunks load)
   const didSaveRef = useRef(false);
   useEffect(() => {
     if (didSaveRef.current) return;
+    if (dailyChunk.id === '__placeholder__') return; // wait for real chunk
     const today = new Date().toISOString().slice(0, 10);
     setHistory((prev) => {
       const alreadySaved = prev.some((h) => h.date === today && h.content === dailyChunk.content);

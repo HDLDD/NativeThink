@@ -2,18 +2,18 @@ import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import DashboardPage from "@/pages/DashboardPage/DashboardPage";
-import ThinkInEnglishPage from "@/pages/ThinkInEnglishPage/ThinkInEnglishPage";
-import ChunkTrainingPage from "@/pages/ChunkTrainingPage/ChunkTrainingPage";
-import ConversationPage from "@/pages/ConversationPage/ConversationPage";
-import ShadowingPage from "@/pages/ShadowingPage/ShadowingPage";
-import ProgressPage from "@/pages/ProgressPage/ProgressPage";
-import WritingPage from "@/pages/WritingPage/WritingPage";
 import NotFoundPage from "@/pages/NotFoundPage/NotFoundPage";
 import { Loader2 } from "lucide-react";
 
-// Lazy-load vocabulary page — the word bank has ~47K words (~30MB raw data).
-// This keeps it out of the main bundle; it loads only when the user navigates to /vocabulary.
+// Lazy-load all pages except the dashboard (index route).
+// This keeps the main bundle lean; each page chunk loads on-demand.
+const ThinkInEnglishPage = lazy(() => import("@/pages/ThinkInEnglishPage/ThinkInEnglishPage"));
+const ChunkTrainingPage = lazy(() => import("@/pages/ChunkTrainingPage/ChunkTrainingPage"));
+const ConversationPage = lazy(() => import("@/pages/ConversationPage/ConversationPage"));
+const ShadowingPage = lazy(() => import("@/pages/ShadowingPage/ShadowingPage"));
 const DeepVocabularyPage = lazy(() => import("@/pages/DeepVocabularyPage/DeepVocabularyPage"));
+const WritingPage = lazy(() => import("@/pages/WritingPage/WritingPage"));
+const ProgressPage = lazy(() => import("@/pages/ProgressPage/ProgressPage"));
 
 function PageFallback() {
   return (
@@ -28,13 +28,13 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<DashboardPage />} />
-        <Route path="think" element={<ThinkInEnglishPage />} />
-        <Route path="chunks" element={<ChunkTrainingPage />} />
-        <Route path="conversation" element={<ConversationPage />} />
-        <Route path="shadowing" element={<ShadowingPage />} />
+        <Route path="think" element={<Suspense fallback={<PageFallback />}><ThinkInEnglishPage /></Suspense>} />
+        <Route path="chunks" element={<Suspense fallback={<PageFallback />}><ChunkTrainingPage /></Suspense>} />
+        <Route path="conversation" element={<Suspense fallback={<PageFallback />}><ConversationPage /></Suspense>} />
+        <Route path="shadowing" element={<Suspense fallback={<PageFallback />}><ShadowingPage /></Suspense>} />
         <Route path="vocabulary" element={<Suspense fallback={<PageFallback />}><DeepVocabularyPage /></Suspense>} />
-        <Route path="writing" element={<WritingPage />} />
-        <Route path="progress" element={<ProgressPage />} />
+        <Route path="writing" element={<Suspense fallback={<PageFallback />}><WritingPage /></Suspense>} />
+        <Route path="progress" element={<Suspense fallback={<PageFallback />}><ProgressPage /></Suspense>} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
