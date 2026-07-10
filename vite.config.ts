@@ -2,16 +2,32 @@ import path from 'path'
 import type { Plugin } from 'vite'
 import { defineConfig } from '@lark-apaas/coding-preset-vite-react'
 
-// Replace platform template placeholders for standalone/Cloudflare deployment
+// Replace platform template placeholders and strip platform-only analytics for Cloudflare
 function fixHtmlPlaceholders(): Plugin {
   return {
     name: 'fix-html-placeholders',
     enforce: 'post', // run after ogMetaPlugin replaces title with {{appName}}
     transformIndexHtml(html) {
-      return html
+      let result = html
         .replace(/{{appName}}/g, 'NativeThink')
         .replace(/{{appDescription}}/g, '英语母语思维训练')
         .replace(/{{appAvatar}}/g, '/favicon.svg')
+
+      // Strip platform-only analytics/tracking scripts (they're only useful on miaoda,
+      // add no value on Cloudflare/GitHub Pages, and significantly slow mobile loading):
+      // - Slardar error monitoring SDK
+      // - Tea/collectEvent analytics SDK
+      // - Performance monitoring
+      // - Platform runtime template injection
+      result = result.replace(/<script>[\s\S]*?KSlardarWeb[\s\S]*?<\/script>/g, '')
+      result = result.replace(/<script>[\s\S]*?collectEvent[\s\S]*?<\/script>/g, '')
+      result = result.replace(/<script>[\s\S]*?window\.appId = "\{\{appId\}\}"[\s\S]*?appInfo[\s\S]*?<\/script>/g, '')
+      result = result.replace(/<script>[\s\S]*?slardarScript[\s\S]*?<\/script>/g, '')
+      result = result.replace(/<script>[\s\S]*?teaScript[\s\S]*?<\/script>/g, '')
+      result = result.replace(/<script[^>]*performance[^>]*><\/script>/g, '')
+      result = result.replace(/<script[^>]*feishucdn[^>]*><\/script>/g, '')
+
+      return result
     },
   }
 }
