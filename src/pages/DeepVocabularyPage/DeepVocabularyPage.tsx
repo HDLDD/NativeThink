@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFavorites } from '@/lib/use-favorites';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
@@ -762,6 +763,71 @@ export default function DeepVocabularyPage() {
                         {filteredWords.length} 个单词 · {memorizedWords.size} 已记
                       </CardDescription>
                     </div>
+                  </div>
+
+                  {/* Word count summary */}
+                  <div className="flex items-center gap-1 flex-wrap mb-3 text-[9px] font-bold text-muted-foreground">
+                    <span className="text-[#00B894] font-black">全部{totalWordCount.toLocaleString()}</span>
+                    {SUB_LEVELS.map((key) => (
+                      <span key={key} className="ml-1" style={{ color: LEVEL_COLORS[key] }}>
+                        {LEVEL_LABELS[key]}{(WORD_COUNTS as Record<string, number>)[key]?.toLocaleString()}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Filter chips: 词性 语域 情感 有搭配词 中文无对应 乱序 */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <Select value={posFilter} onValueChange={(v) => { setPosFilter(v); setMemory((p) => ({ ...p, posFilter: v })); }}>
+                      <SelectTrigger className={cn('h-7 rounded-xl text-[9px] font-bold border-0', posFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
+                        <SelectValue placeholder="词性" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">{allPartsOfSpeech.map((p) => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Select value={registerFilter} onValueChange={(v) => { setRegisterFilter(v); setMemory((p) => ({ ...p, registerFilter: v })); }}>
+                      <SelectTrigger className={cn('h-7 rounded-xl text-[9px] font-bold border-0', registerFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
+                        <SelectValue placeholder="语域" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="all" className="text-xs">全部语域</SelectItem>
+                        <SelectItem value="formal" className="text-xs">正式</SelectItem>
+                        <SelectItem value="neutral" className="text-xs">中性</SelectItem>
+                        <SelectItem value="informal" className="text-xs">非正式</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={emotionFilter} onValueChange={setEmotionFilter}>
+                      <SelectTrigger className={cn('h-7 rounded-xl text-[9px] font-bold border-0', emotionFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
+                        <SelectValue placeholder="情感" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="all" className="text-xs">全部情感</SelectItem>
+                        <SelectItem value="positive" className="text-xs">积极</SelectItem>
+                        <SelectItem value="neutral" className="text-xs">中性</SelectItem>
+                        <SelectItem value="negative" className="text-xs">消极</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <button
+                      onClick={() => setCollocOnly(!collocOnly)}
+                      className={cn('px-2 h-7 rounded-xl text-[9px] font-bold transition-colors', collocOnly ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground hover:text-foreground')}
+                    >
+                      有搭配词
+                    </button>
+                    <button
+                      onClick={() => setNoChineseEquivOnly(!noChineseEquivOnly)}
+                      className={cn('px-2 h-7 rounded-xl text-[9px] font-bold transition-colors', noChineseEquivOnly ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground hover:text-foreground')}
+                    >
+                      中文无对应
+                    </button>
+                    <button
+                      onClick={() => setSortMode(sortMode === 'random' ? 'az' : 'random')}
+                      className={cn('px-2 h-7 rounded-xl text-[9px] font-bold transition-colors', sortMode === 'random' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground hover:text-foreground')}
+                    >
+                      乱序
+                    </button>
+                    {activeFilterCount > 0 && (
+                      <button onClick={resetFilters} className="px-2 h-7 rounded-xl text-[9px] font-bold bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors">
+                        重置
+                      </button>
+                    )}
                   </div>
 
                   {/* Memory filter + search */}
