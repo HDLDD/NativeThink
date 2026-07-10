@@ -720,18 +720,24 @@ export default function DeepVocabularyPage() {
         <div>
           <h1 className="text-xl font-black italic text-foreground tracking-tight">词汇深度</h1>
           <p className="text-muted-foreground text-xs font-medium">
-            {LEVELS.find((l) => l.key === selectedLevel)?.label || '全部'} · {MODES.find((m) => m.key === tab)?.label || '学习'}
+            {MODES.find((m) => m.key === tab)?.label || '学习'}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
           onClick={handleOpenWizard}
-          className="rounded-2xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894] hover:bg-emerald-50 dark:hover:bg-emerald-500/10 gap-1.5"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 border-2 border-[#00B894]/30 hover:border-[#00B894] hover:shadow-lg hover:shadow-emerald-200/30 dark:hover:shadow-emerald-900/20 transition-all duration-200 active:scale-[0.98] group"
         >
-          <Settings className="size-3.5" />
-          切换词书
-        </Button>
+          <span className="text-lg">{BOOKS.find((b) => b.key === (selectedLevel === 'all' ? 'cet4' : selectedLevel))?.icon || '📖'}</span>
+          <div className="text-left">
+            <p className="text-[10px] font-black uppercase tracking-wider text-[#00B894] leading-none">
+              {LEVELS.find((l) => l.key === selectedLevel)?.label || '全部'}
+            </p>
+            <p className="text-[9px] font-bold text-muted-foreground leading-none mt-0.5 group-hover:text-foreground transition-colors">
+              点击切换词书
+            </p>
+          </div>
+          <Settings className="size-3 text-[#00B894] opacity-50 group-hover:opacity-100 transition-opacity" />
+        </button>
       </div>
 
       {showWizard && (

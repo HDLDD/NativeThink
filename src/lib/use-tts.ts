@@ -260,7 +260,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   }, []);
 
   const speakSS = useCallback(
-    (text: string, rate: number, pitch: number, volume: number, lang: string) => {
+    (text: string, rate: number, pitch: number, volume: number, lang: string, fallbackTimer?: ReturnType<typeof setTimeout>) => {
       if (!ttsSupported) return;
 
       genRef.current++;
@@ -272,7 +272,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       }
 
       const cleaned = cleanText(text);
-      if (!cleaned) return;
+      if (!cleaned) { clearTimeout(fallbackTimer); return; }
 
       const u = new SpeechSynthesisUtterance(cleaned);
       u.lang = lang;
@@ -297,6 +297,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
       u.onstart = () => {
         if (genRef.current !== gen) return;
+        clearTimeout(fallbackTimer);
         started = true;
         setIsSpeaking(true);
         setIsPaused(false);
@@ -323,6 +324,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       };
 
       u.onerror = (e) => {
+        clearTimeout(fallbackTimer);
         if (genRef.current !== gen) return;
         stopKeepAlive();
         if (e.error === 'canceled' || e.error === 'interrupted') {
@@ -370,6 +372,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       abortedRef.current = true;
       ssCancel();
       stopAudio();
+      clearSafety();
       abortedRef.current = false;
 
       const cleaned = cleanText(text);
@@ -380,15 +383,22 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       const volume = opts?.volume ?? settings.volume;
       const lang = opts?.lang ?? 'en-US';
 
-      // Engine selection:
-      // - iOS: SpeechSynthesis is broken, go straight to network engines
-      // - Everything else: SpeechSynthesis first (works offline, fastest)
       if (isIOS()) {
-        // Try Edge TTS WebSocket first, fall back to Google
+        // iOS: SpeechSynthesis is broken, go straight to network engines
         const chunks = chunkText(cleaned);
         playAudioChunks(chunks, 0, rate, 'edge');
       } else {
-        speakSS(cleaned, rate, pitch, volume, lang);
+        // Desktop / Android: try SpeechSynthesis first.
+        // If onstart doesn't fire within 1.5s (common on Xiaomi/Huawei browsers),
+        // fall back to network engines.
+        const fallbackTimer = setTimeout(() => {
+          if (abortedRef.current) return;
+          // SpeechSynthesis didn't start — cancel it and switch
+          ssCancel();
+          const chunks = chunkText(cleaned);
+          playAudioChunks(chunks, 0, rate, 'edge');
+        }, 1500);
+        speakSS(cleaned, rate, pitch, volume, lang, fallbackTimer);
       }
     },
     [settings.rate, settings.pitch, settings.volume, ssCancel, speakSS, playAudioChunks],
