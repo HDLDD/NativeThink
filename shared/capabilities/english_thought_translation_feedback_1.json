@@ -1,0 +1,36 @@
+{
+  "id": "english_thought_translation_feedback_1",
+  "pluginKey": "@official-plugins/ai-text-generate",
+  "pluginVersion": "1.0.17",
+  "name": "英语思维转译反馈插件",
+  "description": "对比用户的英语描述与母语者表达，给出思维转译指导和改进建议，用于母语思维训练页面的思维转译练习功能。",
+  "icon": "",
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "user_english_expression": {
+        "type": "string",
+        "description": "用户输入的英语描述内容"
+      },
+      "native_expression": {
+        "type": "string",
+        "description": "对应的母语者标准表达内容"
+      }
+    },
+    "required": [
+      "user_english_expression",
+      "native_expression"
+    ]
+  },
+  "formValue": {
+    "modelID": "87",
+    "modelParams": {
+      "maxTokens": 8192,
+      "temperature": 0.5
+    },
+    "prompt": "你是一位专业的英语思维训练导师，精通中英双语思维差异，擅长帮助学习者从母语思维转换为地道的英语思维。\n\n请对比以下用户的英语表达和母语者标准表达，给出详细的思维转译指导和改进建议：\n\n用户英语表达：{{input.user_english_expression}}\n母语者标准表达：{{input.native_expression}}\n\n分析要求：\n1. 差异对比：逐句或逐段对比两者的核心差异，重点标注用词、句式结构、表达逻辑的不同\n2. 思维误区分析：指出用户表达中体现的母语思维干扰点，说明为什么这样表达不符合英语母语者的思维习惯\n3. 转译指导：详细讲解如何从中文思维转换为对应的英语思维，包括表达逻辑调整、词汇选择思路、句式构建方法\n4. 改进建议：给出具体的可操作练习建议，帮助用户巩固该场景下的思维转换能力\n5. 举一反三：提供2-3个同类型场景的表达示例，让用户能够迁移学习\n\n输出要求：\n- 内容专业准确，深入浅出，易于理解\n- 结构清晰，分点呈现，重点突出\n- 避免使用过于专业的语法术语，用通俗易懂的语言解释\n- 语气友好鼓励，增强学习者的信心"
+  },
+  "createdAt": 1783507462264,
+  "updatedAt": 1783507462264,
+  "createdBy": 7611965507087895512
+}

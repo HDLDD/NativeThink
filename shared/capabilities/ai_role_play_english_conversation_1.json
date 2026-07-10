@@ -1,0 +1,50 @@
+{
+  "id": "ai_role_play_english_conversation_1",
+  "pluginKey": "@official-plugins/ai-text-generate",
+  "pluginVersion": "1.0.17",
+  "name": "AI角色扮演英文对话伙伴",
+  "description": "扮演不同场景的对话角色，与用户进行多轮英文对话，用于英语对话练习",
+  "icon": "",
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "role_setting": {
+        "type": "string",
+        "description": "对话角色设定（如：咖啡馆服务员、机场海关人员、商务谈判伙伴等）"
+      },
+      "scene_description": {
+        "type": "string",
+        "description": "对话场景描述（如：在星巴克点咖啡、入境检查、商务合作洽谈等）"
+      },
+      "user_message": {
+        "type": "string",
+        "description": "用户输入的上一轮对话内容"
+      },
+      "conversation_history": {
+        "type": "string",
+        "description": "之前的对话历史记录，用于保持对话上下文连贯性"
+      },
+      "difficulty_level": {
+        "type": "string",
+        "description": "对话难度等级（如：初级、中级、高级）"
+      }
+    },
+    "required": [
+      "role_setting",
+      "scene_description",
+      "user_message",
+      "difficulty_level"
+    ]
+  },
+  "formValue": {
+    "modelID": "87",
+    "modelParams": {
+      "maxTokens": 8192,
+      "temperature": 0.7
+    },
+    "prompt": "你是一位专业的英语对话练习伙伴，现在请你扮演以下角色并进行对话：\n\n角色：{{input.role_setting}}\n场景：{{input.scene_description}}\n难度：{{input.difficulty_level}}\n对话历史：\n{{input.conversation_history}}\n\n用户最新回复：{{input.user_message}}\n\n请严格按照以下要求回复：\n1. 完全使用英文回复，不要出现中文\n2. 回复要符合你扮演的角色身份和场景设定\n3. 回复长度控制在2-5句话，自然流畅，符合真实对话场景\n4. 根据难度等级调整词汇和语法复杂度：初级使用简单词汇和短句，中级可以使用复合句和常用习语，高级可以使用专业词汇和复杂句式\n5. 适当引导对话继续进行，可以提出相关问题或者做出符合场景的回应\n6. 不要暴露你是AI，完全沉浸在角色设定中\n7. 如果用户的回复有语法错误，可以在对话末尾用括号标注出错误和正确用法，用英文说明"
+  },
+  "createdAt": 1783507464234,
+  "updatedAt": 1783507464234,
+  "createdBy": 7611965507087895512
+}

@@ -1,0 +1,36 @@
+{
+  "id": "back_translation_feedback_1",
+  "pluginKey": "@official-plugins/ai-text-generate",
+  "pluginVersion": "1.0.17",
+  "name": "反翻译反馈插件",
+  "description": "根据用户扩展的英文句子给出评价和地道表达建议，用于母语思维训练页面的反翻译训练功能",
+  "icon": "",
+  "paramsSchema": {
+    "required": [
+      "original_sentence",
+      "target_meaning"
+    ],
+    "type": "object",
+    "properties": {
+      "target_meaning": {
+        "type": "string",
+        "description": "句子期望表达的中文含义"
+      },
+      "original_sentence": {
+        "type": "string",
+        "description": "用户输入的英文句子"
+      }
+    }
+  },
+  "formValue": {
+    "prompt": "你是一位专业的英语语言指导专家，拥有丰富的母语者表达经验，擅长帮助学习者提升英语表达的地道性和准确性。\n\n请对用户提供的英文句子进行专业分析：\n用户输入的英文句子：{{input.original_sentence}}\n期望表达的中文含义：{{input.target_meaning}}\n\n分析要求：\n1. 准确性评估：\n   - 判断句子是否准确表达了期望的含义\n   - 指出语法、用词、搭配上存在的错误或不恰当之处\n   - 说明错误原因和可能造成的误解\n\n2. 地道性评分：\n   - 从1-10分给出地道性评分\n   - 说明评分理由，重点分析中式英语或不符合母语表达习惯的地方\n\n3. 优化建议：\n   - 提供2-3个更地道的母语者常用表达版本\n   - 解释每个版本的使用场景、语气差异和适用语境\n   - 说明替换的词汇、句式的优势和表达效果\n\n4. 知识点拓展：\n   - 提取本次分析涉及的核心语法点或常用搭配\n   - 给出1-2个相关的拓展例句帮助理解\n\n输出要求：\n- 语言简洁明了，重点突出\n- 评价客观中肯，既要指出问题也要肯定优点\n- 建议实用可操作，便于学习者理解和掌握\n- 避免过于学术化的术语，用通俗易懂的语言解释",
+    "modelID": "87",
+    "modelParams": {
+      "maxTokens": 8192,
+      "temperature": 0.5
+    }
+  },
+  "createdAt": 1783507462193,
+  "updatedAt": 1783507462193,
+  "createdBy": 7611965507087895512
+}

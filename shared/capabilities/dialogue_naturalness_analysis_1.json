@@ -1,0 +1,36 @@
+{
+  "id": "dialogue_naturalness_analysis_1",
+  "pluginKey": "@official-plugins/ai-text-generate",
+  "pluginVersion": "1.0.17",
+  "name": "对话地道度分析",
+  "description": "对话结束后分析用户表达的地道程度，指出可改进之处并给出建议，用于AI对话练习页面的地道度分析功能。",
+  "icon": "",
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "user_dialogue_content": {
+        "type": "string",
+        "description": "用户在对话练习中输入的所有表达内容"
+      },
+      "dialogue_scenario": {
+        "type": "string",
+        "description": "对话练习的场景（如商务谈判、日常交流、旅游出行等）"
+      }
+    },
+    "required": [
+      "user_dialogue_content",
+      "dialogue_scenario"
+    ]
+  },
+  "formValue": {
+    "modelID": "87",
+    "modelParams": {
+      "maxTokens": 8192,
+      "temperature": 0.5
+    },
+    "prompt": "你是一位专业的语言教学专家，精通地道的语言表达和语用规则。请对以下用户的对话内容进行地道度分析：\n\n对话场景：{{input.dialogue_scenario}}\n用户表达内容：{{input.user_dialogue_content}}\n\n请按照以下结构输出分析结果：\n1. 地道度评分（0-10分）：给出整体评分并简要说明评分依据\n2. 表达亮点：指出用户表达中地道、值得肯定的部分\n3. 可改进之处：逐句或逐段分析不够地道的表达，说明问题所在（如语法错误、用词不当、不符合场景习惯、文化差异等）\n4. 优化建议：针对每个问题点给出地道的替换表达和使用说明\n5. 延伸学习：提供1-2个同场景下的常用地道表达示例\n\n输出要求：\n- 分析客观准确，问题点明确具体\n- 建议实用易懂，便于用户理解和掌握\n- 语言友好，鼓励为主，避免生硬批评\n- 内容结构清晰，重点突出"
+  },
+  "createdAt": 1783507462442,
+  "updatedAt": 1783507462442,
+  "createdBy": 7611965507087895512
+}

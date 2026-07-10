@@ -1,0 +1,22 @@
+abandon|v.|放弃；抛弃|/əˈbændən/|1200|||;forsake|;keep||formal|negative|||They had to abandon the sinking ship.|他们不得不弃船逃生。|He abandoned his plan to study abroad.|他放弃了出国留学的计划。
+ability|n.|能力；才能|/əˈbɪləti/|800|||;skill;talent|;inability||neutral|positive|able;ably|She has the ability to learn quickly.|她有快速学习的能力。|This job is beyond his ability.|这份工作超出了他的能力范围。
+abnormal|adj.|不正常的；反常的|/æbˈnɔːml/|4500|||;unusual;irregular|;normal;usual||formal|negative|normally;norm|The test results were abnormal.|测试结果不正常。|It is abnormal for it to be this cold in May.|五月这么冷很不正常。
+aboard|adv./prep.|在船/飞机/火车上|/əˈbɔːd/|4000|||;on board||travel;transport|neutral|neutral||All passengers are now aboard the aircraft.|所有乘客现在都已登机。|Welcome aboard!|欢迎登机/上车！
+abolish|v.|废除；取消|/əˈbɒlɪʃ/|5000|||;eliminate;repeal|;establish;create||formal|neutral||They voted to abolish the outdated policy.|他们投票废除了过时的政策。|Slavery was abolished in the 19th century.|奴隶制在19世纪被废除。
+abroad|adv.|在国外；到国外|/əˈbrɔːd/|1500|||;overseas|;at home||neutral|neutral||She has always wanted to study abroad.|她一直想出国留学。|He works abroad for most of the year.|他一年大部分时间在国外工作。
+absence|n.|缺席；缺乏|/ˈæbsəns/|2500|||;lack;shortage|;presence;attendance||formal|negative|absent|His absence from the meeting was noted.|他缺席会议被注意到了。|The absence of evidence is not evidence of absence.|没有证据不等于证据不存在。
+absolute|adj.|绝对的；完全的|/ˈæbsəluːt/|3000|||;complete;total;utter|;relative;partial||formal|neutral|absolutely|That is absolute nonsense.|那完全是胡说八道。|I have absolute confidence in her ability.|我对她的能力有绝对的信心。
+absorb|v.|吸收；吸引|/əbˈzɔːb/|3500|||;soak up;take in|;release;emit||neutral|neutral|absorption|Plants absorb carbon dioxide from the air.|植物从空气中吸收二氧化碳。|She was completely absorbed in her book.|她完全沉浸在书中。
+abstract|adj./n.|抽象的；摘要|/ˈæbstrækt/|4000|||;theoretical;conceptual|;concrete;specific||formal|neutral|abstraction|The concept is too abstract for beginners.|这个概念对初学者来说太抽象了。|Please write an abstract of your paper.|请给你的论文写一个摘要。
+abundant|adj.|丰富的；充裕的|/əˈbʌndənt/|4500|||;plentiful;ample|;scarce;rare||formal|positive|abundance|The region has abundant natural resources.|该地区有丰富的自然资源。|Food was abundant at the celebration.|庆祝活动上食物很丰盛。
+abuse|v./n.|滥用；虐待|/əˈbjuːz/|3200|||;misuse;maltreat|;respect;protect||formal|negative|abusive|He abused his power as manager.|他滥用了作为经理的权力。|The child suffered years of abuse.|这个孩子遭受了多年的虐待。
+academic|adj./n.|学术的；学者|/ˌækəˈdemɪk/|1800|||;scholarly;educational||education|formal|neutral|academy|She has an impressive academic record.|她有令人印象深刻的学术记录。|The conference was attended by leading academics.|顶尖学者参加了这个会议。
+accelerate|v.|加速；促进|/əkˈseləreɪt/|4200|||;speed up;hasten|;decelerate;slow||formal|positive|acceleration|The car accelerated smoothly onto the highway.|汽车平稳加速驶上高速公路。|The program is designed to accelerate learning.|这个项目旨在加速学习。
+accent|n.|口音；重音|/ˈæksent/|3000|||;pronunciation;stress||language|neutral|neutral||She speaks English with a slight French accent.|她说英语带一点法国口音。|The accent falls on the first syllable.|重音在第一个音节上。
+accept|v.|接受；承认|/əkˈsept/|600|||;receive;agree to|;refuse;reject||neutral|positive|acceptance;acceptable|She accepted the job offer immediately.|她立即接受了工作邀请。|He finds it hard to accept criticism.|他觉得很难接受批评。
+access|n./v.|进入；通道；访问|/ˈækses/|1000|||;entry;admission||technology|neutral|positive|accessible|Students have access to the online library.|学生可以使用在线图书馆。|You need a password to access the system.|你需要密码才能访问系统。
+accident|n.|事故；意外|/ˈæksɪdənt/|1500|||;crash;mishap|;intention;design||neutral|negative|accidental;accidentally|He was injured in a car accident.|他在车祸中受伤。|It was purely an accident, I didn't mean it.|这纯属意外，我不是故意的。
+accommodate|v.|容纳；适应；提供住宿|/əˈkɒmədeɪt/|4000|||;house;adjust to|;reject;turn away||formal|positive|accommodation|The hotel can accommodate up to 500 guests.|酒店最多可容纳500位客人。|We must accommodate our plans to the new situation.|我们必须调整计划以适应新情况。
+accompany|v.|陪伴；伴随|/əˈkʌmpəni/|2500|||;escort;go with|;leave;abandon||neutral|positive|accompaniment|She accompanied her friend to the hospital.|她陪朋友去了医院。|The singer was accompanied by a pianist.|歌手由一位钢琴家伴奏。
+accomplish|v.|完成；实现|/əˈkʌmplɪʃ/|2800|||;achieve;complete|;fail;neglect||formal|positive|accomplishment|She accomplished her goal of running a marathon.|她完成了跑马拉松的目标。|What did you accomplish today?|今天你完成了什么？
+account|n./v.|账户；解释；说明|/əˈkaʊnt/|900|||;report;description||business;money|neutral|neutral|accountant;accounting|I opened a bank account yesterday.|我昨天开了一个银行账户。|How do you account for the missing money?|你如何解释丢失的钱？
