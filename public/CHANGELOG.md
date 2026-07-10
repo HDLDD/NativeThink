@@ -1,6 +1,25 @@
 # NativeThink 开发日志
 
-## 2026-07-11
+## 2026-07-11 (晚间更新)
+
+### 朗读引擎 (TTS) 🔊 — 重大重构
+- **三层引擎架构**: SpeechSynthesis (桌面主引擎) → Cloudflare Function 代理 (手机) → Edge WebSocket → Google TTS
+- 修复 **cancel 竞态条件**：`speak()` 中 `ssCancel()` 和 `speakSS()` 双重 cancel 导致切换单词后静默
+- `setTimeout(0)` 延迟一个微任务确保 cancel 完全处理后再 speak
+- 添加 **1.5s 启动超时检测**：小米/华为浏览器 SpeechSynthesis API 存在但不发声时自动切换到 Cloudflare 代理
+- **Cloudflare Pages Function** (`/api/tts`)：Cloudflare 全球节点代理 Google TTS，绕过 GFW，CDN 永久缓存
+
+### 搭配短语查询 ⚡
+- **即时反馈**：点击搭配短语立即弹出对话框显示短语，释义异步加载
+- **后台预加载**：选中单词后自动静默预加载所有搭配短语到缓存，后续点击秒开
+
+### UI 调整 ✨
+- **闪卡缩小**：宽度 448→384px，高度 340→260px，字号和间距相应缩小，手机端更友好
+- **学习/复习界面视觉差异化**：学习模式 emerald 色系，复习模式 violet 色系
+
+---
+
+## 2026-07-11 (日间)
 
 ### 性能优化 🚀
 - **网页加载速度**: 全部页面改为 `React.lazy` + Suspense 懒加载，主包 **2.3MB → 897KB (-61%)**
@@ -21,19 +40,12 @@
 - **切换词书按钮**：页面标题旁新增醒目词书切换卡片，可随时更换词书和模式
 - 词书/模式记忆功能，刷新自动恢复
 
-### 朗读引擎 (TTS) 🔊
-- **多引擎架构**: SpeechSynthesis (主) → Edge WebSocket TTS (备) → Google TTS (兜底)
-- 修复 Chromium `cancel()` 竞态条件导致后续 `speak()` 静默失败
-- 添加 start-timeout 备用检测：引擎不触发 onstart 时自动降级
-- 自动语音选择 → 朗读时用可选列表匹配降级
-- 手机端 TTS 声音选择器修复 (Popover modal + Select viewport)
-
 ### 移动端适配 📱
 - 底部 Tab 导航栏
 - 响应式布局 (`col-span-12 lg:col-span-X`)
 - 移动端间距优化
 - 词库浏览筛选芯片紧凑布局
-- 手机端 TTS 声音选择修复
+- 手机端 TTS 声音选择器修复 (Popover modal + Select viewport)
 
 ### UI 改进 ✨
 - 词库浏览 & 搭配学习双列布局，统一界面风格
