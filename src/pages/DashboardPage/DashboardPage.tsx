@@ -242,7 +242,7 @@ export default function DashboardPage() {
     setHistory((prev) => {
       const alreadySaved = prev.some((h) => h.date === today && h.content === dailyChunk.content);
       if (alreadySaved) return prev;
-      const updated = [{ date: today, content: dailyChunk.content, meaning: dailyChunk.meaning, example: dailyChunk.example }, ...prev].slice(0, 60);
+      const updated = [{ date: today, content: dailyChunk.content, meaning: dailyChunk.meaning, example: dailyChunk.example }, ...prev].slice(0, 1000);
       safeStorage.setItem('__nativethink_daily_history', JSON.stringify(updated));
       return updated;
     });
@@ -652,17 +652,23 @@ export default function DashboardPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  if (favorited) {
-                    const fav = favorites.find((f) => f.content === dailyChunk.content && f.type === 'chunk');
-                    if (fav) removeFavorite(fav.id);
+                  const existing = favorites.find((f) => f.content === dailyChunk.content && f.type === 'chunk');
+                  if (existing) {
+                    removeFavorite(existing.id);
+                    toast.success('已取消收藏');
                   } else {
-                    addFavorite({
+                    const ok = addFavorite({
                       type: 'chunk',
                       content: dailyChunk.content,
                       meaning: dailyChunk.meaning,
                       example: dailyChunk.example,
                       category: dailyChunk.category,
                     });
+                    if (ok) {
+                      toast.success('已收藏');
+                    } else {
+                      toast.error('收藏失败，可能已存在');
+                    }
                   }
                 }}
                 className={cn(
@@ -810,7 +816,13 @@ export default function DashboardPage() {
               <Button variant="ghost" size="icon" onClick={() => { if (historyMonth === 0) { setHistoryMonth(11); setHistoryYear(historyYear - 1); } else setHistoryMonth(historyMonth - 1); }} className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]">
                 <ChevronLeft className="size-4" />
               </Button>
-              <span className="text-sm font-black text-foreground">{monthLabel}</span>
+              <button
+                onClick={() => { setHistoryMonth(todayDate.getMonth()); setHistoryYear(todayDate.getFullYear()); }}
+                className="text-sm font-black text-foreground hover:text-[#00B894] transition-colors"
+                title="回到今天"
+              >
+                {monthLabel}
+              </button>
               <Button variant="ghost" size="icon" onClick={() => { if (historyMonth === 11) { setHistoryMonth(0); setHistoryYear(historyYear + 1); } else setHistoryMonth(historyMonth + 1); }} className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]">
                 <ChevronRight className="size-4" />
               </Button>
