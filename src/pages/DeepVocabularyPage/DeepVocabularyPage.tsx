@@ -618,9 +618,7 @@ export default function DeepVocabularyPage() {
                           className="rounded-xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894] h-7">
                           <ChevronLeft className="size-3.5" />
                         </Button>
-                        <span className="text-[10px] font-black text-muted-foreground tabular-nums px-2">
-                          {wordPage + 1} / {totalWordPages}
-                        </span>
+                        <PageJumpInput current={wordPage + 1} total={totalWordPages} onJump={(pg) => setWordPage(pg - 1)} />
                         <Button variant="ghost" size="sm" onClick={() => setWordPage((p) => Math.min(totalWordPages - 1, p + 1))} disabled={wordPage >= totalWordPages - 1}
                           className="rounded-xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894] h-7">
                           <ChevronRight className="size-3.5" />
@@ -1040,5 +1038,40 @@ export default function DeepVocabularyPage() {
       </Dialog>
 
     </div>
+  );
+}
+
+/** Clickable page number that turns into an input for direct jumping */
+function PageJumpInput({ current, total, onJump }: { current: number; total: number; onJump: (pg: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(String(current));
+
+  const commit = () => {
+    const n = parseInt(val, 10);
+    if (n >= 1 && n <= total) onJump(n);
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => { setEditing(true); setVal(String(current)); }}
+        className="text-[10px] font-black text-muted-foreground tabular-nums px-1.5 py-0.5 rounded hover:bg-muted min-w-[3em] text-center"
+        title="点击跳转页面"
+      >
+        {current} / {total}
+      </button>
+    );
+  }
+
+  return (
+    <input
+      autoFocus
+      value={val}
+      onChange={(e) => setVal(e.target.value)}
+      onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setVal(String(current)); setEditing(false); } }}
+      onBlur={commit}
+      className="w-12 text-center rounded-lg bg-muted border border-emerald-200 text-[10px] font-black tabular-nums py-1 outline-none focus:ring-1 focus:ring-emerald-300"
+    />
   );
 }
