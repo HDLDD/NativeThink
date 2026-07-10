@@ -345,10 +345,11 @@ export default function DeepVocabularyPage() {
     return isLevelReady(lv);
   };
   const [dataReady, setDataReady] = useState(() => setupDone || levelReady(selectedLevel));
+  const [dataVersion, setDataVersion] = useState(0);
   useEffect(() => {
-    if (setupDone || levelReady(selectedLevel)) { setDataReady(true); return; }
+    if (setupDone || levelReady(selectedLevel)) { setDataReady(true); setDataVersion((v) => v + 1); return; }
     const levels = selectedLevel === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [selectedLevel];
-    preloadLevels(levels).then(() => setDataReady(true));
+    preloadLevels(levels).then(() => { setDataReady(true); setDataVersion((v) => v + 1); });
   }, [selectedLevel, setupDone]);
 
   const markSetupDone = () => {
@@ -434,7 +435,7 @@ export default function DeepVocabularyPage() {
       return arr;
     }
     return words;
-  }, [selectedLevel, searchQuery, sortMode, collocOnly, posFilter, registerFilter, emotionFilter, noChineseEquivOnly, browseMemoryFilter, memorizedWords, dataReady]);
+  }, [selectedLevel, searchQuery, sortMode, collocOnly, posFilter, registerFilter, emotionFilter, noChineseEquivOnly, browseMemoryFilter, memorizedWords, dataReady, dataVersion]);
 
   // tts must be declared BEFORE it's used in the auto-play effect
   const tts = useTTS();
