@@ -36,7 +36,7 @@ const MODE_COLORS: Record<ReviewMode, { accent: string; bg: string; gradient: st
 };
 
 interface LevelInfo { key: string; label: string; }
-export default function DailyLearningMode({ level, onLevelChange, levels, counts, simple }: { level: string; onLevelChange?: (key: string) => void; levels?: LevelInfo[]; counts?: Record<string, number>; simple?: boolean }) {
+export default function DailyLearningMode({ level, onLevelChange, levels, counts, simple, reviewFocus }: { level: string; onLevelChange?: (key: string) => void; levels?: LevelInfo[]; counts?: Record<string, number>; simple?: boolean; reviewFocus?: boolean }) {
   const { state, dailyQuota, setDailyQuota, todayRemaining, dueForReview, getNewWords, recordReview, resetProgress } = useWordLearning(level);
   const tts = useTTS();
 
@@ -423,7 +423,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
             <Brain className="size-4" />
           </div>
           <div>
-            <h2 className="text-sm font-black italic text-foreground">学习模式</h2>
+            <h2 className="text-sm font-black italic text-foreground">{reviewFocus ? '复习模式' : '学习模式'}</h2>
           </div>
         </div>
         {/* Level switch toast */}
@@ -475,7 +475,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
         </div>
         <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-100 text-center">
           <p className="text-lg font-black text-amber-500">{dailyQuota}</p>
-          <p className="text-[8px] font-black uppercase tracking-wider text-amber-600">每日目标</p>
+          <p className="text-[8px] font-black uppercase tracking-wider text-amber-600">{reviewFocus ? '复习目标' : '每日目标'}</p>
         </div>
         <div className="p-2.5 rounded-xl bg-sky-50 dark:bg-sky-500/15 border border-sky-100 text-center">
           <p className="text-lg font-black text-sky-500">{Object.keys(state.progress).length}</p>
@@ -519,7 +519,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <Target className="size-3.5 text-amber-500" />
-                每日学习量
+                {reviewFocus ? '复习题量' : '每日学习量'}
               </span>
               <div className="flex items-center gap-1">
                 {[10, 20, 50, 100, 200].map((n) => (

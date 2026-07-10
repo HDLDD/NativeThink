@@ -18,7 +18,6 @@ import { toast } from 'sonner';
 import type { IWordEntry } from '@/data/wordbank/schema';
 import { queryWords, preloadLevels, isLevelReady, WORD_COUNTS, ALL_PARTS_OF_SPEECH } from '@/data/wordbank';
 import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
-import FlashcardMode from './components/FlashcardMode';
 import DailyLearningMode from './components/DailyLearningMode';
 import CollocationsTab from './components/CollocationsTab';
 
@@ -842,11 +841,11 @@ export default function DeepVocabularyPage() {
         </div>{/* end sticky header */}
 
         <TabsContent value="daily" className="mt-0">
-          <DailyLearningMode level={selectedLevel} counts={counts} simple />
+          <DailyLearningMode level={selectedLevel} counts={counts} />
         </TabsContent>
 
         <TabsContent value="flashcard" className="mt-0">
-          <FlashcardMode level={selectedLevel} counts={counts} reviewMode={reviewMode} />
+          <DailyLearningMode level={selectedLevel} counts={counts} reviewFocus />
         </TabsContent>
 
         <TabsContent value="browse" className="mt-0">

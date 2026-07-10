@@ -212,18 +212,29 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   }, [ttsSupported, prime]);
 
   // ── Chunked audio playback (for network engines) ──
+  // Cascade fallback: cf → edge → google — each level only degrades on actual failure
 
-  const playAudioChunks = useCallback(
-    (chunks: string[], idx: number, rate: number, engine: 'cf' | 'edge' | 'google') => {
-      if (abortedRef.current || idx >= chunks.length) {
+  const playChunkWithFallback = useCallback(
+    (chunks: string[], idx: number, rate: number, engineIdx: number) => {
+      const engines: Array<'cf' | 'edge' | 'google'> = ['cf', 'edge', 'google'];
+      const engine = engines[engineIdx];
+      if (!engine || abortedRef.current || idx >= chunks.length) {
         stopAudio();
         setIsSpeaking(false);
         setIsPaused(false);
-        if (idx >= chunks.length) optionsRef.current?.onEnd?.();
+        if (idx >= chunks.length && !abortedRef.current) optionsRef.current?.onEnd?.();
         return;
       }
 
-      const onDone = () => playAudioChunks(chunks, idx + 1, rate, engine);
+      const onDone = () => playChunkWithFallback(chunks, idx + 1, rate, 0); // next chunk, reset to best engine
+      const onFail = () => {
+        // Current engine failed — try next one for the SAME chunk
+        if (engineIdx + 1 < engines.length) {
+          playChunkWithFallback(chunks, idx, rate, engineIdx + 1);
+        } else {
+          onDone(); // all engines exhausted, skip this chunk
+        }
+      };
 
       const playUrl = (url: string) => {
         if (abortedRef.current) { onDone(); return; }
@@ -234,21 +245,22 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         a.volume = settings.volume;
         a.onplay = () => { if (!abortedRef.current) { setIsSpeaking(true); setIsPaused(false); } };
         a.onended = () => { if (audioRef.current === a) audioRef.current = null; onDone(); };
-        a.onerror = () => { if (audioRef.current === a) audioRef.current = null; onDone(); };
+        a.onerror = () => { if (audioRef.current === a) audioRef.current = null; onFail(); };
         safetyRef.current = setTimeout(() => {
-          if (audioRef.current === a) { a.pause(); a.src = ''; audioRef.current = null; onDone(); }
+          if (audioRef.current === a) { a.pause(); a.src = ''; audioRef.current = null; onFail(); }
         }, 25000);
-        a.play().catch(() => onDone());
+        // Mobile browsers may reject play() without user gesture — catch and fallback
+        a.play().catch(() => { if (audioRef.current === a) audioRef.current = null; onFail(); });
       };
 
       if (engine === 'cf') {
-        // Cloudflare Function — simplest, most reliable
         playUrl(cfTtsUrl(chunks[idx], rate));
       } else if (engine === 'edge') {
         edgeTTSBlob(chunks[idx], rate)
           .then((blob) => playUrl(URL.createObjectURL(blob)))
-          .catch(() => playUrl(googleTTSUrl(chunks[idx])));
+          .catch(onFail);
       } else {
+        // google
         playUrl(googleTTSUrl(chunks[idx]));
       }
     },
