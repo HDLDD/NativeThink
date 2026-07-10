@@ -19,6 +19,7 @@ import type { IWordEntry } from '@/data/wordbank/schema';
 import { queryWords, preloadLevels, isLevelReady, WORD_COUNTS, ALL_PARTS_OF_SPEECH } from '@/data/wordbank';
 import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
 import DailyLearningMode from './components/DailyLearningMode';
+import FlashcardMode from './components/FlashcardMode';
 import CollocationsTab from './components/CollocationsTab';
 
 interface IWordAiData { sentences: { en: string; zh: string }[]; explanation: string; }
@@ -887,7 +888,7 @@ export default function DeepVocabularyPage() {
         </TabsContent>
 
         <TabsContent value="flashcard" className="mt-0">
-          <DailyLearningMode level={selectedLevel} counts={counts} reviewFocus />
+          <FlashcardMode level={selectedLevel} counts={counts} />
         </TabsContent>
 
         <TabsContent value="browse" className="mt-0">

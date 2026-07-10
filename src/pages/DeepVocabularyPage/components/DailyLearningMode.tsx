@@ -36,7 +36,7 @@ const MODE_COLORS: Record<ReviewMode, { accent: string; bg: string; gradient: st
 };
 
 interface LevelInfo { key: string; label: string; }
-export default function DailyLearningMode({ level, onLevelChange, levels, counts, simple, reviewFocus }: { level: string; onLevelChange?: (key: string) => void; levels?: LevelInfo[]; counts?: Record<string, number>; simple?: boolean; reviewFocus?: boolean }) {
+export default function DailyLearningMode({ level, onLevelChange, levels, counts, simple }: { level: string; onLevelChange?: (key: string) => void; levels?: LevelInfo[]; counts?: Record<string, number>; simple?: boolean }) {
   const { state, dailyQuota, setDailyQuota, todayRemaining, dueForReview, getNewWords, recordReview, resetProgress } = useWordLearning(level);
   const tts = useTTS();
 
@@ -413,18 +413,17 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
 
   return (
     <div className="space-y-4">
-      {/* Learning/Review header + level selector */}
+      {/* Learning header + level selector */}
       <div className="flex items-center justify-between gap-2 flex-wrap relative">
         <div className="flex items-center gap-2">
           <div
             className="size-8 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: reviewFocus ? '#6C5CE720' : `${levelColor.accent}15`, color: reviewFocus ? '#6C5CE7' : levelColor.accent }}
+            style={{ backgroundColor: `${levelColor.accent}15`, color: levelColor.accent }}
           >
-            {reviewFocus ? <RotateCw className="size-4" /> : <Brain className="size-4" />}
+            <Brain className="size-4" />
           </div>
           <div>
-            <h2 className="text-sm font-black italic text-foreground">{reviewFocus ? '复习模式' : '学习模式'}</h2>
-            {reviewFocus && <p className="text-[9px] font-bold text-muted-foreground">SM-2 间隔记忆复习</p>}
+            <h2 className="text-sm font-black italic text-foreground">学习模式</h2>
           </div>
         </div>
         {/* Level switch toast */}
@@ -467,16 +466,16 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       {/* Top stats */}
       <div className="grid grid-cols-4 gap-2">
         <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-100 text-center">
-          <p className="text-lg font-black text-[#00B894]">{reviewFocus ? dueForReview.length : learnedToday}</p>
-          <p className="text-[8px] font-black uppercase tracking-wider text-emerald-600">{reviewFocus ? '待复习' : '今日新学'}</p>
+          <p className="text-lg font-black text-[#00B894]">{learnedToday}</p>
+          <p className="text-[8px] font-black uppercase tracking-wider text-emerald-600">今日新学</p>
         </div>
         <div className="p-2.5 rounded-xl bg-violet-50 dark:bg-violet-500/15 border border-violet-100 text-center">
-          <p className="text-lg font-black text-violet-500">{reviewFocus ? Object.values(state.progress).filter((p) => p.status === 'mastered').length : reviewedToday}</p>
-          <p className="text-[8px] font-black uppercase tracking-wider text-violet-600">{reviewFocus ? '已掌握' : '今日复习'}</p>
+          <p className="text-lg font-black text-violet-500">{reviewedToday}</p>
+          <p className="text-[8px] font-black uppercase tracking-wider text-violet-600">今日复习</p>
         </div>
         <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-100 text-center">
           <p className="text-lg font-black text-amber-500">{dailyQuota}</p>
-          <p className="text-[8px] font-black uppercase tracking-wider text-amber-600">{reviewFocus ? '复习目标' : '每日目标'}</p>
+          <p className="text-[8px] font-black uppercase tracking-wider text-amber-600">每日目标</p>
         </div>
         <div className="p-2.5 rounded-xl bg-sky-50 dark:bg-sky-500/15 border border-sky-100 text-center">
           <p className="text-lg font-black text-sky-500">{Object.keys(state.progress).length}</p>
@@ -490,7 +489,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
         <CardContent className="p-3 space-y-3">
           {/* Mode selector */}
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground shrink-0">{reviewFocus ? '复习方式' : '学习方式'}</span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground shrink-0">学习方式</span>
             <div className="flex gap-1 flex-wrap justify-end">
               {modeLabels.map(({ key, label, icon: Icon }) => {
                 const mc = MODE_COLORS[key];
@@ -520,7 +519,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <Target className="size-3.5 text-amber-500" />
-                {reviewFocus ? '复习题量' : '每日学习量'}
+                每日学习量
               </span>
               <div className="flex items-center gap-1">
                 {[10, 20, 50, 100, 200].map((n) => (
@@ -578,7 +577,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
           <div className="flex items-center gap-3">
             <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
               <div
-                className={cn('h-full rounded-full transition-all duration-300', reviewFocus ? 'bg-gradient-to-r from-[#6C5CE7] to-violet-400' : 'bg-gradient-to-r from-[#00B894] to-emerald-400')}
+                className="h-full bg-gradient-to-r from-[#00B894] to-emerald-400 rounded-full transition-all duration-300"
                 style={{ width: `${((currentIdx + 1) / sessionWords.length) * 100}%` }}
               />
             </div>
@@ -614,9 +613,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                         {!isFlipped ? (
                           <>
                             <Badge className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground mb-6">
-                              {reviewFocus
-                                ? (state.progress[currentWord.word.toLowerCase()]?.status === 'mastered' ? '已掌握' : '复习中')
-                                : (state.progress[currentWord.word.toLowerCase()] ? '复习' : '新学')}
+                              {state.progress[currentWord.word.toLowerCase()] ? '复习' : '新学'}
                             </Badge>
                             <div className="flex items-center justify-center gap-3 mb-3">
                               <h2 className="text-5xl font-black italic text-foreground tracking-tight">{currentWord.word}</h2>
