@@ -164,7 +164,7 @@ Explain the difference between the Chinese thinking pattern and the English thin
 ### 💡 Key Takeaway
 One actionable tip to avoid this pattern in the future.
 
-Reply in Chinese (Simplified) so the learner can fully understand the analysis.`,
+Provide ALL responses in BOTH English and Chinese (bilingual). For each section, show the **English version first**, followed by the **中文版本**. This immersive approach helps learners develop English reading skills while using Chinese as a comprehension aid.`,
             },
             { role: 'user', content: `Please analyze this sentence: "${input}"` },
           ],
@@ -222,7 +222,7 @@ Reply in Chinese (Simplified) so the learner can fully understand the analysis.`
               role: 'system',
               content: `You are an English thinking coach. The user has been given a scenario in Chinese and must describe it in English directly (without translating word-by-word). Compare their expression with the native reference and provide feedback.
 
-Reply in Chinese for better understanding:
+Provide ALL responses in BOTH English and Chinese (bilingual). For each section, show the **English version first**, followed by the **中文版本**:
 
 ## 🎯 思维转译分析
 
@@ -302,7 +302,7 @@ Reply in Chinese for better understanding:
               role: 'system',
               content: `You are an English vocabulary coach. The user is given a keyword/phrase and must create a natural English sentence using it. Evaluate their sentence and provide feedback.
 
-Reply in Chinese:
+Provide ALL responses in BOTH English and Chinese (bilingual). For each section, show the **English version first**, followed by the **中文版本**:
 
 ## 📝 造句评估
 
@@ -427,7 +427,7 @@ Reply in Chinese:
               role: 'system',
               content: `You are an expert English thinking coach. The user is shown a Chinese sentence written from a native English speaker's thinking perspective. They must translate it to English and you will analyze the gap between their translation and natural native English.
 
-Reply in Chinese:
+Provide ALL responses in BOTH English and Chinese (bilingual). For each section, show the **English version first**, followed by the **中文版本**:
 
 ## 🧠 思维还原分析
 

@@ -478,7 +478,7 @@ export default function ChunkTrainingPage() {
               role: 'system',
               content: `You are an English chunk/phrase coach. The user must create a sentence using a specific English chunk/phrase. Evaluate their sentence.
 
-Reply in Chinese. Format:
+Provide ALL responses in BOTH English and Chinese (bilingual). For each section, show the **English version first**, followed by the **中文版本**. Format:
 
 ## 评价
 ✅/⚠️ 简短评价

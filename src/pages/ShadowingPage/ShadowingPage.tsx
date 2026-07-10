@@ -420,7 +420,7 @@ Make sentences realistic and conversational. Mark 1-2 stressed words per sentenc
         [
           {
             role: 'system',
-            content: `You are an English pronunciation coach. Analyze the given English sentence for pronunciation challenges for Chinese learners. Reply in Chinese. Format:
+            content: `You are an English pronunciation coach. Analyze the given English sentence for pronunciation challenges for Chinese learners. Provide ALL responses in BOTH English and Chinese (bilingual). For each section, show the **English version first**, followed by the **中文版本**. Format:
 
 ## 🔤 发音难点分析
 
