@@ -536,14 +536,27 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                 ))}
               </div>
             </div>
-            <Slider
-              value={[dailyQuota]}
-              onValueChange={(v) => setDailyQuota(v[0])}
-              min={5}
-              max={500}
-              step={5}
-              className="w-full"
-            />
+            <div className="flex items-center gap-2">
+              <Slider
+                value={[Math.min(dailyQuota, 500)]}
+                onValueChange={(v) => setDailyQuota(v[0])}
+                min={5}
+                max={500}
+                step={5}
+                className="flex-1"
+              />
+              <input
+                type="number"
+                min={1}
+                max={9999}
+                value={dailyQuota}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  if (v > 0 && v <= 9999) setDailyQuota(v);
+                }}
+                className="w-16 px-2 py-1.5 rounded-lg bg-muted border-2 border-transparent focus:border-amber-300 focus:bg-white text-xs font-black text-center outline-none transition-all"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

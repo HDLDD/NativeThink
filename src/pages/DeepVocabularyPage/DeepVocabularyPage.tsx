@@ -61,7 +61,7 @@ const REVIEW_MODES = [
   { key: 'full', label: '整本随机', icon: '📚', desc: '随机抽取书内单词进行自测' },
 ] as const;
 
-const DAILY_COUNTS = [5, 10, 15, 20, 30];
+const DAILY_COUNTS = [5, 10, 20, 30, 50, 100];
 
 function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
   const [step, setStep] = useState(0);
@@ -180,12 +180,28 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
             <p className="text-xs font-bold text-muted-foreground">已选：{selectedBook?.icon} {selectedBook?.label}</p>
             <p className="text-xl font-black text-foreground">每日学习量</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {DAILY_COUNTS.map((n) => (
               <button key={n} onClick={() => setDailyCount(n)}
                 className={cn('flex-1 py-3 rounded-2xl text-sm font-black transition-all',
                   dailyCount === n ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50' : 'bg-muted text-muted-foreground hover:bg-muted/80')}>{n}词</button>
             ))}
+          </div>
+          {/* Custom input for no-limit daily count */}
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-[10px] font-bold text-muted-foreground">自定义：</span>
+            <input
+              type="number"
+              min={1}
+              max={9999}
+              value={dailyCount}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (v > 0 && v <= 9999) setDailyCount(v);
+              }}
+              className="w-20 px-3 py-2.5 rounded-xl bg-muted border-2 border-transparent focus:border-[#00B894] focus:bg-white text-sm font-black text-center outline-none transition-all"
+            />
+            <span className="text-[10px] font-bold text-muted-foreground">词/天</span>
           </div>
           <div className="flex gap-2 pt-2">
             <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="rounded-2xl text-xs">← 返回</Button>
@@ -820,11 +836,11 @@ export default function DeepVocabularyPage() {
         </div>{/* end sticky header */}
 
         <TabsContent value="daily" className="mt-0">
-          <DailyLearningMode level={selectedLevel} onLevelChange={switchLevel} levels={LEVELS} counts={counts} simple />
+          <DailyLearningMode level={selectedLevel} counts={counts} simple />
         </TabsContent>
 
         <TabsContent value="flashcard" className="mt-0">
-          <FlashcardMode level={selectedLevel} onLevelChange={switchLevel} levels={LEVELS} counts={counts} reviewMode={reviewMode} />
+          <FlashcardMode level={selectedLevel} counts={counts} reviewMode={reviewMode} />
         </TabsContent>
 
         <TabsContent value="browse" className="mt-0">
