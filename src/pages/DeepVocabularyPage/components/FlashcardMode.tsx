@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCw, CheckCircle2, XCircle, Volume2, Shuffle, ArrowRight, ArrowLeft, Sparkles, BookOpen, Edit3, Headphones, Link2, PenLine } from 'lucide-react';
+import { RotateCw, Volume2, Shuffle, ArrowRight, ArrowLeft, Sparkles, BookOpen, Edit3, Headphones } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
