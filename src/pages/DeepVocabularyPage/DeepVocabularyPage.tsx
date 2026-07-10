@@ -796,7 +796,9 @@ export default function DeepVocabularyPage() {
           <span className="text-sm font-bold text-muted-foreground">加载词库数据中…</span>
         </div>
       )}
-      <Tabs value={tab} onValueChange={handleTabChange} className={cn('w-full', (!dataReady || showWizard) && 'hidden')}>
+
+      {!showWizard && dataReady && (
+      <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
         {/* Sticky header: browse level scroller + filter chips + tab buttons */}
         <div className="sticky top-20 z-30 bg-background/95 backdrop-blur-md pb-3 -mx-1 px-1">
           {/* 等级筛选滚轮 — only in browse mode */}
@@ -1413,6 +1415,7 @@ export default function DeepVocabularyPage() {
         </TabsContent>
 
       </Tabs>
+      )}
 
       {/* Collocation Detail Dialog */}
       <Dialog open={collocOpen} onOpenChange={setCollocOpen}>

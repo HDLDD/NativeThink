@@ -166,6 +166,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const safetyRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const primedRef = useRef(false);
+  const audioUnlockedRef = useRef(false);
 
   const ttsSupported = 'speechSynthesis' in window;
 
@@ -176,7 +177,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null; }
   };
   const stopAudio = () => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; audioRef.current = null; }
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
   };
 
   // ── Load voices ──
@@ -191,32 +192,43 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
   }, [ttsSupported]);
 
-  // ── Prime SpeechSynthesis on first tap (mobile requirement) ──
+  // ── Prime SpeechSynthesis + Audio on first tap (mobile requirement) ──
   const prime = useCallback(() => {
-    if (primedRef.current || !ttsSupported) return;
-    try {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance('');
-      u.volume = 0;
-      window.speechSynthesis.speak(u);
+    if (!primedRef.current && ttsSupported) {
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance('');
+        u.volume = 0;
+        window.speechSynthesis.speak(u);
+      } catch { /* */ }
       primedRef.current = true;
-    } catch { /* */ }
+    }
+    // Unlock HTMLAudioElement: create silent audio and play() during user gesture.
+    // This tells the browser "user has interacted" — all future Audio.play() calls work.
+    if (!audioUnlockedRef.current) {
+      try {
+        const a = new Audio();
+        a.volume = 0;
+        a.play().then(() => { a.pause(); a.src = ''; }).catch(() => {});
+        audioUnlockedRef.current = true;
+      } catch { /* */ }
+    }
   }, [ttsSupported]);
 
   useEffect(() => {
-    if (!ttsSupported || primedRef.current) return;
+    if (primedRef.current && audioUnlockedRef.current) return;
     const cb = () => { prime(); document.removeEventListener('touchstart', cb); document.removeEventListener('click', cb); };
     document.addEventListener('touchstart', cb, { once: true });
     document.addEventListener('click', cb, { once: true });
     return () => { document.removeEventListener('touchstart', cb); document.removeEventListener('click', cb); };
-  }, [ttsSupported, prime]);
+  }, [prime]);
 
   // ── Chunked audio playback (for network engines) ──
   // Cascade fallback: cf → edge → google — each level only degrades on actual failure
 
   const playChunkWithFallback = useCallback(
     (chunks: string[], idx: number, rate: number, engineIdx: number) => {
-      const engines: Array<'cf' | 'edge' | 'google'> = ['cf', 'edge', 'google'];
+      const engines: Array<'cf' | 'edge' | 'google'> = ['edge', 'cf', 'google'];
       const engine = engines[engineIdx];
       if (!engine || abortedRef.current || idx >= chunks.length) {
         stopAudio();
@@ -249,7 +261,8 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         safetyRef.current = setTimeout(() => {
           if (audioRef.current === a) { a.pause(); a.src = ''; audioRef.current = null; onFail(); }
         }, 25000);
-        // Mobile browsers may reject play() without user gesture — catch and fallback
+        // After first-touch prime(), mobile browsers allow play() — but if it
+        // still fails (e.g. no prior user gesture), cascade to next engine
         a.play().catch(() => { if (audioRef.current === a) audioRef.current = null; onFail(); });
       };
 
