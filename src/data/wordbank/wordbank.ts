@@ -27,15 +27,43 @@ function cleanWordEntry(w: IWordEntry): IWordEntry {
 // ── Dynamic level loaders ──
 const ALL_LEVELS = ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] as const;
 
+const CACHE_VERSION = 1;
+const LS_PREFIX = '__nativethink_wb_';
+
 const _levelCache: Record<string, IWordEntry[]> = {};
 const _loaded: Set<string> = new Set();
 const _loading: Map<string, Promise<void>> = new Map();
+
+function loadFromCache(level: string): IWordEntry[] | null {
+  try {
+    const raw = localStorage.getItem(`${LS_PREFIX}${level}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed.v === CACHE_VERSION && Array.isArray(parsed.d)) return parsed.d;
+  } catch { /* quota exceeded or corrupt */ }
+  return null;
+}
+
+function saveToCache(level: string, words: IWordEntry[]) {
+  try {
+    localStorage.setItem(`${LS_PREFIX}${level}`, JSON.stringify({ v: CACHE_VERSION, d: words }));
+  } catch { /* quota exceeded — silently skip */ }
+}
 
 async function loadLevel(level: string): Promise<void> {
   if (_loaded.has(level)) return;
   if (_loading.has(level)) { await _loading.get(level); return; }
 
   const p = (async () => {
+    // 1. Try localStorage cache first (instant on repeat visits)
+    const cached = loadFromCache(level);
+    if (cached) {
+      _levelCache[level] = cached;
+      _loaded.add(level);
+      return;
+    }
+
+    // 2. Dynamic import from network
     let mod: Record<string, IWordEntry[]>;
     switch (level) {
       case 'cet4': mod = await import('./data/cet4'); break;
@@ -46,9 +74,12 @@ async function loadLevel(level: string): Promise<void> {
       default: return;
     }
     const key = Object.keys(mod).find((k) => k.toUpperCase().includes('WORDS'));
-    const words: IWordEntry[] = key ? (mod as any)[key] : [];
-    _levelCache[level] = words.map(cleanWordEntry);
+    const words: IWordEntry[] = (key ? (mod as any)[key] : []).map(cleanWordEntry);
+    _levelCache[level] = words;
     _loaded.add(level);
+
+    // 3. Save to cache for next visit
+    saveToCache(level, words);
   })();
 
   _loading.set(level, p);

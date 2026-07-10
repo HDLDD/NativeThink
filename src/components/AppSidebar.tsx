@@ -20,6 +20,7 @@ import {
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
+import { preloadLevels } from '@/data/wordbank';
 
 const NAV_ITEMS = [
   { path: '/', label: '首页仪表盘', icon: LayoutDashboard },
@@ -62,7 +63,10 @@ export default function AppSidebar() {
                   ? pathname === '/'
                   : pathname === item.path || pathname.startsWith(`${item.path}/`);
               return (
-                <SidebarMenuItem key={item.path}>
+                <SidebarMenuItem key={item.path}
+                  onMouseEnter={() => { if (item.path === '/vocabulary') preloadLevels(['cet4']); }}
+                  onTouchStart={() => { if (item.path === '/vocabulary') preloadLevels(['cet4']); }}
+                >
                   <SidebarMenuButton asChild tooltip={item.label} isActive={isActive}>
                     <NavLink
                       to={item.path}

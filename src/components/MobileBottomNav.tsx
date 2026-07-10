@@ -7,6 +7,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { preloadLevels } from '@/data/wordbank';
 
 const MOBILE_NAV = [
   { path: '/', label: '首页', icon: LayoutDashboard },
@@ -32,6 +33,7 @@ export default function MobileBottomNav() {
             <button
               key={path}
               onClick={() => navigate(path)}
+              onTouchStart={() => { if (path === '/vocabulary') preloadLevels(['cet4']); }}
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 h-full py-1 transition-colors',
                 isActive
