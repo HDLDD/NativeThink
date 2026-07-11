@@ -118,7 +118,7 @@ const FAMOUS_SPEECHES: SpeechItem[] = [
   { id: 'rand-Atlas', title: 'This is John Galt Speaking', zhTitle: '约翰·高尔特演说', author: 'Ayn Rand', year: 1957, type: '文学演讲', topic: 'philosophy', preview: 'For twelve years you have been asking: Who is John Galt?...' },
   { id: 'mandela-inaugural', title: 'Inaugural Address', zhTitle: '就职演说', author: 'Nelson Mandela', year: 1994, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Nelson_Mandela_1994.jpg/440px-Nelson_Mandela_1994.jpg', preview: 'Our deepest fear is not that we are inadequate...' },
   { id: 'greta-un-climate', title: 'How Dare You', zhTitle: '你们怎么敢', author: 'Greta Thunberg', year: 2019, type: 'UN演讲', topic: 'science', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Greta_Thunberg_2020_%28cropped%29.jpg/440px-Greta_Thunberg_2020_%28cropped%29.jpg', preview: 'My message is that we\'ll be watching you...' },
-  { id: 'emma-heforshe', title: 'HeForShe Gender Equality', zhTitle: '他为她性别平等', author: 'Emma Watson', year: 2014, type: 'UN演讲', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Emma_Watcher_2013.jpg/440px-Emma_Watcher_2013.jpg', preview: 'Today we are launching a campaign called "HeForShe."...' },
+  { id: 'emma-heforshe', title: 'HeForShe Gender Equality', zhTitle: '他为她性别平等', author: 'Emma Watson', year: 2014, type: 'UN演讲', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Emma_Watson_2013.jpg/440px-Emma_Watson_2013.jpg', preview: 'Today we are launching a campaign called "HeForShe."...' },
   { id: 'malala-un', title: 'Education for All', zhTitle: '全民教育', author: 'Malala Yousafzai', year: 2013, type: 'UN演讲', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Malala_Yousafzai_2015.jpg/440px-Malala_Yousafzai_2015.jpg', preview: 'In the name of God, the most beneficent, the most merciful...' },
   { id: 'reagan-challenger', title: 'The Challenger Disaster Speech', zhTitle: '挑战者号灾难演说', author: 'Ronald Reagan', year: 1986, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Official_Portrait_of_President_Reagan_1981.jpg/440px-Official_Portrait_of_President_Reagan_1981.jpg', preview: 'Ladies and gentlemen, I\'d planned to speak to you tonight...' },
 ];
@@ -351,6 +351,8 @@ export default function ArticlePage() {
   }, [wikiQuery, saveToHistory]);
 
   // ── Load Speech ──
+  const [expandLoading, setExpandLoading] = useState(false);
+
   const fetchSpeech = useCallback(async (speech: typeof FAMOUS_SPEECHES[0]) => {
     setLoading(true);
     try {
@@ -622,7 +624,10 @@ A plant can obtain its food from the soil. An animal can obtain its food by acti
 This, and nothing less, is the meaning of human existence: to create, to produce, to achieve. Every form of happiness is a form of creation. Every form of suffering is a form of destruction. The choice is yours: to think or to die.`,
 
       };
-      const content = knownTexts[speech.id] || speech.preview + '\n\n[注：此演讲稿因版权限制仅提供摘要，完整内容请访问来源网站。AI 可基于摘要生成完整学习文章。]';
+      let content = knownTexts[speech.id] || speech.preview;
+      // For TED talks (copyrighted), content is an excerpt — offer AI expansion
+      const needsExpansion = content.length < 1500 && isConfigured;
+
       setDisplayTitle(`${speech.zhTitle} — ${speech.author} (${speech.year})`);
       setDisplayContent(content);
       setDisplayTranslation('');
@@ -631,9 +636,27 @@ This, and nothing less, is the meaning of human existence: to create, to produce
       setQuizMode(false);
       saveToHistory(speech.zhTitle || speech.title, content, 'speeches');
       toast.success(`已加载：${speech.zhTitle || speech.title}`);
+
+      // Auto-expand short speeches with AI
+      if (needsExpansion) {
+        setExpandLoading(true);
+        try {
+          const result = await aiChat([
+            { role: 'system', content: `You are an English teacher. Based on the following speech excerpt, write a complete, well-structured English article (500-800 words) about this speech and its key ideas. Include: (1) Background context of the speech (2) The main arguments and key points (3) The speech's impact and significance. Write in clear, engaging English suitable for intermediate learners. Return ONLY the article text, no JSON, no markdown headers.` },
+            { role: 'user', content: `Speech: "${speech.title}" by ${speech.author} (${speech.year})\n\nExcerpt:\n${content}` },
+          ], { temperature: 0.7, maxTokens: 2048 });
+          const expanded = result.trim();
+          if (expanded.length > content.length + 200) {
+            setDisplayContent(expanded);
+            saveToHistory(speech.zhTitle || speech.title, expanded, 'speeches');
+            toast.success('AI 已扩展为完整文章');
+          }
+        } catch { /* silent */ }
+        finally { setExpandLoading(false); }
+      }
     } catch { toast.error('加载失败'); }
     finally { setLoading(false); }
-  }, [saveToHistory]);
+  }, [saveToHistory, isConfigured, aiChat]);
 
   // ── Word Lookup ──
   const handleWordClick = useCallback(async (word: string) => {
@@ -870,7 +893,7 @@ This, and nothing less, is the meaning of human existence: to create, to produce
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[500px] overflow-y-auto">
               {GUTENBERG_BOOKS.map((book) => (
-                <button key={book.id} onClick={() => fetchGutenbergBook({ id: book.id, title: book.title, authors: [{ name: book.author }], subjects: [book.topic], formats: { 'text/plain': `https://www.gutenberg.org/files/${book.id}/${book.id}-0.txt` }, download_count: 0 })}
+                <button key={book.id} onClick={() => fetchGutenbergBook({ id: book.id, title: book.title, authors: [{ name: book.author }], subjects: [book.topic], formats: { 'text/plain': `https://www.gutenberg.org/cache/epub/${book.id}/pg${book.id}.txt`, 'text/html': `https://www.gutenberg.org/cache/epub/${book.id}/pg${book.id}-images.html` }, download_count: 0 })}
                   className="group text-left rounded-2xl bg-muted/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all border border-transparent hover:border-[#00B894]/30 hover:shadow-lg overflow-hidden">
                   {/* Book cover */}
                   <div className="aspect-[3/4] bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center relative overflow-hidden">
@@ -985,17 +1008,16 @@ This, and nothing less, is the meaning of human existence: to create, to produce
                 return (
                 <button key={speech.id} onClick={() => fetchSpeech(speech)}
                   className="group text-left rounded-2xl bg-muted/30 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-all border border-transparent hover:border-amber-200 hover:shadow-lg overflow-hidden">
-                  {/* Speech card header: speaker image or gradient */}
+                  {/* Speech card header: speaker image or gradient fallback */}
                   <div className={cn('aspect-[4/3] bg-gradient-to-br flex items-center justify-center relative overflow-hidden',
                     typeColors[speech.type] || 'from-amber-500 to-orange-600')}>
-                    {speech.image ? (
+                    <span className="text-3xl absolute">🎤</span>
+                    {speech.image && (
                       <img src={speech.image} alt={speech.author}
-                        className="absolute inset-0 w-full h-full object-cover" loading="lazy"
+                        className="absolute inset-0 w-full h-full object-cover z-10" loading="lazy"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                    ) : (
-                      <span className="text-3xl">🎤</span>
                     )}
-                    <Badge className="absolute top-2 right-2 rounded-full px-1.5 py-0 text-[7px] font-black bg-white/20 text-white border-0">
+                    <Badge className="absolute top-2 right-2 rounded-full px-1.5 py-0 text-[7px] font-black bg-white/20 text-white border-0 z-20">
                       {speech.type}
                     </Badge>
                   </div>
