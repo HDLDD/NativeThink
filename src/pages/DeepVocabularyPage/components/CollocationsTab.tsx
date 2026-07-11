@@ -205,6 +205,25 @@ export default function CollocationsTab({
     });
   };
 
+  // ===== 单词记忆（与词库浏览共享同一存储） =====
+  const WORD_MEMORIZED_KEY = '__nativethink_browse_memorized';
+  const [memorizedWords, setMemorizedWords] = useState<Set<string>>(() => {
+    try {
+      const raw = safeStorage.getItem(WORD_MEMORIZED_KEY);
+      return raw ? new Set(JSON.parse(raw)) : new Set<string>();
+    } catch { return new Set<string>(); }
+  });
+
+  const toggleMemorizedWord = (word: string) => {
+    const key = word.toLowerCase();
+    setMemorizedWords((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      try { safeStorage.setItem(WORD_MEMORIZED_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
   const handleToggleLevel = (key: string) => {
     setSelectedLevels((prev) => {
       const next = new Set(prev);
@@ -579,16 +598,30 @@ export default function CollocationsTab({
                               </button>
                             )}
                             <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                              {entry.words.slice(0, 5).map((w) => (
-                                <button
-                                  key={w.word}
-                                  onClick={(e) => { e.stopPropagation(); onSelectWord?.(w); }}
-                                  className="text-[9px] text-muted-foreground bg-muted hover:bg-amber-100 hover:text-amber-600 px-1.5 py-0.5 rounded-md font-medium transition-colors"
-                                  title={onSelectWord ? `跳转到 ${w.word}` : undefined}
-                                >
-                                  {w.word}
-                                </button>
-                              ))}
+                              {entry.words.slice(0, 5).map((w) => {
+                                const wordMemorized = memorizedWords.has(w.word.toLowerCase());
+                                return (
+                                  <span key={w.word} className="inline-flex items-center gap-0.5 bg-muted rounded-md pl-1 pr-1.5 py-0.5">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); toggleMemorizedWord(w.word); }}
+                                      title={wordMemorized ? '取消记忆' : '标记为已记'}
+                                      className={cn(
+                                        'p-0 rounded transition-colors',
+                                        wordMemorized ? 'text-[#00B894]' : 'text-muted-foreground/40 hover:text-[#00B894]',
+                                      )}
+                                    >
+                                      <Brain className={cn('size-3', wordMemorized && 'fill-[#00B894]/20')} />
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); onSelectWord?.(w); }}
+                                      className="text-[9px] text-muted-foreground hover:text-amber-600 font-medium transition-colors"
+                                      title={onSelectWord ? `跳转到 ${w.word}` : undefined}
+                                    >
+                                      {w.word}
+                                    </button>
+                                  </span>
+                                );
+                              })}
                               {entry.words.length > 5 && (
                                 <span className="text-[9px] text-muted-foreground/50">+{entry.words.length - 5}</span>
                               )}
@@ -818,6 +851,7 @@ export default function CollocationsTab({
                       .sort((a, b) => a.word.localeCompare(b.word))
                       .map((w) => {
                         const wLc = LEVEL_COLORS[w.level] || LEVEL_COLORS.cet4;
+                        const wordMemorized = memorizedWords.has(w.word.toLowerCase());
                         return (
                           <div
                             key={w.word}
@@ -827,6 +861,16 @@ export default function CollocationsTab({
                             )}
                             style={{ borderColor: wLc.hex + '30', backgroundColor: wLc.hex + '0D' }}
                           >
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleMemorizedWord(w.word); }}
+                              title={wordMemorized ? '取消记忆' : '标记为已记'}
+                              className={cn(
+                                'p-0 rounded transition-colors',
+                                wordMemorized ? 'text-[#00B894]' : 'text-muted-foreground/40 hover:text-[#00B894]',
+                              )}
+                            >
+                              <Brain className={cn('size-3.5', wordMemorized && 'fill-[#00B894]/20')} />
+                            </button>
                             <button
                               onClick={() => onSelectWord?.(w)}
                               className="flex items-center gap-1.5 text-left"
