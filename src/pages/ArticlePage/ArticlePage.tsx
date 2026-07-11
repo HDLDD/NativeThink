@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   FileText, Sparkles, Languages, BookOpen, Volume2, RefreshCw, Loader2,
@@ -20,6 +20,9 @@ import { toast } from 'sonner';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import { buildPages } from '@/data/reading';
 import type { SpeechMeta } from '@/data/speeches';
+
+// Lazy load PageReader to avoid circular dependency (PageReader → wordbank → reading → back to ArticlePage)
+const PageReader = lazy(() => import('./components/PageReader'));
 // ── Types ──
 type Level = 'beginner' | 'intermediate' | 'advanced';
 type MainTab = 'books' | 'publications' | 'ai' | 'speeches';
@@ -895,24 +898,18 @@ export default function ArticlePage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── PageReader overlay ── */}
+      {/* ── PageReader overlay (lazy-loaded to avoid circular dependency) ── */}
       {readerVisible && readerContent && (
-        <ErrorBoundary
-          fallbackRender={({ error, resetErrorBoundary }) => (
-            <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
-              <div className="text-center max-w-sm px-6">
-                <BookOpen className="size-12 mx-auto mb-3 text-muted-foreground/30" />
-                <p className="text-sm font-black text-foreground">阅读器加载失败</p>
-                <p className="text-xs text-muted-foreground mt-1 mb-4">{error?.message || '未知错误'}</p>
-                <Button onClick={() => { resetErrorBoundary(); closeReader(); }} className="rounded-xl text-sm font-bold">
-                  关闭并重试
-                </Button>
-              </div>
+        <Suspense fallback={
+          <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
+            <div className="text-center">
+              <Loader2 className="size-8 mx-auto mb-3 animate-spin text-[#00B894]" />
+              <p className="text-sm font-medium text-muted-foreground">加载阅读器…</p>
             </div>
-          )}
-        >
+          </div>
+        }>
           <PageReader content={readerContent} onClose={closeReader} />
-        </ErrorBoundary>
+        </Suspense>
       )}
 
       {/* ── Usage Guide Dialog ── */}
