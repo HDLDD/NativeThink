@@ -645,61 +645,60 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       <div className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch"
       >
         {viewMode === 'toc' && hasChapters ? (
-          /* ── TABLE OF CONTENTS (scrollable chapter pills) ── */
-          <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+          /* ── TABLE OF CONTENTS (vertical scroll wheel like word browse) ── */
+          <div className="max-w-lg mx-auto px-4 sm:px-6 py-6 flex flex-col h-full">
             {/* Book info header */}
-            <div className="text-center">
-              <BookOpen className="size-8 text-[#00B894] mx-auto mb-2" />
-              <h2 className="text-lg font-black italic text-foreground">{activeContent.zhTitle || activeContent.title}</h2>
+            <div className="text-center shrink-0 mb-4">
+              <BookOpen className="size-7 text-[#00B894] mx-auto mb-1.5" />
+              <h2 className="text-base font-black italic text-foreground">{activeContent.zhTitle || activeContent.title}</h2>
               <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">
                 {activeContent.author || activeContent.source} · {chapters.length} 章节 · {activeContent.totalWords.toLocaleString()} 词
               </p>
             </div>
 
-            {/* Horizontal scrollable chapter pills */}
-            <div className="relative">
-              <div
-                ref={tocScrollRef}
-                className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-none snap-x snap-mandatory"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-              >
-                {chapters.map((ch, i) => {
-                  const endPage = i < chapters.length - 1 ? chapters[i + 1].pageIndex : activePages;
-                  const startPage = ch.pageIndex + 1;
-                  const isActive = i === currentChapter;
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setCurrentChapter(i);
-                        setPageIdx(ch.pageIndex);
-                        setViewMode('reading');
-                      }}
-                      className={cn(
-                        'shrink-0 snap-start text-left p-3 rounded-2xl border-2 transition-all min-w-[140px] max-w-[200px]',
-                        isActive
-                          ? 'border-[#00B894] bg-[#00B894]/10 shadow-sm'
-                          : 'border-border hover:border-[#00B894]/40 hover:bg-muted/50',
-                      )}
-                    >
+            {/* Chapter list — vertical scrollable, like word bank browse */}
+            <div ref={tocScrollRef} className="flex-1 overflow-y-auto space-y-1 pr-1">
+              {chapters.map((ch, i) => {
+                const endPage = i < chapters.length - 1 ? chapters[i + 1].pageIndex : activePages;
+                const startPage = ch.pageIndex + 1;
+                const isActive = i === currentChapter;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setCurrentChapter(i);
+                      setPageIdx(ch.pageIndex);
+                      setViewMode('reading');
+                    }}
+                    className={cn(
+                      'w-full text-left p-2.5 rounded-xl transition-all duration-200 border-2',
+                      isActive
+                        ? 'border-[#00B894] bg-[#00B894]/5 shadow-sm'
+                        : 'border-transparent bg-muted/30 hover:bg-muted hover:border-border',
+                    )}
+                  >
+                    <div className="flex items-center gap-2.5">
                       <span className={cn(
-                        'inline-block size-6 rounded-lg text-[10px] font-black flex items-center justify-center mb-1.5',
+                        'shrink-0 size-6 rounded-lg flex items-center justify-center text-[10px] font-black',
                         isActive ? 'bg-[#00B894] text-white' : 'bg-muted text-muted-foreground',
                       )}>
                         {i + 1}
                       </span>
-                      <h3 className="text-[11px] font-black text-foreground line-clamp-2 leading-tight">
-                        {ch.title}
-                      </h3>
-                      <p className="text-[9px] text-muted-foreground mt-1">{startPage === endPage ? `p${startPage}` : `p${startPage}-${endPage}`}</p>
-                    </button>
-                  );
-                })}
-              </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-black text-foreground line-clamp-1">{ch.title}</span>
+                      </div>
+                      <span className="shrink-0 text-[9px] font-bold text-muted-foreground">
+                        p{startPage}{endPage !== startPage ? `-${endPage}` : ''}
+                      </span>
+                      <ChevronRight className="shrink-0 size-3 text-muted-foreground/30" />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Continue reading + scroll hint */}
-            <div className="flex items-center gap-3 pt-1">
+            {/* Continue reading */}
+            <div className="shrink-0 pt-3">
               <Button
                 onClick={() => {
                   const saved = loadProgress(activeContent.id);
@@ -716,11 +715,10 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                   }
                   setViewMode('reading');
                 }}
-                className="flex-1 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50"
+                className="w-full rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50"
               >
                 📖 继续阅读
               </Button>
-              <span className="text-[10px] text-muted-foreground/50 font-medium whitespace-nowrap">← 左右滑动选择章节 →</span>
             </div>
           </div>
         ) : (

@@ -61,6 +61,8 @@ const PUBLICATIONS: IReadingContent[] = [
       { en: 'Recent studies suggest that up to 40% of current jobs could be automated within the next two decades. But this doesn\'t mean mass unemployment. Instead, we are likely to see a fundamental shift in the nature of work itself.', zh: '最近的研究表明，未来二十年内多达40%的现有工作可能会实现自动化。但这并不意味着大规模失业。相反，我们可能会看到工作本质的根本转变。' },
       { en: 'The key is adaptability. Workers who can learn new skills and pivot quickly will thrive. Companies that invest in retraining their workforce will gain a competitive edge in the rapidly evolving marketplace.', zh: '关键在于适应能力。能够学习新技能并快速转型的工人将会蓬勃发展。投资于员工再培训的公司将在快速发展的市场中获得竞争优势。' },
       { en: 'Governments also have a role to play. Education systems need to be redesigned to prepare students for jobs that don\'t yet exist, using technologies that haven\'t been invented, to solve problems we can\'t yet imagine.', zh: '政府也可以发挥作用。教育体系需要重新设计，让学生为尚不存在的工作做好准备，使用尚未发明的技术，解决我们尚无法想象的问题。' },
+      { en: 'The ethical dimensions of workplace AI cannot be overlooked. Algorithmic bias in hiring, surveillance of employees, and the concentration of AI power in a few tech giants all demand urgent attention. A future where AI serves humanity rather than the other way around requires deliberate choices today.', zh: '工作场所AI的伦理维度不容忽视。招聘中的算法偏见、对员工的监控以及AI权力集中在少数科技巨头手中，都需要紧急关注。AI服务人类而非相反的未来，需要今天做出深思熟虑的选择。' },
+      { en: 'Despite the challenges, there is reason for optimism. AI has the potential to eliminate drudgery, unleash creativity, and create entirely new categories of meaningful work. The transition will be difficult, but the destination — a world where technology amplifies human potential rather than replacing it — is worth striving for.', zh: '尽管面临挑战，仍有理由保持乐观。AI有潜力消除繁琐的工作，释放创造力，并创造全新的有意义的工作类别。转型将是困难的，但目标——一个技术放大人类潜力而非取代人类的世界——值得为之奋斗。' },
     ]), totalWords: 0,
   },
   {
@@ -72,6 +74,8 @@ const PUBLICATIONS: IReadingContent[] = [
       { en: 'The latest climate models suggest we need not just carbon neutrality, but carbon negativity — actively removing CO2 from the atmosphere. Technologies like direct air capture, enhanced weathering, and ocean fertilization are being explored.', zh: '最新的气候模型表明，我们不仅需要碳中和，还需要碳负排放——主动从大气中移除二氧化碳。直接空气捕获、增强风化和海洋施肥等技术正在探索中。' },
       { en: 'Renewable energy has made remarkable progress. Solar and wind power are now cheaper than fossil fuels in most parts of the world. But the intermittency problem — the fact that the sun doesn\'t always shine and the wind doesn\'t always blow — remains a major hurdle.', zh: '可再生能源取得了显著进展。太阳能和风能现在在世界大多数地区比化石燃料更便宜。但间歇性问题——太阳不会一直照耀，风不会一直吹——仍然是一个主要障碍。' },
       { en: 'The solution lies in a combination of approaches: better battery storage, smart grids that can balance supply and demand, and perhaps most importantly, a global commitment to innovation and cooperation. The window for action is closing, but it is not yet shut.', zh: '解决方案在于多种方法的结合：更好的电池存储，能够平衡供需的智能电网，也许最重要的是，全球对创新和合作的承诺。行动的时间窗口正在关闭，但尚未完全关闭。' },
+      { en: 'Individual actions matter too. From the food we eat to the way we travel, every choice has a carbon footprint. But systemic change is essential — and that means voting, advocating, and holding corporations accountable for their environmental impact.', zh: '个人行动也很重要。从我们吃的食物到出行方式，每一个选择都有碳足迹。但系统性变革至关重要——这意味着投票、倡导并让企业对其环境影响负责。' },
+      { en: 'Innovation in carbon removal is accelerating. New materials that capture CO2 directly from the air, reforestation projects at unprecedented scale, and advances in nuclear fusion all offer hope. The challenge is scaling these solutions fast enough to make a difference.', zh: '碳移除领域的创新正在加速。直接从空气中捕获CO2的新材料、空前规模的再造林项目以及核聚变的进展都带来了希望。挑战在于以足够快的速度扩大这些解决方案以产生影响。' },
     ]), totalWords: 0,
   },
   {
@@ -83,6 +87,8 @@ const PUBLICATIONS: IReadingContent[] = [
       { en: 'Bilingual children show better executive function — the ability to focus attention, ignore distractions, and switch between tasks. These cognitive advantages persist throughout life and may even delay the onset of dementia by up to five years.', zh: '双语儿童表现出更好的执行功能——集中注意力、忽略干扰和切换任务的能力。这些认知优势贯穿一生，甚至可以将痴呆症的发病延迟长达五年。' },
       { en: 'But the benefits go beyond cognition. Bilinguals tend to be more empathetic and culturally aware. Learning a second language opens a window into another way of seeing the world, another set of values and traditions.', zh: '但好处超越了认知。双语者往往更具同理心和文化意识。学习第二语言打开了了解另一种看待世界的方式、另一套价值观和传统的窗口。' },
       { en: 'The best time to start? Right now. While children have an advantage in achieving native-like pronunciation, adults can learn vocabulary and grammar just as effectively. The key is consistency and immersion — even 15 minutes a day can make a huge difference over time.', zh: '最佳开始时间？现在。虽然儿童在实现母语般的发音方面有优势，但成年人同样可以有效地学习词汇和语法。关键是坚持和沉浸——即使每天15分钟，随着时间的推移也能产生巨大的差异。' },
+      { en: 'Technology has made language learning more accessible than ever. Apps, podcasts, online tutors, and AI-powered conversation partners mean that anyone with a smartphone can practice anytime, anywhere. The barriers that once existed — expensive classes, lack of native speakers — are rapidly disappearing.', zh: '技术使语言学习比以往任何时候都更容易获得。应用程序、播客、在线导师和AI驱动的对话伙伴意味着任何拥有智能手机的人都可以随时随地练习。曾经存在的障碍——昂贵的课程、缺乏母语者——正在迅速消失。' },
+      { en: 'Perhaps the most profound benefit of bilingualism is the way it changes how you see yourself. When you learn a new language, you are not just memorizing words — you are building a second identity. You become, in a very real sense, a different person when you speak your second language.', zh: '也许双语能力最深远的好处是它改变了你对自己的看法。当你学习一门新语言时，你不仅仅是在记忆单词——你正在构建第二个身份。当你用第二语言说话时，你在非常真实的意义上成为了一个不同的人。' },
     ]), totalWords: 0,
   },
   {
@@ -93,6 +99,9 @@ const PUBLICATIONS: IReadingContent[] = [
       { en: 'The Renaissance was not just a period of artistic brilliance. It was a fundamental rethinking of what humans could achieve. From Leonardo da Vinci to Michelangelo, the Renaissance produced polymaths — individuals who excelled across multiple disciplines.', zh: '文艺复兴不仅仅是一个艺术辉煌的时期。它是对人类能够实现什么的根本性重新思考。从列奥纳多·达·芬奇到米开朗基罗，文艺复兴产生了通才——在多个学科中表现出色的个人。' },
       { en: 'What made the Renaissance possible? One factor was the rediscovery of classical texts. Another was the patronage system, where wealthy families like the Medici funded artists and thinkers. But perhaps the most important factor was the cross-pollination of ideas.', zh: '是什么使文艺复兴成为可能？一个因素是对古典文本的重新发现。另一个是赞助制度，像美第奇这样的富裕家族资助艺术家和思想家。但也许最重要的因素是思想的交叉传播。' },
       { en: 'Artists learned from scientists, and scientists learned from artists. The boundaries between disciplines were fluid. This is the lesson for our own time: the biggest breakthroughs often happen at the intersection of fields, not within them.', zh: '艺术家向科学家学习，科学家向艺术家学习。学科之间的界限是流动的。这对我们自己的时代是一个教训：最大的突破往往发生在领域的交叉点，而不是领域内部。' },
+      { en: 'The Renaissance also teaches us about the importance of environment. Florence in the 15th century was not particularly large or wealthy compared to other European cities. What made it special was its culture of curiosity, competition, and openness to new ideas. Innovation thrives in ecosystems, not in isolation.', zh: '文艺复兴还教给我们环境的重要性。15世纪的佛罗伦萨与其他欧洲城市相比并不特别大或富裕。使其特别的是它的好奇心文化、竞争和对新思想的开放态度。创新在生态系统中蓬勃发展，而非孤立。' },
+      { en: 'Perhaps the most enduring legacy of the Renaissance is the ideal of the well-rounded individual. In an age of increasing specialization, the Renaissance reminds us that the most creative breakthroughs often come from those who can connect seemingly unrelated fields. The ability to think across boundaries is more valuable than ever.', zh: '也许文艺复兴最持久的遗产是全面发展的个人理想。在一个日益专业化的时代，文艺复兴提醒我们，最具创造性的突破往往来自那些能够连接看似无关领域的人。跨领域思考的能力比以往任何时候都更有价值。' },
+      { en: 'Today, we face challenges that are no less daunting than those of the Renaissance — climate change, political division, technological disruption. The Renaissance response was not retreat but engagement, not despair but creativity. That spirit of optimistic problem-solving is exactly what our own era demands.', zh: '今天，我们面临的挑战不亚于文艺复兴时期——气候变化、政治分裂、技术颠覆。文艺复兴的回应不是退缩而是参与，不是绝望而是创造力。这种乐观解决问题的精神正是我们这个时代所需要的。' },
     ]), totalWords: 0,
   },
   {
@@ -104,6 +113,8 @@ const PUBLICATIONS: IReadingContent[] = [
       { en: 'The core idea is simple: build a minimum viable product (MVP), measure how customers respond, and learn from the data. Then iterate. This cycle of Build-Measure-Learn should happen as quickly as possible — in days or weeks, not months.', zh: '核心理念很简单：构建最小可行产品（MVP），衡量客户的反应，从数据中学习。然后迭代。这个构建-测量-学习的循环应该尽可能快地发生——在几天或几周内，而不是几个月。' },
       { en: 'Instead of writing a detailed business plan and spending years in stealth mode, lean startups embrace validated learning. Every product feature is treated as an experiment. If the data shows customers don\'t care about a feature, it gets cut without mercy.', zh: '精益创业不是写详细的商业计划书并花数年时间在隐秘模式下开发，而是拥抱经过验证的学习。每个产品功能都被视为一个实验。如果数据显示客户不关心某个功能，它就会被毫不留情地砍掉。' },
       { en: 'This approach has been adopted not just by tech startups, but by large corporations, government agencies, and even schools. The principles of lean thinking — eliminating waste, amplifying learning, and deciding as late as possible — are universal.', zh: '这种方法不仅被科技初创公司采用，还被大公司、政府机构甚至学校所采用。精益思维的原则——消除浪费、放大学习、尽可能晚做决定——是普遍适用的。' },
+      { en: 'One of the most powerful concepts in the lean startup toolkit is the pivot — the willingness to change direction when the data shows you are on the wrong path. Successful entrepreneurs are not the ones with the best initial ideas, but those who can adapt fastest to what the market is telling them.', zh: '精益创业工具包中最强大的概念之一是 pivot——当数据显示你在错误的道路上时愿意改变方向。成功的企业家不是那些拥有最好初始想法的人，而是那些能够最快适应市场告诉他们的人。' },
+      { en: 'The lean approach has its critics, however. Some argue that an excessive focus on rapid iteration can lead to short-term thinking and a neglect of deep, fundamental research. The challenge for modern organizations is to balance the speed of lean methods with the patience required for genuine breakthroughs.', zh: '然而，精益方法也有批评者。一些人认为，过度关注快速迭代可能导致短期思维和忽视深入的基础研究。现代组织面临的挑战是在精益方法的速度与真正突破所需的耐心之间取得平衡。' },
     ]), totalWords: 0,
   },
 ];
@@ -114,33 +125,8 @@ PUBLICATIONS.forEach((p) => {
     sum + page.paragraphs.reduce((s, para) => s + para.en.split(/\s+/).filter(Boolean).length, 0), 0);
 });
 
-// ── Wikipedia curated list ──
-const WIKI_ARTICLES: { title: string; zhTitle: string; topic: string }[] = [
-  { title: 'Climate change', zhTitle: '气候变化', topic: 'science' },
-  { title: 'Artificial intelligence', zhTitle: '人工智能', topic: 'tech' },
-  { title: 'Renaissance', zhTitle: '文艺复兴', topic: 'history' },
-  { title: 'Industrial Revolution', zhTitle: '工业革命', topic: 'history' },
-  { title: 'Quantum mechanics', zhTitle: '量子力学', topic: 'science' },
-  { title: 'Ancient Egypt', zhTitle: '古埃及', topic: 'history' },
-  { title: 'Solar System', zhTitle: '太阳系', topic: 'science' },
-  { title: 'World War II', zhTitle: '第二次世界大战', topic: 'history' },
-  { title: 'Democracy', zhTitle: '民主', topic: 'culture' },
-  { title: 'Globalization', zhTitle: '全球化', topic: 'culture' },
-  { title: 'Neuroscience', zhTitle: '神经科学', topic: 'science' },
-  { title: 'Buddhism', zhTitle: '佛教', topic: 'culture' },
-  { title: 'Roman Empire', zhTitle: '罗马帝国', topic: 'history' },
-  { title: 'Internet', zhTitle: '互联网', topic: 'tech' },
-  { title: 'Evolution', zhTitle: '进化论', topic: 'science' },
-  { title: 'French Revolution', zhTitle: '法国大革命', topic: 'history' },
-  { title: 'Renewable energy', zhTitle: '可再生能源', topic: 'science' },
-  { title: 'Psychology', zhTitle: '心理学', topic: 'science' },
-  { title: 'Ancient Greece', zhTitle: '古希腊', topic: 'history' },
-  { title: 'Blockchain', zhTitle: '区块链', topic: 'tech' },
-  { title: 'Philosophy', zhTitle: '哲学', topic: 'philosophy' },
-  { title: 'Great Wall of China', zhTitle: '万里长城', topic: 'history' },
-];
 
-interface WikiPage { title: string; extract: string; pageid: number; thumbnail?: { source: string }; }
+
 
 export default function ArticlePage() {
   const { isConfigured, chat: aiChat } = useAI();
@@ -272,35 +258,9 @@ export default function ArticlePage() {
   }, []);
   };
 
-  // ── Wikipedia ──
-  const [wikiQuery, setWikiQuery] = useState('');
-  const [wikiLoading, setWikiLoading] = useState(false);
-  const [wikiResults, setWikiResults] = useState<{ title: string; snippet: string; pageid: number }[]>([]);
-  const [wikiSearched, setWikiSearched] = useState(false);
-  const [wikiThumbnails, setWikiThumbnails] = useState<Record<string, string>>({});
-  const wikiThumbsLoaded = useRef(false);
-  // Saved Wikipedia articles (persisted)
-  const SAVED_WIKI_KEY = '__nativethink_saved_wiki';
-  const [savedWiki, setSavedWiki] = useState<{ title: string; zhTitle: string }[]>(() => {
-    try { const r = localStorage.getItem(SAVED_WIKI_KEY); return r ? JSON.parse(r) : []; } catch { return []; }
-  });
-  const persistSavedWiki = (list: { title: string; zhTitle: string }[]) => {
-    setSavedWiki(list);
-    try { localStorage.setItem(SAVED_WIKI_KEY, JSON.stringify(list)); } catch { /* */ }
-  };
-  const addToSavedWiki = (title: string, zhTitle: string) => {
-    const exists = savedWiki.some((a) => a.title === title);
-    if (exists) { toast.error('该条目已在列表中'); return; }
-    persistSavedWiki([...savedWiki, { title, zhTitle }]);
-    toast.success(`已添加：${zhTitle || title}`);
-  };
-  const removeFromSavedWiki = (title: string) => {
-    persistSavedWiki(savedWiki.filter((a) => a.title !== title));
-  };
-
   // ── History ──
   const HISTORY_KEY = '__nativethink_article_history';
-  interface HistoryEntry { id: string; title: string; source: string; createdAt: string; meta?: { wikiTitle?: string; speechId?: string; bookId?: string; pubId?: string; }; }
+  interface HistoryEntry { id: string; title: string; source: string; createdAt: string; meta?: { speechId?: string; bookId?: string; pubId?: string; }; }
   const [history, setHistory] = useState<HistoryEntry[]>(() => {
     try { const s = safeStorage.getItem(HISTORY_KEY); return s ? JSON.parse(s) : []; } catch { return []; }
   });
@@ -315,12 +275,8 @@ export default function ArticlePage() {
 
   const handleHistoryClick = (entry: HistoryEntry) => {
     if (!entry.meta) return;
-    const { wikiTitle, speechId, bookId } = entry.meta;
-    if (wikiTitle) {
-      setWikiQuery(wikiTitle);
-      openWikipediaArticle(wikiTitle);
-    } else if (speechId) {
-      // Switch to speeches tab and load
+    const { speechId, bookId } = entry.meta;
+    if (speechId) {
       setMainTab('speeches');
       // Delay to ensure speechMeta is loaded
       setTimeout(() => loadSpeech(speechId), 100);
@@ -396,111 +352,7 @@ export default function ArticlePage() {
     finally { setAiLoading(false); }
   }, [isConfigured, genType, genTopic, genLevel, genChapters, aiChat]);
 
-  // ── Wikipedia ──
-  // Search Wikipedia and show results list
-  const searchWikipedia = useCallback(async (query?: string) => {
-    const q = (query || wikiQuery).trim();
-    if (!q) return;
-    setWikiLoading(true);
-    setWikiResults([]);
-    setWikiSearched(false);
-    try {
-      const encoded = encodeURIComponent(q);
-      // Use Wikipedia's opensearch API for title suggestions + snippets
-      const searchUrl = `https://en.wikipedia.org/w/api.php?format=json&action=query&list=search&srsearch=${encoded}&srlimit=15&utf8=1&origin=*`;
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 10000);
-      const res = await fetch(searchUrl, { signal: ctrl.signal });
-      clearTimeout(tid);
-      if (!res.ok) throw new Error('Search failed');
-      const data = await res.json();
-      const results = (data.query?.search || []).map((r: any) => ({
-        title: r.title,
-        snippet: r.snippet.replace(/<\/?[^>]+(>|$)/g, ''), // strip HTML tags
-        pageid: r.pageid,
-      }));
-      setWikiResults(results);
-      setWikiSearched(true);
-      if (results.length === 0) toast.error('未找到相关条目');
-    } catch { toast.error('搜索失败（网络受限，请尝试其他来源）'); }
-    finally { setWikiLoading(false); }
-  }, [wikiQuery]);
-
-  // Open a specific Wikipedia article in the reader
-  const openWikipediaArticle = useCallback(async (title: string) => {
-    setWikiLoading(true);
-    try {
-      const encoded = encodeURIComponent(title);
-      // Try REST summary API
-      let extract = '';
-      let pageTitle = title;
-      let pageid = 0;
-      let thumbnail = '';
-
-      try {
-        const ctrl1 = new AbortController();
-        const tid1 = setTimeout(() => ctrl1.abort(), 8000);
-        const res = await fetch(
-          `https://en.wikipedia.org/api/rest_v1/page/summary/${encoded}`,
-          { signal: ctrl1.signal },
-        );
-        clearTimeout(tid1);
-        if (res.ok) {
-          const page: WikiPage = await res.json();
-          extract = page.extract || '';
-          pageTitle = page.title;
-          pageid = page.pageid;
-          thumbnail = page.thumbnail?.source || '';
-        }
-      } catch { /* fall through */ }
-
-      // Fallback: MediaWiki API
-      if (!extract) {
-        const ctrl2 = new AbortController();
-        const tid2 = setTimeout(() => ctrl2.abort(), 8000);
-        const res = await fetch(
-          `https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts|pageimages&exintro&explaintext&piprop=thumbnail&pithumbsize=400&titles=${encoded}&origin=*`,
-          { signal: ctrl2.signal },
-        );
-        clearTimeout(tid2);
-        if (res.ok) {
-          const data = await res.json();
-          const pages = data.query?.pages || {};
-          const first: any = Object.values(pages)[0];
-          if (first && !first.missing) {
-            extract = first.extract || '';
-            pageTitle = first.title || title;
-            pageid = first.pageid || 0;
-            thumbnail = first.thumbnail?.source || '';
-          }
-        }
-      }
-
-      if (!extract) { toast.error('无法加载该条目'); return; }
-
-      const paragraphs: IParagraph[] = extract
-        .split(/\n\n+/)
-        .map((p) => p.replace(/\n/g, ' ').trim())
-        .filter((p) => p.length > 40)
-        .map((en) => ({ en, zh: '' }));
-      if (!paragraphs.length) { toast.error('该条目无可读内容'); return; }
-
-      const content: IReadingContent = {
-        id: `wiki_${pageid || Date.now()}`, type: 'wikipedia',
-        title: pageTitle, zhTitle: pageTitle,
-        source: 'Wikipedia', topic: 'general', difficulty: 'advanced' as Level,
-        cover: thumbnail,
-        pages: buildPages(paragraphs),
-        totalWords: paragraphs.reduce((s, p) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
-      };
-      openReader(content);
-      saveToHistory(pageTitle, content.totalWords.toString(), 'wikipedia', { wikiTitle: pageTitle });
-      toast.success(`已加载：${pageTitle}`);
-    } catch { toast.error('加载失败'); }
-    finally { setWikiLoading(false); }
-  }, []);
-
-  // ── Speech ──
+    // ── Speech ──
   const loadSpeech = useCallback(async (speechId: string) => {
     const meta = speechMeta?.find((m) => m.id === speechId);
     if (!meta) { toast.error('未找到演讲'); return; }
@@ -545,41 +397,7 @@ export default function ArticlePage() {
 
   useEffect(() => { safeStorage.setItem(HISTORY_KEY, JSON.stringify(history)); }, [history]);
 
-  // ── Wikipedia thumbnails ──
-  useEffect(() => {
-    if (mainTab !== 'wikipedia' || wikiThumbsLoaded.current) return;
-    wikiThumbsLoaded.current = true;
-    let cancelled = false;
-    (async () => {
-      // Load thumbnails in parallel batches of 5
-      const batchSize = 5;
-      for (let i = 0; i < WIKI_ARTICLES.length && !cancelled; i += batchSize) {
-        const batch = WIKI_ARTICLES.slice(i, i + batchSize);
-        await Promise.allSettled(batch.map(async (article) => {
-          if (cancelled) return;
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 6000);
-            try {
-              const res = await fetch(
-                `https://en.wikipedia.org/w/api.php?format=json&action=query&prop=pageimages&piprop=thumbnail&pithumbsize=200&titles=${encodeURIComponent(article.title)}&origin=*`,
-                { signal: controller.signal },
-              );
-              clearTimeout(timeoutId);
-              if (res.ok) {
-                const data = await res.json();
-                const pages = data.query?.pages || {};
-                const first: any = Object.values(pages)[0];
-                if (first?.thumbnail?.source) setWikiThumbnails((prev) => ({ ...prev, [article.title]: first.thumbnail.source }));
-              }
-            } catch { /* skip */ }
-          } catch { /* skip failed thumbnails */ }
-        }));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [mainTab]);
-
+  
   // ── TOC (table of contents) for books/publications ──
   const [tocVisible, setTocVisible] = useState(false);
   const [tocContent, setTocContent] = useState<IReadingContent | null>(null);
@@ -654,7 +472,7 @@ export default function ArticlePage() {
             ) : (
               <div className="space-y-2 max-h-[200px] overflow-y-auto">
                 {history.slice(0, 20).map((h) => {
-                  const clickable = !!h.meta?.wikiTitle || !!h.meta?.speechId || (!!h.meta?.bookId && !!books);
+                  const clickable = !!h.meta?.speechId || (!!h.meta?.bookId && !!books);
                   return (
                   <button
                     key={h.id}
@@ -922,82 +740,6 @@ export default function ArticlePage() {
         </div>
       )}
 
-      {/* ── WIKIPEDIA TAB ── */}
-      {mainTab === 'wikipedia' && (
-        <div className="space-y-4">
-          {/* Search bar */}
-          <div className="flex gap-2">
-            <Input value={wikiQuery} onChange={(e) => setWikiQuery(e.target.value)}
-              placeholder="搜索英文 Wikipedia 条目..." className="rounded-2xl text-sm"
-              onKeyDown={(e) => e.key === 'Enter' && searchWikipedia()} />
-            <Button onClick={() => searchWikipedia()} disabled={wikiLoading} className="rounded-2xl">
-              {wikiLoading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-            </Button>
-          </div>
-
-          {/* Search results */}
-          {wikiResults.length > 0 && (
-            <div>
-              <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-3">搜索结果 ({wikiResults.length})</h3>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {wikiResults.map((r) => (
-                  <div key={r.pageid} className="flex items-start gap-3 p-3 rounded-2xl bg-muted/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors border border-transparent hover:border-[#00B894]/20 group">
-                    <div className="min-w-0 flex-1 cursor-pointer" onClick={() => openWikipediaArticle(r.title)}>
-                      <p className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors">{r.title}</p>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{r.snippet}</p>
-                    </div>
-                    <button onClick={() => addToSavedWiki(r.title, r.title)}
-                      className="shrink-0 px-2 py-1 rounded-xl text-[9px] font-black bg-[#00B894]/10 text-[#00B894] hover:bg-[#00B894]/20 transition-colors">+ 添加</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {wikiSearched && wikiResults.length === 0 && !wikiLoading && (
-            <p className="text-sm text-muted-foreground text-center py-4">未找到相关条目</p>
-          )}
-
-          {/* Saved Wikipedia articles */}
-          {savedWiki.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">我的列表 ({savedWiki.length})</h3>
-                <button onClick={() => { persistSavedWiki([]); toast.success('已清空'); }} className="text-[9px] font-bold text-muted-foreground hover:text-rose-500">清空</button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {savedWiki.map((a) => (
-                  <button key={a.title} onClick={() => openWikipediaArticle(a.title)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 dark:bg-sky-500/10 border border-sky-100 hover:bg-sky-100 transition-colors group">
-                    <span className="text-xs font-bold text-foreground group-hover:text-sky-600">{a.title}</span>
-                    <span onClick={(e) => { e.stopPropagation(); removeFromSavedWiki(a.title); }} className="text-muted-foreground/40 hover:text-rose-500 ml-0.5">×</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Curated articles */}
-          <div>
-            <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-3">精选条目</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {WIKI_ARTICLES.map((a) => (
-                <Card key={a.title} className="rounded-2xl border-border hover:border-[#00B894]/40 hover:shadow-sm transition-all cursor-pointer overflow-hidden"
-                  onClick={() => openWikipediaArticle(a.title)}>
-                  {wikiThumbnails[a.title] && (
-                    <img src={wikiThumbnails[a.title]} alt="" loading="lazy" referrerPolicy="no-referrer"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} className="w-full h-24 object-cover" />
-                  )}
-                  <CardContent className="p-3">
-                    <p className="text-xs font-bold line-clamp-2">{a.zhTitle}</p>
-                    <p className="text-[9px] text-muted-foreground mt-0.5">{a.title}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── SPEECHES TAB ── */}
       {mainTab === 'speeches' && (
         <div className="space-y-4">
@@ -1021,17 +763,11 @@ export default function ArticlePage() {
             </div>
           ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {speechMeta.map((speech) => {
-              // Mark speeches without full text content
-              const hasContent = speech.id !== 'ted-gates-climate' && speech.id !== 'ted-adichie-single' && speech.id !== 'ted-urban-procrastination' && speech.id !== 'ted-godin-tribes' && speech.id !== 'rand-Atlas' && speech.id !== 'mandela-inaugural' && speech.id !== 'greta-un-climate' && speech.id !== 'emma-heforshe' && speech.id !== 'malala-un';
-              return (
+            {speechMeta.map((speech) => (
               <Card
                 key={speech.id}
-                className={cn(
-                  'rounded-[24px] border-border hover:shadow-md transition-all overflow-hidden group',
-                  hasContent ? 'hover:border-[#00B894]/40 cursor-pointer' : 'opacity-60 cursor-default',
-                )}
-                onClick={() => hasContent && loadSpeech(speech.id)}
+                className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all overflow-hidden group cursor-pointer"
+                onClick={() => loadSpeech(speech.id)}
               >
                 {speech.image ? (
                   <img
@@ -1048,9 +784,6 @@ export default function ArticlePage() {
                 <CardContent className="p-4">
                   <div className="flex items-center gap-1.5 mb-2">
                     <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">{speech.type}</Badge>
-                    {!hasContent && (
-                      <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">即将上线</Badge>
-                    )}
                   </div>
                   <h3 className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors line-clamp-2">
                     {speech.zhTitle}
@@ -1059,8 +792,7 @@ export default function ArticlePage() {
                   <p className="text-[10px] text-muted-foreground/70 mt-1 line-clamp-2 italic">{speech.preview}</p>
                 </CardContent>
               </Card>
-              );
-            })}
+            ))}
           </div>
           )}
         </div>
