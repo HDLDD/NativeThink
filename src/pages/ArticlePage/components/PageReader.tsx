@@ -94,46 +94,6 @@ export default function PageReader({ content, onClose }: Props) {
   const [lookupLoading, setLookupLoading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // ── Chapter index ──
-  interface ChapterInfo { title: string; pageIndex: number; }
-  const chapters = useMemo<ChapterInfo[]>(() => {
-    const result: ChapterInfo[] = [];
-    for (let pi = 0; pi < activeContent.pages.length; pi++) {
-      for (const p of activeContent.pages[pi].paragraphs) {
-        if (p.en.startsWith('##CHAPTER##')) {
-          result.push({ title: p.en.replace('##CHAPTER##', ''), pageIndex: pi });
-        }
-      }
-    }
-    return result;
-  }, [activeContent.pages]);
-  const hasChapters = chapters.length > 0;
-  const [viewMode, setViewMode] = useState<'toc' | 'reading'>(hasChapters ? 'toc' : 'reading');
-  const [currentChapter, setCurrentChapter] = useState(0);
-
-  // Calculate chapter-relative paragraph index for current page
-  const paraChapterIndex = useMemo(() => {
-    if (!hasChapters) return null;
-    const cp = activeContent.pages[Math.max(0, Math.min(pageIdx, activeContent.pages.length - 1))];
-    if (!cp) return null;
-    // Find which chapter the current page is in
-    let chIdx = chapters.length - 1;
-    for (let i = chapters.length - 1; i >= 0; i--) {
-      if (pageIdx >= chapters[i].pageIndex) { chIdx = i; break; }
-    }
-    // Count paragraphs from chapter start to current page
-    let count = 0;
-    for (let pi = chapters[chIdx].pageIndex; pi <= pageIdx; pi++) {
-      for (const p of activeContent.pages[pi].paragraphs) {
-        if (p.en.startsWith('##CHAPTER##')) {
-          if (pi === chapters[chIdx].pageIndex && count === 0) continue;
-        }
-        if (pi < pageIdx) count++;
-      }
-    }
-    return { chIdx, startCount: count };
-  }, [hasChapters, chapters, pageIdx, activeContent.pages]);
-
   // Translation cache state
   const TR_CACHE_KEY = `__reader_trans_${content.id}`;
   const [transCache, setTransCache] = useState<Record<number, string[]>>(() => {
@@ -179,6 +139,44 @@ export default function PageReader({ content, onClose }: Props) {
   // Use displayContent for rendering
   const activeContent = displayContent;
   const activePages = activeContent.pages.length;
+
+  // ── Chapter index ──
+  interface ChapterInfo { title: string; pageIndex: number; }
+  const chapters = useMemo<ChapterInfo[]>(() => {
+    const result: ChapterInfo[] = [];
+    for (let pi = 0; pi < activeContent.pages.length; pi++) {
+      for (const p of activeContent.pages[pi].paragraphs) {
+        if (p.en.startsWith('##CHAPTER##')) {
+          result.push({ title: p.en.replace('##CHAPTER##', ''), pageIndex: pi });
+        }
+      }
+    }
+    return result;
+  }, [activeContent.pages]);
+  const hasChapters = chapters.length > 0;
+  const [viewMode, setViewMode] = useState<'toc' | 'reading'>(hasChapters ? 'toc' : 'reading');
+  const [currentChapter, setCurrentChapter] = useState(0);
+
+  // Calculate chapter-relative paragraph index for current page
+  const paraChapterIndex = useMemo(() => {
+    if (!hasChapters) return null;
+    const cp = activeContent.pages[currentPage];
+    if (!cp) return null;
+    let chIdx = chapters.length - 1;
+    for (let i = chapters.length - 1; i >= 0; i--) {
+      if (pageIdx >= chapters[i].pageIndex) { chIdx = i; break; }
+    }
+    let count = 0;
+    for (let pi = chapters[chIdx].pageIndex; pi <= pageIdx; pi++) {
+      for (const p of activeContent.pages[pi].paragraphs) {
+        if (p.en.startsWith('##CHAPTER##')) {
+          if (pi === chapters[chIdx].pageIndex && count === 0) continue;
+        }
+        if (pi < pageIdx) count++;
+      }
+    }
+    return { chIdx, startCount: count };
+  }, [hasChapters, chapters, pageIdx, activeContent.pages, currentPage]);
 
   // Clamp page
   const currentPage = Math.max(0, Math.min(pageIdx, activePages - 1));
