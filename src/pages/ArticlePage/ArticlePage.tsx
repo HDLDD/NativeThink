@@ -933,25 +933,40 @@ This, and nothing less, is the meaning of human existence: to create, to produce
       {source === 'speeches' && (
         <Card className="rounded-[28px] border-border shadow-sm">
           <CardContent className="p-4 space-y-3">
-            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">名人演讲 & TED</p>
-            <div className="max-h-[500px] overflow-y-auto space-y-2">
-              {FAMOUS_SPEECHES.map((speech) => (
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Mic className="size-3.5 text-rose-500" />名人演讲 & TED ({FAMOUS_SPEECHES.length} 篇)
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[550px] overflow-y-auto">
+              {FAMOUS_SPEECHES.map((speech) => {
+                const typeColors: Record<string, string> = {
+                  'TED': 'from-red-500 to-rose-600',
+                  'UN演讲': 'from-sky-500 to-blue-600',
+                  '毕业演讲': 'from-emerald-500 to-teal-600',
+                  '历史演讲': 'from-amber-500 to-orange-600',
+                  '政治演讲': 'from-indigo-500 to-purple-600',
+                  '文学演讲': 'from-violet-500 to-purple-600',
+                };
+                return (
                 <button key={speech.id} onClick={() => fetchSpeech(speech)}
-                  className="w-full text-left p-3 rounded-2xl bg-muted/30 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors border border-transparent hover:border-amber-200">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-black text-foreground">{speech.zhTitle}</p>
-                    <Badge className={cn('rounded-full px-1.5 py-0 text-[8px] font-bold shrink-0',
-                      speech.type === 'TED' ? 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400' :
-                      speech.type === 'UN演讲' ? 'bg-sky-100 text-sky-600' :
-                      speech.type === '毕业演讲' ? 'bg-emerald-100 text-emerald-600' :
-                      'bg-amber-100 text-amber-700')}>{speech.type}</Badge>
+                  className="group text-left rounded-2xl bg-muted/30 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-all border border-transparent hover:border-amber-200 hover:shadow-lg overflow-hidden">
+                  {/* Speech type gradient header */}
+                  <div className={cn('aspect-[4/3] bg-gradient-to-br flex items-center justify-center relative',
+                    typeColors[speech.type] || 'from-amber-500 to-orange-600')}>
+                    <span className="text-3xl">🎤</span>
+                    <Badge className="absolute top-2 right-2 rounded-full px-1.5 py-0 text-[7px] font-black bg-white/20 text-white border-0">
+                      {speech.type}
+                    </Badge>
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{speech.title} · {speech.author} ({speech.year})</p>
-                  <p className="text-[10px] text-muted-foreground/60 mt-1 line-clamp-2 italic">"{speech.preview}"</p>
+                  <div className="p-2.5">
+                    <p className="text-[11px] font-black text-foreground line-clamp-1 group-hover:text-amber-600 transition-colors">{speech.zhTitle}</p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5 line-clamp-1">{speech.title}</p>
+                    <p className="text-[8px] text-muted-foreground/60 mt-0.5">{speech.author} · {speech.year}</p>
+                  </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
-            <p className="text-[9px] text-muted-foreground text-center">经典演讲稿 (public domain)</p>
+            <p className="text-[9px] text-muted-foreground text-center">经典演讲稿 (public domain) · 点击卡片阅读全文</p>
           </CardContent>
         </Card>
       )}
