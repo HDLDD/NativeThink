@@ -409,7 +409,10 @@ export default function ArticlePage() {
       const encoded = encodeURIComponent(q);
       // Use Wikipedia's opensearch API for title suggestions + snippets
       const searchUrl = `https://en.wikipedia.org/w/api.php?format=json&action=query&list=search&srsearch=${encoded}&srlimit=15&utf8=1&origin=*`;
-      const res = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) });
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 10000);
+      const res = await fetch(searchUrl, { signal: ctrl.signal });
+      clearTimeout(tid);
       if (!res.ok) throw new Error('Search failed');
       const data = await res.json();
       const results = (data.query?.search || []).map((r: any) => ({
@@ -436,10 +439,13 @@ export default function ArticlePage() {
       let thumbnail = '';
 
       try {
+        const ctrl1 = new AbortController();
+        const tid1 = setTimeout(() => ctrl1.abort(), 8000);
         const res = await fetch(
           `https://en.wikipedia.org/api/rest_v1/page/summary/${encoded}`,
-          { signal: AbortSignal.timeout(8000) },
+          { signal: ctrl1.signal },
         );
+        clearTimeout(tid1);
         if (res.ok) {
           const page: WikiPage = await res.json();
           extract = page.extract || '';
@@ -451,10 +457,13 @@ export default function ArticlePage() {
 
       // Fallback: MediaWiki API
       if (!extract) {
+        const ctrl2 = new AbortController();
+        const tid2 = setTimeout(() => ctrl2.abort(), 8000);
         const res = await fetch(
           `https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts|pageimages&exintro&explaintext&piprop=thumbnail&pithumbsize=400&titles=${encoded}&origin=*`,
-          { signal: AbortSignal.timeout(8000) },
+          { signal: ctrl2.signal },
         );
+        clearTimeout(tid2);
         if (res.ok) {
           const data = await res.json();
           const pages = data.query?.pages || {};
@@ -551,16 +560,20 @@ export default function ArticlePage() {
           if (cancelled) return;
           try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000);
-            const res = await fetch(
-              `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(article.title)}`,
-              { signal: controller.signal },
-            );
-            clearTimeout(timeoutId);
-            if (res.ok) {
-              const data = await res.json();
-              if (data.thumbnail?.source) setWikiThumbnails((prev) => ({ ...prev, [article.title]: data.thumbnail.source }));
-            }
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
+            try {
+              const res = await fetch(
+                `https://en.wikipedia.org/w/api.php?format=json&action=query&prop=pageimages&piprop=thumbnail&pithumbsize=200&titles=${encodeURIComponent(article.title)}&origin=*`,
+                { signal: controller.signal },
+              );
+              clearTimeout(timeoutId);
+              if (res.ok) {
+                const data = await res.json();
+                const pages = data.query?.pages || {};
+                const first: any = Object.values(pages)[0];
+                if (first?.thumbnail?.source) setWikiThumbnails((prev) => ({ ...prev, [article.title]: first.thumbnail.source }));
+              }
+            } catch { /* skip */ }
           } catch { /* skip failed thumbnails */ }
         }));
       }
