@@ -200,6 +200,19 @@ export default function ChunkTrainingPage() {
   const [builtinPage, setBuiltinPage] = useState(chunkPosMemory.page || 0);
   const [aiPage, setAiPage] = useState(0);
 
+  // Save position memory on state changes (persists across page refreshes)
+  useEffect(() => { saveChunkPosition({ source: librarySource, tab: activeTab }); }, [librarySource, activeTab]);
+  useEffect(() => { saveChunkPosition({ page: builtinPage }); }, [builtinPage]);
+
+  // Scroll position ref + save
+  const libraryScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const saved = chunkPosMemory.scrollTop;
+    if (saved && libraryScrollRef.current) {
+      requestAnimationFrame(() => { if (libraryScrollRef.current) libraryScrollRef.current.scrollTop = saved; });
+    }
+  }, []); // restore once on mount
+
   // Refresh key for useMemo random shuffles
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -465,7 +478,7 @@ export default function ChunkTrainingPage() {
   const MEMORIZED_KEY = '__nativethink_chunk_memorized';
   const [memorizedChunks, setMemorizedChunks] = useState<Set<string>>(() => {
     try {
-      const raw = safeStorage.getItem(MEMORIZED_KEY);
+      const raw = localStorage.getItem(MEMORIZED_KEY);
       return raw ? new Set(JSON.parse(raw)) : new Set<string>();
     } catch { return new Set<string>(); }
   });
@@ -474,7 +487,7 @@ export default function ChunkTrainingPage() {
     setMemorizedChunks((prev) => {
       const next = new Set(prev);
       if (next.has(chunkId)) { next.delete(chunkId); } else { next.add(chunkId); }
-      try { safeStorage.setItem(MEMORIZED_KEY, JSON.stringify([...next])); } catch { /* */ }
+      try { localStorage.setItem(MEMORIZED_KEY, JSON.stringify([...next])); } catch { /* */ }
       return next;
     });
   };
@@ -950,6 +963,9 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
 
         {/* 语块库 */}
         <TabsContent value="library" className="space-y-6 mt-6">
+          <div ref={libraryScrollRef} onScroll={() => {
+            if (libraryScrollRef.current) saveChunkPosition({ scrollTop: libraryScrollRef.current.scrollTop });
+          }} className="max-h-[70vh] overflow-y-auto pr-1 space-y-6">
           <Card className="rounded-[40px] border-border shadow-sm">
             <CardHeader className="pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1630,6 +1646,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
               )}
             </DialogContent>
           </Dialog>
+          </div>
         </TabsContent>
 
         {/* 替换练习 */}
