@@ -132,8 +132,11 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   };
 
   const activeContent = displayContent;
-  const activePages = Math.max(0, activeContent?.pages?.length || 0);
+  // Guard against malformed content (missing pages array, null paragraphs)
+  const validPages = activeContent?.pages?.filter(p => p && Array.isArray(p.paragraphs)) || [];
+  const activePages = validPages.length;
   const currentPage = activePages > 0 ? Math.max(0, Math.min(pageIdx, activePages - 1)) : 0;
+  const currentPageData = validPages[currentPage] || null;
 
   // Preload wordbank for Chinese word lookup
   useEffect(() => { if (!isAllReady()) preloadAll(); }, []);

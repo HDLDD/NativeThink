@@ -178,43 +178,43 @@ export default function ArticlePage() {
 
   // ── Auto-open from favorites jump (/?open=<id>&source=<type>) ──
   useEffect(() => {
-    const articleId = searchParams.get('open');
-    const source = searchParams.get('source') as MainTab | null;
-    if (!articleId) return;
-    // Determine which tab the article belongs to
-    let tab: MainTab = source || 'ai';
-    if (tab === 'publication' as any) tab = 'publications';
-    if (tab !== 'books' && tab !== 'publications' && tab !== 'ai' && tab !== 'speeches') tab = 'ai';
-    setMainTab(tab);
-    // Wait for data to be available, then open
-    const tryOpen = () => {
-      if (tab === 'books') {
-        if (!books || books.length === 0) return false;
-        const book = books.find((b) => b.id === articleId);
-        if (book) { openReader(book); return true; }
-      }
-      if (tab === 'publications') {
-        const pub = PUBLICATIONS.find((p) => p.id === articleId);
-        if (pub) { openReader(pub); return true; }
-      }
-      if (tab === 'ai') {
-        const ai = aiArticles.find((a) => a.id === articleId);
-        if (ai) { openReader(ai); return true; }
-        // AI articles load synchronously from localStorage, so always ready
+    try {
+      const articleId = searchParams.get('open');
+      const source = searchParams.get('source');
+      if (!articleId) return;
+      // Determine which tab the article belongs to
+      const validTabs = ['books', 'publications', 'ai', 'speeches'] as const;
+      let tab: MainTab = (validTabs as readonly string[]).includes(source || '') ? (source as MainTab) : 'ai';
+      if (tab === 'publication' as any) tab = 'publications';
+      setMainTab(tab);
+      // Wait for data to be available, then open
+      const tryOpen = () => {
+        try {
+          if (tab === 'books' && books?.length) {
+            const book = books.find((b) => b.id === articleId);
+            if (book?.pages?.length) { openReader(book); return true; }
+          }
+          if (tab === 'publications') {
+            const pub = PUBLICATIONS.find((p) => p.id === articleId);
+            if (pub?.pages?.length) { openReader(pub); return true; }
+          }
+          if (tab === 'ai') {
+            const ai = aiArticles.find((a) => a.id === articleId);
+            if (ai?.pages?.length) { openReader(ai); return true; }
+            return false;
+          }
+          if (tab === 'speeches' && speechMeta && buildSpeechFn) {
+            const existing = buildSpeechFn(articleId);
+            if (existing?.pages?.length) { openReader(existing); return true; }
+          }
+        } catch { /* skip malformed content */ }
         return false;
+      };
+      if (!tryOpen()) {
+        const timer = setTimeout(() => tryOpen(), 500);
+        return () => clearTimeout(timer);
       }
-      if (tab === 'speeches') {
-        if (!speechMeta || !buildSpeechFn) return false;
-        const existing = buildSpeechFn(articleId);
-        if (existing) { openReader(existing); return true; }
-      }
-      return false;
-    };
-    // Try immediately; if data isn't loaded, retry once after a short delay
-    if (!tryOpen()) {
-      const timer = setTimeout(() => tryOpen(), 500);
-      return () => clearTimeout(timer);
-    }
+    } catch { /* URL params parse error — ignore */ }
   }, [searchParams, books, speechMeta, buildSpeechFn, aiArticles]);
 
   // ── AI article generation (shared by free-form + topic grid) ──
