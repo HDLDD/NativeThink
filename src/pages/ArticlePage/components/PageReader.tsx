@@ -107,11 +107,31 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const [lookupData, setLookupData] = useState<{ word: string; phonetic: string; meaning: string; zhMeaning: string } | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const wheelDebounceRef = useRef(0);
 
   // TTS cleanup on unmount
   useEffect(() => {
     return () => { tts.cancel(); };
   }, []);
+
+  // Scroll wheel → page navigation
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    const el = e.currentTarget as HTMLDivElement;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    const atBottom = scrollTop + clientHeight >= scrollHeight - 4;
+    const atTop = scrollTop <= 4;
+    const now = Date.now();
+    if (now - wheelDebounceRef.current < 600) return;
+
+    if (e.deltaY > 30 && atBottom && currentPage < activePages - 1) {
+      wheelDebounceRef.current = now;
+      goNext();
+    } else if (e.deltaY < -30 && atTop && currentPage > 0) {
+      wheelDebounceRef.current = now;
+      goPrev();
+    }
+  }, [currentPage, activePages]);
 
   // Translation cache state
   const TR_CACHE_KEY = `__reader_trans_${content.id}`;
@@ -607,7 +627,11 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       )}
 
       {/* ── TOC / Reading Content ── */}
-      <div className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch">
+      <div
+        ref={scrollAreaRef}
+        onWheel={handleWheel}
+        className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch"
+      >
         {viewMode === 'toc' && hasChapters ? (
           /* ── TABLE OF CONTENTS ── */
           <div className="max-w-lg mx-auto px-4 sm:px-6 py-8 space-y-4">

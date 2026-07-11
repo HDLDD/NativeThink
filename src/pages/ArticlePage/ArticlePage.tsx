@@ -692,8 +692,8 @@ export default function ArticlePage() {
                       </h3>
                       <p className="text-[10px] text-muted-foreground mt-0.5">{book.zhAuthor} · {book.title}</p>
                       <div className="flex items-center gap-2 mt-2">
-                        <Badge className="text-[8px] rounded-full px-2 py-0 bg-muted">{book.difficulty}</Badge>
-                        <Badge className="text-[8px] rounded-full px-2 py-0 bg-muted">{book.topic}</Badge>
+                        <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">{book.difficulty}</Badge>
+                        <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400">{book.topic}</Badge>
                         <span className="text-[9px] text-muted-foreground ml-auto">{book.totalWords.toLocaleString()} 词</span>
                       </div>
                       {/* Reading progress */}
@@ -745,7 +745,7 @@ export default function ArticlePage() {
                       <p className="text-[10px] text-muted-foreground mt-0.5">{pub.author} · {pub.title?.slice(0, 60)}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <Badge className="text-[8px] rounded-full px-2 py-0 bg-blue-50 dark:bg-blue-500/15 text-blue-600">{pub.source}</Badge>
-                        <Badge className="text-[8px] rounded-full px-2 py-0 bg-muted">{pub.difficulty}</Badge>
+                        <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">{pub.difficulty}</Badge>
                         <span className="text-[9px] text-muted-foreground ml-auto">{pub.totalWords.toLocaleString()} 词</span>
                       </div>
                     </div>
