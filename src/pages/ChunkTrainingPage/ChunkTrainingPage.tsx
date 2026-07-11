@@ -24,6 +24,7 @@ import {
   Pause,
   ChevronLeft,
   ChevronRight,
+  Brain,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -426,12 +427,41 @@ export default function ChunkTrainingPage() {
     });
   }, [searchQuery, categoryFilter, difficultyFilter, customChunks]);
 
+  // Memory / Brain toggle – simple memorized flag (independent of SM-2)
+  const MEMORIZED_KEY = '__nativethink_chunk_memorized';
+  const [memorizedChunks, setMemorizedChunks] = useState<Set<string>>(() => {
+    try {
+      const raw = safeStorage.getItem(MEMORIZED_KEY);
+      return raw ? new Set(JSON.parse(raw)) : new Set<string>();
+    } catch { return new Set<string>(); }
+  });
+  const [memoryFilter, setMemoryFilter] = useState<'all' | 'memorized' | 'unmemorized'>('all');
+  const toggleMemorized = (chunkId: string) => {
+    setMemorizedChunks((prev) => {
+      const next = new Set(prev);
+      if (next.has(chunkId)) { next.delete(chunkId); } else { next.add(chunkId); }
+      try { safeStorage.setItem(MEMORIZED_KEY, JSON.stringify([...next])); } catch { /* */ }
+      return next;
+    });
+  };
+
+  // Apply memory filter to built-in chunks
+  const memorizedFilteredBuiltIn = useMemo(() => {
+    if (memoryFilter === 'memorized') {
+      return filteredBuiltInChunks.filter((c) => memorizedChunks.has(c.id));
+    }
+    if (memoryFilter === 'unmemorized') {
+      return filteredBuiltInChunks.filter((c) => !memorizedChunks.has(c.id));
+    }
+    return filteredBuiltInChunks;
+  }, [filteredBuiltInChunks, memoryFilter, memorizedChunks]);
+
   // Pagination: page counts + slices
-  const builtinTotalPages = Math.max(1, Math.ceil(filteredBuiltInChunks.length / LIBRARY_PAGE_SIZE));
+  const builtinTotalPages = Math.max(1, Math.ceil(memorizedFilteredBuiltIn.length / LIBRARY_PAGE_SIZE));
   const aiTotalPages = Math.max(1, Math.ceil(filteredAiChunks.length / LIBRARY_PAGE_SIZE));
   const builtinPageChunks = useMemo(
-    () => filteredBuiltInChunks.slice(builtinPage * LIBRARY_PAGE_SIZE, (builtinPage + 1) * LIBRARY_PAGE_SIZE),
-    [filteredBuiltInChunks, builtinPage],
+    () => memorizedFilteredBuiltIn.slice(builtinPage * LIBRARY_PAGE_SIZE, (builtinPage + 1) * LIBRARY_PAGE_SIZE),
+    [memorizedFilteredBuiltIn, builtinPage],
   );
   const aiPageChunks = useMemo(
     () => filteredAiChunks.slice(aiPage * LIBRARY_PAGE_SIZE, (aiPage + 1) * LIBRARY_PAGE_SIZE),
@@ -449,7 +479,7 @@ export default function ChunkTrainingPage() {
   // Current page-dependent values
   const activePageChunks = librarySource === 'builtin' ? builtinPageChunks : aiPageChunks;
   const activeTotalPages = librarySource === 'builtin' ? builtinTotalPages : aiTotalPages;
-  const activeFilteredCount = librarySource === 'builtin' ? filteredBuiltInChunks.length : filteredAiChunks.length;
+  const activeFilteredCount = librarySource === 'builtin' ? memorizedFilteredBuiltIn.length : filteredAiChunks.length;
   const activePage = librarySource === 'builtin' ? builtinPage : aiPage;
   const setActivePage = librarySource === 'builtin' ? setBuiltinPage : setAiPage;
 
@@ -1018,7 +1048,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   <Puzzle className="size-3.5" />
                   内置语块
                   <Badge className="ml-0.5 text-[9px] font-black rounded-full px-1.5 py-0 bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] border-none">
-                    {filteredBuiltInChunks.length}
+                    {memorizedFilteredBuiltIn.length}
                   </Badge>
                 </button>
                 <button
@@ -1159,6 +1189,32 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                 )}
               </div>
 
+              {/* Memory filter bar */}
+              {librarySource === 'builtin' && (
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-0.5 bg-muted rounded-xl p-0.5">
+                    {([
+                      { key: 'all' as const, label: '全部' },
+                      { key: 'memorized' as const, label: '已记' },
+                      { key: 'unmemorized' as const, label: '未记' },
+                    ]).map(({ key, label }) => (
+                      <button
+                        key={key}
+                        onClick={() => setMemoryFilter(key)}
+                        className={cn(
+                          'px-3 py-1 rounded-[10px] text-xs font-bold transition-all',
+                          memoryFilter === key
+                            ? 'bg-white dark:bg-card text-[#00B894] shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {activePageChunks.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {activePageChunks.map((chunk) => {
@@ -1205,6 +1261,20 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                               )}
                             >
                               <Heart className={cn('size-4', favorited && 'fill-current')} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => { e.stopPropagation(); toggleMemorized(chunk.id); }}
+                              title={memorizedChunks.has(chunk.id) ? '取消记忆' : '标记为已记'}
+                              className={cn(
+                                'rounded-xl size-8',
+                                memorizedChunks.has(chunk.id)
+                                  ? 'text-[#00B894] hover:text-[#00B894]/70'
+                                  : 'text-muted-foreground/30 hover:text-[#00B894]',
+                              )}
+                            >
+                              <Brain className={cn('size-4', memorizedChunks.has(chunk.id) && 'fill-[#00B894]/20')} />
                             </Button>
                             {chunk.id.startsWith('ai_') && (
                               <Button
@@ -1490,6 +1560,20 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                       >
                         <BookOpen className="size-4 mr-2" />
                         朗读例句
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border"
+                        onClick={() => toggleMemorized(detailChunk.id)}
+                        title={memorizedChunks.has(detailChunk.id) ? '取消记忆' : '标记为已记'}
+                      >
+                        <Brain
+                          className={cn(
+                            'size-4 mr-2',
+                            memorizedChunks.has(detailChunk.id) && 'fill-[#00B894]/20 text-[#00B894]',
+                          )}
+                        />
+                        {memorizedChunks.has(detailChunk.id) ? '已记忆' : '记忆'}
                       </Button>
                       <Button
                         variant="outline"

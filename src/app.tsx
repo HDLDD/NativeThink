@@ -8,6 +8,7 @@ const ThinkInEnglishPage = lazy(() => import("@/pages/ThinkInEnglishPage/ThinkIn
 const ChunkTrainingPage = lazy(() => import("@/pages/ChunkTrainingPage/ChunkTrainingPage"));
 const ConversationPage = lazy(() => import("@/pages/ConversationPage/ConversationPage"));
 const ShadowingPage = lazy(() => import("@/pages/ShadowingPage/ShadowingPage"));
+const ArticlePage = lazy(() => import("@/pages/ArticlePage/ArticlePage"));
 const DeepVocabularyPage = lazy(() => import("@/pages/DeepVocabularyPage/DeepVocabularyPage"));
 const WritingPage = lazy(() => import("@/pages/WritingPage/WritingPage"));
 const ProgressPage = lazy(() => import("@/pages/ProgressPage/ProgressPage"));
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="chunks" element={<ChunkTrainingPage />} />
         <Route path="conversation" element={<ConversationPage />} />
         <Route path="shadowing" element={<ShadowingPage />} />
+        <Route path="articles" element={<ArticlePage />} />
         <Route path="vocabulary" element={<DeepVocabularyPage />} />
         <Route path="writing" element={<WritingPage />} />
         <Route path="progress" element={<ProgressPage />} />

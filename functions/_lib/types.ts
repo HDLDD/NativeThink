@@ -1,9 +1,9 @@
-/** Shared types for API functions */
+/** Shared types (Cloudflare-compatible — no imports needed) */
 
 export interface User {
   id: string;
   email: string;
-  passwordHash: string; // "saltHex:hashHex"
+  passwordHash: string;
   createdAt: number;
 }
 
@@ -11,11 +11,6 @@ export interface UserSession {
   userId: string;
   email: string;
 }
-
-// KV key conventions:
-//   users:email:<email>        → JSON<User>
-//   users:data:<userId>:<key>  → string (user's app data)
-//   passages:<userId>:<id>     → JSON<GeneratedPassage>
 
 export interface GeneratedPassage {
   id: string;

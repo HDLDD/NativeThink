@@ -1,4 +1,4 @@
-/** Authenticated fetch wrapper for Vercel API calls */
+/** Authenticated fetch wrapper for Cloudflare Pages API calls */
 
 const TOKEN_KEY = '__nativethink_auth_token';
 
@@ -13,16 +13,13 @@ export function setStoredToken(token: string | null): void {
   } catch { /* ignore */ }
 }
 
-export async function apiFetch(
-  path: string,
-  options: RequestInit = {},
-): Promise<Response> {
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = getStoredToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string> || {}),
-  };
+  const headers: Record<string, string> = { ...(options.headers as Record<string, string> || {}) };
+  // Only set Content-Type for requests with a body
+  if (options.body && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
   if (token) headers['Authorization'] = `Bearer ${token}`;
-
   return fetch(path, { ...options, headers });
 }

@@ -4,6 +4,7 @@ import {
   Brain,
   Puzzle,
   MessageSquare,
+  FileText,
   BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -14,6 +15,7 @@ const MOBILE_NAV = [
   { path: '/think', label: '思维', icon: Brain },
   { path: '/chunks', label: '语块', icon: Puzzle },
   { path: '/conversation', label: '对话', icon: MessageSquare },
+  { path: '/articles', label: '文章', icon: FileText },
   { path: '/vocabulary', label: '词汇', icon: BookOpen },
 ];
 
