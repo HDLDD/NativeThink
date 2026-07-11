@@ -483,9 +483,29 @@ export default function ArticlePage() {
     return () => { cancelled = true; };
   }, [mainTab]);
 
-  // ── Reader open/close — track reading time ──
-  const openReader = (content: IReadingContent) => {
+  // ── TOC (table of contents) for books/publications ──
+  const [tocVisible, setTocVisible] = useState(false);
+  const [tocContent, setTocContent] = useState<IReadingContent | null>(null);
+  const [readerStartPage, setReaderStartPage] = useState(0);
+
+  const showToc = (content: IReadingContent) => {
+    setTocContent(content);
+    setTocVisible(true);
+  };
+
+  const startReading = (startPage: number) => {
+    if (!tocContent) return;
+    setTocVisible(false);
     readingStartRef.current = Date.now();
+    setReaderStartPage(startPage);
+    setReaderContent(tocContent);
+    setReaderVisible(true);
+  };
+
+  // ── Reader open/close — track reading time ──
+  const openReader = (content: IReadingContent, startPage = 0) => {
+    readingStartRef.current = Date.now();
+    setReaderStartPage(startPage);
     setReaderContent(content);
     setReaderVisible(true);
   };
@@ -497,6 +517,15 @@ export default function ArticlePage() {
       readingStartRef.current = 0;
     }
     setReaderVisible(false);
+  };
+
+  // For books/publications: show TOC first instead of opening reader directly
+  const handleOpenBook = (content: IReadingContent) => {
+    if (content.pages.length > 4) {
+      showToc(content); // multi-page → show TOC
+    } else {
+      openReader(content); // short → open directly
+    }
   };
 
   // ── Render ──
@@ -607,7 +636,7 @@ export default function ArticlePage() {
               <Card
                 key={book.id}
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => { openReader(book); saveToHistory(book.zhTitle, '', 'books', { bookId: book.id }); }}
+                onClick={() => { handleOpenBook(book); saveToHistory(book.zhTitle, '', 'books', { bookId: book.id }); }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
@@ -659,7 +688,7 @@ export default function ArticlePage() {
               <Card
                 key={pub.id}
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => { openReader(pub); saveToHistory(pub.zhTitle, '', 'publications'); }}
+                onClick={() => { handleOpenBook(pub); saveToHistory(pub.zhTitle, '', 'publications'); }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
