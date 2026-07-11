@@ -132,54 +132,53 @@ export default function PageReader({ content, onClose }: Props) {
   // Save progress
   useEffect(() => { saveProgress(activeContent.id, currentPage); }, [activeContent.id, currentPage]);
 
-  // TTS — paragraph-by-paragraph sequential playback
-  const [speakingPara, setSpeakingPara] = useState(-1);
   const ttsCancelRef = useRef(false);
 
-  const speakPage = async () => {
+  const playNextParagraph = () => {
+    if (ttsCancelRef.current) {
+      setSpeakingPara(-1);
+      paraQueueRef.current = [];
+      return;
+    }
+    const idx = paraIdxRef.current;
+    if (idx >= paraQueueRef.current.length) {
+      // All paragraphs done
+      setSpeakingPara(-1);
+      paraQueueRef.current = [];
+      return;
+    }
+    setSpeakingPara(idx);
+    const text = paraQueueRef.current[idx];
+    paraIdxRef.current = idx + 1;
+    // Set onEnd to play next paragraph
+    onEndRef.current = () => {
+      setTimeout(() => playNextParagraph(), 300); // pause between paragraphs
+    };
+    tts.speak(text, { rate: 0.9 });
+  };
+
+  const speakPage = () => {
     const page = activeContent.pages[currentPage];
     if (!page) return;
-    // Cancel any ongoing playback
     tts.cancel();
     ttsCancelRef.current = true;
-    await new Promise((r) => setTimeout(r, 150));
-    ttsCancelRef.current = false;
-
-    const paras = page.paragraphs.map((p) => cleanText(p.en)).filter((t) => t.length > 0);
-    for (let i = 0; i < paras.length; i++) {
-      if (ttsCancelRef.current) break;
-      setSpeakingPara(i);
-      // Estimate duration: ~150 words/min = 2.5 words/sec, add buffer
-      const wordCount = paras[i].split(/\s+/).filter(Boolean).length;
-      const estimatedMs = Math.max(2000, (wordCount / 2.5) * 1000 + 800);
-      await new Promise<void>((resolve) => {
-        tts.speak(paras[i], { rate: 0.9 });
-        // Use estimated duration as primary timer, with isSpeaking as early-exit check
-        let elapsed = 0;
-        let silentFor = 0;
-        const check = setInterval(() => {
-          elapsed += 250;
-          if (ttsCancelRef.current) { clearInterval(check); resolve(); return; }
-          if (!tts.isSpeaking) {
-            silentFor += 250;
-            // Must be silent for 1.5s OR elapsed > estimated to advance
-            if (silentFor >= 1500 || elapsed >= estimatedMs) {
-              clearInterval(check);
-              setTimeout(resolve, 250);
-            }
-          } else {
-            silentFor = 0; // reset silence counter when speaking resumes
-          }
-        }, 250);
-      });
-    }
     setSpeakingPara(-1);
+    setTimeout(() => {
+      ttsCancelRef.current = false;
+      const paras = page.paragraphs.map((p) => cleanText(p.en)).filter((t) => t.length > 0);
+      if (paras.length === 0) return;
+      paraQueueRef.current = paras;
+      paraIdxRef.current = 0;
+      playNextParagraph();
+    }, 200);
   };
 
   const stopSpeaking = () => {
     ttsCancelRef.current = true;
+    onEndRef.current = null;
     tts.cancel();
     setSpeakingPara(-1);
+    paraQueueRef.current = [];
   };
 
   // Page navigation
