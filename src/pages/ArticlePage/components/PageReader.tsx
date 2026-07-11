@@ -197,26 +197,45 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   // Clamp page
   const currentPage = Math.max(0, Math.min(pageIdx, activePages - 1));
 
-  // Calculate chapter-relative paragraph index for current page
-  const paraChapterIndex = useMemo(() => {
-    if (!hasChapters) return null;
+  // Calculate chapter-relative paragraph numbering for current page
+  // Returns an array of per-paragraph numbers (1-based, within chapter, non-header only)
+  const paraChapterNumbers = useMemo<number[]>(() => {
     const cp = activeContent.pages[currentPage];
-    if (!cp) return null;
+    if (!cp) return [];
+    if (!hasChapters) {
+      // No chapters: global sequential across all pages
+      let globalCount = 0;
+      for (let pi = 0; pi < currentPage; pi++) {
+        globalCount += activeContent.pages[pi].paragraphs.filter((p) => !p.en.startsWith('##CHAPTER##')).length;
+      }
+      const result: number[] = [];
+      for (const p of cp.paragraphs) {
+        if (p.en.startsWith('##CHAPTER##')) { result.push(0); continue; }
+        result.push(++globalCount);
+      }
+      return result;
+    }
+    // Has chapters: reset counter at each chapter start
     let chIdx = chapters.length - 1;
     for (let i = chapters.length - 1; i >= 0; i--) {
-      if (pageIdx >= chapters[i].pageIndex) { chIdx = i; break; }
+      if (currentPage >= chapters[i].pageIndex) { chIdx = i; break; }
     }
+    // Count paragraphs from chapter start up to current page
     let count = 0;
-    for (let pi = chapters[chIdx].pageIndex; pi <= pageIdx; pi++) {
+    for (let pi = chapters[chIdx].pageIndex; pi <= currentPage; pi++) {
       for (const p of activeContent.pages[pi].paragraphs) {
-        if (p.en.startsWith('##CHAPTER##')) {
-          if (pi === chapters[chIdx].pageIndex && count === 0) continue;
-        }
-        if (pi < pageIdx) count++;
+        if (p.en.startsWith('##CHAPTER##')) continue;
+        if (pi < currentPage) count++;
       }
     }
-    return { chIdx, startCount: count };
-  }, [hasChapters, chapters, pageIdx, activeContent.pages, currentPage]);
+    // Now assign numbers to current page paragraphs
+    const result: number[] = [];
+    for (const p of cp.paragraphs) {
+      if (p.en.startsWith('##CHAPTER##')) { result.push(0); continue; }
+      result.push(++count);
+    }
+    return result;
+  }, [hasChapters, chapters, currentPage, activeContent.pages]);
 
   // Preload wordbank for Chinese word lookup
   useEffect(() => { if (!isAllReady()) preloadAll(); }, []);
@@ -701,13 +720,11 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         ) : (
           /* ── READING MODE ── */
           <div ref={contentRef} className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-white/80 rounded-2xl my-2">
-            {page.paragraphs.map((para, i) => {
-              const globalIdx = paraChapterIndex ? paraChapterIndex.startCount + i + 1 : i + 1;
-              return (
+            {page.paragraphs.map((para, i) => (
                 <ParagraphBlock
                   key={i}
                   para={para}
-                  paraIndex={globalIdx}
+                  paraIndex={paraChapterNumbers[i] || 0}
                   transMode={transMode}
                   sentenceMode={sentenceMode}
                   fontSize={fontSize}
@@ -715,8 +732,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                   isSpeaking={speakingPara === i}
                   tts={tts}
                 />
-              );
-            })}
+            ))}
           </div>
         )}
       </div>
