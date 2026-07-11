@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import AISettings from '@/components/AISettings';
 import TTSSettings from '@/components/TTSSettings';
 import HelpGuide from '@/components/HelpGuide';
+import GlobalWordSearch from '@/components/GlobalWordSearch';
 import FeedbackDialog from '@/components/FeedbackDialog';
 import ChangelogDialog from '@/components/ChangelogDialog';
 
@@ -137,6 +138,7 @@ export default function Header() {
             <ChangelogDialog />
             <FeedbackDialog />
             <HelpGuide />
+            <GlobalWordSearch />
             <AISettings />
             <TTSSettings />
             <Button

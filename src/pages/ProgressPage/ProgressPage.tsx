@@ -58,6 +58,7 @@ import { safeStorage } from '@/lib/safe-storage';
 import { WORD_COUNTS } from '@/data/wordbank/meta';
 import { cn, cleanText } from '@/lib/utils';
 import { toast } from 'sonner';
+import FavoriteReviewMode from './components/FavoriteReviewMode';
 
 // 从真实日历数据生成日历视图
 function buildCalendarDays(calendar: { date: string; checkedIn: boolean; minutes: number }[], year: number, month: number) {
@@ -104,6 +105,7 @@ export default function ProgressPage() {
   const tts = useTTS();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [filterType, setFilterType] = usePageMemory('progress-filter', 'all');
+  const [favReviewMode, setFavReviewMode] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [resetConfirm, setResetConfirm] = useState<string | null>(null);
 
@@ -1023,11 +1025,26 @@ export default function ProgressPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <Button
+                    variant={favReviewMode ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => { setFavReviewMode((v) => !v); }}
+                    className={cn(
+                      'rounded-xl text-[10px] font-black uppercase tracking-wider',
+                      favReviewMode
+                        ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50'
+                        : 'border-border hover:border-[#00B894] hover:text-[#00B894]',
+                    )}
+                  >
+                    {favReviewMode ? '浏览模式' : '开始回顾'}
+                  </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              {filteredFavorites.length > 0 ? (
+              {favReviewMode ? (
+                <FavoriteReviewMode favorites={filteredFavorites} onExit={() => setFavReviewMode(false)} />
+              ) : filteredFavorites.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {filteredFavorites.map((item) => (
                     <Card

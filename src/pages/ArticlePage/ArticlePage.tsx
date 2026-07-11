@@ -328,21 +328,281 @@ export default function ArticlePage() {
     setLoading(true);
     try {
       const knownTexts: Record<string, string> = {
-        'mlk-dream': 'I am happy to join with you today in what will go down in history as the greatest demonstration for freedom in the history of our nation. Five score years ago, a great American, in whose symbolic shadow we stand today, signed the Emancipation Proclamation. This momentous decree came as a great beacon light of hope to millions of Negro slaves who had been seared in the flames of withering injustice. It came as a joyous daybreak to end the long night of their captivity. But one hundred years later, the Negro still is not free... I have a dream that one day this nation will rise up and live out the true meaning of its creed: "We hold these truths to be self-evident, that all men are created equal." I have a dream that one day on the red hills of Georgia, the sons of former slaves and the sons of former slave owners will be able to sit down together at the table of brotherhood... I have a dream that my four little children will one day live in a nation where they will not be judged by the color of their skin but by the content of their character. I have a dream today!',
-        'gettysburg': 'Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived and so dedicated, can long endure. We are met on a great battlefield of that war. We have come to dedicate a portion of that field, as a final resting place for those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we can not dedicate—we can not consecrate—we can not hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it, far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced... that this nation, under God, shall have a new birth of freedom—and that government of the people, by the people, for the people, shall not perish from the earth.',
-        'jfk-inaugural': 'We observe today not a victory of party but a celebration of freedom—symbolizing an end as well as a beginning—signifying renewal as well as change. For I have sworn before you and Almighty God the same solemn oath our forebears prescribed nearly a century and three quarters ago. The world is very different now. For man holds in his mortal hands the power to abolish all forms of human poverty and all forms of human life. And yet the same revolutionary beliefs for which our forebears fought are still at issue around the globe... And so, my fellow Americans: ask not what your country can do for you—ask what you can do for your country. My fellow citizens of the world: ask not what America will do for you, but what together we can do for the freedom of man.',
-        'churchill-finest': 'What General Weygand called the Battle of France is over. I expect that the Battle of Britain is about to begin. Upon this battle depends the survival of Christian civilization. Upon it depends our own British life, and the long continuity of our institutions and our Empire. The whole fury and might of the enemy must very soon be turned on us. Hitler knows that he will have to break us in this Island or lose the war. If we can stand up to him, all Europe may be free and the life of the world may move forward into broad, sunlit uplands... Let us therefore brace ourselves to our duties, and so bear ourselves that, if the British Empire and its Commonwealth last for a thousand years, men will still say, "This was their finest hour."',
-        'jobs-stanford': 'I am honored to be with you today at your commencement from one of the finest universities in the world. I never graduated from college. Truth be told, this is the closest I\'ve ever gotten to a college graduation. Today I want to tell you three stories from my life. That\'s it. No big deal. Just three stories... Your time is limited, so don\'t waste it living someone else\'s life. Don\'t be trapped by dogma—which is living with the results of other people\'s thinking. Don\'t let the noise of others\' opinions drown out your own inner voice. And most important, have the courage to follow your heart and intuition... Stay hungry, stay foolish.',
-        'susan-anthony': 'Friends and fellow citizens: I stand before you tonight under indictment for the alleged crime of having voted at the last presidential election, without having a lawful right to vote. It shall be my work this evening to prove to you that in thus voting, I not only committed no crime, but, instead, simply exercised my citizen\'s rights, guaranteed to me and all United States citizens by the National Constitution, beyond the power of any state to deny.',
+        'mlk-dream': `I am happy to join with you today in what will go down in history as the greatest demonstration for freedom in the history of our nation.
+
+Five score years ago, a great American, in whose symbolic shadow we stand today, signed the Emancipation Proclamation. This momentous decree came as a great beacon light of hope to millions of Negro slaves who had been seared in the flames of withering injustice. It came as a joyous daybreak to end the long night of their captivity.
+
+But one hundred years later, the Negro still is not free. One hundred years later, the life of the Negro is still sadly crippled by the manacles of segregation and the chains of discrimination. One hundred years later, the Negro lives on a lonely island of poverty in the midst of a vast ocean of material prosperity. One hundred years later, the Negro is still languished in the corners of American society and finds himself an exile in his own land. And so we've come here today to dramatize a shameful condition.
+
+In a sense we've come to our nation's capital to cash a check. When the architects of our republic wrote the magnificent words of the Constitution and the Declaration of Independence, they were signing a promissory note to which every American was to fall heir. This note was a promise that all men, yes, black men as well as white men, would be guaranteed the "unalienable Rights" of "Life, Liberty and the pursuit of Happiness."
+
+I have a dream that one day this nation will rise up and live out the true meaning of its creed: "We hold these truths to be self-evident, that all men are created equal."
+
+I have a dream that one day on the red hills of Georgia, the sons of former slaves and the sons of former slave owners will be able to sit down together at the table of brotherhood.
+
+I have a dream that one day even the state of Mississippi, a state sweltering with the heat of injustice, sweltering with the heat of oppression, will be transformed into an oasis of freedom and justice.
+
+I have a dream that my four little children will one day live in a nation where they will not be judged by the color of their skin but by the content of their character. I have a dream today!
+
+I have a dream that one day, down in Alabama, with its vicious racists, with its governor having his lips dripping with the words of "interposition" and "nullification" — one day right there in Alabama little black boys and black girls will be able to join hands with little white boys and white girls as sisters and brothers. I have a dream today!
+
+This is our hope, and this is the faith that I go back to the South with. With this faith, we will be able to hew out of the mountain of despair a stone of hope. With this faith, we will be able to transform the jangling discords of our nation into a beautiful symphony of brotherhood. With this faith, we will be able to work together, to pray together, to struggle together, to go to jail together, to stand up for freedom together, knowing that we will be free one day.
+
+And when this happens, when we allow freedom to ring, when we let it ring from every village and every hamlet, from every state and every city, we will be able to speed up that day when all of God's children, black men and white men, Jews and Gentiles, Protestants and Catholics, will be able to join hands and sing in the words of the old Negro spiritual: Free at last! Free at last! Thank God Almighty, we are free at last!`,
+
+        'gettysburg': `Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal.
+
+Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived and so dedicated, can long endure. We are met on a great battlefield of that war. We have come to dedicate a portion of that field, as a final resting place for those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this.
+
+But, in a larger sense, we can not dedicate — we can not consecrate — we can not hallow — this ground. The brave men, living and dead, who struggled here, have consecrated it, far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us — that from these honored dead we take increased devotion to that cause for which they gave the last full measure of devotion — that we here highly resolve that these dead shall not have died in vain — that this nation, under God, shall have a new birth of freedom — and that government of the people, by the people, for the people, shall not perish from the earth.`,
+
+        'jfk-inaugural': `We observe today not a victory of party but a celebration of freedom — symbolizing an end as well as a beginning — signifying renewal as well as change. For I have sworn before you and Almighty God the same solemn oath our forebears prescribed nearly a century and three quarters ago.
+
+The world is very different now. For man holds in his mortal hands the power to abolish all forms of human poverty and all forms of human life. And yet the same revolutionary beliefs for which our forebears fought are still at issue around the globe — the belief that the rights of man come not from the generosity of the state, but from the hand of God.
+
+Let the word go forth from this time and place, to friend and foe alike, that the torch has been passed to a new generation of Americans — born in this century, tempered by war, disciplined by a hard and bitter peace, proud of our ancient heritage — and unwilling to witness or permit the slow undoing of those human rights to which this Nation has always been committed, and to which we are committed today at home and around the world.
+
+Let every nation know, whether it wishes us well or ill, that we shall pay any price, bear any burden, meet any hardship, support any friend, oppose any foe, in order to assure the survival and the success of liberty.
+
+In the long history of the world, only a few generations have been granted the role of defending freedom in its hour of maximum danger. I do not shrink from this responsibility — I welcome it. I do not believe that any of us would exchange places with any other people or any other generation. The energy, the faith, the devotion which we bring to this endeavor will light our country and all who serve it — and the glow from that fire can truly light the world.
+
+And so, my fellow Americans: ask not what your country can do for you — ask what you can do for your country.
+
+My fellow citizens of the world: ask not what America will do for you, but what together we can do for the freedom of man.`,
+
+        'churchill-finest': `What General Weygand called the Battle of France is over. I expect that the Battle of Britain is about to begin. Upon this battle depends the survival of Christian civilization. Upon it depends our own British life, and the long continuity of our institutions and our Empire. The whole fury and might of the enemy must very soon be turned on us.
+
+Hitler knows that he will have to break us in this Island or lose the war. If we can stand up to him, all Europe may be free and the life of the world may move forward into broad, sunlit uplands. But if we fail, then the whole world, including the United States, including all that we have known and cared for, will sink into the abyss of a new Dark Age made more sinister, and perhaps more protracted, by the lights of perverted science.
+
+Let us therefore brace ourselves to our duties, and so bear ourselves that, if the British Empire and its Commonwealth last for a thousand years, men will still say, "This was their finest hour."
+
+What has happened is the result of a long and famous history. The British people have faced great dangers before. We have survived the Spanish Armada, we have survived Napoleon, we have survived the Kaiser. We shall survive Hitler and his Nazi tyranny. Hitler has not yet been withstood by a great nation with a will power the equal of his own. We shall prove ourselves once again able to defend our Island home, to ride out the storm of war, and to outlive the menace of tyranny, if necessary for years, if necessary alone.
+
+Even though large tracts of Europe and many old and famous States have fallen or may fall into the grip of the Gestapo and all the odious apparatus of Nazi rule, we shall not flag or fail. We shall go on to the end. We shall fight in France, we shall fight on the seas and oceans, we shall fight with growing confidence and growing strength in the air, we shall defend our Island, whatever the cost may be. We shall fight on the beaches, we shall fight on the landing grounds, we shall fight in the fields and in the streets, we shall fight in the hills; we shall never surrender.`,
+
+        'susan-anthony': `Friends and fellow citizens: I stand before you tonight under indictment for the alleged crime of having voted at the last presidential election, without having a lawful right to vote. It shall be my work this evening to prove to you that in thus voting, I not only committed no crime, but, instead, simply exercised my citizen's rights, guaranteed to me and all United States citizens by the National Constitution, beyond the power of any state to deny.
+
+The preamble of the Federal Constitution says: "We, the people of the United States, in order to form a more perfect union, establish justice, insure domestic tranquillity, provide for the common defense, promote the general welfare, and secure the blessings of liberty to ourselves and our posterity, do ordain and establish this Constitution for the United States of America."
+
+It was we, the people; not we, the white male citizens; nor yet we, the male citizens; but we, the whole people, who formed the Union. And we formed it, not to give the blessings of liberty, but to secure them; not to the half of ourselves and the half of our posterity, but to the whole people — women as well as men. And it is a downright mockery to talk to women of their enjoyment of the blessings of liberty while they are denied the use of the only means of securing them provided by this democratic-republican government — the ballot.
+
+The only question left to be settled now is: Are women persons? And I hardly believe any of our opponents will have the hardihood to say they are not. Being persons, then, women are citizens; and no state has a right to make any law, or to enforce any old law, that shall abridge their privileges or immunities. Hence, every discrimination against women in the constitutions and laws of the several states is today null and void, precisely as is every one against Negroes.`,
+
+        'jobs-stanford': `I am honored to be with you today at your commencement from one of the finest universities in the world. I never graduated from college. Truth be told, this is the closest I've ever gotten to a college graduation. Today I want to tell you three stories from my life. That's it. No big deal. Just three stories.
+
+The first story is about connecting the dots. I dropped out of Reed College after the first 6 months, but then stayed around as a drop-in for another 18 months or so before I really quit. So why did I drop out? It started before I was born. My biological mother was a young, unwed college graduate student, and she decided to put me up for adoption... Seventeen years later I did go to college. But I naively chose a college that was almost as expensive as Stanford, and all of my working-class parents' savings were being spent on my college tuition. After six months, I couldn't see the value in it... So I decided to drop out and trust that it would all work out OK. It was pretty scary at the time, but looking back it was one of the best decisions I ever made.
+
+My second story is about love and loss. I was lucky — I found what I loved to do early in life. Woz and I started Apple in my parents' garage when I was 20. We worked hard, and in 10 years Apple had grown from just the two of us in a garage into a $2 billion company with over 4000 employees... And then I got fired. How can you get fired from a company you started? Well, as Apple grew we hired someone who I thought was very talented to run the company with me, and for the first year or so things went well. But then our visions of the future began to diverge and eventually we had a falling out... I didn't see it then, but it turned out that getting fired from Apple was the best thing that could have ever happened to me.
+
+My third story is about death. When I was 17, I read a quote that went something like: "If you live each day as if it was your last, someday you'll most certainly be right." It made an impression on me... Remembering that I'll be dead soon is the most important tool I've ever encountered to help me make the big choices in life.
+
+Your time is limited, so don't waste it living someone else's life. Don't be trapped by dogma — which is living with the results of other people's thinking. Don't let the noise of others' opinions drown out your own inner voice. And most important, have the courage to follow your heart and intuition. They somehow already know what you truly want to become. Everything else is secondary.
+
+Stay hungry, stay foolish.`,
+
+        'obama-yes-we-can': `If there is anyone out there who still doubts that America is a place where all things are possible, who still wonders if the dream of our founders is alive in our time, who still questions the power of our democracy, tonight is your answer.
+
+It's the answer told by lines that stretched around schools and churches in numbers this nation has never seen, by people who waited three hours and four hours, many for the very first time in their lives, because they believed that this time must be different, that their voice could be that difference.
+
+It's the answer spoken by young and old, rich and poor, Democrat and Republican, black, white, Latino, Asian, Native American, gay, straight, disabled and not disabled. Americans who sent a message to the world that we have never been just a collection of individuals, or a collection of red states and blue states. We are, and always will be, the United States of America.
+
+It's the answer that led those who've been told for so long by so many to be cynical and fearful and doubtful about what we can achieve, to put their hands on the arc of history and bend it once more toward the hope of a better day.
+
+It's been a long time coming, but tonight, because of what we did on this day, in this election, at this defining moment, change has come to America.
+
+Yes, we can. Yes, we can. Yes, we can.
+
+This is our moment. This is our time — to put our people back to work and open doors of opportunity for our kids; to restore prosperity and promote the cause of peace; to reclaim the American Dream and reaffirm that fundamental truth: that out of many, we are one; that while we breathe, we hope; and where we are met with cynicism and doubt, and those who tell us that we can't, we will respond with that timeless creed that sums up the spirit of a people: Yes, we can.`,
+
+        'rowling-harvard': `President Faust, members of the Harvard Corporation and the Board of Overseers, members of the faculty, proud parents, and, above all, graduates. The first thing I would like to say is "thank you." Not only has Harvard given me an extraordinary honour, but the weeks of fear and nausea I have endured at the thought of giving this commencement address have made me lose weight. A win-win situation!
+
+I have come up with two answers. On this wonderful day when we are gathered together to celebrate your academic success, I have decided to talk to you about the benefits of failure. And as you stand on the threshold of what is sometimes called "real life," I want to extol the crucial importance of imagination.
+
+Why do I talk about the benefits of failure? Simply because failure meant a stripping away of the inessential. I stopped pretending to myself that I was anything other than what I was, and began to direct all my energy into finishing the only work that mattered to me... Failure gave me an inner security that I had never attained by passing examinations. Failure taught me things about myself that I could have learned no other way.
+
+Imagination is not only the uniquely human capacity to envision that which is not, and therefore the fount of all invention and innovation. In its arguably most transformative and revelatory capacity, it is the power that enables us to empathise with humans whose experiences we have never shared... We do not need magic to change the world, we carry all the power we need inside ourselves already: we have the power to imagine better.
+
+As is a tale, so is life: not how long it is, but how good it is, is what matters. I wish you all very good lives.`,
+
+        'reagan-challenger': `Ladies and gentlemen, I'd planned to speak to you tonight to report on the state of the Union, but the events of earlier today have led me to change those plans. Today is a day for mourning and remembering.
+
+Nancy and I are pained to the core by the tragedy of the shuttle Challenger. We know we share this pain with all of the people of our country. This is truly a national loss.
+
+Nineteen years ago, almost to the day, we lost three astronauts in a terrible accident on the ground. But we've never lost an astronaut in flight; we've never had a tragedy like this. And perhaps we've forgotten the courage it took for the crew of the shuttle. But they, the Challenger Seven, were aware of the dangers, but overcame them and did their jobs brilliantly. We mourn seven heroes.
+
+We mourn their loss as a nation together. For the families of the seven, we cannot bear, as you do, the full impact of this tragedy. But we feel the loss, and we're thinking about you so very much.
+
+Your loved ones were daring and brave, and they had that special grace, that special spirit that says, "Give me a challenge, and I'll meet it with joy." They had a hunger to explore the universe and discover its truths. They wished to serve, and they did. They served all of us.
+
+The crew of the space shuttle Challenger honored us by the manner in which they lived their lives. We will never forget them, nor the last time we saw them, this morning, as they prepared for their journey and waved goodbye and "slipped the surly bonds of Earth" to "touch the face of God."`,
+
+        'ted-robinson-school': `Good morning. How are you? It's been great, hasn't it? I've been blown away by the whole thing. In fact, I'm leaving.
+
+There have been three themes running through the conference which are relevant to what I want to talk about. One is the extraordinary evidence of human creativity in all of the presentations that we've had and in all of the people here. Just the variety of it and the range of it. The second is that it's put us in a place where we have no idea what's going to happen, in terms of the future. No idea how this may play out.
+
+I have an interest in education. Actually, what I find is everybody has an interest in education. Don't you? I find this very interesting. If you're at a dinner party, and you say you work in education — actually, you're not often at dinner parties, frankly.
+
+If you think of it, children starting school this year will be retiring in 2065. Nobody has a clue, despite all the expertise that's been on parade for the past four days, what the world will look like in five years' time. And yet we're meant to be educating them for it. So the unpredictability, I think, is extraordinary.
+
+We are educating people out of their creative capacities. Picasso once said this, he said that all children are born artists. The problem is to remain an artist as we grow up. I believe this passionately, that we don't grow into creativity, we grow out of it. Or rather, we get educated out of it.
+
+Our education system has mined our minds in the way that we strip-mine the earth: for a particular commodity. And for the future, it won't serve us. We have to rethink the fundamental principles on which we're educating our children.`,
+
+        'ted-sinek-leaders': `How do you explain when things don't go as we assume? Or better, how do you explain when others are able to achieve things that seem to defy all of the assumptions? For example: Why is Apple so innovative? Year after year, they're more innovative than all their competition. And yet, they're just a computer company. They have the same access to the same talent, the same agencies, the same consultants, the same media. Then why is it that they seem to have something different?
+
+As it turns out, all the great inspiring leaders and organizations in the world, whether it's Apple or Martin Luther King or the Wright brothers, they all think, act and communicate the exact same way. And it's the complete opposite to everyone else. All I did was codify it, and it's probably the world's simplest idea. I call it the golden circle.
+
+Why? How? What? Every single person, every single organization on the planet knows what they do, 100 percent. Some know how they do it. But very, very few people or organizations know why they do what they do. And by "why" I don't mean "to make a profit." That's a result. By "why," I mean: What's your purpose? What's your cause? What's your belief?
+
+People don't buy what you do; people buy why you do it. The goal is not to do business with everybody who needs what you have. The goal is to do business with people who believe what you believe.`,
+
+        'ted-brown-vulnerability': `So, I'll start with this: a couple years ago, an event planner called me because I was going to do a speaking event. And she called, and she said, "I'm really struggling with how to write about you on the little flyer." And I thought, "Well, what's the struggle?" And she said, "Well, I saw you speak, and I'm going to call you a researcher, I think, but I'm afraid if I call you a researcher, no one will come, because they'll think you're boring and irrelevant."
+
+This is where my story starts. When I was a young researcher, doctoral student, my first year I had a research professor who said, "Here's the thing, if you cannot measure it, it does not exist." And I thought he was just sweet-talking me.
+
+So I started with connection. Because, when you ask people about love, they tell you about heartbreak. When you ask people about belonging, they'll tell you their most excruciating experiences of being excluded. And when you ask people about connection, the stories they told me were about disconnection.
+
+This is what I have found: vulnerability is the birthplace of innovation, creativity and change. To let ourselves be seen, deeply seen, vulnerably seen; to love with our whole hearts, even though there's no guarantee. To practice gratitude and joy in those moments of terror. And to believe that we are enough. Because when we work from a place, I believe, that says, "I'm enough," then we stop screaming and start listening, we're kinder and gentler to the people around us, and we're kinder and gentler to ourselves.`,
+
+        'ted-cuddy-body': `So I want to start by offering you a free no-tech life hack, and all it requires of you is this: that you change your posture for two minutes. But before I give it away, I want to ask you to right now do a little audit of your body and what you're doing with your body.
+
+So how many of you are sort of making yourselves smaller? Maybe you're hunching, crossing your legs, maybe wrapping your ankles. Sometimes we hold onto our arms like this. Sometimes we spread out. I see you.
+
+So I want to start by offering you a free no-tech life hack, and all it requires of you is this: that you change your posture for two minutes. But before I give it away, I want to ask you to right now do a little audit of your body and what you're doing with your body.
+
+We're really fascinated with body language, and we're particularly interested in other people's body language. You know, we're interested in, like, you know, an awkward interaction, or a smile, or a contemptuous glance, or maybe a very awkward wink, or maybe even something like a handshake.
+
+So what nonverbals am I talking about? I'm a social psychologist. I study prejudice, and I teach at a competitive business school, so it was almost inevitable that I would become interested in power dynamics. I became especially interested in nonverbal expressions of power and dominance.
+
+Our bodies change our minds, and our minds can change our behavior, and our behavior can change our outcomes. They are not just a reflection of our minds. The mind reflects the body. Don't just fake it till you make it. Fake it till you become it. Do it enough until you actually become it and internalize.`,
+
+        'ted-duckworth-grit': `When I was 27 years old, I left a very demanding job in management consulting for a job that was even more demanding: teaching. I went to teach seventh graders math in the New York City public schools. And like any teacher, I made quizzes and tests. I gave out homework assignments. When the work came back, I calculated grades.
+
+What struck me was that IQ was not the only difference between my best and my worst students. Some of my strongest performers did not have stratospheric IQ scores. Some of my smartest kids weren't doing so well.
+
+After several more years of teaching, I came to the conclusion that what we need in education is a much better understanding of students and learning from a motivational perspective, from a psychological perspective. In education, the one thing we know how to measure best is IQ. But what if doing well in school and in life depends on much more than your ability to learn quickly and easily?
+
+So I left the classroom, and I went to graduate school to become a psychologist. I started studying kids and adults in all kinds of super challenging settings, and in every study my question was, who is successful here and why?
+
+One characteristic emerged as a significant predictor of success. And it wasn't social intelligence. It wasn't good looks, physical health, and it wasn't IQ. It was grit. Grit is passion and perseverance for very long-term goals. Grit is having stamina. Grit is sticking with your future, day in, day out, not just for the week, not just for the month, but for years, and working really hard to make that future a reality. Grit is living life like it's a marathon, not a sprint.
+
+In other words, we need to be gritty about getting our kids grittier.`,
+
+        'ted-adichie-single': `I'm a storyteller. And I would like to tell you a few personal stories about what I like to call "the danger of the single story."
+
+I grew up on a university campus in eastern Nigeria. My mother says that I started reading at the age of two, although I think four is probably close to the truth. So I was an early reader, and what I read were British and American children's books.
+
+When I began to write, at about the age of seven, stories in pencil with crayon illustrations that my poor mother was obligated to read, I wrote exactly the kinds of stories I was reading: All my characters were white and blue-eyed, they played in the snow, they ate apples, and they talked a lot about the weather, how lovely it was that the sun had come out. Now, this despite the fact that I lived in Nigeria. I had never been outside Nigeria. We didn't have snow, we ate mangoes, and we never talked about the weather, because there was no need to.
+
+What this demonstrates, I think, is how impressionable and vulnerable we are in the face of a story, particularly as children. Because all I had read were books in which characters were foreign, I had become convinced that books by their very nature had to have foreigners in them.
+
+The single story creates stereotypes, and the problem with stereotypes is not that they are untrue, but that they are incomplete. They make one story become the only story.
+
+Stories matter. Many stories matter. Stories have been used to dispossess and to malign, but stories can also be used to empower and to humanize. Stories can break the dignity of a people, but stories can also repair that broken dignity.
+
+When we reject the single story, when we realize that there is never a single story about any place, we regain a kind of paradise.`,
+
+        'ted-urban-procrastination': `So in college, I was a government major, which means I had to write a lot of papers. Now, when a normal student writes a paper, they might spread the work out a little like this. So, you know, you get started maybe a little slowly, but you get enough done in the first week that, with some heavier days later on, everything gets done, things stay civil. And I would want to do that like that. That would be the plan. I would have it all ready to go, but then, actually, the paper would come along, and then I would kind of do this.
+
+And that would happen every single paper. But then came my 90-page senior thesis, a paper you're supposed to spend a year on. And I knew for a paper like that, my normal work flow was not an option. It was way too big a project. So I planned things out, and I decided it kind of had to go like this. This is how the year would go.
+
+And then, actually, the paper came along, and of course, at some point I was just sitting there, and it was like, "Oh, man!" And it was the same thing. And that was when I had my little epiphany.
+
+Both the Rational Decision-Maker and the Instant Gratification Monkey live in your brain. The Rational Decision-Maker will make the rational decision to do something productive, but the Monkey doesn't like that plan. The Monkey lives entirely in the present moment. The Monkey only cares about two things: easy and fun.
+
+Now, what is this doing to our lives? It has a huge impact. We need to stay aware of the Instant Gratification Monkey. That's a job for all of us. And because there's not that many boxes left to check, I think we should all start thinking about what we're really procrastinating on. Because everyone is procrastinating on something in life. We need to think about what that really is. Maybe for all of us, the thing we need to start doing, is just to start.`,
+
+        'ted-gates-climate': `I'm going to talk today about energy and climate. And that might seem a bit surprising, because my full-time work at the foundation is mostly about vaccines and seeds, about the things that we need to invent and deliver to help the poorest two billion live better lives. But energy and climate are extremely important to these people. In fact, more important to them than to anyone else on the planet.
+
+The climate getting worse means that many years, their crops won't grow. There will be too much rain, not enough rain. Things will change in ways that their fragile environment simply cannot support. And that leads to starvation, it leads to uncertainty, it leads to unrest.
+
+Now, the exact amount of how you map from a certain increase of CO2 to what temperature will be and where the positive feedbacks are, there's some uncertainty there, but not very much. And there's certainly uncertainty about how bad those effects will be, but they will be extremely bad.
+
+So what we're going to have to do at a global scale is create a new system. And so we need energy miracles. Now, when I use the term "miracle," I don't mean something that's impossible. The microprocessor is a miracle. The Internet is a miracle. The personal computer is a miracle. So the people here have participated in the creation of many miracles.
+
+We need to get to zero. We need to reduce CO2 emissions to zero. And we need to do it within the next few decades.`,
+
+        'greta-un-climate': `My message is that we'll be watching you. This is all wrong. I shouldn't be up here. I should be back in school on the other side of the ocean. Yet you all come to us young people for hope. How dare you!
+
+You have stolen my dreams and my childhood with your empty words. And yet I'm one of the lucky ones. People are suffering. People are dying. Entire ecosystems are collapsing. We are in the beginning of a mass extinction, and all you can talk about is money and fairy tales of eternal economic growth. How dare you!
+
+For more than 30 years, the science has been crystal clear. How dare you continue to look away and come here saying that you're doing enough, when the politics and solutions needed are still nowhere in sight.
+
+You say you hear us and that you understand the urgency. But no matter how sad and angry I am, I do not want to believe that. Because if you really understood the situation and still kept on failing to act, then you would be evil. And that I refuse to believe.
+
+The popular idea of cutting our emissions in half in 10 years only gives us a 50% chance of staying below 1.5 degrees Celsius, and the risk of setting off irreversible chain reactions beyond human control.
+
+You are failing us. But the young people are starting to understand your betrayal. The eyes of all future generations are upon you. And if you choose to fail us, I say: We will never forgive you.`,
+
+        'emma-heforshe': `Today we are launching a campaign called "HeForShe." I am reaching out to you because I need your help. We want to end gender inequality — and to do that we need everyone to be involved.
+
+This is the first campaign of its kind at the UN: we want to try and galvanize as many men and boys as possible to be advocates for gender equality. And we don't just want to talk about it, but make sure it is tangible.
+
+I was appointed six months ago and the more I have spoken about feminism the more I have realized that fighting for women's rights has too often become synonymous with man-hating. If there is one thing I know for certain, it is that this has to stop. For the record, feminism by definition is: "The belief that men and women should have equal rights and opportunities. It is the theory of the political, economic and social equality of the sexes."
+
+I started questioning gender-based assumptions when at eight I was confused at being called "bossy," because I wanted to direct the plays we would put on for our parents—but the boys were not. When at 14 I started being sexualized by certain elements of the press. When at 15 my girlfriends started dropping out of their sports teams because they didn't want to appear "muscly." When at 18 my male friends were unable to express their feelings. I decided I was a feminist and this seemed uncomplicated to me.
+
+Men—I would like to take this opportunity to extend your formal invitation. Gender equality is your issue too. We don't often talk about men being imprisoned by gender stereotypes but I can see that that they are and that when they are free, things will change for women as a natural consequence. If men don't have to be aggressive in order to be accepted women won't feel compelled to be submissive. Both men and women should feel free to be sensitive. Both men and women should feel free to be strong. It is time that we all perceive gender on a spectrum not as two opposing sets of ideals.`,
+
+        'malala-un': `In the name of God, the most beneficent, the most merciful. Honorable UN Secretary General Mr. Ban Ki-moon, respected president of the General Assembly, and dear brothers and sisters: Today, it is an honor for me to be speaking again after a long time. Being here with such honorable people is a great moment in my life.
+
+Dear brothers and sisters, do remember one thing. Malala Day is not my day. Today is the day of every woman, every boy and every girl who have raised their voice for their rights. There are hundreds of human rights activists and social workers who are not only speaking for human rights, but who are struggling to achieve their goals of education, peace and equality. Thousands of people have been killed by the terrorists and millions have been injured. I am just one of them. So here I stand, one girl among many. I speak not for myself, but for all girls and boys. I raise up my voice — not so that I can shout, but so that those without a voice can be heard. Those who have fought for their rights: Their right to live in peace. Their right to be treated with dignity. Their right to equality of opportunity. Their right to be educated.
+
+The terrorists thought that they would change our aims and stop our ambitions, but nothing changed in my life except this: Weakness, fear and hopelessness died. Strength, power and courage was born. I am the same Malala. My ambitions are the same. My hopes are the same. My dreams are the same.
+
+Dear brothers and sisters, we must not forget that millions of people are suffering from poverty, injustice and ignorance. We must not forget that millions of children are out of schools. We must not forget that our sisters and brothers are waiting for a bright peaceful future.
+
+So let us wage a global struggle against illiteracy, poverty and terrorism. Let us pick up our books and our pens. They are our most powerful weapons. One child, one teacher, one pen and one book can change the world. Education is the only solution. Education first.`,
+
+        'ted-harari-nationalism': `So, humankind has two great stories: the story of the individual and the story of the collective. For most of history, the dominant story was the collective story. The individual was just a tiny cog in the great machine of the tribe, the kingdom, the empire. And the meaning of life came from belonging to something bigger than yourself.
+
+But in the last few centuries, a new story has emerged. The story of the individual. That each of us has a unique inner self, with unique feelings, unique desires, unique dreams. And the highest purpose of society is to enable each individual to fulfill their unique potential.
+
+Now, these two stories are colliding. And this collision is causing a lot of the political and social turmoil we see around the world today. People feel that something is missing. They feel disconnected, alienated.
+
+The big question of the 21st century is not whether we will believe in one story or the other. The big question is how to combine the two. How to create a society that values both the individual and the collective. That is the challenge.
+
+Nationalism is the attempt to go back to the collective story, but without the traditional frameworks of religion or empire. And it's very tempting. Because it offers people a sense of belonging, a sense of identity, a sense of meaning. But it also has a dark side. It can easily turn into chauvinism, xenophobia, and ultimately, war.`,
+
+        'ted-godin-tribes': `Something really important is happening. The Internet has ended the age of mass marketing and has revived a social unit from the past: the tribe. A tribe is a group of people connected to one another, connected to a leader, and connected to an idea. For millions of years, human beings have been part of one tribe or another. A group needs only two things to be a tribe: a shared interest and a way to communicate.
+
+Tribes need leadership. Sometimes one person speaks up and leads, sometimes the group selects a leader. What makes a tribe different from a crowd is that the members care about each other and about the shared goal.
+
+The Beatles did not invent teenagers. They merely decided to lead them. Most organizations, most movements, spend their time trying to find people and get them to do what they're told. But that's not what tribes are about. Tribes are about finding people who share your passion and giving them a platform to connect.
+
+What we do for a living now is find something to change, put it into a context, and connect people. The new status quo is that you don't need to be appointed by someone in power to lead. You just need to start a movement.
+
+You don't need permission from anyone. You just need the passion to connect people and the willingness to lead them. The question isn't, "Is it possible for me to do that?" The question is, "Will I choose to do it?"`,
+
+        'mandela-inaugural': `Our deepest fear is not that we are inadequate. Our deepest fear is that we are powerful beyond measure. It is our light, not our darkness, that most frightens us. We ask ourselves, who am I to be brilliant, gorgeous, talented and fabulous? Actually, who are you not to be?
+
+We were born to make manifest the glory of God that is within us. And as we let our own light shine, we unconsciously give other people permission to do the same. As we are liberated from our own fear, our presence automatically liberates others.
+
+Never, never and never again shall it be that this beautiful land will again experience the oppression of one by another and suffer the indignity of being the skunk of the world. Let freedom reign. The sun shall never set on so glorious a human achievement! God bless Africa!
+
+Out of the experience of an extraordinary human disaster that lasted too long, must be born a society of which all humanity will be proud. We understand it still that there is no easy road to freedom. We know it well that none of us acting alone can achieve success. We must therefore act together as a united people, for national reconciliation, for nation building, for the birth of a new world.
+
+Let there be justice for all. Let there be peace for all. Let there be work, bread, water and salt for all. Let each know that for each the body, the mind and the soul have been freed to fulfill themselves.`,
+
+        'rand-Atlas': `For twelve years you have been asking: Who is John Galt? This is John Galt speaking. I am the man who loves his life. I am the man who does not sacrifice his love or his values. I am the man who has deprived you of victims and thus has destroyed your world.
+
+If you wish to know why you are perishing—you who dread knowledge—I am the man who will now tell you. You have cried that man's sins are the greed and the lust for power. You have proclaimed that man must be reformed, that he must turn himself into a sacrificial animal. But what you see now in the world proves that your beliefs are wrong.
+
+Man's mind is his basic tool of survival. Life is given to him, survival is not. His body is given to him, its sustenance is not. His mind is given to him, its content is not. To remain alive, he must act, and before he can act he must know the nature and purpose of his action.
+
+A plant can obtain its food from the soil. An animal can obtain its food by acting on its instincts. But man cannot obtain his food from the soil, nor can he obtain it by instinct. Man must produce it. And to produce it, he must think.
+
+This, and nothing less, is the meaning of human existence: to create, to produce, to achieve. Every form of happiness is a form of creation. Every form of suffering is a form of destruction. The choice is yours: to think or to die.`,
+
       };
-      const content = knownTexts[speech.id] || speech.preview + '\n\n[注：本文为演讲摘要。TED 及部分演讲因版权限制仅提供摘要，完整内容请访问 ted.com 或相关来源。AI 可基于摘要生成学习文章。]';
-      setDisplayTitle(`${speech.title} — ${speech.author} (${speech.year})`);
+      const content = knownTexts[speech.id] || speech.preview + '\n\n[注：此演讲稿因版权限制仅提供摘要，完整内容请访问来源网站。AI 可基于摘要生成完整学习文章。]';
+      setDisplayTitle(`${speech.zhTitle} — ${speech.author} (${speech.year})`);
       setDisplayContent(content);
       setDisplayTranslation('');
       setDisplayVocab([]);
       setDisplayQuestions([]);
       setQuizMode(false);
-      saveToHistory(speech.title, content, 'speeches');
+      saveToHistory(speech.zhTitle || speech.title, content, 'speeches');
       toast.success(`已加载：${speech.zhTitle || speech.title}`);
     } catch { toast.error('加载失败'); }
     finally { setLoading(false); }
