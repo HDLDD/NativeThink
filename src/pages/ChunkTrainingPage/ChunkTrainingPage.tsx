@@ -962,10 +962,12 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
         </TabsList>
 
         {/* 语块库 */}
-        <TabsContent value="library" className="space-y-6 mt-6">
-          <div ref={libraryScrollRef} onScroll={() => {
-            if (libraryScrollRef.current) saveChunkPosition({ scrollTop: libraryScrollRef.current.scrollTop });
-          }} className="max-h-[70vh] overflow-y-auto pr-1 space-y-6">
+        <TabsContent value="library" className="mt-6">
+          <div className="grid grid-cols-12 gap-6">
+            {/* Left: library content */}
+            <div ref={libraryScrollRef} onScroll={() => {
+              if (libraryScrollRef.current) saveChunkPosition({ scrollTop: libraryScrollRef.current.scrollTop });
+            }} className="col-span-12 lg:col-span-5 max-h-[70vh] overflow-y-auto pr-1 space-y-6">
           <Card className="rounded-[40px] border-border shadow-sm">
             <CardHeader className="pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
