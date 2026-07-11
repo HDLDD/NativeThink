@@ -14,7 +14,7 @@ import { useTTS } from '@/lib/use-tts';
 import { useAI } from '@/hooks/use-ai';
 import { useFavorites } from '@/lib/use-favorites';
 import { safeStorage } from '@/lib/safe-storage';
-import { cn, cleanText } from '@/lib/utils';
+import { cn, cleanText, extractJson } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { IReadingContent, TransMode, IParagraph } from '@/data/reading';
 import { buildPages } from '@/data/reading';
@@ -84,15 +84,30 @@ export default function PageReader({ content, onClose }: Props) {
     onEnd: () => onEndRef.current?.(),
   });
 
+  // Cleanup on unmount: stop TTS and nullify onEnd to prevent setState on unmounted
+  useEffect(() => {
+    return () => {
+      onEndRef.current = null;
+      tts.cancel();
+      paraQueueRef.current = [];
+    };
+  }, []);
+
   // ── State ──
   const [pageIdx, setPageIdx] = useState(() => loadProgress(content.id).page);
   const [transMode, setTransMode] = useState<TransMode>('bilingual');
   const [sentenceMode, setSentenceMode] = useState(false);
+  const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
   const [lookupOpen, setLookupOpen] = useState(false);
   const [lookupWord_State, setLookupWordState] = useState('');
   const [lookupData, setLookupData] = useState<{ word: string; phonetic: string; meaning: string; zhMeaning: string } | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // TTS cleanup on unmount
+  useEffect(() => {
+    return () => { tts.cancel(); };
+  }, []);
 
   // Translation cache state
   const TR_CACHE_KEY = `__reader_trans_${content.id}`;
@@ -118,10 +133,8 @@ export default function PageReader({ content, onClose }: Props) {
         { role: 'system', content: `Rewrite the following English text for ${lvl.label} English learners. Return ONLY valid JSON (no markdown): {"title":"adapted title","paragraphs":[{"en":"English paragraph","zh":"Chinese translation"}]}. Keep the core meaning but adjust vocabulary, sentence length, and complexity.` },
         { role: 'user', content: `Title: ${displayContent.title}\n\n${allText.slice(0, 5000)}` },
       ], { temperature: 0.6, maxTokens: 4096 });
-      const m = result.match(/\{[\s\S]*\}/);
-      if (!m) { toast.error('格式异常'); return; }
-      const parsed = JSON.parse(m[0]);
-      if (!parsed.paragraphs?.length) { toast.error('转换失败'); return; }
+      const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
+      if (!parsed?.paragraphs?.length) { toast.error('转换失败，请重试'); return; }
       const newContent: IReadingContent = {
         ...displayContent,
         title: parsed.title || displayContent.title,
@@ -435,6 +448,24 @@ export default function PageReader({ content, onClose }: Props) {
             sentenceMode ? 'bg-white dark:bg-card text-[#00B894] shadow-sm' : 'text-muted-foreground hover:text-foreground',
           )}
         >逐句</button>
+        {/* Font size toggle */}
+        <div className="w-px h-4 bg-border mx-0.5" />
+        <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
+          {([
+            { key: 'sm' as const, label: '小' },
+            { key: 'base' as const, label: '中' },
+            { key: 'lg' as const, label: '大' },
+          ]).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFontSize(key)}
+              className={cn(
+                'px-2 py-1 rounded-md text-[10px] font-bold transition-all',
+                fontSize === key ? 'bg-white dark:bg-card text-[#00B894] shadow-sm' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >{label}</button>
+          ))}
+        </div>
         {/* Inline level conversion — click to convert current article */}
         <div className="w-px h-4 bg-border mx-0.5" />
         <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
@@ -616,6 +647,7 @@ export default function PageReader({ content, onClose }: Props) {
                   paraIndex={globalIdx}
                   transMode={transMode}
                   sentenceMode={sentenceMode}
+                  fontSize={fontSize}
                   onWordClick={handleWordClick}
                   isSpeaking={speakingPara === i}
                   tts={tts}
@@ -642,13 +674,13 @@ export default function PageReader({ content, onClose }: Props) {
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 const n = parseInt((e.target as HTMLInputElement).value);
-                if (n >= 1 && n <= totalPages) jumpPage(n);
+                if (n >= 1 && n <= activePages) jumpPage(n);
                 (e.target as HTMLInputElement).value = '';
               }
             }}
           />
         </div>
-        <Button variant="outline" size="sm" onClick={goNext} disabled={currentPage >= totalPages - 1} className="rounded-xl text-[10px] font-bold gap-1 px-2 sm:px-3">
+        <Button variant="outline" size="sm" onClick={goNext} disabled={currentPage >= activePages - 1} className="rounded-xl text-[10px] font-bold gap-1 px-2 sm:px-3">
           <span className="hidden sm:inline">下一页</span><ChevronRight className="size-4" />
         </Button>
       </div>
@@ -716,14 +748,18 @@ export default function PageReader({ content, onClose }: Props) {
 // ── Paragraph block with word-click + individual TTS + sentence mode + chapter support ──
 const CIRCLED = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮','⑯','⑰','⑱','⑲','⑳'];
 
+const FONT_SIZES: Record<string, string> = { sm: 'text-sm leading-7', base: 'text-base leading-8', lg: 'text-lg leading-9' };
+
 function ParagraphBlock({
-  para, paraIndex, transMode, sentenceMode, onWordClick, isSpeaking, tts,
+  para, paraIndex, transMode, sentenceMode, fontSize, onWordClick, isSpeaking, tts,
 }: {
   para: IParagraph; paraIndex?: number; transMode: TransMode; sentenceMode: boolean;
+  fontSize?: 'sm' | 'base' | 'lg';
   onWordClick: (e: React.MouseEvent, word: string) => void;
   isSpeaking?: boolean;
   tts: ReturnType<typeof useTTS>;
 }) {
+  const textClass = FONT_SIZES[fontSize || 'base'];
   const numLabel = paraIndex && paraIndex <= 20 ? CIRCLED[paraIndex - 1] : paraIndex ? `(${paraIndex})` : null;
   const isChapter = para.en.startsWith('##CHAPTER##');
   const displayEn = isChapter ? para.en.replace('##CHAPTER##', '') : para.en;
@@ -787,7 +823,7 @@ function ParagraphBlock({
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className={cn(
-                      'text-base leading-8 text-foreground/90 font-medium transition-colors rounded-lg px-1 -mx-1',
+                      textClass, 'text-foreground/90 font-medium transition-colors rounded-lg px-1 -mx-1',
                       isSpeaking && 'bg-[#00B894]/10 text-[#00B894]',
                     )}>
                       {renderWordBlock(s)}
@@ -820,7 +856,7 @@ function ParagraphBlock({
         <div className="flex items-start gap-2">
           <button
             onClick={() => tts.speak(cleanText(displayEn), { rate: 0.9 })}
-            className="shrink-0 text-muted-foreground/30 hover:text-[#00B894] transition-colors mt-1 opacity-0 group-hover/para:opacity-100"
+            className="shrink-0 text-muted-foreground/40 hover:text-[#00B894] transition-colors mt-1"
             title="朗读本段"
           >
             <Volume2 className="size-3.5" />
@@ -829,7 +865,7 @@ function ParagraphBlock({
             <span className="shrink-0 text-xs font-bold text-muted-foreground/50 mt-0.5 select-none">{numLabel} </span>
           )}
           <p className={cn(
-            'text-base leading-8 text-foreground/90 font-medium transition-colors rounded-lg px-1 -mx-1 flex-1',
+            textClass, 'text-foreground/90 font-medium transition-colors rounded-lg px-1 -mx-1 flex-1',
             isSpeaking && 'bg-[#00B894]/10 text-[#00B894]',
           )}>
             {renderWordBlock(displayEn)}

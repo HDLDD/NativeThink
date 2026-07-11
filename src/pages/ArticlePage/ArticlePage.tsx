@@ -172,7 +172,7 @@ export default function ArticlePage() {
   useEffect(() => {
     if (mainTab !== 'books' || booksLoaded) return;
     setBooksLoaded(true);
-    import('@/data/books').then((m) => setBooks(m.ALL_BOOKS));
+    import('@/data/books').then((m) => setBooks(m.ALL_BOOKS)).catch(() => setBooks([]));
   }, [mainTab, booksLoaded]);
 
   // ── AI article generation (shared by free-form + topic grid) ──
@@ -197,7 +197,7 @@ export default function ArticlePage() {
         pages: buildPages(safeParagraphs),
         totalWords: safeParagraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
       };
-      setReaderContent(content); setReaderVisible(true);
+      openReader(content);
       saveToHistory(parsed.title || topic, content.totalWords.toString(), 'ai');
       setAiTopicInput('');
       toast.success('文章已生成！');
@@ -222,7 +222,7 @@ export default function ArticlePage() {
     import('@/data/speeches').then((m) => {
       setSpeechMeta(m.FAMOUS_SPEECHES_META);
       setBuildSpeechFn(() => m.buildSpeechContent);
-    });
+    }).catch(() => { setSpeechMeta([]); });
   }, [mainTab, speechesLoaded]);
 
   // ── AI generation ──
@@ -265,7 +265,7 @@ export default function ArticlePage() {
     } else if (bookId) {
       // Books can only be reopened from the books tab
       const book = books?.find((b) => b.id === bookId);
-      if (book) { setReaderContent(book); setReaderVisible(true); }
+      if (book) { openReader(book); }
     }
   };
 
@@ -303,7 +303,7 @@ export default function ArticlePage() {
           pages: buildPages(allParagraphs),
           totalWords: allParagraphs.reduce((s, p) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
         };
-        setReaderContent(content); setReaderVisible(true);
+        openReader(content);
         toast.success(`已生成 ${genChapters} 章书籍！`);
       } else {
         // Generate article/publication
@@ -323,7 +323,7 @@ export default function ArticlePage() {
           pages: buildPages(safeParagraphs),
           totalWords: safeParagraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
         };
-        setReaderContent(content); setReaderVisible(true);
+        openReader(content);
         toast.success(genType === 'publication' ? '刊物文章已生成！' : '文章已生成！');
       }
       setGenDialogOpen(false);
@@ -356,7 +356,7 @@ export default function ArticlePage() {
         totalWords: paragraphs.reduce((s, p) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
       };
       setReaderContent(content); setReaderVisible(true);
-      saveToHistory(page.title, content.totalWords.toString(), 'wikipedia');
+      saveToHistory(page.title, content.totalWords.toString(), 'wikipedia', { wikiTitle: page.title });
       toast.success(`已加载：${page.title}`);
     } catch { toast.error('加载失败'); }
     finally { setWikiLoading(false); }
@@ -368,8 +368,8 @@ export default function ArticlePage() {
     if (!meta) { toast.error('未找到演讲'); return; }
     const existing = buildSpeechFn?.(speechId);
     if (existing) {
-      setReaderContent(existing); setReaderVisible(true);
-      saveToHistory(meta.zhTitle || meta.title, existing.totalWords.toString(), 'speeches');
+      openReader(existing);
+      saveToHistory(meta.zhTitle || meta.title, existing.totalWords.toString(), 'speeches', { speechId });
       toast.success(`已加载：${meta.zhTitle}`);
       return;
     }
@@ -413,20 +413,46 @@ export default function ArticlePage() {
     wikiThumbsLoaded.current = true;
     let cancelled = false;
     (async () => {
-      for (const article of WIKI_ARTICLES) {
-        if (cancelled) break;
-        try {
-          const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(article.title)}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.thumbnail?.source) setWikiThumbnails((prev) => ({ ...prev, [article.title]: data.thumbnail.source }));
-          }
-          await new Promise((r) => setTimeout(r, 200));
-        } catch { /* */ }
+      // Load thumbnails in parallel batches of 5
+      const batchSize = 5;
+      for (let i = 0; i < WIKI_ARTICLES.length && !cancelled; i += batchSize) {
+        const batch = WIKI_ARTICLES.slice(i, i + batchSize);
+        await Promise.allSettled(batch.map(async (article) => {
+          if (cancelled) return;
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+            const res = await fetch(
+              `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(article.title)}`,
+              { signal: controller.signal },
+            );
+            clearTimeout(timeoutId);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.thumbnail?.source) setWikiThumbnails((prev) => ({ ...prev, [article.title]: data.thumbnail.source }));
+            }
+          } catch { /* skip failed thumbnails */ }
+        }));
       }
     })();
     return () => { cancelled = true; };
   }, [mainTab]);
+
+  // ── Reader open/close — track reading time ──
+  const openReader = (content: IReadingContent) => {
+    readingStartRef.current = Date.now();
+    setReaderContent(content);
+    setReaderVisible(true);
+  };
+
+  const closeReader = () => {
+    if (readingStartRef.current > 0) {
+      const minutes = Math.round((Date.now() - readingStartRef.current) / 60000 * 10) / 10;
+      if (minutes >= 0.1) addStudyMinutes(minutes, 'articles');
+      readingStartRef.current = 0;
+    }
+    setReaderVisible(false);
+  };
 
   // ── Render ──
   return (
@@ -456,13 +482,26 @@ export default function ArticlePage() {
               <p className="text-xs text-muted-foreground">暂无记录</p>
             ) : (
               <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {history.slice(0, 20).map((h) => (
-                  <div key={h.id} className="flex items-center gap-2 text-xs">
-                    <Badge className="text-[8px] rounded-full px-2 py-0">{h.source}</Badge>
+                {history.slice(0, 20).map((h) => {
+                  const clickable = !!h.meta?.wikiTitle || !!h.meta?.speechId || (!!h.meta?.bookId && !!books);
+                  return (
+                  <button
+                    key={h.id}
+                    onClick={() => clickable && handleHistoryClick(h)}
+                    disabled={!clickable}
+                    className={cn(
+                      'w-full flex items-center gap-2 text-xs text-left',
+                      clickable ? 'hover:bg-muted rounded-lg p-1 -mx-1 cursor-pointer' : 'p-1',
+                    )}
+                    title={clickable ? '点击重新打开' : (h.source === 'ai' || h.source === 'review-words' ? 'AI 生成内容无法恢复' : '数据未加载')}
+                  >
+                    <Badge className="text-[8px] rounded-full px-2 py-0 shrink-0">{h.source}</Badge>
                     <span className="font-medium truncate flex-1">{h.title}</span>
-                    <span className="text-muted-foreground">{new Date(h.createdAt).toLocaleDateString('zh-CN')}</span>
-                  </div>
-                ))}
+                    <span className="text-muted-foreground shrink-0">{new Date(h.createdAt).toLocaleDateString('zh-CN')}</span>
+                    {clickable && <ExternalLink className="size-3 text-muted-foreground/40 shrink-0" />}
+                  </button>
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -523,7 +562,7 @@ export default function ArticlePage() {
               <Card
                 key={book.id}
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => { setReaderContent(book); setReaderVisible(true); saveToHistory(book.zhTitle, '', 'books'); }}
+                onClick={() => { openReader(book); saveToHistory(book.zhTitle, '', 'books', { bookId: book.id }); }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
@@ -575,7 +614,7 @@ export default function ArticlePage() {
               <Card
                 key={pub.id}
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => { setReaderContent(pub); setReaderVisible(true); saveToHistory(pub.zhTitle, '', 'publications'); }}
+                onClick={() => { openReader(pub); saveToHistory(pub.zhTitle, '', 'publications'); }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
@@ -834,7 +873,7 @@ export default function ArticlePage() {
 
       {/* ── PageReader Fullscreen ── */}
       {readerVisible && readerContent && (
-        <PageReader content={readerContent} onClose={() => setReaderVisible(false)} />
+        <PageReader content={readerContent} onClose={closeReader} />
       )}
     </div>
   );

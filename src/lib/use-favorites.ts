@@ -5,7 +5,7 @@ const FAVORITES_KEY = '__nativethink_favorites';
 
 export interface IFavoriteItem {
   id: string;
-  type: 'chunk' | 'expression' | 'vocabulary' | 'think' | 'shadowing';
+  type: 'chunk' | 'expression' | 'vocabulary' | 'think' | 'shadowing' | 'word';
   content: string;
   meaning: string;
   example?: string;

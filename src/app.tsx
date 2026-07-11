@@ -44,7 +44,7 @@ export default function App() {
         <Route path="chunks" element={<ErrorBoundary fallback={<PageErrorFallback page="语块训练" />}><ChunkTrainingPage /></ErrorBoundary>} />
         <Route path="conversation" element={<ConversationPage />} />
         <Route path="shadowing" element={<ShadowingPage />} />
-        <Route path="articles" element={<ArticlePage />} />
+        <Route path="articles" element={<ErrorBoundary fallback={<PageErrorFallback page="文章阅读" />}><ArticlePage /></ErrorBoundary>} />
         <Route path="vocabulary" element={<ErrorBoundary fallback={<PageErrorFallback page="词汇深度" />}><DeepVocabularyPage /></ErrorBoundary>} />
         <Route path="writing" element={<WritingPage />} />
         <Route path="progress" element={<ProgressPage />} />
