@@ -187,19 +187,20 @@ export default function CollocationsTab({
   const MEMORIZED_STORAGE_KEY = '__nativethink_colloc_memorized';
   const [memorizedCollocs, setMemorizedCollocs] = useState<Set<string>>(() => {
     try {
-      // Use raw localStorage for memory — safeStorage prefix can change with login state
-      const raw = localStorage.getItem(MEMORIZED_STORAGE_KEY);
+      const raw = safeStorage.getItem(MEMORIZED_STORAGE_KEY);
       return raw ? new Set(JSON.parse(raw)) : new Set<string>();
     } catch { return new Set<string>(); }
   });
-  const [memoryFilter, setMemoryFilter] = useState<'all' | 'memorized' | 'unmemorized'>('all');
+  const [memoryFilter, setMemoryFilter] = useState<'all' | 'memorized' | 'unmemorized'>(
+    () => loadPersisted<'all' | 'memorized' | 'unmemorized'>('memoryFilter', 'all'),
+  );
 
   const toggleMemorized = (phrase: string) => {
     const key = phrase.toLowerCase();
     setMemorizedCollocs((prev) => {
       const next = new Set(prev);
       if (next.has(key)) { next.delete(key); } else { next.add(key); }
-      try { localStorage.setItem(MEMORIZED_STORAGE_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      try { safeStorage.setItem(MEMORIZED_STORAGE_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
       return next;
     });
   };
@@ -465,7 +466,7 @@ export default function CollocationsTab({
                 ] as const).map(({ key, label }) => (
                   <button
                     key={key}
-                    onClick={() => setMemoryFilter(key)}
+                    onClick={() => { setMemoryFilter(key); persistState({ memoryFilter: key }); }}
                     className={cn(
                       'px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all',
                       memoryFilter === key

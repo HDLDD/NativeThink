@@ -275,6 +275,16 @@ export default function ChunkTrainingPage() {
   });
   useEffect(() => { safeStorage.setItem('__nativethink_phrase_examples', JSON.stringify(phraseExamples)); }, [phraseExamples]);
 
+  // ===== 语块库点击朗读 =====
+  const libraryTtsRef = useRef(tts);
+  libraryTtsRef.current = tts;
+
+  // 点击语块时朗读
+  useEffect(() => {
+    if (!detailChunk || activeTab !== 'library') return;
+    libraryTtsRef.current.speak(detailChunk.content, { rate: 0.85 });
+  }, [detailChunk, activeTab]);
+
   // ===== 短语库点击朗读 =====
   const phraseTtsRef = useRef(tts);
   phraseTtsRef.current = tts;
