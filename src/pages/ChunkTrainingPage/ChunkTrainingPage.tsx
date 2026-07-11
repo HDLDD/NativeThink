@@ -144,8 +144,22 @@ export default function ChunkTrainingPage() {
   const { isConfigured, streamChat: aiStream, chat: aiChat } = useAI();
 
   const [memory, setMemory] = usePageMemory('chunk-page', { tab: 'library', category: 'all', difficulty: 'all' });
+
+  // ── Position memory: restore list state across page refreshes ──
+  const CHUNK_POS_KEY = '__nativethink_chunk_position';
+  const [chunkPosMemory, setChunkPosMemory] = useState<{ source?: string; page?: number; scrollTop?: number; tab?: string }>(() => {
+    try { const s = localStorage.getItem(CHUNK_POS_KEY); return s ? JSON.parse(s) : {}; } catch { return {}; }
+  });
+  const saveChunkPosition = (partial: Record<string, unknown>) => {
+    setChunkPosMemory((prev) => {
+      const next = { ...prev, ...partial };
+      try { localStorage.setItem(CHUNK_POS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
   const [searchQuery, setSearchQuery] = usePageMemoryDebounced('chunk-search', '');
-  const [activeTab, setActiveTab] = useState(memory.tab);
+  const [activeTab, setActiveTab] = useState(chunkPosMemory.tab || memory.tab);
   const [categoryFilter, setCategoryFilter] = useState(memory.category);
   const [difficultyFilter, setDifficultyFilter] = useState(memory.difficulty);
   const [detailChunk, setDetailChunk] = useState<(typeof MOCK_CHUNKS)[0] | null>(null);
@@ -180,8 +194,10 @@ export default function ChunkTrainingPage() {
   const [generating, setGenerating] = useState(false);
 
   // Library sub-tab + pagination
-  const [librarySource, setLibrarySource] = useState<'builtin' | 'aigenerated'>('builtin');
-  const [builtinPage, setBuiltinPage] = useState(0);
+  const [librarySource, setLibrarySource] = useState<'builtin' | 'aigenerated'>(
+    (chunkPosMemory.source as 'builtin' | 'aigenerated') || 'builtin',
+  );
+  const [builtinPage, setBuiltinPage] = useState(chunkPosMemory.page || 0);
   const [aiPage, setAiPage] = useState(0);
 
   // Refresh key for useMemo random shuffles

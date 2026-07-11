@@ -726,12 +726,16 @@ export default function DeepVocabularyPage() {
   };
   const scrollSelector = (dir: 'left' | 'right') => { if (scrollRef.current) scrollRef.current.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' }); };
 
-  // Save scroll position on scroll
+  // Debounced save of scroll position (avoids excessive localStorage writes)
+  const scrollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleBrowseScroll = useCallback(() => {
-    if (wordListRef.current) {
-      const curScroll = wordListRef.current.scrollTop;
-      persistLevelMemory({ ...levelMemory, [selectedLevel]: { word: selectedWord?.word || '', scrollTop: curScroll } });
-    }
+    if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
+    scrollSaveTimerRef.current = setTimeout(() => {
+      if (wordListRef.current) {
+        const curScroll = wordListRef.current.scrollTop;
+        persistLevelMemory({ ...levelMemory, [selectedLevel]: { word: selectedWord?.word || '', scrollTop: curScroll } });
+      }
+    }, 400);
   }, [levelMemory, selectedLevel, selectedWord, persistLevelMemory]);
 
   // Restore scroll position + selected word when switching to browse tab

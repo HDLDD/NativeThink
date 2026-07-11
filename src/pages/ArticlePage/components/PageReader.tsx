@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   X, ChevronLeft, ChevronRight, Volume2, BookOpen, Heart, Globe,
-  Sparkles, Hash, Wand2, Loader2,
+  Sparkles, Hash, Wand2, Loader2, Pause,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -123,12 +123,41 @@ export default function PageReader({ content, onClose }: Props) {
   // Save progress
   useEffect(() => { saveProgress(activeContent.id, currentPage); }, [activeContent.id, currentPage]);
 
-  // TTS
-  const speakPage = () => {
+  // TTS — paragraph-by-paragraph sequential playback
+  const [speakingPara, setSpeakingPara] = useState(-1);
+  const ttsCancelRef = useRef(false);
+
+  const speakPage = async () => {
     const page = activeContent.pages[currentPage];
     if (!page) return;
-    const text = page.paragraphs.map((p) => cleanText(p.en)).join(' ');
-    tts.speak(text, { rate: 0.9 });
+    // Cancel any ongoing playback
+    tts.cancel();
+    ttsCancelRef.current = true;
+    await new Promise((r) => setTimeout(r, 150));
+    ttsCancelRef.current = false;
+
+    const paras = page.paragraphs.map((p) => cleanText(p.en)).filter((t) => t.length > 0);
+    for (let i = 0; i < paras.length; i++) {
+      if (ttsCancelRef.current) break;
+      setSpeakingPara(i);
+      await new Promise<void>((resolve) => {
+        tts.speak(paras[i], { rate: 0.9 });
+        // Poll until speaking stops (paragraph complete or cancelled)
+        const check = setInterval(() => {
+          if (!tts.isSpeaking || ttsCancelRef.current) {
+            clearInterval(check);
+            setTimeout(resolve, 200); // small gap between paragraphs
+          }
+        }, 200);
+      });
+    }
+    setSpeakingPara(-1);
+  };
+
+  const stopSpeaking = () => {
+    ttsCancelRef.current = true;
+    tts.cancel();
+    setSpeakingPara(-1);
   };
 
   // Page navigation
@@ -348,9 +377,15 @@ export default function PageReader({ content, onClose }: Props) {
             翻译全部
           </Button>
         )}
-        <Button variant="ghost" size="sm" onClick={speakPage} className="rounded-xl text-[10px] font-bold gap-1">
-          <Volume2 className="size-3.5" />朗读
-        </Button>
+        {speakingPara >= 0 ? (
+          <Button variant="ghost" size="sm" onClick={stopSpeaking} className="rounded-xl text-[10px] font-bold gap-1 text-[#00B894]">
+            <Pause className="size-3.5" />停止
+          </Button>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={speakPage} className="rounded-xl text-[10px] font-bold gap-1">
+            <Volume2 className="size-3.5" />朗读
+          </Button>
+        )}
         <Button variant="ghost" size="sm" onClick={favPage} className="rounded-xl text-[10px] font-bold gap-1">
           <Heart className="size-3.5" />收藏
         </Button>
@@ -365,6 +400,7 @@ export default function PageReader({ content, onClose }: Props) {
               para={para}
               transMode={transMode}
               onWordClick={handleWordClick}
+              isSpeaking={speakingPara === i}
             />
           ))}
         </div>
@@ -445,15 +481,19 @@ export default function PageReader({ content, onClose }: Props) {
 
 // ── Paragraph block with word-click support ──
 function ParagraphBlock({
-  para, transMode, onWordClick,
+  para, transMode, onWordClick, isSpeaking,
 }: {
   para: IParagraph; transMode: TransMode; onWordClick: (e: React.MouseEvent, word: string) => void;
+  isSpeaking?: boolean;
 }) {
   const words = para.en.split(/\s+/).filter(Boolean);
   return (
     <div className="space-y-1">
       {(transMode === 'en' || transMode === 'bilingual') && (
-        <p className="text-base leading-8 text-foreground/90 font-medium">
+        <p className={cn(
+          'text-base leading-8 text-foreground/90 font-medium transition-colors rounded-lg px-1 -mx-1',
+          isSpeaking && 'bg-[#00B894]/10 text-[#00B894]',
+        )}>
           {words.map((w, i) => {
             const clean = w.replace(/[^a-zA-Z'-]/g, '');
             const isWord = clean.length >= 2;

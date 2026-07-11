@@ -258,34 +258,43 @@ export default function CollocationsTab({
 
   // ===== Lazy compute: collocations for selected level(s) =====
   const allCollocEntries = useMemo(() => {
-    const lvls = [...selectedLevels];
-    if (lvls.length === 0) return [];
+    try {
+      const lvls = [...selectedLevels];
+      if (lvls.length === 0) return [];
 
-    const map = new Map<string, CollocEntry & { seenWords: Set<string> }>();
+      const map = new Map<string, CollocEntry & { seenWords: Set<string> }>();
 
-    for (const lvl of lvls) {
-      const words = queryWords({ level: lvl });
-      words.forEach((w) => {
-        const wk = w.word.toLowerCase();
-        w.collocations.forEach((c) => {
-          const key = c.toLowerCase();
-          if (!map.has(key)) map.set(key, { phrase: c, words: [], examples: [], pattern: detectPattern(c), seenWords: new Set() });
-          const entry = map.get(key)!;
-          if (entry.seenWords.has(wk)) return;
-          entry.seenWords.add(wk);
-          entry.words.push(w);
-          if (entry.examples.length < 2 && w.examples.length > 0) {
-            const newEx = w.examples.find((ex) => !entry.examples.some((e) => e.en === ex.en));
-            if (newEx) entry.examples.push(newEx);
-          }
+      for (const lvl of lvls) {
+        let words: IWordEntry[];
+        try { words = queryWords({ level: lvl }); } catch { continue; }
+        if (!Array.isArray(words)) continue;
+        words.forEach((w) => {
+          if (!w?.collocations) return;
+          const wk = w.word?.toLowerCase();
+          if (!wk) return;
+          w.collocations.forEach((c) => {
+            if (!c) return;
+            const key = c.toLowerCase();
+            if (!map.has(key)) map.set(key, { phrase: c, words: [], examples: [], pattern: detectPattern(c), seenWords: new Set() });
+            const entry = map.get(key)!;
+            if (entry.seenWords.has(wk)) return;
+            entry.seenWords.add(wk);
+            entry.words.push(w);
+            if (entry.examples.length < 2 && w.examples?.length > 0) {
+              const newEx = w.examples.find((ex) => !entry.examples.some((e) => e.en === ex.en));
+              if (newEx) entry.examples.push(newEx);
+            }
+          });
         });
-      });
-    }
+      }
 
-    return Array.from(map.values())
-      .map(({ seenWords, ...entry }) => entry)
-      .filter((e) => e.words.length >= 1)
-      .sort((a, b) => b.words.length - a.words.length || a.phrase.localeCompare(b.phrase));
+      return Array.from(map.values())
+        .map(({ seenWords, ...entry }) => entry)
+        .filter((e) => e.words.length >= 1)
+        .sort((a, b) => b.words.length - a.words.length || a.phrase.localeCompare(b.phrase));
+    } catch {
+      return [];
+    }
   }, [selectedLevels]);
 
   // Search + memory filter
