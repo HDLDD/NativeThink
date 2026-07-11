@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   X, ChevronLeft, ChevronRight, Volume2, BookOpen, Heart, Globe,
   Sparkles, Hash, Wand2, Loader2, Pause,

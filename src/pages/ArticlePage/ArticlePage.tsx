@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   FileText, Sparkles, Languages, BookOpen, Volume2, RefreshCw, Loader2,
   Search, ExternalLink, X, Globe, Library, Mic, Wand2, BookMarked,
