@@ -40,15 +40,15 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<DashboardPage />} />
-        <Route path="think" element={<ThinkInEnglishPage />} />
+        <Route path="think" element={<ErrorBoundary fallback={<PageErrorFallback page="母语思维训练" />}><ThinkInEnglishPage /></ErrorBoundary>} />
         <Route path="chunks" element={<ErrorBoundary fallback={<PageErrorFallback page="语块训练" />}><ChunkTrainingPage /></ErrorBoundary>} />
-        <Route path="conversation" element={<ConversationPage />} />
-        <Route path="shadowing" element={<ShadowingPage />} />
+        <Route path="conversation" element={<ErrorBoundary fallback={<PageErrorFallback page="AI对话" />}><ConversationPage /></ErrorBoundary>} />
+        <Route path="shadowing" element={<ErrorBoundary fallback={<PageErrorFallback page="影子跟读" />}><ShadowingPage /></ErrorBoundary>} />
         <Route path="articles" element={<ErrorBoundary fallback={<PageErrorFallback page="文章阅读" />}><ArticlePage /></ErrorBoundary>} />
         <Route path="vocabulary" element={<ErrorBoundary fallback={<PageErrorFallback page="词汇深度" />}><DeepVocabularyPage /></ErrorBoundary>} />
-        <Route path="writing" element={<WritingPage />} />
-        <Route path="progress" element={<ProgressPage />} />
-        <Route path="favorites" element={<FavoritesPage />} />
+        <Route path="writing" element={<ErrorBoundary fallback={<PageErrorFallback page="写作练习" />}><WritingPage /></ErrorBoundary>} />
+        <Route path="progress" element={<ErrorBoundary fallback={<PageErrorFallback page="学习记录" />}><ProgressPage /></ErrorBoundary>} />
+        <Route path="favorites" element={<ErrorBoundary fallback={<PageErrorFallback page="我的收藏" />}><FavoritesPage /></ErrorBoundary>} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

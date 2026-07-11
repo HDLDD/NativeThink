@@ -355,6 +355,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
   };
 
   const nextExercise = () => {
+    if (translationExercises.length === 0) return;
     setCurrentExerciseIdx((prev) => (prev + 1) % translationExercises.length);
     setTranslationInput('');
     setTranslationResult('');
@@ -379,6 +380,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
   };
 
   const nextBackExercise = () => {
+    if (backExercises.length === 0) return;
     setCurrentBackIdx((prev) => (prev + 1) % backExercises.length);
     setBackInput('');
     setBackResult('');
@@ -483,6 +485,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
   };
 
   const nextNativeExercise = () => {
+    if (nativeExercises.length === 0) return;
     setCurrentNativeIdx((prev) => (prev + 1) % nativeExercises.length);
     setNativeInput('');
     setNativeResult('');
