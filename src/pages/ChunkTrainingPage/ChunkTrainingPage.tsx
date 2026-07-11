@@ -20,8 +20,6 @@ import {
   X,
   RotateCw,
   Shuffle,
-  Play,
-  Pause,
   ChevronLeft,
   ChevronRight,
   Brain,
@@ -277,44 +275,15 @@ export default function ChunkTrainingPage() {
   });
   useEffect(() => { safeStorage.setItem('__nativethink_phrase_examples', JSON.stringify(phraseExamples)); }, [phraseExamples]);
 
-  // ===== 短语库自动朗读 =====
+  // ===== 短语库点击朗读 =====
   const phraseTtsRef = useRef(tts);
   phraseTtsRef.current = tts;
 
-  // 自动依次朗读
-  const [phraseAutoPlaying, setPhraseAutoPlaying] = useState(false);
-  const [phraseAutoIdx, setPhraseAutoIdx] = useState(0);
-  const phraseAutoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const stopPhraseAutoPlay = useCallback(() => {
-    setPhraseAutoPlaying(false);
-    if (phraseAutoTimerRef.current) { clearTimeout(phraseAutoTimerRef.current); phraseAutoTimerRef.current = null; }
-  }, []);
-
-  const startPhraseAutoPlay = useCallback(() => {
-    if (sortedChunks.length === 0) return;
-    setPhraseAutoPlaying(true);
-    setPhraseAutoIdx(0);
-  }, [sortedChunks.length]);
-
   // 点击短语时朗读
   useEffect(() => {
-    if (!selectedPhrase || activeTab !== 'phrases' || phraseAutoPlaying) return;
+    if (!selectedPhrase || activeTab !== 'phrases') return;
     phraseTtsRef.current.speak(selectedPhrase.content, { rate: 0.85 });
-  }, [selectedPhrase, activeTab, phraseAutoPlaying]);
-
-  // 自动依次朗读所有短语
-  useEffect(() => {
-    if (!phraseAutoPlaying) return;
-    if (phraseAutoIdx >= sortedChunks.length) { stopPhraseAutoPlay(); return; }
-    const chunk = sortedChunks[phraseAutoIdx];
-    setSelectedPhrase(chunk);
-    phraseTtsRef.current.speak(chunk.content, { rate: 0.85 });
-    phraseAutoTimerRef.current = setTimeout(() => {
-      setPhraseAutoIdx((p) => p + 1);
-    }, 2500);
-    return () => { if (phraseAutoTimerRef.current) clearTimeout(phraseAutoTimerRef.current); };
-  }, [phraseAutoPlaying, phraseAutoIdx, sortedChunks, stopPhraseAutoPlay]);
+  }, [selectedPhrase, activeTab]);
 
   const handleGeneratePhraseExamples = async (chunk: IChunk) => {
     if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
@@ -521,28 +490,6 @@ export default function ChunkTrainingPage() {
   const activeFilteredCount = librarySource === 'builtin' ? memorizedFilteredBuiltIn.length : filteredAiChunks.length;
   const activePage = librarySource === 'builtin' ? builtinPage : aiPage;
   const setActivePage = librarySource === 'builtin' ? setBuiltinPage : setAiPage;
-
-  // Auto-play for chunk library list (declared AFTER activePageChunks)
-  const [libAutoPlaying, setLibAutoPlaying] = useState(false);
-  const [libAutoIdx, setLibAutoIdx] = useState(0);
-  const libAutoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stopLibAutoPlay = useCallback(() => {
-    setLibAutoPlaying(false);
-    if (libAutoTimerRef.current) { clearTimeout(libAutoTimerRef.current); libAutoTimerRef.current = null; }
-  }, []);
-  const startLibAutoPlay = useCallback(() => {
-    if (activePageChunks.length === 0) return;
-    setLibAutoPlaying(true);
-    setLibAutoIdx(0);
-  }, [activePageChunks.length]);
-  useEffect(() => {
-    if (!libAutoPlaying) return;
-    if (libAutoIdx >= activePageChunks.length) { stopLibAutoPlay(); return; }
-    const chunk = activePageChunks[libAutoIdx];
-    tts.speak(chunk.content, { rate: 0.85 });
-    libAutoTimerRef.current = setTimeout(() => setLibAutoIdx((p) => p + 1), 2500);
-    return () => { if (libAutoTimerRef.current) clearTimeout(libAutoTimerRef.current); };
-  }, [libAutoPlaying, libAutoIdx, activePageChunks, tts, stopLibAutoPlay]);
 
   // Restore library scroll position after page data loads
   useEffect(() => {
@@ -1367,18 +1314,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                     {/* Auto-play + pagination */}
                     <div className="flex items-center justify-between pt-3 mt-3 border-t border-border/50">
                       <div className="flex items-center gap-1">
-                        {libAutoPlaying ? (
-                          <>
-                            <span className="text-[10px] font-bold text-[#00B894] tabular-nums">{libAutoIdx + 1}/{activePageChunks.length}</span>
-                            <Button variant="ghost" size="icon" onClick={stopLibAutoPlay}
-                              className="rounded-xl size-7 bg-rose-50 dark:bg-rose-500/15 text-rose-500 hover:bg-rose-100"><Pause className="size-3.5" /></Button>
-                          </>
-                        ) : (
-                          <Button variant="ghost" size="sm" onClick={startLibAutoPlay} disabled={activePageChunks.length === 0}
-                            className="rounded-xl text-[10px] font-black uppercase tracking-wider bg-[#00B894]/10 text-[#00B894] hover:bg-[#00B894]/20 gap-1">
-                            <Play className="size-3.5" />自动朗读
-                          </Button>
-                        )}
+                        <span className="text-[10px] font-bold text-muted-foreground/50">点击语块即可朗读</span>
                       </div>
                     {activeTotalPages > 1 && (
                       <div className="flex items-center justify-center gap-2">
@@ -2104,17 +2040,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {phraseAutoPlaying ? (
-                    <Button variant="ghost" size="icon" onClick={stopPhraseAutoPlay}
-                      className="rounded-xl size-9 bg-rose-50 dark:bg-rose-500/15 text-rose-500 hover:bg-rose-100">
-                      <Pause className="size-4" />
-                    </Button>
-                  ) : (
-                    <Button variant="ghost" size="sm" onClick={startPhraseAutoPlay} disabled={sortedChunks.length === 0}
-                      className="rounded-xl text-[9px] font-black uppercase tracking-wider bg-[#00B894]/10 text-[#00B894] hover:bg-[#00B894]/20 gap-1">
-                      <Play className="size-3" />自动朗读
-                    </Button>
-                  )}
+                    <span className="text-[10px] font-bold text-muted-foreground/50">点击短语即可朗读</span>
                   <Button
                     variant="outline"
                     size="sm"
