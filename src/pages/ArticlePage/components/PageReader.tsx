@@ -827,7 +827,7 @@ function ParagraphBlock({
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className={cn(
-                      textClass, 'text-foreground/90 font-medium transition-colors rounded-lg px-1 -mx-1',
+                      textClass, 'text-foreground font-bold transition-colors rounded-lg px-1 -mx-1',
                       isSpeaking && 'bg-[#00B894]/10 text-[#00B894]',
                     )}>
                       {renderWordBlock(s)}
@@ -843,7 +843,7 @@ function ParagraphBlock({
                 </div>
               ))}
             {(transMode === 'zh' || transMode === 'bilingual') && para.zh && (
-              <p className="text-sm text-muted-foreground leading-7 pl-3 border-l-2 border-[#00B894]/30 italic">
+              <p className="text-base text-foreground/75 leading-7 pl-3 border-l-2 border-[#00B894]/40">
                 {para.zh}
               </p>
             )}
@@ -869,7 +869,7 @@ function ParagraphBlock({
             <span className="shrink-0 text-xs font-bold text-muted-foreground/50 mt-0.5 select-none">{numLabel} </span>
           )}
           <p className={cn(
-            textClass, 'text-foreground/90 font-medium transition-colors rounded-lg px-1 -mx-1 flex-1',
+            textClass, 'text-foreground font-bold transition-colors rounded-lg px-1 -mx-1 flex-1',
             isSpeaking && 'bg-[#00B894]/10 text-[#00B894]',
           )}>
             {renderWordBlock(displayEn)}
@@ -877,7 +877,7 @@ function ParagraphBlock({
         </div>
       )}
       {(transMode === 'zh' || transMode === 'bilingual') && para.zh && (
-        <p className="text-sm text-muted-foreground leading-7 pl-3 border-l-2 border-[#00B894]/30 italic ml-6">
+        <p className="text-base text-foreground/75 leading-7 pl-3 border-l-2 border-[#00B894]/40 ml-6">
           {para.zh}
         </p>
       )}
