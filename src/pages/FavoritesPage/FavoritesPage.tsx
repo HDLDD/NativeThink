@@ -34,6 +34,8 @@ const TYPE_LABELS: Record<string, string> = {
   vocabulary: '词汇',
   think: '思维训练',
   shadowing: '影子跟读',
+  article: '文章',
+  word: '单词',
 };
 
 const TYPE_COLORS: Record<string, { bg: string; badge: string; icon: LucideIcon }> = {
@@ -42,9 +44,11 @@ const TYPE_COLORS: Record<string, { bg: string; badge: string; icon: LucideIcon 
   vocabulary: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600' },
   think:      { bg: 'bg-violet-50 dark:bg-violet-500/10',  badge: 'bg-violet-100 dark:bg-violet-500/20 text-violet-600' },
   shadowing:  { bg: 'bg-rose-50 dark:bg-rose-500/10',      badge: 'bg-rose-100 dark:bg-rose-500/20 text-rose-600' },
+  article:    { bg: 'bg-teal-50 dark:bg-teal-500/10',      badge: 'bg-teal-100 dark:bg-teal-500/20 text-teal-600' },
+  word:       { bg: 'bg-slate-50 dark:bg-slate-500/10',    badge: 'bg-slate-100 dark:bg-slate-500/20 text-slate-600' },
 };
 
-const FILTER_TYPES = ['all', 'vocabulary', 'chunk', 'expression', 'think', 'shadowing'] as const;
+const FILTER_TYPES = ['all', 'vocabulary', 'chunk', 'expression', 'think', 'shadowing', 'article'] as const;
 
 // ============================================================
 // Component
@@ -267,6 +271,21 @@ export default function FavoritesPage() {
                       </div>
                     )}
 
+                    {/* Article — navigate to article page */}
+                    {item.type === 'article' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full rounded-xl text-[10px] font-black uppercase tracking-wider border-teal-200 text-teal-500 hover:bg-teal-50 dark:hover:bg-teal-500/10 gap-1.5 mt-1"
+                        onClick={() => {
+                          // Navigate to article page — AI tab is where saved articles live
+                          window.location.href = '/articles';
+                        }}
+                      >
+                        <ExternalLink className="size-3" />
+                        前往文章阅读
+                      </Button>
+                    )}
                     {/* Shadowing jump button */}
                     {item.type === 'shadowing' && (
                       <Button

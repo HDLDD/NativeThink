@@ -318,6 +318,7 @@ export default function ArticlePage() {
   const [genTopic, setGenTopic] = useState('technology');
   const [genLevel, setGenLevel] = useState<Level>('intermediate');
   const [genChapters, setGenChapters] = useState(3);
+  const [genWordCount, setGenWordCount] = useState(500);
 
   // ── AI generation (articles + book chapters) ──
   const generateContent = useCallback(async () => {
@@ -328,8 +329,8 @@ export default function ArticlePage() {
       if (genType === 'book') {
         // Generate book chapters
         const result = await aiChat([
-          { role: 'system', content: `You are an English writer. Write a mini-book with ${genChapters} chapters about "${genTopic}" for ${levelLabel} English learners. Each chapter should be 2-3 paragraphs. Return ONLY valid JSON: {"title":"book title","chapters":[{"chapterTitle":"Chapter 1 title","paragraphs":[{"en":"English paragraph","zh":"Chinese translation"}]}]}` },
-          { role: 'user', content: `Write a ${genChapters}-chapter mini-book about ${genTopic}. Level: ${levelLabel}.` },
+          { role: 'system', content: `You are an English writer. Write a mini-book with ${genChapters} chapters about "${genTopic}" for ${levelLabel} English learners. Total ~${genWordCount} words. Each chapter should be 2-3 paragraphs. Return ONLY valid JSON: {"title":"book title","chapters":[{"chapterTitle":"Chapter 1 title","paragraphs":[{"en":"English paragraph","zh":"Chinese translation"}]}]}` },
+          { role: 'user', content: `Write a ${genChapters}-chapter mini-book about ${genTopic} (~${genWordCount} words total). Level: ${levelLabel}.` },
         ], { temperature: 0.8, maxTokens: 4096 });
         const parsed = extractJson<{ title?: string; chapters?: { chapterTitle?: string; paragraphs: IParagraph[] }[] }>(result);
         if (!parsed?.chapters?.length) { toast.error('AI 生成失败，请重试'); return; }
@@ -352,8 +353,8 @@ export default function ArticlePage() {
       } else {
         // Generate article/publication
         const result = await aiChat([
-          { role: 'system', content: `You are an English writer. Write an engaging English ${genType === 'publication' ? 'magazine article' : 'article'} about "${genTopic}" for ${levelLabel} learners (4-6 paragraphs). Return ONLY valid JSON: {"title":"...","paragraphs":[{"en":"English paragraph","zh":"Chinese translation"}]}` },
-          { role: 'user', content: `Write an article about ${genTopic}. Level: ${levelLabel}.` },
+          { role: 'system', content: `You are an English writer. Write an engaging English ${genType === 'publication' ? 'magazine article' : 'article'} about "${genTopic}" for ${levelLabel} learners (~${genWordCount} words). Return ONLY valid JSON: {"title":"...","paragraphs":[{"en":"English paragraph","zh":"Chinese translation"}]}` },
+          { role: 'user', content: `Write an article about ${genTopic} (~${genWordCount} words). Level: ${levelLabel}.` },
         ], { temperature: 0.8, maxTokens: 4096 });
         const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
         if (!parsed?.paragraphs?.length) { toast.error('AI 生成失败，请重试'); return; }
@@ -990,6 +991,22 @@ export default function ArticlePage() {
                       genLevel === l.key ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
                     )}
                   >{l.label}</button>
+                ))}
+              </div>
+            </div>
+            {/* Word count */}
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2 block">词数: ~{genWordCount}</label>
+              <div className="flex gap-2 flex-wrap">
+                {[200, 500, 1000, 2000].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setGenWordCount(n)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2',
+                      genWordCount === n ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                    )}
+                  >{n}</button>
                 ))}
               </div>
             </div>

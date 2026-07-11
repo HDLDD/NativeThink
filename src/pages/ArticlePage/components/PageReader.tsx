@@ -218,17 +218,17 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     setCurrentChapter(0);
   }, [content.id]);
 
-  const ttsCancelRef = useRef(false);
+  const cancelRef = useRef(false);
+  const speakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const playNextParagraph = () => {
-    if (ttsCancelRef.current) {
+    if (cancelRef.current) {
       setSpeakingPara(-1);
       paraQueueRef.current = [];
       return;
     }
     const idx = paraIdxRef.current;
     if (idx >= paraQueueRef.current.length) {
-      // All paragraphs done
       setSpeakingPara(-1);
       paraQueueRef.current = [];
       return;
@@ -236,40 +236,52 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     setSpeakingPara(idx);
     const text = paraQueueRef.current[idx];
     paraIdxRef.current = idx + 1;
-    // Set onEnd to play next paragraph
+
+    // Clear previous timer
+    if (speakTimerRef.current) clearTimeout(speakTimerRef.current);
+
+    // Set onEnd — fires when TTS finishes naturally
     onEndRef.current = () => {
-      setTimeout(() => playNextParagraph(), 300); // pause between paragraphs
+      if (cancelRef.current) return;
+      speakTimerRef.current = setTimeout(() => playNextParagraph(), 400);
     };
-    tts.speak(text, { rate: 0.9 });
+
+    // Fallback timer: if onEnd never fires, auto-advance
+    const estimatedMs = Math.max(3000, text.length * 50);
+    speakTimerRef.current = setTimeout(() => {
+      if (cancelRef.current) return;
+      playNextParagraph();
+    }, estimatedMs + 600);
+
+    tts.speak(text, { rate: 0.85 });
   };
 
   const speakPage = () => {
     const page = activeContent.pages[currentPage];
     if (!page) return;
-    tts.cancel();
-    ttsCancelRef.current = true;
-    setSpeakingPara(-1);
+    stopSpeaking();
     setTimeout(() => {
-      ttsCancelRef.current = false;
+      cancelRef.current = false;
       const paras = page.paragraphs.map((p) => cleanText(p.en)).filter((t) => t.length > 0);
       if (paras.length === 0) return;
       paraQueueRef.current = paras;
       paraIdxRef.current = 0;
       playNextParagraph();
-    }, 200);
+    }, 150);
   };
 
   const stopSpeaking = () => {
-    ttsCancelRef.current = true;
+    cancelRef.current = true;
     onEndRef.current = null;
+    if (speakTimerRef.current) { clearTimeout(speakTimerRef.current); speakTimerRef.current = null; }
     tts.cancel();
     setSpeakingPara(-1);
     paraQueueRef.current = [];
   };
 
-  // Page navigation
-  const goPrev = () => setPageIdx((p) => Math.max(0, p - 1));
-  const goNext = () => setPageIdx((p) => Math.min(activePages - 1, p + 1));
+  // Page navigation — stop speaking on page change
+  const goPrev = () => { stopSpeaking(); setPageIdx((p) => Math.max(0, p - 1)); };
+  const goNext = () => { stopSpeaking(); setPageIdx((p) => Math.min(activePages - 1, p + 1)); };
   const jumpPage = (n: number) => setPageIdx(Math.max(0, Math.min(activePages - 1, n - 1)));
 
   // Word click
@@ -307,6 +319,25 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     const snippet = page.paragraphs.slice(0, 3).map((p) => cleanText(p.en).slice(0, 100)).join(' ');
     addFavorite({ type: 'expression', content: snippet, meaning: page.paragraphs[0]?.zh || '', category: activeContent.topic });
     toast.success('已收藏当前页');
+  };
+
+  // Favorite entire article
+  const articleFaved = isFavorited(activeContent.id, 'article');
+  const favArticle = () => {
+    if (articleFaved) {
+      const f = favorites.find((x) => x.content === activeContent.id && x.type === 'article');
+      if (f) removeFavorite(f.id);
+      toast('已取消收藏');
+    } else {
+      addFavorite({
+        type: 'article',
+        content: activeContent.id,
+        meaning: activeContent.zhTitle || activeContent.title,
+        example: activeContent.source,
+        category: activeContent.type,
+      });
+      toast.success('已收藏文章');
+    }
   };
 
   // ── AI Translation for untranslated content ──
@@ -520,8 +551,12 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             <Volume2 className="size-3.5" />朗读
           </Button>
         )}
-        <Button variant="ghost" size="sm" onClick={favPage} className="rounded-xl text-[10px] font-bold gap-1">
-          <Heart className="size-3.5" />收藏
+        <Button
+          variant="ghost" size="sm"
+          onClick={favArticle}
+          className={cn('rounded-xl text-[10px] font-bold gap-1', articleFaved && 'text-rose-500')}
+        >
+          <Heart className={cn('size-3.5', articleFaved && 'fill-current')} />{articleFaved ? '已收藏' : '收藏'}
         </Button>
         {hasChapters && viewMode === 'reading' && (
           <Button variant="ghost" size="sm" onClick={() => { setViewMode('toc'); }} className="rounded-xl text-[10px] font-bold gap-1">
