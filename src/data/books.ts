@@ -6,14 +6,82 @@ import type { IReadingContent, IParagraph } from './reading';
 import { buildPages } from './reading';
 
 // Helper to build book content from English paragraphs (zh empty, client-AI fills in)
+const GUTENBERG_PATTERNS = [
+  /The Project Gutenberg eBook of/i,
+  /Project Gutenberg/i,
+  /This eBook is for the use of anyone/i,
+  /You may copy it, give it away/i,
+  /Gutenberg License/i,
+  /Gutenberg™/i,
+  /www\.gutenberg\.org/i,
+  /Other information and formats/i,
+  /Credits:/i,
+  /Online Distributed Proofreading/i,
+  /Produced by/i,
+  /This file was produced from/i,
+  /\*\*\* START OF THE PROJECT GUTENBERG EBOOK/i,
+  /\*\*\* END OF THE PROJECT GUTENBERG EBOOK/i,
+  /CHISWICK PRESS/i,
+  /CHARLES WHITTINGHAM/i,
+  /TOOKS COURT/i,
+];
+
+const CHAPTER_PATTERNS = [
+  /^Chapter\s+[IVXLCDM\d]+\.?$/i,
+  /^CHAPTER\s+[IVXLCDM\d]+\.?$/,
+  /^Volume\s+[IVXLCDM\d]+\.?$/i,
+  /^Book\s+[IVXLCDM\d]+\.?$/i,
+  /^Part\s+[IVXLCDM\d]+\.?$/i,
+  /^[IVXLCDM]+\.?$/,
+];
+
+function isGutenbergBoilerplate(text: string): boolean {
+  return GUTENBERG_PATTERNS.some((p) => p.test(text));
+}
+
+function isChapterHeader(text: string): boolean {
+  const trimmed = text.trim();
+  return CHAPTER_PATTERNS.some((p) => p.test(trimmed));
+}
+
+function cleanBookParagraphs(enParas: string[]): IParagraph[] {
+  const result: IParagraph[] = [];
+  let foundStart = false;
+  let foundEnd = false;
+
+  for (const en of enParas) {
+    if (isGutenbergBoilerplate(en)) {
+      if (/\*\*\* END OF THE PROJECT GUTENBERG EBOOK/i.test(en)) foundEnd = true;
+      if (!foundStart) continue; // skip before start marker
+      if (foundEnd) continue; // skip after end marker
+    }
+
+    // Mark end-of-frontmatter boundary
+    if (/\*\*\* START OF THE PROJECT GUTENBERG EBOOK/i.test(en)) {
+      foundStart = true;
+      continue; // skip the marker itself
+    }
+
+    if (!foundStart) continue;
+
+    // Mark chapters
+    if (isChapterHeader(en)) {
+      result.push({ en: `##CHAPTER##${en}`, zh: '' });
+    } else {
+      result.push({ en, zh: '' });
+    }
+  }
+  return result;
+}
+
 function bookContent(
   id: string, title: string, zhTitle: string, author: string, zhAuthor: string,
   topic: string, difficulty: 'intermediate' | 'advanced',
   enParas: string[],
 ): IReadingContent {
-  const paragraphs: IParagraph[] = enParas.map((en) => ({ en, zh: '' }));
+  const paragraphs = cleanBookParagraphs(enParas);
   const pages = buildPages(paragraphs);
-  const totalWords = enParas.reduce((sum, p) => sum + p.split(/\s+/).filter(Boolean).length, 0);
+  const totalWords = paragraphs.reduce((sum, p) => sum + p.en.split(/\s+/).filter(Boolean).length, 0);
   return { id, type: 'book', title, zhTitle, author, zhAuthor, source: 'Project Gutenberg', topic, difficulty, pages, totalWords };
 }
 

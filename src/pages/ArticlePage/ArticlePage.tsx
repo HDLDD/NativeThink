@@ -478,6 +478,7 @@ export default function ArticlePage() {
               </Card>
             ))}
           </div>
+          )}
         </div>
       )}
 
@@ -632,10 +633,25 @@ export default function ArticlePage() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Mic className="size-5 text-[#00B894]" />
-            <span className="text-sm font-black">{FAMOUS_SPEECHES_META.length} 篇演讲 · 点击阅读</span>
+            <span className="text-sm font-black">{speechMeta ? `${speechMeta.length} 篇演讲` : '加载中...'} · 点击阅读</span>
           </div>
+          {!speechMeta ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="rounded-[24px] border-border border bg-muted/30 animate-pulse overflow-hidden">
+                  <div className="h-32 bg-muted" />
+                  <div className="p-4 space-y-2">
+                    <div className="h-3 bg-muted rounded-full w-16" />
+                    <div className="h-4 bg-muted rounded-lg w-3/4" />
+                    <div className="h-3 bg-muted rounded-lg w-1/2" />
+                    <div className="h-3 bg-muted rounded-lg w-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {FAMOUS_SPEECHES_META.map((speech) => (
+            {speechMeta.map((speech) => (
               <Card
                 key={speech.id}
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group overflow-hidden"
@@ -655,6 +671,7 @@ export default function ArticlePage() {
               </Card>
             ))}
           </div>
+          )}
         </div>
       )}
 

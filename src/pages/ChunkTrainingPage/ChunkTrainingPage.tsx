@@ -159,12 +159,6 @@ export default function ChunkTrainingPage() {
   };
 
   const libraryScrollRef = useRef<HTMLDivElement>(null);
-  // Restore library scroll position
-  useEffect(() => {
-    const el = libraryScrollRef.current;
-    if (!el || !chunkPosMemory.scrollTop) return;
-    requestAnimationFrame(() => { el.scrollTop = chunkPosMemory.scrollTop!; });
-  }, [activePageChunks.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [searchQuery, setSearchQuery] = usePageMemoryDebounced('chunk-search', '');
   const [activeTab, setActiveTab] = useState(chunkPosMemory.tab || memory.tab);

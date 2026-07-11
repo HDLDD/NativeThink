@@ -18,6 +18,12 @@ import { cn, cleanText } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { IReadingContent, TransMode, IParagraph } from '@/data/reading';
 import { buildPages } from '@/data/reading';
+import { queryWords, preloadAll, isAllReady } from '@/data/wordbank';
+
+// ── Sentence splitter ──
+function splitSentences(text: string): string[] {
+  return text.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 0);
+}
 
 const LEVELS = [
   { key: 'beginner' as const, label: '初级', color: '#00B894' },
@@ -36,19 +42,26 @@ function saveProgress(contentId: string, page: number) {
   try { safeStorage.setItem(`__reader_progress_${contentId}`, JSON.stringify({ page })); } catch { /* */ }
 }
 
-// ── Word lookup + favorite ──
-async function lookupWord(word: string): Promise<{ word: string; phonetic: string; meaning: string } | null> {
+// ── Word lookup: dictionary API + wordbank Chinese ──
+async function lookupWord(word: string): Promise<{ word: string; phonetic: string; meaning: string; zhMeaning: string } | null> {
   const cleaned = word.replace(/[^a-zA-Z'-]/g, '').toLowerCase();
   if (!cleaned || cleaned.length < 2) return null;
+
+  // Try wordbank first (offline, instant Chinese)
+  const bankResults = queryWords({ search: cleaned, limit: 1 });
+  const zhMeaning = bankResults.length > 0 ? (bankResults[0].meaning || '') : '';
+
   try {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(cleaned)}`);
-    if (!res.ok) return null;
+    if (!res.ok) return { word: cleaned, phonetic: '', meaning: zhMeaning || '未找到释义', zhMeaning };
     const data = await res.json();
     const entry = data[0];
     const phonetic = entry.phonetic || (entry.phonetics?.[0]?.text) || '';
     const meaning = entry.meanings?.[0]?.definitions?.[0]?.definition || '';
-    return { word: cleaned, phonetic, meaning };
-  } catch { return null; }
+    return { word: cleaned, phonetic, meaning, zhMeaning };
+  } catch {
+    return { word: cleaned, phonetic: '', meaning: zhMeaning || '未找到释义', zhMeaning };
+  }
 }
 
 interface Props {
@@ -74,9 +87,10 @@ export default function PageReader({ content, onClose }: Props) {
   // ── State ──
   const [pageIdx, setPageIdx] = useState(() => loadProgress(content.id).page);
   const [transMode, setTransMode] = useState<TransMode>('bilingual');
+  const [sentenceMode, setSentenceMode] = useState(false);
   const [lookupOpen, setLookupOpen] = useState(false);
   const [lookupWord_State, setLookupWordState] = useState('');
-  const [lookupData, setLookupData] = useState<{ word: string; phonetic: string; meaning: string } | null>(null);
+  const [lookupData, setLookupData] = useState<{ word: string; phonetic: string; meaning: string; zhMeaning: string } | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -128,6 +142,9 @@ export default function PageReader({ content, onClose }: Props) {
 
   // Clamp page
   const currentPage = Math.max(0, Math.min(pageIdx, activePages - 1));
+
+  // Preload wordbank for Chinese word lookup
+  useEffect(() => { if (!isAllReady()) preloadAll(); }, []);
 
   // Save progress
   useEffect(() => { saveProgress(activeContent.id, currentPage); }, [activeContent.id, currentPage]);
@@ -357,6 +374,15 @@ export default function PageReader({ content, onClose }: Props) {
             >{label}</button>
           ))}
         </div>
+        {/* Sentence mode toggle */}
+        <div className="w-px h-4 bg-border mx-0.5" />
+        <button
+          onClick={() => setSentenceMode((v) => !v)}
+          className={cn(
+            'px-2.5 py-1 rounded-md text-[10px] font-bold transition-all',
+            sentenceMode ? 'bg-white dark:bg-card text-[#00B894] shadow-sm' : 'text-muted-foreground hover:text-foreground',
+          )}
+        >逐句</button>
         {/* Inline level conversion — click to convert current article */}
         <div className="w-px h-4 bg-border mx-0.5" />
         <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
@@ -413,32 +439,34 @@ export default function PageReader({ content, onClose }: Props) {
       </div>
 
       {/* ── Content ── */}
-      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <div ref={contentRef} className="max-w-2xl mx-auto px-6 py-8 space-y-6">
+      <div className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch">
+        <div ref={contentRef} className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
           {page.paragraphs.map((para, i) => (
             <ParagraphBlock
               key={i}
               para={para}
               transMode={transMode}
+              sentenceMode={sentenceMode}
               onWordClick={handleWordClick}
               isSpeaking={speakingPara === i}
+              tts={tts}
             />
           ))}
         </div>
       </div>
 
       {/* ── Pagination Footer ── */}
-      <div className="shrink-0 border-t border-border px-4 py-3 flex items-center justify-between gap-2">
-        <Button variant="outline" size="sm" onClick={goPrev} disabled={currentPage === 0} className="rounded-xl text-[10px] font-bold gap-1">
-          <ChevronLeft className="size-4" />上一页
+      <div className="shrink-0 border-t border-border px-3 sm:px-4 py-3 flex items-center justify-center gap-2 sm:gap-3">
+        <Button variant="outline" size="sm" onClick={goPrev} disabled={currentPage === 0} className="rounded-xl text-[10px] font-bold gap-1 px-2 sm:px-3">
+          <ChevronLeft className="size-4" /><span className="hidden sm:inline">上一页</span>
         </Button>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-muted-foreground tabular-nums">{currentPage + 1} / {activePages}</span>
+          <span className="text-xs font-bold text-muted-foreground tabular-nums whitespace-nowrap">{currentPage + 1} / {activePages}</span>
           <Input
             type="number"
             min={1}
             max={activePages}
-            className="w-14 h-8 text-center text-xs font-bold rounded-xl"
+            className="w-12 sm:w-14 h-8 text-center text-xs font-bold rounded-xl"
             placeholder={`${currentPage + 1}`}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -449,8 +477,8 @@ export default function PageReader({ content, onClose }: Props) {
             }}
           />
         </div>
-        <Button variant="outline" size="sm" onClick={goNext} disabled={currentPage >= totalPages - 1} className="rounded-xl text-[10px] font-bold gap-1">
-          下一页<ChevronRight className="size-4" />
+        <Button variant="outline" size="sm" onClick={goNext} disabled={currentPage >= totalPages - 1} className="rounded-xl text-[10px] font-bold gap-1 px-2 sm:px-3">
+          <span className="hidden sm:inline">下一页</span><ChevronRight className="size-4" />
         </Button>
       </div>
 
@@ -469,10 +497,24 @@ export default function PageReader({ content, onClose }: Props) {
           <div className="px-6 pb-6 space-y-4">
             {lookupLoading ? (
               <p className="text-sm text-muted-foreground">查询中...</p>
-            ) : lookupData?.meaning ? (
-              <p className="text-sm text-foreground/80 leading-relaxed">{lookupData.meaning}</p>
             ) : (
-              <p className="text-sm text-muted-foreground">未找到释义</p>
+              <div className="space-y-3">
+                {lookupData?.zhMeaning && (
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">中文释义</p>
+                    <p className="text-sm font-bold text-[#00B894]">{lookupData.zhMeaning}</p>
+                  </div>
+                )}
+                {lookupData?.meaning && (
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">英文释义</p>
+                    <p className="text-sm text-foreground/80 leading-relaxed">{lookupData.meaning}</p>
+                  </div>
+                )}
+                {!lookupData?.meaning && !lookupData?.zhMeaning && (
+                  <p className="text-sm text-muted-foreground">未找到释义</p>
+                )}
+              </div>
             )}
             <div className="flex gap-2">
               <Button
@@ -500,42 +542,122 @@ export default function PageReader({ content, onClose }: Props) {
   );
 }
 
-// ── Paragraph block with word-click support ──
+// ── Paragraph block with word-click + individual TTS + sentence mode + chapter support ──
 function ParagraphBlock({
-  para, transMode, onWordClick, isSpeaking,
+  para, transMode, sentenceMode, onWordClick, isSpeaking, tts,
 }: {
-  para: IParagraph; transMode: TransMode; onWordClick: (e: React.MouseEvent, word: string) => void;
+  para: IParagraph; transMode: TransMode; sentenceMode: boolean;
+  onWordClick: (e: React.MouseEvent, word: string) => void;
   isSpeaking?: boolean;
+  tts: ReturnType<typeof useTTS>;
 }) {
-  const words = para.en.split(/\s+/).filter(Boolean);
+  const isChapter = para.en.startsWith('##CHAPTER##');
+  const displayEn = isChapter ? para.en.replace('##CHAPTER##', '') : para.en;
+  const words = displayEn.split(/\s+/).filter(Boolean);
+
+  // Chapter header rendering
+  if (isChapter) {
+    return (
+      <div className="flex items-center gap-3 py-2 my-1">
+        <div className="flex-1 h-px bg-[#00B894]/20" />
+        <h3 className="text-xs font-black uppercase tracking-widest text-[#00B894] whitespace-nowrap px-2">
+          {displayEn}
+        </h3>
+        <div className="flex-1 h-px bg-[#00B894]/20" />
+      </div>
+    );
+  }
+
+  const renderWordBlock = (text: string) => {
+    const sWords = text.split(/\s+/).filter(Boolean);
+    return sWords.map((w, i) => {
+      const clean = w.replace(/[^a-zA-Z'-]/g, '');
+      const isWord = clean.length >= 2;
+      return (
+        <span key={i}>
+          {i > 0 && ' '}
+          <span
+            className={cn(
+              isWord && 'cursor-pointer hover:text-[#00B894] hover:underline underline-offset-2 transition-colors',
+            )}
+            onClick={isWord ? (e) => onWordClick(e, w) : undefined}
+          >
+            {w}
+          </span>
+        </span>
+      );
+    });
+  };
+
+  if (sentenceMode) {
+    const sentences = splitSentences(displayEn);
+    return (
+      <div className="space-y-2 py-1">
+        <div className="flex items-start gap-2">
+          <button
+            onClick={() => tts.speak(cleanText(displayEn), { rate: 0.9 })}
+            className="shrink-0 text-muted-foreground/30 hover:text-[#00B894] transition-colors mt-1"
+            title="朗读本段"
+          >
+            <Volume2 className="size-3.5" />
+          </button>
+          <div className="space-y-2 flex-1">
+            {(transMode === 'en' || transMode === 'bilingual') &&
+              sentences.map((s, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="text-[10px] text-muted-foreground/40 mt-1.5 shrink-0 w-5 text-right tabular-nums">
+                    {i + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className={cn(
+                      'text-base leading-8 text-foreground/90 font-medium transition-colors rounded-lg px-1 -mx-1',
+                      isSpeaking && 'bg-[#00B894]/10 text-[#00B894]',
+                    )}>
+                      {renderWordBlock(s)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => tts.speak(cleanText(s), { rate: 0.85 })}
+                    className="shrink-0 text-muted-foreground/30 hover:text-[#00B894] transition-colors mt-1"
+                    title="朗读本句"
+                  >
+                    <Volume2 className="size-3" />
+                  </button>
+                </div>
+              ))}
+            {(transMode === 'zh' || transMode === 'bilingual') && para.zh && (
+              <p className="text-sm text-muted-foreground leading-7 pl-3 border-l-2 border-[#00B894]/30 italic">
+                {para.zh}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Normal paragraph mode
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 group/para">
       {(transMode === 'en' || transMode === 'bilingual') && (
-        <p className={cn(
-          'text-base leading-8 text-foreground/90 font-medium transition-colors rounded-lg px-1 -mx-1',
-          isSpeaking && 'bg-[#00B894]/10 text-[#00B894]',
-        )}>
-          {words.map((w, i) => {
-            const clean = w.replace(/[^a-zA-Z'-]/g, '');
-            const isWord = clean.length >= 2;
-            return (
-              <span key={i}>
-                {i > 0 && ' '}
-                <span
-                  className={cn(
-                    isWord && 'cursor-pointer hover:text-[#00B894] hover:underline underline-offset-2 transition-colors',
-                  )}
-                  onClick={isWord ? (e) => onWordClick(e, w) : undefined}
-                >
-                  {w}
-                </span>
-              </span>
-            );
-          })}
-        </p>
+        <div className="flex items-start gap-2">
+          <button
+            onClick={() => tts.speak(cleanText(displayEn), { rate: 0.9 })}
+            className="shrink-0 text-muted-foreground/30 hover:text-[#00B894] transition-colors mt-1 opacity-0 group-hover/para:opacity-100"
+            title="朗读本段"
+          >
+            <Volume2 className="size-3.5" />
+          </button>
+          <p className={cn(
+            'text-base leading-8 text-foreground/90 font-medium transition-colors rounded-lg px-1 -mx-1 flex-1',
+            isSpeaking && 'bg-[#00B894]/10 text-[#00B894]',
+          )}>
+            {renderWordBlock(displayEn)}
+          </p>
+        </div>
       )}
       {(transMode === 'zh' || transMode === 'bilingual') && para.zh && (
-        <p className="text-sm text-muted-foreground leading-7 pl-3 border-l-2 border-[#00B894]/30 italic">
+        <p className="text-sm text-muted-foreground leading-7 pl-3 border-l-2 border-[#00B894]/30 italic ml-6">
           {para.zh}
         </p>
       )}
