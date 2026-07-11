@@ -11,7 +11,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const DATA_DIR = path.resolve(__dirname, '../src/data/wordbank/data');
 
 const SOURCES: { key: string; url: string; label: string; topics: string[] }[] = [
