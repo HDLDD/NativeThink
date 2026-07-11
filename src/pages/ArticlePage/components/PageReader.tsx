@@ -9,6 +9,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 import { useTTS } from '@/lib/use-tts';
 import { useAI } from '@/hooks/use-ai';
@@ -704,7 +705,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
       {/* ── TOC Dialog ── */}
       <Dialog open={tocOpen} onOpenChange={setTocOpen}>
-        <DialogContent className="max-w-md rounded-[32px] p-0 max-h-[85vh] flex flex-col bg-white overflow-y-auto">
+        <DialogContent className="max-w-md rounded-[32px] p-0 bg-white !grid-rows-[auto_1fr]" style={{ maxHeight: '85vh' }}>
           {/* Header */}
           <div className="shrink-0 px-6 pt-6 pb-4 border-b border-slate-100">
             <div className="flex items-center gap-2.5 mb-1">
@@ -723,7 +724,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           </div>
 
           {/* Scrollable chapter list */}
-          <div className="flex-1 overflow-y-auto px-4 py-3">
+          <ScrollArea className="h-[55vh] px-4 py-3">
             <div className="space-y-1">
               {chapters.map((ch, i) => {
                 const isActive = i === currentChapter;
@@ -763,7 +764,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 );
               })}
             </div>
-          </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
