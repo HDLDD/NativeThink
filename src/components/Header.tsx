@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { ExternalLink } from 'lucide-react';
 import AISettings from '@/components/AISettings';
 import TTSSettings from '@/components/TTSSettings';
 import HelpGuide from '@/components/HelpGuide';
