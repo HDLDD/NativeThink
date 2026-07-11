@@ -373,6 +373,19 @@ export default function ChunkTrainingPage() {
   const [reviewKnown, setReviewKnown] = useState(0);
   const [reviewTotal, setReviewTotal] = useState(0);
   const [reviewQuality, setReviewQuality] = useState<number[]>([]); // track quality per card for summary
+  const [reviewTtsMode, setReviewTtsMode] = useState<'chunk' | 'example'>('chunk');
+
+  // Auto-speak when flipping card based on mode
+  useEffect(() => {
+    if (!reviewFlipped || reviewIdx >= reviewQueue.length) return;
+    const phrase = reviewQueue[reviewIdx];
+    if (!phrase) return;
+    if (reviewTtsMode === 'chunk') {
+      tts.speak(phrase.content, { rate: 0.85 });
+    } else {
+      tts.speak(cleanText(phrase.example), { rate: 0.85 });
+    }
+  }, [reviewFlipped, reviewIdx]);
 
   const startReview = (count = 20) => {
     const queue = getReviewQueue(count);
@@ -2326,6 +2339,24 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                       {reviewIdx + 1}/{reviewQueue.length}
                     </Badge>
                   )}
+                  {/* TTS mode toggle */}
+                  <div className="flex items-center gap-0.5 bg-muted rounded-xl p-0.5">
+                    {([
+                      { key: 'chunk' as const, label: '朗读语块' },
+                      { key: 'example' as const, label: '朗读例句' },
+                    ]).map(({ key, label }) => (
+                      <button
+                        key={key}
+                        onClick={() => setReviewTtsMode(key)}
+                        className={cn(
+                          'px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all',
+                          reviewTtsMode === key
+                            ? 'bg-white dark:bg-card text-[#00B894] shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground',
+                        )}
+                      >{label}</button>
+                    ))}
+                  </div>
                   <Button onClick={() => startMemorizedReview()} variant="outline" size="sm" className="rounded-2xl text-[10px] font-black uppercase tracking-wider gap-1.5 border-[#00B894]/30 text-[#00B894] hover:bg-[#00B894]/10">
                     <Brain className="size-3.5" />已记 ({memorizedChunks.size})
                   </Button>
