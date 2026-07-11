@@ -592,15 +592,6 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             翻译全部
           </Button>
         )}
-        {speakingPara >= 0 ? (
-          <Button variant="ghost" size="sm" onClick={stopSpeaking} className="rounded-xl text-[10px] font-bold gap-1 text-[#00B894]">
-            <Pause className="size-3.5" />停止
-          </Button>
-        ) : (
-          <Button variant="ghost" size="sm" onClick={speakPage} className="rounded-xl text-[10px] font-bold gap-1">
-            <Volume2 className="size-3.5" />朗读
-          </Button>
-        )}
         <Button
           variant="ghost" size="sm"
           onClick={favArticle}
@@ -878,13 +869,6 @@ function ParagraphBlock({
     return (
       <div className="space-y-2 py-1">
         <div className="flex items-start gap-2">
-          <button
-            onClick={() => tts.speak(cleanText(displayEn), { rate: 0.9 })}
-            className="shrink-0 text-muted-foreground/30 hover:text-[#00B894] transition-colors mt-1"
-            title="朗读本段"
-          >
-            <Volume2 className="size-3.5" />
-          </button>
           {numLabel && (
             <span className="shrink-0 text-xs font-bold text-muted-foreground/50 mt-0.5 select-none">{numLabel} </span>
           )}
@@ -928,13 +912,6 @@ function ParagraphBlock({
     <div className="space-y-1 group/para">
       {(transMode === 'en' || transMode === 'bilingual') && (
         <div className="flex items-start gap-2">
-          <button
-            onClick={() => tts.speak(cleanText(displayEn), { rate: 0.9 })}
-            className="shrink-0 text-muted-foreground/40 hover:text-[#00B894] transition-colors mt-1"
-            title="朗读本段"
-          >
-            <Volume2 className="size-3.5" />
-          </button>
           {numLabel && (
             <span className="shrink-0 text-xs font-bold text-muted-foreground/50 mt-0.5 select-none">{numLabel} </span>
           )}
