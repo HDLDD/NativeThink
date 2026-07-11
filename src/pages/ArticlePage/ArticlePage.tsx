@@ -20,7 +20,6 @@ import { toast } from 'sonner';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import { buildPages } from '@/data/reading';
 import type { SpeechMeta } from '@/data/speeches';
-import PageReader from './components/PageReader';
 
 // ── Types ──
 type Level = 'beginner' | 'intermediate' | 'advanced';
@@ -42,26 +41,6 @@ const TOPICS: { key: string; label: string; icon: string }[] = [
   { key: 'business', label: '商业', icon: '💼' },
   { key: 'literature', label: '文学', icon: '📚' },
 ];
-
-// Simple error boundary for the reader
-class ReaderErrorBoundary extends React.Component<{ children: React.ReactNode; onClose: () => void }> {
-  state = { hasError: false };
-  static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(error: Error) { console.error('PageReader crashed:', error); }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <p className="text-muted-foreground">阅读器加载失败</p>
-            <Button onClick={() => { this.setState({ hasError: false }); this.props.onClose(); }} className="rounded-2xl">关闭</Button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 const MAINTABS: { key: MainTab; label: string; icon: typeof BookOpen }[] = [
   { key: 'books', label: '书籍', icon: Library },
