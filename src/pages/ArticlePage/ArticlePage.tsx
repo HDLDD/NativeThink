@@ -1013,9 +1013,53 @@ export default function ArticlePage() {
         </DialogContent>
       </Dialog>
 
+      {/* ── TOC Dialog (chapter selection for books/publications) ── */}
+      <Dialog open={tocVisible} onOpenChange={setTocVisible}>
+        <DialogContent className="max-w-md rounded-[32px] p-0 overflow-hidden max-h-[80vh] flex flex-col">
+          <div className="p-5 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 shrink-0">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
+                <BookOpen className="size-5 text-[#00B894]" />
+                {tocContent?.zhTitle || tocContent?.title || '目录'}
+              </DialogTitle>
+              {tocContent?.author && (
+                <p className="text-xs text-muted-foreground mt-1">{tocContent.author}</p>
+              )}
+            </DialogHeader>
+          </div>
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-1">
+              {tocContent?.pages.map((page, i) => {
+                const firstPara = page.paragraphs[0];
+                const preview = firstPara?.en?.slice(0, 80) || `第 ${i + 1} 页`;
+                return (
+                  <button key={i} onClick={() => startReading(i)}
+                    className="w-full text-left p-3 rounded-2xl hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors border border-transparent hover:border-[#00B894]/20 group">
+                    <div className="flex items-center gap-3">
+                      <span className="size-7 rounded-xl bg-[#00B894]/10 text-[#00B894] flex items-center justify-center text-xs font-black shrink-0">
+                        {i + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-foreground group-hover:text-[#00B894] transition-colors line-clamp-1">
+                          {preview}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {page.paragraphs.length} 段 · ~{page.paragraphs.reduce((s, p) => s + p.en.split(/\s+/).filter(Boolean).length, 0)} 词
+                        </p>
+                      </div>
+                      <ChevronRight className="size-4 text-muted-foreground/30 group-hover:text-[#00B894] transition-colors shrink-0" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
       {/* ── PageReader Fullscreen ── */}
       {readerVisible && readerContent && (
-        <PageReader content={readerContent} onClose={closeReader} />
+        <PageReader content={readerContent} onClose={closeReader} startPage={readerStartPage} />
       )}
     </div>
   );

@@ -67,9 +67,10 @@ async function lookupWord(word: string): Promise<{ word: string; phonetic: strin
 interface Props {
   content: IReadingContent;
   onClose: () => void;
+  startPage?: number;
 }
 
-export default function PageReader({ content, onClose }: Props) {
+export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const { isConfigured, chat: aiChat } = useAI();
   const { addFavorite, isFavorited, favorites, removeFavorite } = useFavorites();
   const totalPages = content.pages.length;
@@ -94,7 +95,10 @@ export default function PageReader({ content, onClose }: Props) {
   }, []);
 
   // ── State ──
-  const [pageIdx, setPageIdx] = useState(() => loadProgress(content.id).page);
+  const [pageIdx, setPageIdx] = useState(() => {
+    const saved = loadProgress(content.id);
+    return saved.page > 0 ? saved.page : startPage;
+  });
   const [transMode, setTransMode] = useState<TransMode>('bilingual');
   const [sentenceMode, setSentenceMode] = useState(false);
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
