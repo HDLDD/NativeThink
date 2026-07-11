@@ -16,6 +16,7 @@ import { useLearningStats } from '@/lib/use-learning-stats';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn, cleanText, extractJson } from '@/lib/utils';
 import { toast } from 'sonner';
+import { ErrorBoundary } from 'react-error-boundary';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import { buildPages } from '@/data/reading';
 import type { SpeechMeta } from '@/data/speeches';
@@ -856,7 +857,22 @@ export default function ArticlePage() {
 
       {/* ── PageReader overlay ── */}
       {readerVisible && readerContent && (
-        <PageReader content={readerContent} onClose={closeReader} />
+        <ErrorBoundary
+          fallbackRender={({ error, resetErrorBoundary }) => (
+            <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
+              <div className="text-center max-w-sm px-6">
+                <BookOpen className="size-12 mx-auto mb-3 text-muted-foreground/30" />
+                <p className="text-sm font-black text-foreground">阅读器加载失败</p>
+                <p className="text-xs text-muted-foreground mt-1 mb-4">{error?.message || '未知错误'}</p>
+                <Button onClick={() => { resetErrorBoundary(); closeReader(); }} className="rounded-xl text-sm font-bold">
+                  关闭并重试
+                </Button>
+              </div>
+            </div>
+          )}
+        >
+          <PageReader content={readerContent} onClose={closeReader} />
+        </ErrorBoundary>
       )}
 
       {/* ── Usage Guide Dialog ── */}

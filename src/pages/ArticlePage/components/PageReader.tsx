@@ -71,7 +71,12 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const tts = useTTS();
 
   // Cleanup TTS on unmount
-  useEffect(() => { return () => tts.cancel(); }, []);
+  useEffect(() => { return () => { try { tts.cancel(); } catch { /* */ } }; }, []);
+
+  // Safe speak wrapper — prevents crashes on unsupported devices
+  const safeSpeak = useCallback((text: string, opts?: { rate?: number }) => {
+    try { tts.speak(text, opts); } catch { /* TTS not available — silent */ }
+  }, [tts]);
 
   // ── State ──
   const [pageIdx, setPageIdx] = useState(() => {
@@ -127,8 +132,8 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   };
 
   const activeContent = displayContent;
-  const activePages = activeContent.pages.length;
-  const currentPage = Math.max(0, Math.min(pageIdx, activePages - 1));
+  const activePages = Math.max(0, activeContent?.pages?.length || 0);
+  const currentPage = activePages > 0 ? Math.max(0, Math.min(pageIdx, activePages - 1)) : 0;
 
   // Preload wordbank for Chinese word lookup
   useEffect(() => { if (!isAllReady()) preloadAll(); }, []);
@@ -411,7 +416,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             const text = page.paragraphs
               .filter(p => !p.en.startsWith('##CHAPTER##'))
               .map(p => cleanText(p.en)).join(' ');
-            if (text) tts.speak(text, { rate: 0.85 });
+            if (text) safeSpeak(text, { rate: 0.85 });
           }}
           className="rounded-xl text-[10px] font-bold gap-1"
         >
@@ -464,7 +469,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                           })}
                         </p>
                         <button
-                          onClick={() => tts.speak(cleanText(displayEn), { rate: 0.85 })}
+                          onClick={() => safeSpeak(cleanText(displayEn), { rate: 0.85 })}
                           className="shrink-0 text-muted-foreground/25 hover:text-[#00B894] transition-colors mt-0.5 opacity-0 group-hover/para:opacity-100"
                           title="朗读段落"
                         >
@@ -556,7 +561,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             <div className="flex gap-2">
               <Button
                 size="sm"
-                onClick={() => tts.speak(lookupWord_State, { rate: 0.85 })}
+                onClick={() => safeSpeak(lookupWord_State, { rate: 0.85 })}
                 variant="outline"
                 className="rounded-xl text-xs font-bold gap-1 flex-1"
               >
