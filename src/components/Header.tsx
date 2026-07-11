@@ -19,7 +19,6 @@ import AISettings from '@/components/AISettings';
 import TTSSettings from '@/components/TTSSettings';
 import HelpGuide from '@/components/HelpGuide';
 import GlobalWordSearch from '@/components/GlobalWordSearch';
-import FeedbackDialog from '@/components/FeedbackDialog';
 import ChangelogDialog from '@/components/ChangelogDialog';
 
 const GOAL_OPTIONS = [10, 20, 30, 45, 60];
@@ -137,7 +136,13 @@ export default function Header() {
             </Dialog>
 
             <ChangelogDialog />
-            <FeedbackDialog />
+            <a href="https://b23.tv/nHHPunY" target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center justify-center size-9 bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894] transition-colors"
+              aria-label="开发者B站主页"
+              title="开发者B站主页"
+            >
+              <ExternalLink className="size-4.5" />
+            </a>
             <HelpGuide />
             <GlobalWordSearch />
             <AISettings />
