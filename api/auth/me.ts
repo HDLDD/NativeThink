@@ -1,6 +1,6 @@
 /** GET /api/auth/me — validate token and return current user */
 
-import { authenticateRequest } from '../_lib/auth-middleware';
+import { authenticateRequest } from '../_lib/auth-middleware.js';
 
 export const config = { runtime: 'edge' };
 

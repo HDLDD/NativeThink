@@ -1,7 +1,7 @@
 /** GET/PUT /api/data/:key — user data via KV proxy */
 
-import { authenticateRequest } from '../_lib/auth-middleware';
-import { getKV, userDataKey } from '../_lib/kv';
+import { authenticateRequest } from '../_lib/auth-middleware.js';
+import { getKV, userDataKey } from '../_lib/kv.js';
 
 export const config = { runtime: 'edge' };
 

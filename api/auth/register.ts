@@ -1,9 +1,9 @@
 /** POST /api/auth/register — create account */
 
-import { getKV } from '../_lib/kv';
-import { hashPassword } from '../_lib/crypto';
-import { signToken } from '../_lib/jwt';
-import type { User } from '../_lib/types';
+import { getKV } from '../_lib/kv.js';
+import { hashPassword } from '../_lib/crypto.js';
+import { signToken } from '../_lib/jwt.js';
+import type { User } from '../_lib/types.js';
 
 export const config = { runtime: 'edge' };
 

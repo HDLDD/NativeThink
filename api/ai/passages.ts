@@ -1,8 +1,8 @@
 /** GET /api/ai/passages — list saved passages (for future Articles feature) */
 
-import { authenticateRequest } from '../_lib/auth-middleware';
-import { getKV } from '../_lib/kv';
-import type { GeneratedPassage } from '../_lib/types';
+import { authenticateRequest } from '../_lib/auth-middleware.js';
+import { getKV } from '../_lib/kv.js';
+import type { GeneratedPassage } from '../_lib/types.js';
 
 export const config = { runtime: 'edge' };
 

@@ -1,9 +1,9 @@
 /** POST /api/auth/login — sign in */
 
-import { getKV } from '../_lib/kv';
-import { verifyPassword } from '../_lib/crypto';
-import { signToken } from '../_lib/jwt';
-import type { User } from '../_lib/types';
+import { getKV } from '../_lib/kv.js';
+import { verifyPassword } from '../_lib/crypto.js';
+import { signToken } from '../_lib/jwt.js';
+import type { User } from '../_lib/types.js';
 
 export const config = { runtime: 'edge' };
 
