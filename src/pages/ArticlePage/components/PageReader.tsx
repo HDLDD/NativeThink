@@ -91,6 +91,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     try { const r = safeStorage.getItem(TR_CACHE_KEY); return r ? JSON.parse(r) : {}; } catch { return {}; }
   });
   const [transLoading, setTransLoading] = useState(false);
+  const [paraTranslating, setParaTranslating] = useState<string | null>(null);
   const [transAllLoading, setTransAllLoading] = useState(false);
 
   // Level conversion
@@ -250,6 +251,31 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       toast.success(`已翻译 ${count} 个段落！`);
     } catch { toast.error('批量翻译失败'); }
     finally { setTransAllLoading(false); }
+  };
+
+  // Translate a single paragraph
+  const translateParagraph = async (pageNum: number, paraIdx: number) => {
+    if (!isConfigured) return;
+    const page = activeContent.pages[pageNum];
+    if (!page) return;
+    const para = page.paragraphs[paraIdx];
+    if (!para || para.zh || para.en.startsWith('##CHAPTER##')) return;
+    const key = `${pageNum}-${paraIdx}`;
+    setParaTranslating(key);
+    try {
+      const result = await aiChat([
+        { role: 'system', content: 'Translate the following English to natural Chinese. Return ONLY the Chinese translation, no extra text, no markdown.' },
+        { role: 'user', content: para.en.slice(0, 1500) },
+      ], { temperature: 0.3, maxTokens: 1024 });
+      const zh = result.trim();
+      const updatedPages = [...activeContent.pages];
+      updatedPages[pageNum] = {
+        ...page,
+        paragraphs: page.paragraphs.map((p, i) => i === paraIdx ? { ...p, zh } : p),
+      };
+      setDisplayContent({ ...activeContent, pages: updatedPages });
+    } catch { /* silent */ }
+    finally { setParaTranslating(null); }
   };
 
   // Apply cached translations on page change
@@ -444,6 +470,16 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                         >
                           <Volume2 className="size-3.5" />
                         </button>
+                        {!para.zh && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); translateParagraph(currentPage, i); }}
+                            disabled={paraTranslating === `${currentPage}-${i}`}
+                            className="shrink-0 text-muted-foreground/25 hover:text-amber-500 transition-colors mt-0.5 opacity-0 group-hover/para:opacity-100"
+                            title="翻译本段"
+                          >
+                            {paraTranslating === `${currentPage}-${i}` ? <Loader2 className="size-3 animate-spin" /> : <Globe className="size-3" />}
+                          </button>
+                        )}
                       </div>
                     )}
                     {/* Chinese translation */}
