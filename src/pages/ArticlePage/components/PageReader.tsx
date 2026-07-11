@@ -284,6 +284,8 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     advanceTimerRef.current = setTimeout(advance, estimatedMs);
 
     tts.speak(text, { rate: 0.85 });
+    // Pre-warm the next sentence for seamless playback
+    prewarmNext();
   };
 
   const speakPage = () => {
@@ -292,33 +294,31 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     stopSpeaking();
     setTimeout(() => {
       cancelRef.current = false;
-      // Split long paragraphs into sentences to avoid TTS engine character limits
-      const chunks: string[] = [];
+      // Split every paragraph into sentences for sentence-by-sentence playback
+      const sentences: string[] = [];
       for (const p of page.paragraphs) {
         const text = cleanText(p.en);
         if (!text) continue;
-        if (text.length < 250) {
-          chunks.push(text);
-        } else {
-          // Split into sentences, then re-join into ~200-char groups
-          const sentences = splitSentences(text);
-          let batch = '';
-          for (const s of sentences) {
-            if (batch && (batch.length + s.length > 220)) {
-              chunks.push(batch.trim());
-              batch = s;
-            } else {
-              batch = batch ? batch + ' ' + s : s;
-            }
-          }
-          if (batch.trim()) chunks.push(batch.trim());
+        const sents = splitSentences(text);
+        for (const s of sents) {
+          const trimmed = cleanText(s);
+          if (trimmed.length > 0) sentences.push(trimmed);
         }
       }
-      if (chunks.length === 0) return;
-      paraQueueRef.current = chunks;
+      if (sentences.length === 0) return;
+      paraQueueRef.current = sentences;
       paraIdxRef.current = 0;
       playNextParagraph();
     }, 150);
+  };
+
+  // Pre-warm next sentence in the queue while current is playing
+  const prewarmNext = () => {
+    const nextIdx = paraIdxRef.current;
+    if (nextIdx < paraQueueRef.current.length) {
+      const nextText = paraQueueRef.current[nextIdx];
+      if (nextText) tts.prewarm(nextText);
+    }
   };
 
   const stopSpeaking = () => {
