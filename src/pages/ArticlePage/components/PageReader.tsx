@@ -599,112 +599,11 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         >
           <Heart className={cn('size-3.5', articleFaved && 'fill-current')} />{articleFaved ? '已收藏' : '收藏'}
         </Button>
-        {hasChapters && (
-          <Button variant="ghost" size="sm" onClick={() => setTocOpen(true)} className="rounded-xl text-[10px] font-bold gap-1">
-            <BookOpen className="size-3.5" />目录
-          </Button>
-        )}
       </div>
 
-      {/* ── Chapter Navigation ── */}
-      {hasChapters && (
-        <div className="shrink-0 px-4 py-1.5 flex items-center justify-center gap-2 border-b border-border/30 bg-muted/30">
-          <Button
-            variant="ghost" size="icon"
-            onClick={() => {
-              const prev = Math.max(0, currentChapter - 1);
-              setCurrentChapter(prev);
-              setPageIdx(chapters[prev].pageIndex);
-            }}
-            disabled={currentChapter <= 0}
-            className="rounded-lg size-7 text-muted-foreground hover:text-[#00B894]"
-          >
-            <ChevronLeft className="size-3.5" />
-          </Button>
-          <div className="flex-1 text-center min-w-0">
-            <button
-              onClick={() => setTocOpen(true)}
-              className="text-[10px] font-black text-foreground hover:text-[#00B894] transition-colors line-clamp-1 px-1"
-            >
-              {chapters[currentChapter]?.title || activeContent.title}
-            </button>
-            <p className="text-[8px] text-muted-foreground">
-              {currentChapter + 1} / {chapters.length}
-            </p>
-          </div>
-          <Button
-            variant="ghost" size="icon"
-            onClick={() => {
-              const next = Math.min(chapters.length - 1, currentChapter + 1);
-              setCurrentChapter(next);
-              setPageIdx(chapters[next].pageIndex);
-            }}
-            disabled={currentChapter >= chapters.length - 1}
-            className="rounded-lg size-7 text-muted-foreground hover:text-[#00B894]"
-          >
-            <ChevronRight className="size-3.5" />
-          </Button>
-        </div>
-      )}
-
-      {/* ── Reading Content ── */}
-      <div className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch">
-        {tocOpen && hasChapters ? (
-          /* ── TABLE OF CONTENTS (same pattern as CollocationsTab left column) ── */
-          <div className="max-w-lg mx-auto px-4 py-4">
-            <div className="rounded-[32px] border border-border shadow-sm bg-card overflow-hidden">
-              {/* Header */}
-              <div className="px-5 py-4 border-b border-border/50">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-black text-foreground">{activeContent.zhTitle || activeContent.title}</h3>
-                    <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">{chapters.length} 章节 · {activeContent.totalWords?.toLocaleString()} 词</p>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => setTocOpen(false)} className="rounded-xl text-[10px] font-bold">✕</Button>
-                </div>
-              </div>
-              {/* Chapter list — same scroll pattern as word bank browse */}
-              <div className="max-h-[480px] overflow-y-auto px-2 py-2">
-                <div className="space-y-1">
-                  {chapters.map((ch, i) => {
-                    const isActive = i === currentChapter;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          setCurrentChapter(i);
-                          setPageIdx(ch.pageIndex);
-                          setTocOpen(false);
-                        }}
-                        className={cn(
-                          'w-full text-left p-2.5 rounded-xl transition-all duration-200 border-2',
-                          isActive
-                            ? 'border-[#00B894] bg-[#00B894]/5 shadow-sm'
-                            : 'border-transparent bg-muted/30 hover:bg-muted hover:border-border',
-                        )}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span className={cn(
-                            'shrink-0 size-6 rounded-lg flex items-center justify-center text-[10px] font-black',
-                            isActive ? 'bg-[#00B894] text-white' : 'bg-muted text-muted-foreground',
-                          )}>
-                            {i + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-xs font-black text-foreground line-clamp-1">{ch.title}</span>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">{ch.paraCount}段 · ~{ch.wordCount}词</p>
-                          </div>
-                          <ChevronRight className="shrink-0 size-3 text-muted-foreground/30" />
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* ── READING MODE ── */
+      {/* ── Content ── */}
+      <ScrollArea className="flex-1">
+        <div className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch">
           <div ref={contentRef} className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-white/80 rounded-2xl my-2">
             {page.paragraphs.map((para, i) => (
                 <ParagraphBlock
@@ -720,8 +619,8 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 />
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      </ScrollArea>
 
       {/* ── Pagination Footer ── */}
       <div className="shrink-0 border-t border-border px-3 sm:px-4 py-3 flex items-center justify-center gap-2 sm:gap-3">
