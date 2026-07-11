@@ -251,6 +251,26 @@ export default function ArticlePage() {
       safeStorage.setItem(AI_ARTICLES_KEY, JSON.stringify(next));
       return next;
     });
+
+  // Reload AI articles when cloud sync pulls data from other devices
+  useEffect(() => {
+    const reload = () => {
+      try {
+        const s = safeStorage.getItem(AI_ARTICLES_KEY);
+        if (s) setAiArticles(JSON.parse(s));
+      } catch { /* */ }
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key && e.key.includes("__nativethink_ai_articles")) reload();
+    };
+    window.addEventListener("storage", onStorage);
+    const onVisible = () => { if (document.visibilityState === "visible") reload(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
   };
 
   // ── Wikipedia ──
@@ -803,7 +823,14 @@ export default function ArticlePage() {
                   onClick={() => searchWikipedia(a.title)}
                 >
                   {wikiThumbnails[a.title] && (
-                    <img src={wikiThumbnails[a.title]} alt="" className="w-full h-24 object-cover" />
+                    <img
+                      src={wikiThumbnails[a.title]}
+                      alt=""
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      className="w-full h-24 object-cover"
+                    />
                   )}
                   <CardContent className="p-3">
                     <p className="text-xs font-bold line-clamp-2">{a.zhTitle}</p>
@@ -840,17 +867,37 @@ export default function ArticlePage() {
             </div>
           ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {speechMeta.map((speech) => (
+            {speechMeta.map((speech) => {
+              // Mark speeches without full text content
+              const hasContent = speech.id !== 'ted-gates-climate' && speech.id !== 'ted-adichie-single' && speech.id !== 'ted-urban-procrastination' && speech.id !== 'ted-godin-tribes' && speech.id !== 'rand-Atlas' && speech.id !== 'mandela-inaugural' && speech.id !== 'greta-un-climate' && speech.id !== 'emma-heforshe' && speech.id !== 'malala-un';
+              return (
               <Card
                 key={speech.id}
-                className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group overflow-hidden"
-                onClick={() => loadSpeech(speech.id)}
+                className={cn(
+                  'rounded-[24px] border-border hover:shadow-md transition-all overflow-hidden group',
+                  hasContent ? 'hover:border-[#00B894]/40 cursor-pointer' : 'opacity-60 cursor-default',
+                )}
+                onClick={() => hasContent && loadSpeech(speech.id)}
               >
-                {speech.image && (
-                  <img src={speech.image} alt="" className="w-full h-32 object-cover" />
+                {speech.image ? (
+                  <img
+                    src={speech.image}
+                    alt=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    className="w-full h-32 object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-32 bg-muted flex items-center justify-center text-3xl">🎙️</div>
                 )}
                 <CardContent className="p-4">
-                  <Badge className="text-[8px] rounded-full px-2 py-0 mb-2 bg-amber-50 dark:bg-amber-500/15 text-amber-600">{speech.type}</Badge>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Badge className="text-[8px] rounded-full px-2 py-0 bg-amber-50 dark:bg-amber-500/15 text-amber-600">{speech.type}</Badge>
+                    {!hasContent && (
+                      <Badge className="text-[8px] rounded-full px-2 py-0 bg-rose-50 dark:bg-rose-500/15 text-rose-500">即将上线</Badge>
+                    )}
+                  </div>
                   <h3 className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors line-clamp-2">
                     {speech.zhTitle}
                   </h3>
@@ -858,7 +905,8 @@ export default function ArticlePage() {
                   <p className="text-[10px] text-muted-foreground/70 mt-1 line-clamp-2 italic">{speech.preview}</p>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
           )}
         </div>

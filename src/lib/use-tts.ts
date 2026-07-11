@@ -439,11 +439,13 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
       // Desktop / Android: try SpeechSynthesis first (offline, instant)
       // Defer one tick to let ssCancel's cancel() fully resolve in the browser
+      // Reduced to 300ms — SS onstart typically fires in <50ms on desktop;
+      // 300ms is enough to detect silent failure without excessive user-perceived delay
       const fallbackTimer = setTimeout(() => {
         if (abortedRef.current) return;
         ssCancel();
         playChunkWithFallback(chunks, 0, rate, 0);
-      }, 600);
+      }, 300);
       setTimeout(() => {
         if (abortedRef.current) return;
         speakSS(cleaned, rate, pitch, volume, lang, fallbackTimer);

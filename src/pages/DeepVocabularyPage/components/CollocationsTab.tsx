@@ -379,6 +379,7 @@ export default function CollocationsTab({
     [selectedColloc, allCollocEntries],
   );
 
+
   // ===== Collocation translation: static map → AI cache → AI on-demand =====
   const AI_CACHE_KEY = '__nativethink_colloc_ai_tranlations';
 

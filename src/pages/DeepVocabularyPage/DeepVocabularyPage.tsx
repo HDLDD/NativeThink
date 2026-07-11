@@ -657,13 +657,17 @@ export default function DeepVocabularyPage() {
     }
   }, [filteredWords, memory.word, selectedWord]);
 
-  // Auto-speak word when selected in browse tab — 每次切换都朗读
+  // Auto-speak word when selected in browse tab — 每次切换都朗读 + 预加载下一个
   const browseTtsRef = useRef(tts);
   browseTtsRef.current = tts;
 
   useEffect(() => {
     if (!selectedWord || tab !== 'browse') return;
     browseTtsRef.current.speak(selectedWord.word, { rate: 0.85 });
+    // Prewarm the next word's audio for instant playback
+    const idx = filteredWords.findIndex((w) => w.word === selectedWord.word);
+    const next = filteredWords[idx + 1];
+    if (next) browseTtsRef.current.prewarm(next.word);
   }, [selectedWord, tab]);
 
   const switchLevel = (level: string) => {
