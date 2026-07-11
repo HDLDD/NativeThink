@@ -1,7 +1,7 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   X, ChevronLeft, ChevronRight, BookOpen, Heart, Globe,
-  Sparkles, Hash, Wand2, Loader2,
+  Sparkles, Hash, Wand2, Loader2, Volume2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 import { useAI } from '@/hooks/use-ai';
+import { useTTS } from '@/lib/use-tts';
 import { useFavorites } from '@/lib/use-favorites';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn, cleanText, extractJson } from '@/lib/utils';
@@ -67,6 +68,10 @@ interface Props {
 export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const { isConfigured, chat: aiChat } = useAI();
   const { addFavorite, isFavorited, favorites, removeFavorite } = useFavorites();
+  const tts = useTTS();
+
+  // Cleanup TTS on unmount
+  useEffect(() => { return () => tts.cancel(); }, []);
 
   // ── State ──
   const [pageIdx, setPageIdx] = useState(() => {
@@ -371,6 +376,21 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             翻译全部
           </Button>
         )}
+        {/* Speak page */}
+        <Button
+          variant="ghost" size="sm"
+          onClick={() => {
+            const page = activeContent.pages[currentPage];
+            if (!page) return;
+            const text = page.paragraphs
+              .filter(p => !p.en.startsWith('##CHAPTER##'))
+              .map(p => cleanText(p.en)).join(' ');
+            if (text) tts.speak(text, { rate: 0.85 });
+          }}
+          className="rounded-xl text-[10px] font-bold gap-1"
+        >
+          <Volume2 className="size-3.5" />朗读本页
+        </Button>
         {/* Favorite */}
         <Button
           variant="ghost" size="sm"
@@ -395,27 +415,36 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                   <h3 className="text-sm font-black text-[#00B894]">{displayEn}</h3>
                 ) : (
                   <>
-                    {/* English — clickable words */}
+                    {/* English — clickable words + paragraph speak */}
                     {(transMode === 'en' || transMode === 'bilingual') && (
-                      <p className={cn(fontSizeClass, 'text-foreground/85 font-medium')}>
-                        {displayEn.split(/\s+/).filter(Boolean).map((w, wi) => {
-                          const clean = w.replace(/[^a-zA-Z'-]/g, '');
-                          const isWord = clean.length >= 2;
-                          return (
-                            <span key={wi}>
-                              {wi > 0 && ' '}
-                              <span
-                                className={cn(
-                                  isWord && 'cursor-pointer hover:text-[#00B894] hover:underline underline-offset-2 transition-colors',
-                                )}
-                                onClick={isWord ? (e) => handleWordClick(e, w) : undefined}
-                              >
-                                {w}
+                      <div className="flex items-start gap-2 group/para">
+                        <p className={cn(fontSizeClass, 'text-foreground/85 font-medium flex-1')}>
+                          {displayEn.split(/\s+/).filter(Boolean).map((w, wi) => {
+                            const clean = w.replace(/[^a-zA-Z'-]/g, '');
+                            const isWord = clean.length >= 2;
+                            return (
+                              <span key={wi}>
+                                {wi > 0 && ' '}
+                                <span
+                                  className={cn(
+                                    isWord && 'cursor-pointer hover:text-[#00B894] hover:underline underline-offset-2 transition-colors',
+                                  )}
+                                  onClick={isWord ? (e) => handleWordClick(e, w) : undefined}
+                                >
+                                  {w}
+                                </span>
                               </span>
-                            </span>
-                          );
-                        })}
-                      </p>
+                            );
+                          })}
+                        </p>
+                        <button
+                          onClick={() => tts.speak(cleanText(displayEn), { rate: 0.85 })}
+                          className="shrink-0 text-muted-foreground/25 hover:text-[#00B894] transition-colors mt-0.5 opacity-0 group-hover/para:opacity-100"
+                          title="朗读段落"
+                        >
+                          <Volume2 className="size-3.5" />
+                        </button>
+                      </div>
                     )}
                     {/* Chinese translation */}
                     {(transMode === 'zh' || transMode === 'bilingual') && para.zh && (
@@ -488,15 +517,25 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 )}
               </div>
             )}
-            <Button
-              size="sm"
-              onClick={toggleWordFav}
-              className={cn('rounded-xl text-xs font-bold gap-1 w-full', favWord ? 'bg-rose-500 hover:bg-rose-600 text-white' : '')}
-              variant={favWord ? 'default' : 'outline'}
-            >
-              <Heart className={cn('size-3.5', favWord && 'fill-current')} />
-              {favWord ? '已收藏' : '收藏单词'}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => tts.speak(lookupWord_State, { rate: 0.85 })}
+                variant="outline"
+                className="rounded-xl text-xs font-bold gap-1 flex-1"
+              >
+                <Volume2 className="size-3.5" />发音
+              </Button>
+              <Button
+                size="sm"
+                onClick={toggleWordFav}
+                className={cn('rounded-xl text-xs font-bold gap-1 flex-1', favWord ? 'bg-rose-500 hover:bg-rose-600 text-white' : '')}
+                variant={favWord ? 'default' : 'outline'}
+              >
+                <Heart className={cn('size-3.5', favWord && 'fill-current')} />
+                {favWord ? '已收藏' : '收藏'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
