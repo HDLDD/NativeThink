@@ -70,8 +70,13 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const { addFavorite, isFavorited, favorites, removeFavorite } = useFavorites();
   const tts = useTTS();
 
-  // Cleanup TTS on unmount
+  // Cleanup on unmount: stop TTS + release heavy references for GC
   useEffect(() => { return () => { try { tts.cancel(); } catch { /* */ } }; }, []);
+  useEffect(() => { return () => {
+    // Help GC by clearing translation cache and display content on unmount
+    setTransCache({});
+    setDisplayContent(content);
+  }; }, []);
 
   // Safe speak wrapper — prevents crashes on unsupported devices
   const safeSpeak = useCallback((text: string, opts?: { rate?: number }) => {
@@ -110,7 +115,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     setConvertLevel(targetLevel);
     setConvertLoading(true);
     try {
-      const allText = displayContent.pages.map((p) => p.paragraphs.map((pp) => pp.en).join(' ')).join('\n\n');
+      const allText = validPages.map((p) => p.paragraphs.map((pp) => pp.en).join(' ')).join('\n\n');
       const result = await aiChat([
         { role: 'system', content: `Rewrite the following English text for ${lvl.label} English learners. Return ONLY valid JSON (no markdown): {"title":"adapted title","paragraphs":[{"en":"English paragraph","zh":"Chinese translation"}]}. Keep the core meaning but adjust vocabulary, sentence length, and complexity.` },
         { role: 'user', content: `Title: ${displayContent.title}\n\n${allText.slice(0, 5000)}` },
@@ -196,7 +201,6 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   };
 
   // ── AI Translation ──
-  const currentPageData = activeContent.pages[currentPage];
   const needsTranslation = transMode !== 'en' && currentPageData?.paragraphs.some((p) => !p.zh);
 
   const translateCurrentPage = async () => {
@@ -215,7 +219,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       const newCache = { ...transCache, [currentPage]: zhResults };
       setTransCache(newCache);
       safeStorage.setItem(TR_CACHE_KEY, JSON.stringify(newCache));
-      const updatedPages = [...activeContent.pages];
+      const updatedPages = [...validPages];
       let zi = 0;
       updatedPages[currentPage] = {
         ...currentPageData,
@@ -231,12 +235,12 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     setTransAllLoading(true);
     let count = 0;
     try {
-      const allUntranslated = activeContent.pages.flatMap(
-        (p, pi) => p.paragraphs.map((pp, ppi) => ({ en: pp.en, pageIdx: pi, paraIdx: ppi })).filter((x) => !activeContent.pages[pi].paragraphs[ppi].zh),
+      const allUntranslated = validPages.flatMap(
+        (p, pi) => p.paragraphs.map((pp, ppi) => ({ en: pp.en, pageIdx: pi, paraIdx: ppi })).filter((x) => !validPages[pi].paragraphs[ppi].zh),
       );
       if (allUntranslated.length === 0) { toast('所有页面已有翻译'); return; }
       const newCache = { ...transCache };
-      let updatedPages = [...activeContent.pages];
+      let updatedPages = [...validPages];
       for (const item of allUntranslated) {
         const result = await aiChat([
           { role: 'system', content: 'Translate the following English to natural Chinese. Return ONLY the Chinese translation, no extra text.' },
@@ -297,14 +301,14 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         return p;
       });
       if (updated.some((p, i) => p.zh !== currentPageData.paragraphs[i]?.zh)) {
-        const updatedPages = [...activeContent.pages];
+        const updatedPages = [...validPages];
         updatedPages[currentPage] = { ...currentPageData, paragraphs: updated };
         setDisplayContent((prev) => ({ ...prev, pages: updatedPages }));
       }
     }
   }, [currentPage, transMode]);
 
-  if (!activeContent.pages.length) {
+  if (!validPages.length) {
     return (
       <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
         <div className="text-center">
@@ -414,9 +418,8 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         <Button
           variant="ghost" size="sm"
           onClick={() => {
-            const page = activeContent.pages[currentPage];
-            if (!page) return;
-            const text = page.paragraphs
+            if (!currentPageData) return;
+            const text = currentPageData.paragraphs
               .filter(p => !p.en.startsWith('##CHAPTER##'))
               .map(p => cleanText(p.en)).join(' ');
             if (text) safeSpeak(text, { rate: 0.85 });
@@ -438,7 +441,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       {/* ── Content (current page only) ── */}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
-          {activeContent.pages[currentPage]?.paragraphs.map((para, i) => {
+          {currentPageData?.paragraphs.map((para, i) => {
             const displayEn = para.en.startsWith('##CHAPTER##') ? para.en.replace('##CHAPTER##', '') : para.en;
             const isChapter = para.en.startsWith('##CHAPTER##');
             const fontSizeClass = fontSize === 'sm' ? 'text-base leading-7' : fontSize === 'base' ? 'text-lg leading-8' : 'text-xl leading-9';
