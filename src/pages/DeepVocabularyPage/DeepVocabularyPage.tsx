@@ -291,14 +291,14 @@ export default function DeepVocabularyPage() {
   // Per-level memory: remember selected word & scroll position for each level
   const [levelMemory, setLevelMemory] = useState<Record<string, { word: string; scrollTop: number }>>(() => {
     try {
-      const saved = safeStorage.getItem('__nativethink_level_memory');
+      const saved = localStorage.getItem('__nativethink_level_memory');
       return saved ? JSON.parse(saved) : {};
     } catch { return {}; }
   });
-  const persistLevelMemory = (lm: Record<string, { word: string; scrollTop: number }>) => {
+  const persistLevelMemory = useCallback((lm: Record<string, { word: string; scrollTop: number }>) => {
     setLevelMemory(lm);
-    try { safeStorage.setItem('__nativethink_level_memory', JSON.stringify(lm)); } catch { /* ignore */ }
-  };
+    try { localStorage.setItem('__nativethink_level_memory', JSON.stringify(lm)); } catch { /* ignore */ }
+  }, []);
 
   // Restore last selected word for initial level from level memory
   useEffect(() => {
@@ -726,6 +726,22 @@ export default function DeepVocabularyPage() {
   };
   const scrollSelector = (dir: 'left' | 'right') => { if (scrollRef.current) scrollRef.current.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' }); };
 
+  // Save scroll position on scroll
+  const handleBrowseScroll = useCallback(() => {
+    if (wordListRef.current) {
+      const curScroll = wordListRef.current.scrollTop;
+      persistLevelMemory({ ...levelMemory, [selectedLevel]: { word: selectedWord?.word || '', scrollTop: curScroll } });
+    }
+  }, [levelMemory, selectedLevel, selectedWord, persistLevelMemory]);
+
+  // Restore scroll position when switching to browse tab
+  const restoreBrowseScroll = useCallback(() => {
+    const saved = levelMemory[selectedLevel];
+    if (saved?.scrollTop && wordListRef.current) {
+      requestAnimationFrame(() => { if (wordListRef.current) wordListRef.current.scrollTop = saved.scrollTop; });
+    }
+  }, [levelMemory, selectedLevel]);
+
   const handleSelectWord = (w: IWordEntry) => {
     setSelectedWord(w);
     setMemory((p) => ({ ...p, word: w.word }));
@@ -733,7 +749,14 @@ export default function DeepVocabularyPage() {
     const curScroll = wordListRef.current?.scrollTop || 0;
     persistLevelMemory({ ...levelMemory, [selectedLevel]: { word: w.word, scrollTop: curScroll } });
   };
-  const handleTabChange = (v: string) => { setTab(v); setMemory((p) => ({ ...p, tab: v })); };
+  const handleTabChange = (v: string) => {
+    // Save scroll before switching away from browse
+    if (tab === 'browse' && v !== 'browse') handleBrowseScroll();
+    setTab(v);
+    setMemory((p) => ({ ...p, tab: v }));
+    // Restore scroll when switching to browse
+    if (v === 'browse') setTimeout(restoreBrowseScroll, 100);
+  };
 
   /** Open word detail in a small popup from collocations tab */
   const [collocWordPopup, setCollocWordPopup] = useState<IWordEntry | null>(null);
@@ -1037,7 +1060,7 @@ export default function DeepVocabularyPage() {
                   ) : (
                     <>
                       {/* Word list */}
-                      <div className="space-y-1 max-h-[480px] overflow-y-auto pr-1">
+                      <div ref={wordListRef} onScroll={handleBrowseScroll} className="space-y-1 max-h-[480px] overflow-y-auto pr-1">
                         {pagedWords.map((w) => {
                           const isSelected = selectedWord?.word === w.word;
                           const lc = LEVEL_COLORS[w.level] || '#00B894';

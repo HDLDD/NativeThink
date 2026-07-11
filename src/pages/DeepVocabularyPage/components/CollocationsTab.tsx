@@ -170,11 +170,34 @@ export default function CollocationsTab({
     () => loadPersisted<{ phrase: string; page: number } | null>('lastSelection', null)?.page || 0,
   );
   const [batchTranslating, setBatchTranslating] = useState(false);
+  const collocListRef = useRef<HTMLDivElement>(null);
+  const SCROLL_MEMORY_KEY = '__nativethink_colloc_scroll';
 
-  // Persist selected collocation + page for tab-switch memory
+  // Persist selected collocation + page + scroll for tab-switch memory
   useEffect(() => {
     persistState({ lastSelection: selectedColloc ? { phrase: selectedColloc, page: currentPage } : null });
   }, [selectedColloc, currentPage]);
+
+  // Save scroll position on scroll
+  const handleCollocListScroll = useCallback(() => {
+    if (collocListRef.current) {
+      try { localStorage.setItem(SCROLL_MEMORY_KEY, String(collocListRef.current.scrollTop)); } catch { /* ignore */ }
+    }
+  }, []);
+
+  // Restore scroll position on mount
+  useEffect(() => {
+    const el = collocListRef.current;
+    if (!el) return;
+    try {
+      const saved = localStorage.getItem(SCROLL_MEMORY_KEY);
+      if (saved) {
+        const top = parseInt(saved, 10);
+        // Delay to let the list render first
+        requestAnimationFrame(() => { el.scrollTop = top; });
+      }
+    } catch { /* ignore */ }
+  }, [allCollocEntries.length > 0]);
 
   // ===== 记忆功能：标记已记住的搭配 =====
   const MEMORIZED_STORAGE_KEY = '__nativethink_colloc_memorized';
@@ -511,7 +534,7 @@ export default function CollocationsTab({
             ) : (
               <>
                 {/* Collocation list */}
-                <div className="space-y-1 max-h-[480px] overflow-y-auto pr-1">
+                <div ref={collocListRef} onScroll={handleCollocListScroll} className="space-y-1 max-h-[480px] overflow-y-auto pr-1">
                   {pageEntries.map((entry) => {
                     const patInfo = PATTERN_LABELS[entry.pattern];
                     const isSelected = selectedColloc?.toLowerCase() === entry.phrase.toLowerCase();

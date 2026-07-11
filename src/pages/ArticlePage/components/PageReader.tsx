@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   X, ChevronLeft, ChevronRight, Volume2, BookOpen, Heart, Globe,
-  Sparkles, Hash,
+  Sparkles, Hash, Wand2, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,11 +11,19 @@ import {
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTTS } from '@/lib/use-tts';
+import { useAI } from '@/hooks/use-ai';
 import { useFavorites } from '@/lib/use-favorites';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn, cleanText } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { IReadingContent, TransMode, IParagraph } from '@/data/reading';
+import { buildPages } from '@/data/reading';
+
+const LEVELS = [
+  { key: 'beginner' as const, label: '初级', color: '#00B894' },
+  { key: 'intermediate' as const, label: '中级', color: '#F59E0B' },
+  { key: 'advanced' as const, label: '高级', color: '#6C5CE7' },
+];
 
 // ── Reading progress persistence ──
 function loadProgress(contentId: string): { page: number } {
@@ -50,6 +58,7 @@ interface Props {
 
 export default function PageReader({ content, onClose }: Props) {
   const tts = useTTS();
+  const { isConfigured, chat: aiChat } = useAI();
   const { addFavorite, isFavorited, favorites, removeFavorite } = useFavorites();
   const totalPages = content.pages.length;
 
@@ -62,15 +71,53 @@ export default function PageReader({ content, onClose }: Props) {
   const [lookupLoading, setLookupLoading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // Level conversion
+  const [convertLevel, setConvertLevel] = useState<string>(content.difficulty || 'intermediate');
+  const [convertLoading, setConvertLoading] = useState(false);
+  const [displayContent, setDisplayContent] = useState(content);
+
+  const convertArticleLevel = async (targetLevel: string) => {
+    if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
+    const lvl = LEVELS.find((l) => l.key === targetLevel)!;
+    setConvertLevel(targetLevel);
+    setConvertLoading(true);
+    try {
+      const allText = displayContent.pages.map((p) => p.paragraphs.map((pp) => pp.en).join(' ')).join('\n\n');
+      const result = await aiChat([
+        { role: 'system', content: `Rewrite the following English text for ${lvl.label} English learners. Return ONLY valid JSON (no markdown): {"title":"adapted title","paragraphs":[{"en":"English paragraph","zh":"Chinese translation"}]}. Keep the core meaning but adjust vocabulary, sentence length, and complexity.` },
+        { role: 'user', content: `Title: ${displayContent.title}\n\n${allText.slice(0, 5000)}` },
+      ], { temperature: 0.6, maxTokens: 4096 });
+      const m = result.match(/\{[\s\S]*\}/);
+      if (!m) { toast.error('格式异常'); return; }
+      const parsed = JSON.parse(m[0]);
+      if (!parsed.paragraphs?.length) { toast.error('转换失败'); return; }
+      const newContent: IReadingContent = {
+        ...displayContent,
+        title: parsed.title || displayContent.title,
+        pages: buildPages(parsed.paragraphs),
+        difficulty: targetLevel as any,
+        totalWords: parsed.paragraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
+      };
+      setDisplayContent(newContent);
+      setPageIdx(0); // Reset to first page
+      toast.success(`已转换为${lvl.label}等级！`);
+    } catch { toast.error('转换失败'); }
+    finally { setConvertLoading(false); }
+  };
+
+  // Use displayContent for rendering
+  const activeContent = displayContent;
+  const activePages = activeContent.pages.length;
+
   // Clamp page
-  const currentPage = Math.max(0, Math.min(pageIdx, totalPages - 1));
+  const currentPage = Math.max(0, Math.min(pageIdx, activePages - 1));
 
   // Save progress
-  useEffect(() => { saveProgress(content.id, currentPage); }, [content.id, currentPage]);
+  useEffect(() => { saveProgress(activeContent.id, currentPage); }, [activeContent.id, currentPage]);
 
   // TTS
   const speakPage = () => {
-    const page = content.pages[currentPage];
+    const page = activeContent.pages[currentPage];
     if (!page) return;
     const text = page.paragraphs.map((p) => cleanText(p.en)).join(' ');
     tts.speak(text, { rate: 0.9 });
@@ -78,8 +125,8 @@ export default function PageReader({ content, onClose }: Props) {
 
   // Page navigation
   const goPrev = () => setPageIdx((p) => Math.max(0, p - 1));
-  const goNext = () => setPageIdx((p) => Math.min(totalPages - 1, p + 1));
-  const jumpPage = (n: number) => setPageIdx(Math.max(0, Math.min(totalPages - 1, n - 1)));
+  const goNext = () => setPageIdx((p) => Math.min(activePages - 1, p + 1));
+  const jumpPage = (n: number) => setPageIdx(Math.max(0, Math.min(activePages - 1, n - 1)));
 
   // Word click
   const handleWordClick = useCallback(async (e: React.MouseEvent, word: string) => {
@@ -111,14 +158,14 @@ export default function PageReader({ content, onClose }: Props) {
 
   // Favorite current page (as expression)
   const favPage = () => {
-    const page = content.pages[currentPage];
+    const page = activeContent.pages[currentPage];
     if (!page) return;
     const snippet = page.paragraphs.slice(0, 3).map((p) => cleanText(p.en).slice(0, 100)).join(' ');
-    addFavorite({ type: 'expression', content: snippet, meaning: page.paragraphs[0]?.zh || '', category: content.topic });
+    addFavorite({ type: 'expression', content: snippet, meaning: page.paragraphs[0]?.zh || '', category: activeContent.topic });
     toast.success('已收藏当前页');
   };
 
-  if (!content.pages.length) {
+  if (!activeContent.pages.length) {
     return (
       <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
         <div className="text-center">
@@ -130,7 +177,7 @@ export default function PageReader({ content, onClose }: Props) {
     );
   }
 
-  const page = content.pages[currentPage];
+  const page = activeContent.pages[currentPage];
 
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col">
@@ -140,9 +187,9 @@ export default function PageReader({ content, onClose }: Props) {
           <X className="size-5" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-black text-foreground truncate">{content.zhTitle || content.title}</h2>
+          <h2 className="text-sm font-black text-foreground truncate">{activeContent.zhTitle || activeContent.title}</h2>
           <p className="text-[10px] font-medium text-muted-foreground truncate">
-            {content.author && `${content.author} · `}{content.source} · {content.difficulty}
+            {activeContent.author && `${activeContent.author} · `}{activeContent.source} · {activeContent.difficulty}
           </p>
         </div>
       </div>
@@ -163,6 +210,24 @@ export default function PageReader({ content, onClose }: Props) {
                 transMode === key ? 'bg-white dark:bg-card text-[#00B894] shadow-sm' : 'text-muted-foreground hover:text-foreground',
               )}
             >{label}</button>
+          ))}
+        </div>
+        {/* Inline level conversion — click to convert current article */}
+        <div className="w-px h-4 bg-border mx-0.5" />
+        <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
+          {LEVELS.map(({ key, label, color }) => (
+            <button
+              key={key}
+              onClick={() => convertArticleLevel(key)}
+              disabled={convertLoading || !isConfigured}
+              className={cn('px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all',
+                convertLevel === key ? 'text-white shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+              style={convertLevel === key ? { backgroundColor: color } : undefined}
+              title={`转换为${label}等级`}
+            >
+              {convertLoading && convertLevel === key ? <Loader2 className="size-2.5 animate-spin inline mr-0.5" /> : null}
+              {label}
+            </button>
           ))}
         </div>
         <div className="flex-1" />
@@ -194,11 +259,11 @@ export default function PageReader({ content, onClose }: Props) {
           <ChevronLeft className="size-4" />上一页
         </Button>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-muted-foreground tabular-nums">{currentPage + 1} / {totalPages}</span>
+          <span className="text-xs font-bold text-muted-foreground tabular-nums">{currentPage + 1} / {activePages}</span>
           <Input
             type="number"
             min={1}
-            max={totalPages}
+            max={activePages}
             className="w-14 h-8 text-center text-xs font-bold rounded-xl"
             placeholder={`${currentPage + 1}`}
             onKeyDown={(e) => {
