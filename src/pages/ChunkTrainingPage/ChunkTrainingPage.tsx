@@ -375,17 +375,23 @@ export default function ChunkTrainingPage() {
   const [reviewQuality, setReviewQuality] = useState<number[]>([]); // track quality per card for summary
   const [reviewTtsMode, setReviewTtsMode] = useState<'chunk' | 'example'>('chunk');
 
-  // Auto-speak when flipping card based on mode
+  // Auto-speak: new card → always read chunk; flip → read chunk or example based on mode
   useEffect(() => {
-    if (!reviewFlipped || reviewIdx >= reviewQueue.length) return;
+    if (reviewIdx >= reviewQueue.length) return;
     const phrase = reviewQueue[reviewIdx];
     if (!phrase) return;
-    if (reviewTtsMode === 'chunk') {
+    if (!reviewFlipped) {
+      // Front side — speak chunk
       tts.speak(phrase.content, { rate: 0.85 });
     } else {
-      tts.speak(cleanText(phrase.example), { rate: 0.85 });
+      // Back side — speak based on mode
+      if (reviewTtsMode === 'chunk') {
+        tts.speak(phrase.content, { rate: 0.85 });
+      } else if (phrase.example) {
+        tts.speak(cleanText(phrase.example), { rate: 0.85 });
+      }
     }
-  }, [reviewFlipped, reviewIdx]);
+  }, [reviewFlipped, reviewIdx, reviewTtsMode]);
 
   const startReview = (count = 20) => {
     const queue = getReviewQueue(count);
