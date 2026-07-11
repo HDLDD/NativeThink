@@ -228,11 +228,13 @@ export default function ArticlePage() {
     if (!isConfigured || !text || text.length < 100) return;
     setTranslationLoading(true);
     try {
+      // Split into paragraphs for paragraph-aligned translation
+      const paragraphs = text.split(/\n\n+/).filter((p) => p.trim());
       const result = await aiChat([
-        { role: 'system', content: 'Translate the following English text to natural Chinese. Keep paragraphs aligned. Return ONLY the Chinese translation, no markdown, no explanation.' },
-        { role: 'user', content: text.slice(0, 5000) },
-      ], { temperature: 0.3, maxTokens: 2048 });
-      const cleaned = result.trim().replace(/^```[\s\S]*?\n|```$/g, '');
+        { role: 'system', content: `Translate each English paragraph below into natural Chinese. Keep the EXACT same number of paragraphs. Separate paragraphs with a blank line. Return ONLY the Chinese translation paragraphs, no markdown, no numbering, no explanation.` },
+        { role: 'user', content: paragraphs.map((p, i) => `[${i + 1}] ${p.slice(0, 800)}`).join('\n\n') },
+      ], { temperature: 0.3, maxTokens: 3072 });
+      const cleaned = result.trim().replace(/^```[\s\S]*?\n|```$/g, '').replace(/^\[\d+\]\s*/gm, '');
       if (cleaned.length > 10) setDisplayTranslation(cleaned);
     } catch { /* silent */ }
     finally { setTranslationLoading(false); }
@@ -251,7 +253,7 @@ export default function ArticlePage() {
       const levelDesc = LEVELS.find((l) => l.key === level)!;
       const topicLabel = TOPICS.find((t) => t.key === topic)!;
       const result = await aiChat([
-        { role: 'system', content: `You are an English teacher. Write an engaging English article for ${levelDesc.label} learners about ${topicLabel.label}. Return ONLY valid JSON (no markdown): {"title":"...","content":"full article (3-5 paragraphs)","translation":"Chinese translation","vocabulary":[{"word":"...","meaning":"Chinese"}],"questions":[{"q":"...","options":["A. ...","B. ...","C. ...","D. ..."],"answer":0}]}` },
+        { role: 'system', content: `You are an English teacher. Write an engaging English article for ${levelDesc.label} learners about ${topicLabel.label}. Return ONLY valid JSON (no markdown): {"title":"...","content":"full article (3-5 paragraphs, separated by blank lines)","translation":"paragraph-aligned Chinese translation (same number of paragraphs as content, separated by blank lines)","vocabulary":[{"word":"...","meaning":"Chinese"}],"questions":[{"q":"...","options":["A. ...","B. ...","C. ...","D. ..."],"answer":0}]}` },
         { role: 'user', content: `Generate an English article about ${topicLabel.label}. Level: ${levelDesc.label}.` },
       ], { temperature: 0.8, maxTokens: 4096 });
       const m = result.match(/\{[\s\S]*\}/);
@@ -286,7 +288,7 @@ export default function ArticlePage() {
         return `${p.wordKey}${s ? ` (status: ${s.status}, EF: ${s.ef.toFixed(1)})` : ''}`;
       }).join(', ');
       const result = await aiChat([
-        { role: 'system', content: `You are an English teacher. Write a short English article (2-3 paragraphs, ${level === 'beginner' ? 'simple vocabulary' : level === 'intermediate' ? 'moderate difficulty' : 'advanced level'}) that naturally incorporates ALL of the following vocabulary words: ${wordList}. The article should be coherent and engaging. Return ONLY valid JSON (no markdown): {"title":"...","content":"article text","translation":"Chinese translation"}` },
+        { role: 'system', content: `You are an English teacher. Write a short English article (2-3 paragraphs, separated by blank lines, ${level === 'beginner' ? 'simple vocabulary' : level === 'intermediate' ? 'moderate difficulty' : 'advanced level'}) that naturally incorporates ALL of the following vocabulary words: ${wordList}. Return ONLY valid JSON (no markdown): {"title":"...","content":"article text (paragraphs separated by blank lines)","translation":"paragraph-aligned Chinese translation (same number of paragraphs, separated by blank lines)"}` },
         { role: 'user', content: `Create an English article using these words: ${wordDetails}. Level: ${level}.` },
       ], { temperature: 0.7, maxTokens: 4096 });
       const m = result.match(/\{[\s\S]*\}/);
@@ -664,7 +666,7 @@ This, and nothing less, is the meaning of human existence: to create, to produce
         setExpandLoading(true);
         try {
           const result = await aiChat([
-            { role: 'system', content: `You are an English teacher. Based on the following TED talk excerpt, write a complete, well-structured English article (500-800 words) about this speech and its key ideas. Include: (1) Background context of the speech and the speaker (2) The main arguments and key points in detail (3) The speech's impact and significance. Write in clear, engaging English suitable for intermediate learners. Return ONLY the article text, no headers.` },
+            { role: 'system', content: `You are an English teacher. Based on the following TED talk excerpt, write a complete, well-structured English article (500-800 words, 4-6 paragraphs separated by blank lines) about this speech and its key ideas. Include: (1) Background context of the speaker and speech (2) Main arguments and key points in detail (3) Impact and significance. Write in clear English for intermediate learners. Return ONLY the article text (paragraphs separated by blank lines), no headers, no JSON.` },
             { role: 'user', content: `Speech: "${speech.title}" by ${speech.author} (${speech.year})\n\nOriginal excerpt:\n${content}` },
           ], { temperature: 0.7, maxTokens: 2048 });
           const expanded = result.trim();
@@ -724,7 +726,7 @@ This, and nothing less, is the meaning of human existence: to create, to produce
     try {
       const targetLevel = LEVELS.find((l) => l.key === convertLevel)!;
       const result = await aiChat([
-        { role: 'system', content: `Rewrite the following English text for ${targetLevel.label} English learners (${targetLevel.desc}). You must return ONLY valid JSON (no markdown): {"title":"adapted title","content":"adapted article","translation":"Chinese translation of adapted article"}. Keep the core meaning but adjust vocabulary, sentence length, and complexity for the target level.` },
+        { role: 'system', content: `Rewrite the following English text for ${targetLevel.label} English learners (${targetLevel.desc}). You must return ONLY valid JSON (no markdown): {"title":"adapted title","content":"adapted article (paragraphs separated by blank lines)","translation":"paragraph-aligned Chinese translation (same number of paragraphs, separated by blank lines)"}. Keep the core meaning but adjust vocabulary, sentence length, and complexity for the target level.` },
         { role: 'user', content: `Original title: ${displayTitle}\n\nOriginal text:\n${displayContent.slice(0, 5000)}` },
       ], { temperature: 0.6, maxTokens: 4096 });
       const m = result.match(/\{[\s\S]*\}/);
@@ -1094,7 +1096,7 @@ This, and nothing less, is the meaning of human existence: to create, to produce
                 <img src={wikiPage.thumbnail.source} alt={displayTitle}
                   className="w-full max-h-64 object-cover rounded-2xl mb-6 shadow-md" />
               )}
-              {/* TED original excerpt — shown above AI expansion */}
+              {/* TED original excerpt */}
               {displayExcerpt && displayContent !== displayExcerpt && (
                 <div className="mb-6 p-4 rounded-2xl bg-amber-50/50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20">
                   <p className="text-[10px] font-black uppercase tracking-wider text-amber-600 mb-2 flex items-center gap-1.5">
@@ -1106,30 +1108,45 @@ This, and nothing less, is the meaning of human existence: to create, to produce
                 </div>
               )}
 
-              {/* Main content */}
-              <div ref={contentRef} className="text-foreground/85 leading-[1.9] text-[15px] whitespace-pre-line select-text">
-                {renderContent(displayContent)}
+              {/* Bilingual paragraph-by-paragraph display */}
+              <div ref={contentRef} className="space-y-6 select-text">
+                {(() => {
+                  const enParas = displayContent.split(/\n\n+/).filter((p) => p.trim());
+                  const zhParas = displayTranslation ? displayTranslation.split(/\n\n+/).filter((p) => p.trim()) : [];
+
+                  return enParas.map((enPara, i) => (
+                    <div key={i} className="group">
+                      {/* English paragraph */}
+                      <div className="text-foreground/85 leading-[1.9] text-[15px] whitespace-pre-line">
+                        {renderContent(enPara)}
+                      </div>
+                      {/* Chinese translation paragraph */}
+                      {zhParas[i] ? (
+                        <div className="mt-1.5 pl-4 border-l-2 border-[#6C5CE7]/30 text-[14px] text-[#6C5CE7]/80 leading-[1.8] whitespace-pre-line">
+                          {zhParas[i]}
+                        </div>
+                      ) : translationLoading && i >= enParas.length - 1 ? (
+                        <div className="mt-1.5 pl-4 border-l-2 border-[#6C5CE7]/20 text-xs text-muted-foreground flex items-center gap-1.5">
+                          <Loader2 className="size-3 animate-spin" />翻译中…
+                        </div>
+                      ) : null}
+                    </div>
+                  ));
+                })()}
                 {expandLoading && (
-                  <span className="inline-flex items-center gap-1.5 ml-2 text-[#F59E0B] text-xs font-bold">
+                  <div className="text-[#F59E0B] text-xs font-bold flex items-center gap-1.5">
                     <Loader2 className="size-3 animate-spin" />AI 扩展中…
-                  </span>
+                  </div>
                 )}
               </div>
 
-              {/* Translation — always visible if available, or show loading */}
-              {displayTranslation ? (
-                <div className="mt-6 p-5 rounded-2xl bg-violet-50/50 dark:bg-violet-500/10 border border-violet-100 dark:border-violet-500/20">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-[#6C5CE7] mb-3 flex items-center gap-1.5">
-                    <Languages className="size-3.5" />中文翻译
-                  </p>
-                  <p className="text-sm text-foreground/75 leading-relaxed whitespace-pre-line">{displayTranslation}</p>
-                </div>
-              ) : translationLoading ? (
+              {/* Translation loading — show at bottom if no paragraphs matched yet */}
+              {translationLoading && !displayTranslation && (
                 <div className="mt-6 p-5 rounded-2xl bg-violet-50/30 dark:bg-violet-500/5 border border-violet-100/50 flex items-center gap-2">
                   <Loader2 className="size-4 text-[#6C5CE7] animate-spin" />
-                  <span className="text-sm text-muted-foreground">AI 翻译中…</span>
+                  <span className="text-sm text-muted-foreground">AI 翻译中，完成后将逐段对照显示…</span>
                 </div>
-              ) : null}
+              )}
 
               {source === 'gutenberg' && (
                 <p className="text-[10px] text-muted-foreground mt-4 pt-4 border-t border-border text-center">
