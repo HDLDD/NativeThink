@@ -917,20 +917,8 @@ export default function ArticlePage() {
               {/* Speeches */}
               <div className="space-y-2">
                 <h3 className="font-black text-foreground flex items-center gap-2"><Mic className="size-4 text-[#00B894]" />演讲</h3>
-                <p className="text-muted-foreground text-xs leading-relaxed">24 篇经典演讲（MLK、丘吉尔、TED 等），支持分页阅读和朗读。</p>
+                <p className="text-muted-foreground text-xs leading-relaxed">24 篇经典演讲（MLK、丘吉尔、TED 等），支持分页阅读（朗读根据文本可能存在问题）。</p>
                 <p className="text-amber-600 text-[11px] font-medium">⚠ 演讲中文翻译需手动点击"AI翻译"。</p>
-              </div>
-
-              {/* Reader tips */}
-              <div className="pt-3 border-t border-border space-y-2">
-                <h3 className="font-black text-foreground text-xs uppercase tracking-wider">阅读器技巧</h3>
-                <ul className="text-muted-foreground text-xs space-y-1.5 leading-relaxed">
-                  <li>· 点击任意单词 → 查词 + 收藏</li>
-                  <li>· 工具栏切换 原文/对照/译文 三种视图</li>
-                  <li>· 朗读按钮 → 逐段朗读，当前段落高亮</li>
-                  <li>· 键盘翻页：← → 方向键</li>
-                  <li>· 关注 TTS 朗读：桌面/Android 优先系统语音（秒启），iOS 走云端引擎</li>
-                </ul>
               </div>
             </div>
           </ScrollArea>
