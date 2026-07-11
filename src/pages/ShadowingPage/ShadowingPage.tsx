@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Mic,
   Play,
@@ -68,6 +69,7 @@ export default function ShadowingPage() {
   const { addStudyMinutes } = useLearningStats();
   const { addFavorite, removeFavorite, isFavorited, favorites } = useFavorites();
   const { isConfigured, chat: aiChat } = useAI();
+  const [searchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState<string | null>(MOCK_SHADOWING_MATERIALS[0]?.id || null);
   const [currentSentenceIdx, setCurrentSentenceIdx] = useState(0);
   const [isLooping, setIsLooping] = useState(false);
@@ -86,6 +88,19 @@ export default function ShadowingPage() {
   useEffect(() => {
     safeStorage.setItem('__nativethink_custom_shadowing', JSON.stringify(customMaterials));
   }, [customMaterials]);
+
+  // Navigate to a specific material via ?material=<title> query param
+  useEffect(() => {
+    const materialTitle = searchParams.get('material');
+    if (!materialTitle) return;
+    const all = [...customMaterials, ...MOCK_SHADOWING_MATERIALS];
+    const match = all.find((m) => m.title === decodeURIComponent(materialTitle));
+    if (match) {
+      setSelectedId(match.id);
+      setCurrentSentenceIdx(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const [showGenDialog, setShowGenDialog] = useState(false);
   const [filterCategory, setFilterCategory] = usePageMemory('shadowing-filter', 'all');

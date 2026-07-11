@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Volume2, Sparkles, CheckCircle2, XCircle, RotateCw, ArrowLeft } from 'lucide-react';
+import { Heart, Volume2, Sparkles, CheckCircle2, XCircle, RotateCw, ArrowLeft, ExternalLink, Mic } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,10 +39,25 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
   const [unknownIds, setUnknownIds] = useState<Set<string>>(new Set());
   const [completed, setCompleted] = useState(false);
 
+  // Shadowing items are better reviewed in context — exclude from flashcards
   const filtered = useMemo(() => {
-    if (filterType === 'all') return favorites;
-    return favorites.filter((f) => f.type === filterType);
+    let items = favorites.filter((f) => f.type !== 'shadowing');
+    if (filterType !== 'all') items = items.filter((f) => f.type === filterType);
+    return items;
   }, [favorites, filterType]);
+
+  // Count shadowing items for the info message
+  const shadowingCount = useMemo(
+    () => favorites.filter((f) => f.type === 'shadowing').length,
+    [favorites],
+  );
+
+  // Check if the current filter has NO reviewable items but shadowing exists
+  const showShadowingSkip = useMemo(() => {
+    if (filterType === 'all') return shadowingCount > 0 && filtered.length === 0;
+    if (filterType === 'shadowing') return true;
+    return false;
+  }, [filterType, shadowingCount, filtered.length]);
 
   // Reset state when filter changes
   const handleFilterChange = (type: string) => {
@@ -173,8 +188,49 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
     );
   }
 
-  // ── Empty state ──
+  // ── Empty state (or shadowing-only) ──
   if (total === 0) {
+    // Shadowing items exist but can't be reviewed as flashcards
+    if (showShadowingSkip) {
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="size-10 rounded-xl bg-[#00B894]/10 flex items-center justify-center text-[#00B894]">
+                <Heart className="size-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black italic text-foreground">收藏回顾</h2>
+                <p className="text-[9px] font-bold text-muted-foreground">影子跟读需在原文中练习</p>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" onClick={onExit} className="rounded-xl text-xs font-bold">
+              <ArrowLeft className="size-3.5 mr-1" />返回
+            </Button>
+          </div>
+          <div className="text-center py-12 space-y-4">
+            <div className="size-16 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center mx-auto">
+              <Mic className="size-8 text-rose-400" />
+            </div>
+            <div>
+              <p className="text-muted-foreground text-sm font-medium mb-1">
+                影子跟读收藏不适合闪卡复习
+              </p>
+              <p className="text-xs text-muted-foreground/60">
+                影子跟读需要在完整的语境中练习发音和语调，请在影子跟读页面查看。
+              </p>
+            </div>
+            <Button
+              onClick={() => { window.location.href = '/shadowing'; }}
+              className="rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-black text-sm shadow-lg shadow-rose-200/50 gap-2"
+            >
+              <ExternalLink className="size-4" />前往影子跟读
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">

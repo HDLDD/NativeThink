@@ -93,33 +93,34 @@ const WIKI_ARTICLES: { title: string; zhTitle: string; topic: string }[] = [
 ];
 
 // ── Famous speeches + TED talks ──
-const FAMOUS_SPEECHES: { id: string; title: string; zhTitle: string; author: string; year: number; type: string; topic: string; preview: string }[] = [
-  { id: 'mlk-dream', title: 'I Have a Dream', zhTitle: '我有一个梦想', author: 'Martin Luther King Jr.', year: 1963, type: '历史演讲', topic: 'history', preview: 'I am happy to join with you today in what will go down in history as the greatest demonstration for freedom in the history of our nation...' },
-  { id: 'gettysburg', title: 'The Gettysburg Address', zhTitle: '葛底斯堡演说', author: 'Abraham Lincoln', year: 1863, type: '历史演讲', topic: 'history', preview: 'Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty...' },
-  { id: 'churchill-finest', title: 'Their Finest Hour', zhTitle: '最光辉的时刻', author: 'Winston Churchill', year: 1940, type: '历史演讲', topic: 'history', preview: 'What General Weygand called the Battle of France is over. I expect that the Battle of Britain is about to begin...' },
-  { id: 'jfk-inaugural', title: 'Inaugural Address', zhTitle: '就职演说', author: 'John F. Kennedy', year: 1961, type: '历史演讲', topic: 'history', preview: 'We observe today not a victory of party but a celebration of freedom—symbolizing an end as well as a beginning...' },
-  { id: 'susan-anthony', title: 'On Women\'s Right to Vote', zhTitle: '论妇女选举权', author: 'Susan B. Anthony', year: 1873, type: '历史演讲', topic: 'culture', preview: 'Friends and fellow citizens: I stand before you tonight under indictment for the alleged crime of having voted...' },
+type SpeechItem = { id: string; title: string; zhTitle: string; author: string; year: number; type: string; topic: string; preview: string; image?: string };
+const FAMOUS_SPEECHES: SpeechItem[] = [
+  { id: 'mlk-dream', title: 'I Have a Dream', zhTitle: '我有一个梦想', author: 'Martin Luther King Jr.', year: 1963, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Martin_Luther_King%2C_Jr..jpg/440px-Martin_Luther_King%2C_Jr..jpg', preview: 'I am happy to join with you today in what will go down in history as the greatest demonstration for freedom in the history of our nation...' },
+  { id: 'gettysburg', title: 'The Gettysburg Address', zhTitle: '葛底斯堡演说', author: 'Abraham Lincoln', year: 1863, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Abraham_Lincoln_O-77_matte_collodion_print.jpg/440px-Abraham_Lincoln_O-77_matte_collodion_print.jpg', preview: 'Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty...' },
+  { id: 'churchill-finest', title: 'Their Finest Hour', zhTitle: '最光辉的时刻', author: 'Winston Churchill', year: 1940, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Sir_Winston_Churchill_-_19086236948.jpg/440px-Sir_Winston_Churchill_-_19086236948.jpg', preview: 'What General Weygand called the Battle of France is over...' },
+  { id: 'jfk-inaugural', title: 'Inaugural Address', zhTitle: '就职演说', author: 'John F. Kennedy', year: 1961, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/John_F._Kennedy%2C_White_House_color_photo_portrait.jpg/440px-John_F._Kennedy%2C_White_House_color_photo_portrait.jpg', preview: 'We observe today not a victory of party but a celebration of freedom...' },
+  { id: 'susan-anthony', title: 'On Women\'s Right to Vote', zhTitle: '论妇女选举权', author: 'Susan B. Anthony', year: 1873, type: '历史演讲', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Susan_B._Anthony_c1855.png/440px-Susan_B._Anthony_c1855.png', preview: 'Friends and fellow citizens: I stand before you tonight under indictment for the alleged crime of having voted...' },
   // TED Talks
-  { id: 'ted-robinson-school', title: 'Do Schools Kill Creativity?', zhTitle: '学校扼杀创造力吗？', author: 'Sir Ken Robinson', year: 2006, type: 'TED', topic: 'culture', preview: 'Good morning. How are you? It\'s been great, hasn\'t it? I\'ve been blown away by the whole thing...' },
-  { id: 'ted-sinek-leaders', title: 'How Great Leaders Inspire Action', zhTitle: '伟大领袖如何激励行动', author: 'Simon Sinek', year: 2009, type: 'TED', topic: 'business', preview: 'How do you explain when things don\'t go as we assume? Or better, how do you explain when others are able to achieve things...' },
-  { id: 'ted-brown-vulnerability', title: 'The Power of Vulnerability', zhTitle: '脆弱的力量', author: 'Brené Brown', year: 2010, type: 'TED', topic: 'culture', preview: 'So, I\'ll start with this: a couple years ago, an event planner called me because I was going to do a speaking event...' },
-  { id: 'ted-cuddy-body', title: 'Your Body Language Shapes Who You Are', zhTitle: '肢体语言塑造你自己', author: 'Amy Cuddy', year: 2012, type: 'TED', topic: 'science', preview: 'So I want to start by offering you a free no-tech life hack, and all it requires of you is this...' },
-  { id: 'ted-duckworth-grit', title: 'Grit: The Power of Passion and Perseverance', zhTitle: '毅力：激情与坚持的力量', author: 'Angela Duckworth', year: 2013, type: 'TED', topic: 'culture', preview: 'When I was 27 years old, I left a very demanding job in management consulting for a job that was even more demanding: teaching...' },
-  { id: 'ted-harari-nationalism', title: 'Why Fascism is so Tempting', zhTitle: '法西斯主义为何诱人', author: 'Yuval Noah Harari', year: 2018, type: 'TED', topic: 'history', preview: 'So, humankind has two great stories: the story of the individual and the story of the collective...' },
-  { id: 'ted-gates-climate', title: 'Innovating to Zero', zhTitle: '创新到零排放', author: 'Bill Gates', year: 2010, type: 'TED', topic: 'science', preview: 'I\'m going to talk today about energy and climate. And that might seem a bit surprising...' },
-  { id: 'ted-adichie-single', title: 'The Danger of a Single Story', zhTitle: '单一故事的危险', author: 'Chimamanda Adichie', year: 2009, type: 'TED', topic: 'culture', preview: 'I\'m a storyteller. And I would like to tell you a few personal stories about what I like to call "the danger of the single story."...' },
-  { id: 'ted-urban-procrastination', title: 'Inside the Mind of a Master Procrastinator', zhTitle: '拖延症大师的内心世界', author: 'Tim Urban', year: 2016, type: 'TED', topic: 'culture', preview: 'So in college, I was a government major, which means I had to write a lot of papers...' },
-  { id: 'ted-godin-tribes', title: 'The Tribes We Lead', zhTitle: '我们领导的部落', author: 'Seth Godin', year: 2009, type: 'TED', topic: 'business', preview: 'Something really important is happening. The Internet has ended the age of mass marketing...' },
+  { id: 'ted-robinson-school', title: 'Do Schools Kill Creativity?', zhTitle: '学校扼杀创造力吗？', author: 'Sir Ken Robinson', year: 2006, type: 'TED', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Sir_Ken_Robinson.jpg/440px-Sir_Ken_Robinson.jpg', preview: 'Good morning. How are you? It\'s been great, hasn\'t it?...' },
+  { id: 'ted-sinek-leaders', title: 'How Great Leaders Inspire Action', zhTitle: '伟大领袖如何激励行动', author: 'Simon Sinek', year: 2009, type: 'TED', topic: 'business', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Simon_Sinek_2019.jpg/440px-Simon_Sinek_2019.jpg', preview: 'How do you explain when things don\'t go as we assume?...' },
+  { id: 'ted-brown-vulnerability', title: 'The Power of Vulnerability', zhTitle: '脆弱的力量', author: 'Brené Brown', year: 2010, type: 'TED', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Brene_Brown_2018.png/440px-Brene_Brown_2018.png', preview: 'So, I\'ll start with this: a couple years ago, an event planner called me...' },
+  { id: 'ted-cuddy-body', title: 'Your Body Language Shapes Who You Are', zhTitle: '肢体语言塑造你自己', author: 'Amy Cuddy', year: 2012, type: 'TED', topic: 'science', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/Amy_Cuddy_2018.jpg/440px-Amy_Cuddy_2018.jpg', preview: 'So I want to start by offering you a free no-tech life hack...' },
+  { id: 'ted-duckworth-grit', title: 'Grit: The Power of Passion and Perseverance', zhTitle: '毅力：激情与坚持的力量', author: 'Angela Duckworth', year: 2013, type: 'TED', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Angela_Duckworth.jpg/440px-Angela_Duckworth.jpg', preview: 'When I was 27 years old, I left a very demanding job...' },
+  { id: 'ted-harari-nationalism', title: 'Why Fascism is so Tempting', zhTitle: '法西斯主义为何诱人', author: 'Yuval Noah Harari', year: 2018, type: 'TED', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Yuval_Noah_Harari_2022.jpg/440px-Yuval_Noah_Harari_2022.jpg', preview: 'So, humankind has two great stories...' },
+  { id: 'ted-gates-climate', title: 'Innovating to Zero', zhTitle: '创新到零排放', author: 'Bill Gates', year: 2010, type: 'TED', topic: 'science', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Bill_Gates_2018.jpg/440px-Bill_Gates_2018.jpg', preview: 'I\'m going to talk today about energy and climate...' },
+  { id: 'ted-adichie-single', title: 'The Danger of a Single Story', zhTitle: '单一故事的危险', author: 'Chimamanda Adichie', year: 2009, type: 'TED', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Chimamanda_Adichie_2015.jpg/440px-Chimamanda_Adichie_2015.jpg', preview: 'I\'m a storyteller...' },
+  { id: 'ted-urban-procrastination', title: 'Inside the Mind of a Master Procrastinator', zhTitle: '拖延症大师的内心世界', author: 'Tim Urban', year: 2016, type: 'TED', topic: 'culture', preview: 'So in college, I was a government major...' },
+  { id: 'ted-godin-tribes', title: 'The Tribes We Lead', zhTitle: '我们领导的部落', author: 'Seth Godin', year: 2009, type: 'TED', topic: 'business', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Seth_Godin_2009.jpg/440px-Seth_Godin_2009.jpg', preview: 'Something really important is happening...' },
   // More classic speeches
-  { id: 'jobs-stanford', title: 'Stanford Commencement Address', zhTitle: '斯坦福毕业演讲', author: 'Steve Jobs', year: 2005, type: '毕业演讲', topic: 'business', preview: 'I am honored to be with you today at your commencement from one of the finest universities in the world...' },
-  { id: 'rowling-harvard', title: 'The Fringe Benefits of Failure', zhTitle: '失败带来的额外收益', author: 'J.K. Rowling', year: 2008, type: '毕业演讲', topic: 'culture', preview: 'President Faust, members of the Harvard Corporation and the Board of Overseers...' },
-  { id: 'obama-yes-we-can', title: 'Yes We Can Speech', zhTitle: '是的，我们可以', author: 'Barack Obama', year: 2008, type: '政治演讲', topic: 'history', preview: 'If there is anyone out there who still doubts that America is a place where all things are possible...' },
-  { id: 'rand-Atlas', title: 'This is John Galt Speaking', zhTitle: '约翰·高尔特演说', author: 'Ayn Rand', year: 1957, type: '文学演讲', topic: 'philosophy', preview: 'For twelve years you have been asking: Who is John Galt? This is John Galt speaking...' },
-  { id: 'mandela-inaugural', title: 'Inaugural Address', zhTitle: '就职演说', author: 'Nelson Mandela', year: 1994, type: '历史演讲', topic: 'history', preview: 'Our deepest fear is not that we are inadequate. Our deepest fear is that we are powerful beyond measure...' },
-  { id: 'greta-un-climate', title: 'How Dare You', zhTitle: '你们怎么敢', author: 'Greta Thunberg', year: 2019, type: 'UN演讲', topic: 'science', preview: 'My message is that we\'ll be watching you. This is all wrong. I shouldn\'t be up here...' },
-  { id: 'emma-heforshe', title: 'HeForShe Gender Equality', zhTitle: '他为她性别平等', author: 'Emma Watson', year: 2014, type: 'UN演讲', topic: 'culture', preview: 'Today we are launching a campaign called "HeForShe." I am reaching out to you because I need your help...' },
-  { id: 'malala-un', title: 'Education for All', zhTitle: '全民教育', author: 'Malala Yousafzai', year: 2013, type: 'UN演讲', topic: 'culture', preview: 'In the name of God, the most beneficent, the most merciful. Honorable UN Secretary General...' },
-  { id: 'reagan-challenger', title: 'The Challenger Disaster Speech', zhTitle: '挑战者号灾难演说', author: 'Ronald Reagan', year: 1986, type: '历史演讲', topic: 'history', preview: 'Ladies and gentlemen, I\'d planned to speak to you tonight to report on the state of the Union...' },
+  { id: 'jobs-stanford', title: 'Stanford Commencement Address', zhTitle: '斯坦福毕业演讲', author: 'Steve Jobs', year: 2005, type: '毕业演讲', topic: 'business', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Steve_Jobs_Headshot_2010-CROP_%28cropped_2%29.jpg/440px-Steve_Jobs_Headshot_2010-CROP_%28cropped_2%29.jpg', preview: 'I am honored to be with you today...' },
+  { id: 'rowling-harvard', title: 'The Fringe Benefits of Failure', zhTitle: '失败带来的额外收益', author: 'J.K. Rowling', year: 2008, type: '毕业演讲', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/J._K._Rowling_2010.jpg/440px-J._K._Rowling_2010.jpg', preview: 'President Faust, members of the Harvard Corporation...' },
+  { id: 'obama-yes-we-can', title: 'Yes We Can Speech', zhTitle: '是的，我们可以', author: 'Barack Obama', year: 2008, type: '政治演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/President_Barack_Obama.jpg/440px-President_Barack_Obama.jpg', preview: 'If there is anyone out there who still doubts...' },
+  { id: 'rand-Atlas', title: 'This is John Galt Speaking', zhTitle: '约翰·高尔特演说', author: 'Ayn Rand', year: 1957, type: '文学演讲', topic: 'philosophy', preview: 'For twelve years you have been asking: Who is John Galt?...' },
+  { id: 'mandela-inaugural', title: 'Inaugural Address', zhTitle: '就职演说', author: 'Nelson Mandela', year: 1994, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Nelson_Mandela_1994.jpg/440px-Nelson_Mandela_1994.jpg', preview: 'Our deepest fear is not that we are inadequate...' },
+  { id: 'greta-un-climate', title: 'How Dare You', zhTitle: '你们怎么敢', author: 'Greta Thunberg', year: 2019, type: 'UN演讲', topic: 'science', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Greta_Thunberg_2020_%28cropped%29.jpg/440px-Greta_Thunberg_2020_%28cropped%29.jpg', preview: 'My message is that we\'ll be watching you...' },
+  { id: 'emma-heforshe', title: 'HeForShe Gender Equality', zhTitle: '他为她性别平等', author: 'Emma Watson', year: 2014, type: 'UN演讲', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Emma_Watcher_2013.jpg/440px-Emma_Watcher_2013.jpg', preview: 'Today we are launching a campaign called "HeForShe."...' },
+  { id: 'malala-un', title: 'Education for All', zhTitle: '全民教育', author: 'Malala Yousafzai', year: 2013, type: 'UN演讲', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Malala_Yousafzai_2015.jpg/440px-Malala_Yousafzai_2015.jpg', preview: 'In the name of God, the most beneficent, the most merciful...' },
+  { id: 'reagan-challenger', title: 'The Challenger Disaster Speech', zhTitle: '挑战者号灾难演说', author: 'Ronald Reagan', year: 1986, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Official_Portrait_of_President_Reagan_1981.jpg/440px-Official_Portrait_of_President_Reagan_1981.jpg', preview: 'Ladies and gentlemen, I\'d planned to speak to you tonight...' },
 ];
 
 interface GutenbergBook { id: number; title: string; authors: { name: string }[]; subjects: string[]; formats: Record<string, string>; download_count: number; }
@@ -149,6 +150,8 @@ export default function ArticlePage() {
   const [wikiQuery, setWikiQuery] = useState('');
   const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [wikiLoading, setWikiLoading] = useState(false);
+  const [wikiThumbnails, setWikiThumbnails] = useState<Record<string, string>>({});
+  const wikiThumbsLoaded = useRef(false);
 
   // Shared article display
   const [displayTitle, setDisplayTitle] = useState('');
@@ -194,6 +197,30 @@ export default function ArticlePage() {
       return next;
     });
   };
+
+  // Load Wikipedia thumbnails in background when source is selected
+  useEffect(() => {
+    if (source !== 'wikipedia' || wikiThumbsLoaded.current) return;
+    wikiThumbsLoaded.current = true;
+    let cancelled = false;
+    (async () => {
+      for (const article of WIKI_ARTICLES) {
+        if (cancelled) break;
+        try {
+          const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(article.title)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.thumbnail?.source) {
+              setWikiThumbnails((prev) => ({ ...prev, [article.title]: data.thumbnail.source }));
+            }
+          }
+          // Small delay between requests to be polite
+          await new Promise((r) => setTimeout(r, 200));
+        } catch { /* skip */ }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [source]);
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -846,14 +873,18 @@ This, and nothing less, is the meaning of human existence: to create, to produce
                 <button key={book.id} onClick={() => fetchGutenbergBook({ id: book.id, title: book.title, authors: [{ name: book.author }], subjects: [book.topic], formats: { 'text/plain': `https://www.gutenberg.org/files/${book.id}/${book.id}-0.txt` }, download_count: 0 })}
                   className="group text-left rounded-2xl bg-muted/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all border border-transparent hover:border-[#00B894]/30 hover:shadow-lg overflow-hidden">
                   {/* Book cover */}
-                  <div className="aspect-[3/4] bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center relative overflow-hidden"
-                    style={{ backgroundImage: book.cover ? `url(${book.cover})` : undefined, backgroundSize: 'cover' }}>
-                    {!book.cover && (
-                      <div className="text-center p-2">
-                        <span className="text-3xl mb-1 block">📖</span>
-                        <p className="text-white/90 text-[9px] font-black leading-tight line-clamp-2">{book.title}</p>
-                      </div>
-                    )}
+                  <div className="aspect-[3/4] bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center relative overflow-hidden">
+                    <img
+                      src={`https://www.gutenberg.org/cache/epub/${book.id}/pg${book.id}.cover.medium.jpg`}
+                      alt={book.title}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      loading="lazy"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <div className="text-center p-2">
+                      <span className="text-3xl mb-1 block">📖</span>
+                      <p className="text-white/90 text-[9px] font-black leading-tight line-clamp-2">{book.title}</p>
+                    </div>
                   </div>
                   <div className="p-2.5">
                     <p className="text-[11px] font-black text-foreground line-clamp-1 group-hover:text-[#00B894] transition-colors">{book.title}</p>
@@ -903,9 +934,14 @@ This, and nothing less, is the meaning of human existence: to create, to produce
               {WIKI_ARTICLES.map((article) => (
                 <button key={article.title} onClick={() => { setWikiQuery(article.title); searchWikipedia(article.title); }}
                   className="group text-left rounded-2xl bg-muted/30 hover:bg-sky-50 dark:hover:bg-sky-500/10 transition-all border border-transparent hover:border-sky-200 hover:shadow-lg overflow-hidden">
-                  {/* Topic gradient icon card */}
-                  <div className="aspect-[4/3] bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center">
-                    <span className="text-3xl">{TOPICS.find((t) => t.key === article.topic)?.icon || '📄'}</span>
+                  {/* Card image: real thumbnail or gradient fallback */}
+                  <div className="aspect-[4/3] bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center relative overflow-hidden">
+                    {wikiThumbnails[article.title] ? (
+                      <img src={wikiThumbnails[article.title]} alt={article.title}
+                        className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <span className="text-3xl">{TOPICS.find((t) => t.key === article.topic)?.icon || '📄'}</span>
+                    )}
                   </div>
                   <div className="p-2.5">
                     <p className="text-[11px] font-black text-foreground line-clamp-1 group-hover:text-sky-500 transition-colors">{article.title}</p>
@@ -949,10 +985,16 @@ This, and nothing less, is the meaning of human existence: to create, to produce
                 return (
                 <button key={speech.id} onClick={() => fetchSpeech(speech)}
                   className="group text-left rounded-2xl bg-muted/30 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-all border border-transparent hover:border-amber-200 hover:shadow-lg overflow-hidden">
-                  {/* Speech type gradient header */}
-                  <div className={cn('aspect-[4/3] bg-gradient-to-br flex items-center justify-center relative',
+                  {/* Speech card header: speaker image or gradient */}
+                  <div className={cn('aspect-[4/3] bg-gradient-to-br flex items-center justify-center relative overflow-hidden',
                     typeColors[speech.type] || 'from-amber-500 to-orange-600')}>
-                    <span className="text-3xl">🎤</span>
+                    {speech.image ? (
+                      <img src={speech.image} alt={speech.author}
+                        className="absolute inset-0 w-full h-full object-cover" loading="lazy"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    ) : (
+                      <span className="text-3xl">🎤</span>
+                    )}
                     <Badge className="absolute top-2 right-2 rounded-full px-1.5 py-0 text-[7px] font-black bg-white/20 text-white border-0">
                       {speech.type}
                     </Badge>
@@ -1006,6 +1048,11 @@ This, and nothing less, is the meaning of human existence: to create, to produce
               </div>
             </CardHeader>
             <CardContent className="p-6 lg:p-10">
+              {/* Article image (Wikipedia / source thumbnail) */}
+              {(wikiPage?.thumbnail?.source) && (
+                <img src={wikiPage.thumbnail.source} alt={displayTitle}
+                  className="w-full max-h-64 object-cover rounded-2xl mb-6 shadow-md" />
+              )}
               <div ref={contentRef} className="text-foreground/85 leading-[1.9] text-[15px] whitespace-pre-line select-text">
                 {renderContent(displayContent)}
               </div>

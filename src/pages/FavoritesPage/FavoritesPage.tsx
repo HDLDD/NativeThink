@@ -6,6 +6,7 @@ import {
   Filter,
   Sparkles,
   BookOpen,
+  ExternalLink,
   type LucideIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -264,6 +265,21 @@ export default function FavoritesPage() {
                           <Volume2 className="size-3" />
                         </Button>
                       </div>
+                    )}
+
+                    {/* Shadowing jump button */}
+                    {item.type === 'shadowing' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full rounded-xl text-[10px] font-black uppercase tracking-wider border-rose-200 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 gap-1.5 mt-1"
+                        onClick={() => {
+                          window.location.href = `/shadowing?material=${encodeURIComponent(item.content)}`;
+                        }}
+                      >
+                        <ExternalLink className="size-3" />
+                        跳转到影子跟读
+                      </Button>
                     )}
 
                     {/* Bottom row: category + date */}
