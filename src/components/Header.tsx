@@ -136,13 +136,18 @@ export default function Header() {
             </Dialog>
 
             <ChangelogDialog />
-            <a href="https://b23.tv/nHHPunY" target="_blank" rel="noopener noreferrer"
+            <button
+              onClick={() => {
+                if (window.confirm('将跳转到开发者B站主页（bilibili），是否继续？')) {
+                  window.open('https://b23.tv/nHHPunY', '_blank', 'noopener,noreferrer');
+                }
+              }}
               className="inline-flex items-center justify-center size-9 bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894] transition-colors"
               aria-label="开发者B站主页"
               title="开发者B站主页"
             >
               <ExternalLink className="size-4.5" />
-            </a>
+            </button>
             <HelpGuide />
             <GlobalWordSearch />
             <AISettings />

@@ -9,7 +9,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 import { useTTS } from '@/lib/use-tts';
 import { useAI } from '@/hooks/use-ai';
@@ -659,21 +658,78 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
       {/* ── Reading Content ── */}
       <div className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch">
-        <div ref={contentRef} className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-white/80 rounded-2xl my-2">
-          {page.paragraphs.map((para, i) => (
-              <ParagraphBlock
-                key={i}
-                para={para}
-                paraIndex={paraChapterNumbers[i] || 0}
-                transMode={transMode}
-                sentenceMode={sentenceMode}
-                fontSize={fontSize}
-                onWordClick={handleWordClick}
-                isSpeaking={speakingPara === i}
-                tts={tts}
-              />
-          ))}
-        </div>
+        {tocOpen && hasChapters ? (
+          /* ── TABLE OF CONTENTS (same pattern as CollocationsTab left column) ── */
+          <div className="max-w-lg mx-auto px-4 py-4">
+            <div className="rounded-[32px] border border-border shadow-sm bg-card overflow-hidden">
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-border/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-black text-foreground">{activeContent.zhTitle || activeContent.title}</h3>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">{chapters.length} 章节 · {activeContent.totalWords?.toLocaleString()} 词</p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setTocOpen(false)} className="rounded-xl text-[10px] font-bold">✕</Button>
+                </div>
+              </div>
+              {/* Chapter list — same scroll pattern as word bank browse */}
+              <div className="max-h-[480px] overflow-y-auto px-2 py-2">
+                <div className="space-y-1">
+                  {chapters.map((ch, i) => {
+                    const isActive = i === currentChapter;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          setCurrentChapter(i);
+                          setPageIdx(ch.pageIndex);
+                          setTocOpen(false);
+                        }}
+                        className={cn(
+                          'w-full text-left p-2.5 rounded-xl transition-all duration-200 border-2',
+                          isActive
+                            ? 'border-[#00B894] bg-[#00B894]/5 shadow-sm'
+                            : 'border-transparent bg-muted/30 hover:bg-muted hover:border-border',
+                        )}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className={cn(
+                            'shrink-0 size-6 rounded-lg flex items-center justify-center text-[10px] font-black',
+                            isActive ? 'bg-[#00B894] text-white' : 'bg-muted text-muted-foreground',
+                          )}>
+                            {i + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-black text-foreground line-clamp-1">{ch.title}</span>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">{ch.paraCount}段 · ~{ch.wordCount}词</p>
+                          </div>
+                          <ChevronRight className="shrink-0 size-3 text-muted-foreground/30" />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ── READING MODE ── */
+          <div ref={contentRef} className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-white/80 rounded-2xl my-2">
+            {page.paragraphs.map((para, i) => (
+                <ParagraphBlock
+                  key={i}
+                  para={para}
+                  paraIndex={paraChapterNumbers[i] || 0}
+                  transMode={transMode}
+                  sentenceMode={sentenceMode}
+                  fontSize={fontSize}
+                  onWordClick={handleWordClick}
+                  isSpeaking={speakingPara === i}
+                  tts={tts}
+                />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Pagination Footer ── */}
@@ -702,71 +758,6 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           <span className="hidden sm:inline">下一页</span><ChevronRight className="size-4" />
         </Button>
       </div>
-
-      {/* ── TOC Dialog ── */}
-      <Dialog open={tocOpen} onOpenChange={setTocOpen}>
-        <DialogContent className="max-w-md rounded-[32px] p-0 bg-white !grid-rows-[auto_1fr]" style={{ maxHeight: '85vh' }}>
-          {/* Header */}
-          <div className="shrink-0 px-6 pt-6 pb-4 border-b border-slate-100">
-            <div className="flex items-center gap-2.5 mb-1">
-              <div className="size-8 rounded-xl bg-[#00B894]/10 flex items-center justify-center">
-                <BookOpen className="size-4 text-[#00B894]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <DialogTitle className="text-base font-black text-slate-800 truncate">
-                  {activeContent.zhTitle || activeContent.title}
-                </DialogTitle>
-              </div>
-            </div>
-            <p className="text-[11px] text-slate-400 font-medium ml-[42px]">
-              {chapters.length} 章节 · {activeContent.totalWords?.toLocaleString()} 词
-            </p>
-          </div>
-
-          {/* Scrollable chapter list */}
-          <ScrollArea className="h-[55vh] px-4 py-3">
-            <div className="space-y-1">
-              {chapters.map((ch, i) => {
-                const isActive = i === currentChapter;
-                return (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      setCurrentChapter(i);
-                      setPageIdx(ch.pageIndex);
-                      setTocOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2.5 rounded-xl transition-colors hover:bg-slate-50 group"
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* Number circle */}
-                      <span className={cn(
-                        'shrink-0 size-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors',
-                        isActive
-                          ? 'bg-[#00B894] text-white'
-                          : 'bg-[#00B894]/8 text-[#00B894] group-hover:bg-[#00B894]/15',
-                      )}>
-                        {i + 1}
-                      </span>
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-slate-700 line-clamp-1 leading-snug">
-                          {ch.title}
-                        </p>
-                        <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
-                          {ch.paraCount}段 · ~{ch.wordCount}词
-                        </p>
-                      </div>
-                      {/* Arrow */}
-                      <ChevronRight className="shrink-0 size-4 text-slate-300 group-hover:text-[#00B894] transition-colors" />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
 
       {/* ── Word Lookup Dialog ── */}
       <Dialog open={lookupOpen} onOpenChange={setLookupOpen}>
