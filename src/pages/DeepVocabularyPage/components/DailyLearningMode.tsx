@@ -160,6 +160,19 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     }
   }, [reviewMode, currentIdx, isFlipped, sessionWords]);
 
+  // 选择/拼写/配对/填空模式：切换单词时朗读
+  useEffect(() => {
+    if (reviewMode === 'flashcard' || reviewMode === 'listening') return;
+    const word = sessionWords[currentIdx];
+    if (!word) return;
+    // 延迟等卡片动画
+    const timer = setTimeout(() => {
+      ttsRef.current.speak(word.word, { rate: 0.85 });
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewMode, currentIdx, sessionWords]);
+
   // 听写模式：只在换单词时朗读一次，拼写过程中不中断
   useEffect(() => {
     if (reviewMode !== 'listening') return;
