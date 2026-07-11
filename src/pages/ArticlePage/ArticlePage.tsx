@@ -182,12 +182,15 @@ export default function ArticlePage() {
       ], { temperature: 0.8, maxTokens: 4096 });
       const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
       if (!parsed || !parsed.paragraphs?.length) { toast.error('AI 生成失败，请重试'); return; }
+      // Safety: ensure all paragraphs have en/zh fields
+      const safeParagraphs: IParagraph[] = (parsed.paragraphs || []).map((p: any) => ({ en: p?.en || '', zh: p?.zh || '' })).filter((p: IParagraph) => p.en.trim());
+      if (!safeParagraphs.length) { toast.error('AI 生成内容为空，请重试'); return; }
       const content: IReadingContent = {
         id: `ai_topic_${Date.now()}`, type: 'ai',
         title: parsed.title || topic, zhTitle: parsed.title || topic,
         source: 'AI 生成', topic, difficulty: level,
-        pages: buildPages(parsed.paragraphs),
-        totalWords: parsed.paragraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
+        pages: buildPages(safeParagraphs),
+        totalWords: safeParagraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
       };
       setReaderContent(content); setReaderVisible(true);
       saveToHistory(parsed.title || topic, content.totalWords.toString(), 'ai');
@@ -258,6 +261,7 @@ export default function ArticlePage() {
         if (!parsed?.chapters?.length) { toast.error('AI 生成失败，请重试'); return; }
         const allParagraphs: IParagraph[] = [];
         for (const ch of parsed.chapters) {
+          if (!ch?.paragraphs) continue;
           allParagraphs.push({ en: `📖 ${ch.chapterTitle || ''}`, zh: '' });
           for (const p of ch.paragraphs) allParagraphs.push(p);
         }
@@ -303,11 +307,13 @@ export default function ArticlePage() {
       const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`);
       if (!res.ok) { toast.error('未找到该条目'); return; }
       const page: WikiPage = await res.json();
-      const paragraphs: IParagraph[] = page.extract
+      if (!page.extract) { toast.error('该条目内容为空'); return; }
+      const paragraphs: IParagraph[] = (page.extract || '')
         .split(/\n\n+/)
         .map((p) => p.replace(/\n/g, ' ').trim())
         .filter((p) => p.length > 40)
         .map((en) => ({ en, zh: '' }));
+      if (!paragraphs.length) { toast.error('该条目无可读内容'); return; }
       const content: IReadingContent = {
         id: `wiki_${page.pageid}`, type: 'wikipedia',
         title: page.title, zhTitle: page.title,
