@@ -383,27 +383,69 @@ export default function ArticlePage() {
     if (!q) return;
     setWikiLoading(true);
     try {
-      const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`);
-      if (!res.ok) { toast.error('未找到该条目'); return; }
-      const page: WikiPage = await res.json();
-      if (!page.extract) { toast.error('该条目内容为空'); return; }
-      const paragraphs: IParagraph[] = (page.extract || '')
+      const encoded = encodeURIComponent(q);
+      const urls = [
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${encoded}`,
+        `https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts|pageimages&exintro&explaintext&piprop=thumbnail&pithumbsize=400&titles=${encoded}&origin=*`,
+      ];
+
+      let extract = '';
+      let pageTitle = q;
+      let pageid = 0;
+      let thumbnail = '';
+
+      // Try REST API first
+      try {
+        const res = await fetch(urls[0], { signal: AbortSignal.timeout(8000) });
+        if (res.ok) {
+          const page: WikiPage = await res.json();
+          if (page.extract) {
+            extract = page.extract;
+            pageTitle = page.title;
+            pageid = page.pageid;
+            thumbnail = page.thumbnail?.source || '';
+          }
+        }
+      } catch { /* REST API failed, try MediaWiki API */ }
+
+      // Fallback to MediaWiki API
+      if (!extract) {
+        try {
+          const res = await fetch(urls[1], { signal: AbortSignal.timeout(8000) });
+          if (res.ok) {
+            const data = await res.json();
+            const pages = data.query?.pages || {};
+            const firstPage: any = Object.values(pages)[0];
+            if (firstPage && !firstPage.missing) {
+              extract = firstPage.extract || '';
+              pageTitle = firstPage.title || q;
+              pageid = firstPage.pageid || 0;
+              thumbnail = firstPage.thumbnail?.source || '';
+            }
+          }
+        } catch { /* MediaWiki API also failed */ }
+      }
+
+      if (!extract) { toast.error('无法加载该条目（网络受限，请尝试其他来源）'); return; }
+
+      const paragraphs: IParagraph[] = extract
         .split(/\n\n+/)
         .map((p) => p.replace(/\n/g, ' ').trim())
         .filter((p) => p.length > 40)
         .map((en) => ({ en, zh: '' }));
       if (!paragraphs.length) { toast.error('该条目无可读内容'); return; }
+
       const content: IReadingContent = {
-        id: `wiki_${page.pageid}`, type: 'wikipedia',
-        title: page.title, zhTitle: page.title,
+        id: `wiki_${pageid || Date.now()}`, type: 'wikipedia',
+        title: pageTitle, zhTitle: pageTitle,
         source: 'Wikipedia', topic: 'general', difficulty: 'advanced' as Level,
-        cover: page.thumbnail?.source,
+        cover: thumbnail,
         pages: buildPages(paragraphs),
         totalWords: paragraphs.reduce((s, p) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
       };
       openReader(content);
-      saveToHistory(page.title, content.totalWords.toString(), 'wikipedia', { wikiTitle: page.title });
-      toast.success(`已加载：${page.title}`);
+      saveToHistory(pageTitle, content.totalWords.toString(), 'wikipedia', { wikiTitle: pageTitle });
+      toast.success(`已加载：${pageTitle}`);
     } catch { toast.error('加载失败'); }
     finally { setWikiLoading(false); }
   }, [wikiQuery]);
