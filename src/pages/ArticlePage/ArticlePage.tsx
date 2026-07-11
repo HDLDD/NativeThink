@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   FileText, Sparkles, Languages, BookOpen, Volume2, RefreshCw, Loader2,
   Search, ExternalLink, X, Globe, Library, Mic, Wand2, BookMarked,
@@ -132,6 +133,7 @@ export default function ArticlePage() {
   const { isConfigured, chat: aiChat } = useAI();
   const { dueForReview, state: sm2State } = useWordLearning('all');
   const { addStudyMinutes } = useLearningStats();
+  const [searchParams] = useSearchParams();
 
   // ── Tab + config state ──
   const [mainTab, setMainTab] = useState<MainTab>('books');
@@ -173,6 +175,47 @@ export default function ArticlePage() {
     setBooksLoaded(true);
     import('@/data/books').then((m) => setBooks(m.ALL_BOOKS)).catch(() => setBooks([]));
   }, [mainTab, booksLoaded]);
+
+  // ── Auto-open from favorites jump (/?open=<id>&source=<type>) ──
+  useEffect(() => {
+    const articleId = searchParams.get('open');
+    const source = searchParams.get('source') as MainTab | null;
+    if (!articleId) return;
+    // Determine which tab the article belongs to
+    let tab: MainTab = source || 'ai';
+    if (tab === 'publication' as any) tab = 'publications';
+    if (tab !== 'books' && tab !== 'publications' && tab !== 'ai' && tab !== 'speeches') tab = 'ai';
+    setMainTab(tab);
+    // Wait for data to be available, then open
+    const tryOpen = () => {
+      if (tab === 'books') {
+        if (!books || books.length === 0) return false;
+        const book = books.find((b) => b.id === articleId);
+        if (book) { openReader(book); return true; }
+      }
+      if (tab === 'publications') {
+        const pub = PUBLICATIONS.find((p) => p.id === articleId);
+        if (pub) { openReader(pub); return true; }
+      }
+      if (tab === 'ai') {
+        const ai = aiArticles.find((a) => a.id === articleId);
+        if (ai) { openReader(ai); return true; }
+        // AI articles load synchronously from localStorage, so always ready
+        return false;
+      }
+      if (tab === 'speeches') {
+        if (!speechMeta || !buildSpeechFn) return false;
+        const existing = buildSpeechFn(articleId);
+        if (existing) { openReader(existing); return true; }
+      }
+      return false;
+    };
+    // Try immediately; if data isn't loaded, retry once after a short delay
+    if (!tryOpen()) {
+      const timer = setTimeout(() => tryOpen(), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, books, speechMeta, buildSpeechFn, aiArticles]);
 
   // ── AI article generation (shared by free-form + topic grid) ──
   const generateAiArticle = useCallback(async (topic: string) => {

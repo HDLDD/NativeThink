@@ -271,34 +271,55 @@ export default function FavoritesPage() {
                       </div>
                     )}
 
-                    {/* Article — navigate to article page */}
+                    {/* Article — targeted jump to article reading */}
                     {item.type === 'article' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full rounded-xl text-[10px] font-black uppercase tracking-wider border-teal-200 text-teal-500 hover:bg-teal-50 dark:hover:bg-teal-500/10 gap-1.5 mt-1"
-                        onClick={() => {
-                          // Navigate to article page — AI tab is where saved articles live
-                          window.location.href = '/articles';
-                        }}
-                      >
-                        <ExternalLink className="size-3" />
-                        前往文章阅读
-                      </Button>
+                      <div className="flex items-center gap-1.5 mt-2">
+                        {/* Source type tag */}
+                        <span className={cn(
+                          'text-[8px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 shrink-0',
+                          item.category === 'book' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' :
+                          item.category === 'speech' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' :
+                          item.category === 'ai' ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400' :
+                          item.category === 'publication' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' :
+                          'bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-400',
+                        )}>
+                          {item.category === 'book' ? '📖 书籍' :
+                           item.category === 'speech' ? '🎙 演讲' :
+                           item.category === 'ai' ? '✨ AI' :
+                           item.category === 'publication' ? '📰 刊物' : item.category}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 rounded-xl text-[10px] font-black gap-1 border-teal-200 text-teal-500 hover:bg-teal-50 dark:hover:bg-teal-500/10"
+                          onClick={() => {
+                            const source = item.category || 'ai';
+                            window.location.href = `/articles?open=${encodeURIComponent(item.content)}&source=${encodeURIComponent(source)}`;
+                          }}
+                        >
+                          <ExternalLink className="size-3" />
+                          打开文章
+                        </Button>
+                      </div>
                     )}
-                    {/* Shadowing jump button */}
+                    {/* Shadowing — targeted jump to shadowing material */}
                     {item.type === 'shadowing' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full rounded-xl text-[10px] font-black uppercase tracking-wider border-rose-200 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 gap-1.5 mt-1"
-                        onClick={() => {
-                          window.location.href = `/shadowing?material=${encodeURIComponent(item.content)}`;
-                        }}
-                      >
-                        <ExternalLink className="size-3" />
-                        跳转到影子跟读
-                      </Button>
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <span className="text-[8px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400 shrink-0">
+                          🎤 影子
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 rounded-xl text-[10px] font-black gap-1 border-rose-200 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                          onClick={() => {
+                            window.location.href = `/shadowing?material=${encodeURIComponent(item.content)}`;
+                          }}
+                        >
+                          <ExternalLink className="size-3" />
+                          开始跟读
+                        </Button>
+                      </div>
                     )}
 
                     {/* Bottom row: category + date */}
