@@ -309,7 +309,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const stopSpeaking = () => {
     cancelRef.current = true;
     onEndRef.current = null;
-    if (speakTimerRef.current) { clearTimeout(speakTimerRef.current); speakTimerRef.current = null; }
+    if (advanceTimerRef.current) { clearTimeout(advanceTimerRef.current); advanceTimerRef.current = null; }
     tts.cancel();
     setSpeakingPara(-1);
     paraQueueRef.current = [];
