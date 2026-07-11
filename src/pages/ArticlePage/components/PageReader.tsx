@@ -240,39 +240,33 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   }, [content.id]);
 
   const cancelRef = useRef(false);
-  const speakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const advancedRef = useRef(false);
 
   const playNextParagraph = () => {
-    if (cancelRef.current) {
-      setSpeakingPara(-1);
-      paraQueueRef.current = [];
-      return;
-    }
+    if (cancelRef.current) { setSpeakingPara(-1); paraQueueRef.current = []; return; }
     const idx = paraIdxRef.current;
-    if (idx >= paraQueueRef.current.length) {
-      setSpeakingPara(-1);
-      paraQueueRef.current = [];
-      return;
-    }
+    if (idx >= paraQueueRef.current.length) { setSpeakingPara(-1); paraQueueRef.current = []; return; }
+
     setSpeakingPara(idx);
     const text = paraQueueRef.current[idx];
     paraIdxRef.current = idx + 1;
+    advancedRef.current = false;
 
-    // Clear previous timer
-    if (speakTimerRef.current) clearTimeout(speakTimerRef.current);
+    if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
 
-    // Set onEnd — fires when TTS finishes naturally
-    onEndRef.current = () => {
-      if (cancelRef.current) return;
-      speakTimerRef.current = setTimeout(() => playNextParagraph(), 400);
+    const advance = () => {
+      if (cancelRef.current || advancedRef.current) return;
+      advancedRef.current = true;
+      advanceTimerRef.current = setTimeout(() => playNextParagraph(), 500);
     };
 
-    // Fallback timer: if onEnd never fires, auto-advance
-    const estimatedMs = Math.max(3000, text.length * 50);
-    speakTimerRef.current = setTimeout(() => {
-      if (cancelRef.current) return;
-      playNextParagraph();
-    }, estimatedMs + 600);
+    // onEnd for browsers that support it
+    onEndRef.current = advance;
+
+    // Reliable timeout: ~150wpm at 0.85 rate ≈ 55ms/char
+    const estimatedMs = Math.max(2000, text.length * 55);
+    advanceTimerRef.current = setTimeout(advance, estimatedMs);
 
     tts.speak(text, { rate: 0.85 });
   };

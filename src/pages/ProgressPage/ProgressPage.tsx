@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   Calendar,
@@ -19,6 +20,7 @@ import {
   RotateCw,
   AlertTriangle,
   CheckCircle2,
+  ExternalLink,
   X,
 } from 'lucide-react';
 import {
@@ -103,6 +105,7 @@ export default function ProgressPage() {
   const { favorites, removeFavorite } = useFavorites();
   const { unlocked, definitions, isUnlocked } = useAchievements();
   const tts = useTTS();
+  const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [filterType, setFilterType] = usePageMemory('progress-filter', 'all');
   const [favReviewMode, setFavReviewMode] = useState(false);
@@ -318,6 +321,17 @@ export default function ProgressPage() {
     vocabulary: '词汇',
     think: '思维训练',
     shadowing: '影子跟读',
+  };
+
+  const getFavPortal = (type: string): string | null => {
+    const portals: Record<string, string> = {
+      shadowing: '/shadowing',
+      think: '/think',
+      chunk: '/chunks',
+      vocabulary: '/vocabulary',
+      expression: '/vocabulary',
+    };
+    return portals[type] || null;
   };
 
   if (!loaded) {
@@ -1095,12 +1109,24 @@ export default function ProgressPage() {
                           </div>
                         )}
                         <div className="flex items-center justify-between mt-3">
-                          <Badge
-                            variant="secondary"
-                            className="text-[9px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 bg-muted"
-                          >
-                            {item.category}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="secondary"
+                              className="text-[9px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 bg-muted"
+                            >
+                              {item.category}
+                            </Badge>
+                            {/* Portal link to source module */}
+                            {getFavPortal(item.type) && (
+                              <button
+                                onClick={() => navigate(getFavPortal(item.type)!)}
+                                className="shrink-0 text-[10px] font-bold text-[#00B894] hover:underline flex items-center gap-0.5"
+                                title={`前往${typeLabelMap[item.type] || item.type}`}
+                              >
+                                <ExternalLink className="size-3" />传送
+                              </button>
+                            )}
+                          </div>
                           <span className="text-[10px] font-bold text-muted-foreground">
                             {new Date(item.createdAt).toLocaleDateString('zh-CN')}
                           </span>
