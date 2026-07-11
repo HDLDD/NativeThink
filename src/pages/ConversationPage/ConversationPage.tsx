@@ -120,6 +120,8 @@ export default function ConversationPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [autoRead, setAutoRead] = usePageMemory('conv-auto-read', false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; abortRef.current?.abort(); }; }, []);
   const abortRef = useRef<AbortController | null>(null);
 
   // Translation state
@@ -192,6 +194,7 @@ export default function ConversationPage() {
         );
 
         for await (const chunk of stream) {
+          if (!mountedRef.current) break;
           if (chunk.content) {
             full += chunk.content;
             setMessages([...newMessages, { ...aiMsg, content: full }]);
@@ -199,7 +202,9 @@ export default function ConversationPage() {
         }
       } else {
         // Fallback to Lark plugin
-        const stream = capabilityClient.load(PLUGIN_IDS.AI_CONVERSATION).callStream('textGenerate', {
+        const plugin = capabilityClient?.load?.(PLUGIN_IDS.AI_CONVERSATION);
+        if (!plugin) { toast.error('AI 插件未加载'); setIsLoading(false); return; }
+        const stream = plugin.callStream('textGenerate', {
           scenario: selectedScenario?.name,
           role_setting: selectedScenario?.role,
           conversation_history: history,
@@ -207,6 +212,7 @@ export default function ConversationPage() {
         });
 
         for await (const chunk of stream as AsyncIterable<{ content?: string }>) {
+          if (!mountedRef.current) break;
           if (chunk.content) {
             full += chunk.content;
             setMessages([...newMessages, { ...aiMsg, content: full }]);
@@ -219,9 +225,10 @@ export default function ConversationPage() {
     } finally {
       setIsLoading(false);
       abortRef.current = null;
-      // Auto-read AI response if enabled
-      if (autoRead && full) {
-        setTimeout(() => tts.speak(full, { rate: 0.95 }), 300);
+      // Auto-read AI response if enabled (only last ~500 chars to avoid long playback)
+      if (autoRead && full && mountedRef.current) {
+        const snippet = full.length > 500 ? full.slice(-500).replace(/^[\s\S]*?\.\s*/, '') : full;
+        setTimeout(() => { if (mountedRef.current) tts.speak(snippet, { rate: 0.95 }); }, 300);
       }
     }
   };
@@ -297,18 +304,22 @@ export default function ConversationPage() {
         );
 
         for await (const chunk of stream) {
+          if (!mountedRef.current) break;
           if (chunk.content) {
             full += chunk.content;
             setAnalysis(full);
           }
         }
       } else {
-        const stream = capabilityClient.load(PLUGIN_IDS.NATURALNESS_ANALYSIS).callStream('textGenerate', {
+        const plugin2 = capabilityClient?.load?.(PLUGIN_IDS.NATURALNESS_ANALYSIS);
+        if (!plugin2) { toast.error('AI 插件未加载'); setAnalyzing(false); return; }
+        const stream = plugin2.callStream('textGenerate', {
           conversation_history: history,
           scenario: selectedScenario?.name || '',
         });
 
         for await (const chunk of stream as AsyncIterable<{ content?: string }>) {
+          if (!mountedRef.current) break;
           if (chunk.content) {
             full += chunk.content;
             setAnalysis(full);
