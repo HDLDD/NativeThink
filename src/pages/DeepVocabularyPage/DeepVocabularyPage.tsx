@@ -78,11 +78,8 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
   const [dailyCount, setDailyCount] = useState(10);
   const [reviewMode, setReviewMode] = useState('sm2');
 
-  // Background preload all word data while user decides — eliminates post-wizard wait
-  useEffect(() => {
-    const allLevels = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
-    preloadLevels(allLevels);
-  }, []);
+  // Preload only when user explicitly selects a level — loading all 9 levels
+  // (75K words, ~48MB) at wizard mount causes browser OOM crashes on mobile.
 
   const handleBookSelect = (level: string) => {
     setChosenLevel(level);

@@ -257,35 +257,49 @@ export default function CollocationsTab({
   const wordCounts = useMemo(() => getWordCounts(), []);
 
   // ===== Lazy compute: collocations for selected level(s) =====
+  // Cap processing to prevent browser freeze with large wordbanks (75K+ words).
+  // Full computation would process hundreds of thousands of collocation entries,
+  // easily exceeding main-thread budget and causing "page unresponsive" crashes.
+  const MAX_WORDS_PER_LEVEL = 2000;   // max words to scan per level
+  const MAX_ENTRIES = 3000;           // max collocation entries to return
+
   const allCollocEntries = useMemo(() => {
     try {
       const lvls = [...selectedLevels];
       if (lvls.length === 0) return [];
 
       const map = new Map<string, CollocEntry & { seenWords: Set<string> }>();
+      let entryCount = 0;
 
       for (const lvl of lvls) {
         let words: IWordEntry[];
-        try { words = queryWords({ level: lvl }); } catch { continue; }
+        try { words = queryWords({ level: lvl, limit: MAX_WORDS_PER_LEVEL }); } catch { continue; }
         if (!Array.isArray(words)) continue;
-        words.forEach((w) => {
-          if (!w?.collocations) return;
+        let wordCount = 0;
+        for (const w of words) {
+          if (wordCount++ >= MAX_WORDS_PER_LEVEL) break;
+          if (!w?.collocations) continue;
           const wk = w.word?.toLowerCase();
-          if (!wk) return;
-          w.collocations.forEach((c) => {
-            if (!c) return;
+          if (!wk) continue;
+          for (const c of w.collocations) {
+            if (!c) continue;
             const key = c.toLowerCase();
-            if (!map.has(key)) map.set(key, { phrase: c, words: [], examples: [], pattern: detectPattern(c), seenWords: new Set() });
+            if (!map.has(key)) {
+              if (entryCount++ >= MAX_ENTRIES) break;
+              map.set(key, { phrase: c, words: [], examples: [], pattern: detectPattern(c), seenWords: new Set() });
+            }
             const entry = map.get(key)!;
-            if (entry.seenWords.has(wk)) return;
+            if (entry.seenWords.has(wk)) continue;
             entry.seenWords.add(wk);
             entry.words.push(w);
             if (entry.examples.length < 2 && w.examples?.length > 0) {
               const newEx = w.examples.find((ex) => !entry.examples.some((e) => e.en === ex.en));
               if (newEx) entry.examples.push(newEx);
             }
-          });
-        });
+          }
+          if (entryCount >= MAX_ENTRIES) break;
+        }
+        if (entryCount >= MAX_ENTRIES) break;
       }
 
       return Array.from(map.values())
