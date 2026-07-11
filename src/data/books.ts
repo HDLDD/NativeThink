@@ -46,7 +46,7 @@ function isChapterHeader(text: string): boolean {
 
 // Split a paragraph that contains MULTIPLE chapter-like headers (e.g. "CHAPTER I. One CHAPTER II. Two")
 // into individual chapter entries, each prefixed with ##CHAPTER##.
-const MULTI_CHAPTER_RE = /(?:CHAPTER|Chapter|PART|Part|BOOK|Book|VOLUME|Volume)\s+[IVXLCDM\d]+\.?\s*/g;
+const MULTI_CHAPTER_RE = /(?:CHAPTER|Chapter|PART|Part|BOOK|Book|VOLUME|Volume)\s+[IVXLCDM\d]+\.?\s*|\b[IVX]{2,}\.\s+|\b[IVX]\.\s+|\b[IVX]{2,}\s+[A-Z]/g;
 function splitMultiChapterParagraph(text: string): string[] | null {
   // Count chapter-like markers
   const matches = [...text.matchAll(MULTI_CHAPTER_RE)];
@@ -100,6 +100,28 @@ function cleanBookParagraphs(enParas: string[]): IParagraph[] {
       result.push({ en, zh: '' });
     }
   }
+
+  // Fallback: if NO chapters were detected, insert synthetic chapter markers
+  // every ~3000 words so the TOC still has entries to show
+  const hasAnyChapter = result.some((p) => p.en.startsWith('##CHAPTER##'));
+  if (!hasAnyChapter && result.length > 5) {
+    const synthetic: IParagraph[] = [];
+    let wordCount = 0;
+    let chapNum = 1;
+    const WORDS_PER_CHAPTER = 3000;
+    for (let i = 0; i < result.length; i++) {
+      const wc = result[i].en.split(/\s+/).filter(Boolean).length;
+      if (wordCount >= chapNum * WORDS_PER_CHAPTER) {
+        const preview = result[i].en.split(/\s+/).slice(0, 8).join(' ') + '...';
+        synthetic.push({ en: `##CHAPTER##Chapter ${chapNum} — ${preview}`, zh: '' });
+        chapNum++;
+      }
+      synthetic.push(result[i]);
+      wordCount += wc;
+    }
+    return synthetic;
+  }
+
   return result;
 }
 

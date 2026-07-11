@@ -202,7 +202,200 @@ The nationalist story says that the world is divided into nations, and each nati
 
 The liberal story says that the ultimate value is the individual human being. There is no higher authority than the individual. Human rights are universal. Every individual has the right to live, to freedom, to the pursuit of happiness, regardless of nationality.
 
-Both stories are fiction. They are not objective realities. They are stories that we humans invented and that we tell each other. But you cannot organize society without some story. Fascism is appealing because it offers a very simple story. It tells people that there is a struggle for supremacy between nations, and your nation is the best.`;
+Both stories are fiction. They are not objective realities. They are stories that we humans invented and that we tell each other. But you cannot organize society without some story. Fascism is appealing because it offers a very simple story. It tells people that there is a struggle for supremacy between nations, and your nation is the best.
+
+And the really important thing is: the story that will win in the 21st century is not the nationalist story and not the liberal story. It will be a new story. And we need to start writing it now. Because if we don't write a new story, we might find ourselves in a very dark place. So we need to get to know each other better. We need to appreciate the stories of other people. And we need to create together a new global story that will encompass all of humankind.`;
+
+// Bill Gates — Innovating to Zero (TED 2010)
+SPEECH_TEXTS['ted-gates-climate'] = `I'm going to talk today about energy and climate. And that might seem a bit surprising because my full-time work at the foundation is mostly about vaccines and seeds. But I also have an interest in energy and climate.
+
+We're going to have to actually take the CO2 emissions from the world and get them down to zero. That's what it means to talk about climate change. CO2 is a greenhouse gas. It traps heat from the sun, and so as you put more CO2 into the atmosphere, the temperature goes up.
+
+Now, where does CO2 come from? People think of it as just coming from electricity and cars. But really, if you look at the whole world, there are five main sources. There's electricity generation, about 25 percent. There's manufacturing — making cement, steel, aluminum — about 25 percent. There's agriculture — mostly from livestock and fertilizer — about 20 percent. There's transportation — cars, trucks, planes, ships — about 20 percent. And there's buildings — heating and cooling — about 10 percent.
+
+So we need to get all five of these sectors down to zero. And that's a huge challenge. Because the energy industry is a 5 trillion dollar a year industry, with enormous capital investments that last for 30, 40, 50 years.
+
+What we need is an energy miracle. We need breakthroughs that are the equivalent of the Internet, but for energy. We need technologies like advanced nuclear — that's safer, cheaper, and produces less waste. We need carbon capture and storage — pulling CO2 out of the air or out of power plant emissions.
+
+The world needs to invest much more in energy research and development. We need hundreds of companies working on hundreds of ideas. And governments need to create the incentives — the carbon taxes, the R&D funding, the deployment subsidies — that will drive this innovation.
+
+We can do this. It won't be easy. It will be the most difficult thing humanity has ever done. But if we succeed, we'll have clean, cheap, reliable energy for everyone on the planet. And that's a future worth fighting for.`;
+
+// Chimamanda Adichie — The Danger of a Single Story (TED 2009)
+SPEECH_TEXTS['ted-adichie-single'] = `I'm a storyteller. And I would like to tell you a few personal stories about what I like to call "the danger of the single story."
+
+I grew up on a university campus in eastern Nigeria. My mother says that I started reading at the age of two, although I think four is probably closer to the truth. So I was an early reader, and what I read were British and American children's books.
+
+I was also an early writer, and when I began to write, at about the age of seven, stories in pencil with crayon illustrations that my poor mother was obligated to read, I wrote exactly the kinds of stories I was reading: All my characters were white and blue-eyed, they played in the snow, they ate apples, and they talked a lot about the weather, how lovely it was that the sun had come out. This despite the fact that I lived in Nigeria. I had never been outside Nigeria. We didn't have snow, we ate mangoes, and we never talked about the weather because there was no need to.
+
+What this demonstrates is how impressionable and vulnerable we are in the face of a story, particularly as children. Because all I had read were books in which characters were foreign, I had become convinced that books by their very nature had to have foreigners in them.
+
+But then I discovered African writers — Chinua Achebe, Camara Laye. Their stories saved me from having a single story of what books are.
+
+I come from a conventional, middle-class Nigerian family. My father was a professor. My mother was an administrator. And so we had, as was the norm, live-in domestic help. When I was eight, we got a new house boy. His name was Fide. The only thing my mother told us about him was that his family was very poor. And so I felt enormous pity for Fide's family.
+
+Then one Saturday we went to his village to visit, and his mother showed us a beautifully patterned basket that his brother had made. I was startled. It had not occurred to me that anybody in his family could actually make something. All I had heard about them was how poor they were, so it had become impossible for me to see them as anything else but poor. Their poverty was my single story of them.
+
+Years later, I left Nigeria to go to university in the United States. My American roommate was shocked by me. She asked where I had learned to speak English so well, and was confused when I said that Nigeria happened to have English as its official language. She had a single story of Africa: a single story of catastrophe.
+
+The single story creates stereotypes, and the problem with stereotypes is not that they are untrue, but that they are incomplete. They make one story become the only story.
+
+The consequence of the single story is this: It robs people of dignity. It makes our recognition of our equal humanity difficult. It emphasizes how we are different rather than how we are similar.
+
+Stories matter. Many stories matter. Stories have been used to dispossess and to malign, but stories can also be used to empower and to humanize. Stories can break the dignity of a people, but stories can also repair that broken dignity.
+
+When we reject the single story, when we realize that there is never a single story about any place, we regain a kind of paradise.`;
+
+// Tim Urban — Inside the Mind of a Master Procrastinator (TED 2016)
+SPEECH_TEXTS['ted-urban-procrastination'] = `So in college, I was a government major, which means I had to write a lot of papers. Now, when a normal student writes a paper, they might spread the work out a little like this. You start a little slowly and then you get enough work done in the middle, but you'd kind of write the whole thing in a couple of weeks.
+
+But I was different. I was a chronic procrastinator. And I wrote all of my 90-page senior thesis over 72 hours. I pulled two all-nighters. I was sprinting, and I didn't eat, and I didn't sleep. And I submitted it just at the deadline.
+
+I have a confession to make. That 90-page thesis I wrote? I didn't get a very good grade. But more importantly, I realized that this was not a sustainable way to live. And yet, I kept doing it. Year after year, I kept procrastinating.
+
+So I started to think about what was going on inside the brain of a procrastinator. And I think the best way to explain it is with a little story.
+
+Inside the brain of a non-procrastinator, there's a Rational Decision-Maker who runs the show. He makes the plans, he thinks about the future, he does the thing.
+
+But inside the brain of a procrastinator, there's also a Rational Decision-Maker. But he has company. There's also an Instant Gratification Monkey. The Instant Gratification Monkey lives entirely in the present moment. He has no memory of the past, no knowledge of the future, and he only cares about two things: easy and fun.
+
+Now, sometimes it makes sense to be doing things that are easy and fun. That's why we have the Monkey. But the problem is when the Rational Decision-Maker has made a rational decision to do something productive, and the Monkey doesn't like that plan.
+
+The Monkey takes the wheel. And then we find ourselves watching YouTube videos about some random topic for three hours, or reorganizing our bookshelf, or going down a Wikipedia rabbit hole. And we know we shouldn't be doing it, but we just can't seem to stop. That's the Monkey at work.
+
+But here's the thing. The procrastinator has something that the non-procrastinator doesn't have. It's called the Panic Monster. The Panic Monster is dormant most of the time, but he wakes up anytime a deadline gets dangerously close. And the Panic Monster is the only thing the Monkey is terrified of.
+
+When the Panic Monster shows up, the Monkey runs away and the Rational Decision-Maker takes control again. And that's how procrastinators end up writing 90-page theses in 72 hours.
+
+But there's a problem. There's a whole other kind of procrastination that doesn't involve deadlines. It's the kind of procrastination that happens in the absence of deadlines — the things you want to do with your life. Maybe you want to start a business, or get in shape, or learn to paint. There's no deadline. The Panic Monster never shows up. And so the Monkey just keeps doing his thing, and your long-term dreams just keep getting put off.
+
+This is why I think we need to think carefully about what we're procrastinating on. We need to stay aware of the Monkey. And we need to remind ourselves that the things we're putting off — the things without deadlines — are often the most important.`;
+
+// Seth Godin — The Tribes We Lead (TED 2009)
+SPEECH_TEXTS['ted-godin-tribes'] = `Something really important is happening. The Internet has enabled a fundamental shift in how people connect with each other. For the first time in history, anyone can find their tribe — a group of people who share their interests, their passions, their values. And more importantly, anyone can lead a tribe.
+
+A tribe is a group of people connected to one another, connected to a leader, and connected to an idea. For millions of years, human beings have been part of one tribe or another. A group needs only two things to be a tribe: a shared interest and a way to communicate.
+
+Tribes need leadership. Sometimes one person leads, sometimes more. People want connection and growth and something new. They want change.
+
+What leaders do: they connect people to one another. For a long time, leadership was about winning the attention of the masses. You had money, you had factories, you had TV stations. You pushed your message out to everyone at once. The challenge of our time is that the old model of leadership is broken.
+
+The Internet has blown up the old model. Now, anyone can start a movement. Anyone can find their tribe. The question isn't "Can you start a movement?" The question is "Will you?"
+
+Here's what's interesting: most people are afraid to lead. They're afraid of being wrong, of being criticized, of standing out. But the truth is, leadership is now a choice. It's not something you're born into. It's not something you're appointed to. It's a choice you make every single day.
+
+The thing is, tribes are everywhere. There are tribes of Apple fanatics, of CrossFit enthusiasts, of people who care about climate change, of knitters, of entrepreneurs. And each of these tribes is looking for someone to lead them. Not to manage them — but to lead them. To connect them. To give them a voice.
+
+So here's my challenge to you: go find your tribe. Or better yet, start one. Because what the world needs now is more leaders. It needs people who are willing to stand up and say, "Follow me." Not because they have all the answers, but because they have the courage to ask the questions.
+
+And the beautiful thing is, you don't need permission. You just need to care enough to make something happen.`;
+
+// Ayn Rand — This is John Galt Speaking (Atlas Shrugged)
+SPEECH_TEXTS['rand-Atlas'] = `For twelve years you have been asking: Who is John Galt? This is John Galt speaking. I am the man who loves his life. I am the man who does not sacrifice his love or his values. I am the man who has deprived you of victims and thus has destroyed your world.
+
+You have heard it said that this is an age of moral crisis. You have said it yourself. But your moral crisis is the opposite of what you think. You are not suffering from a failure to practice the morality you profess. You are suffering from practicing it — and the disaster is the result.
+
+For centuries, the battle of morality was fought between those who claimed that your life belongs to God and those who claimed that it belongs to your neighbors — between those who preached that the good is self-sacrifice for the sake of ghosts in heaven and those who preached that the good is self-sacrifice for the sake of incompetents on earth. And no one came to say that your life belongs to you and that the good is to live it.
+
+Happiness is that state of consciousness which proceeds from the achievement of one's values. A morality that holds need as a claim holds emptiness as a value. It sees man as a perpetual beggar. It tells him that the way to receive is to give, and the way to be loved is to love. But the choice is not between self-sacrifice and domination. The choice is between independence and dependence.
+
+I have removed the source of all your power: the willingness of men to be victims. I have withdrawn the sanction of the victim. You have been using fear as your weapon. But what you fear is the truth. The truth is that you have no right to exist if you exist by means of the unearned.
+
+Do not say that I am destroying the world. I am not destroying it. I am withdrawing from it. And the world is collapsing because it was built on the premise that I and those like me would continue to support it. We are on strike against the creed of unearned rewards and unrewarded duties.
+
+I will not live for the sake of another man, nor ask another man to live for mine.`;
+
+// Nelson Mandela — Inaugural Address (1994)
+SPEECH_TEXTS['mandela-inaugural'] = `Your Majesties, Your Royal Highnesses, Distinguished Guests, Comrades and Friends:
+
+Today, all of us do, by our presence here, and by our celebrations in other parts of our country and the world, confer glory and hope to newborn liberty. Out of the experience of an extraordinary human disaster that lasted too long, must be born a society of which all humanity will be proud.
+
+Our daily deeds as ordinary South Africans must produce an actual South African reality that will reinforce humanity's belief in justice, strengthen its confidence in the nobility of the human soul and sustain all our hopes for a glorious life for all.
+
+All this we owe both to ourselves and to the peoples of the world who are so well represented here today.
+
+The time for the healing of the wounds has come. The moment to bridge the chasms that divide us has come. The time to build is upon us. We have, at last, achieved our political emancipation. We pledge ourselves to liberate all our people from the continuing bondage of poverty, deprivation, suffering, gender and other discrimination.
+
+We succeeded to take our last steps to freedom in conditions of relative peace. We commit ourselves to the construction of a complete, just and lasting peace.
+
+We enter into a covenant that we shall build the society in which all South Africans, both black and white, will be able to walk tall, without any fear in their hearts, assured of their inalienable right to human dignity — a rainbow nation at peace with itself and the world.
+
+Never, never and never again shall it be that this beautiful land will again experience the oppression of one by another and suffer the indignity of being the skunk of the world. The sun shall never set on so glorious a human achievement. Let freedom reign. God bless Africa.`;
+
+// Greta Thunberg — How Dare You (UN Climate Summit 2019)
+SPEECH_TEXTS['greta-un-climate'] = `My message is that we'll be watching you. This is all wrong. I shouldn't be up here. I should be back in school on the other side of the ocean. Yet you all come to us young people for hope. How dare you!
+
+You have stolen my dreams and my childhood with your empty words. And yet I'm one of the lucky ones. People are suffering. People are dying. Entire ecosystems are collapsing. We are in the beginning of a mass extinction, and all you can talk about is money and fairy tales of eternal economic growth. How dare you!
+
+For more than 30 years, the science has been crystal clear. How dare you continue to look away and come here saying that you're doing enough, when the politics and solutions needed are still nowhere in sight.
+
+You say you hear us and that you understand the urgency. But no matter how sad and angry I am, I do not want to believe that. Because if you really understood the situation and still kept on failing to act, then you would be evil. And that I refuse to believe.
+
+The popular idea of cutting our emissions in half in 10 years only gives us a 50% chance of staying below 1.5 degrees Celsius, and the risk of setting off irreversible chain reactions beyond human control.
+
+Fifty percent may be acceptable to you. But those numbers do not include tipping points, most feedback loops, additional warming hidden by toxic air pollution, or the aspects of equity and climate justice. They also rely on my generation sucking hundreds of billions of tons of your CO2 out of the air with technologies that barely exist.
+
+So a 50% risk is simply not acceptable to us — we who have to live with the consequences.
+
+To have a 67% chance of staying below a 1.5 degrees global temperature rise, the world had a remaining carbon budget of about 420 gigatons of CO2 left to emit. Today that number is already down to less than 350 gigatons.
+
+How dare you pretend that this can be solved with business as usual and some technical solutions? With today's emissions levels, that remaining budget will be entirely gone within less than eight and a half years.
+
+There will not be any solutions or plans presented in line with these figures here today, because these numbers are too uncomfortable. And you are still not mature enough to tell it like it is.
+
+You are failing us. But the young people are starting to understand your betrayal. The eyes of all future generations are upon you. And if you choose to fail us, I say: We will never forgive you.
+
+We will not let you get away with this. Right here, right now is where we draw the line. The world is waking up. And change is coming, whether you like it or not.`;
+
+// Emma Watson — HeForShe (UN 2014)
+SPEECH_TEXTS['emma-heforshe'] = `Today we are launching a campaign called "HeForShe." I am reaching out to you because I need your help. We want to end gender inequality — and to do that we need everyone to be involved.
+
+I was appointed six months ago and the more I have spoken about feminism, the more I have realized that fighting for women's rights has too often become synonymous with man-hating. If there is one thing I know for certain, it is that this has to stop.
+
+For the record, feminism by definition is: the belief that men and women should have equal rights and opportunities. It is the theory of the political, economic and social equality of the sexes.
+
+I started questioning gender-based assumptions when at eight I was confused at being called "bossy" because I wanted to direct the plays we would put on for our parents — but the boys were not. When at 14 I started being sexualized by certain elements of the press. When at 15 my girlfriends started dropping out of their sports teams because they didn't want to appear "muscly." When at 18 my male friends were unable to express their feelings.
+
+I decided I was a feminist and this seemed uncomplicated to me. But my recent research has shown me that feminism has become an unpopular word. Apparently I am among the ranks of women whose expressions are seen as too strong, too aggressive, isolating, anti-men and, unattractive.
+
+Why is the word such an uncomfortable one? I think it is right that as a woman I am paid the same as my male counterparts. We don't often talk about men being imprisoned by gender stereotypes but I can see that they are and that when they are free, things will change for women as a natural consequence. If men don't have to be aggressive in order to be accepted, women won't feel compelled to be submissive. If men don't have to control, women won't have to be controlled.
+
+Both men and women should feel free to be sensitive. Both men and women should feel free to be strong. It is time that we all perceive gender on a spectrum, not as two opposing sets of ideals.
+
+I want men to take up this mantle. So their daughters, sisters and mothers can be free from prejudice, but also so that their sons have permission to be vulnerable and human too. We claim those parts of themselves they abandoned, and in doing so, we are a truer and more complete version of humanity.
+
+In my nervousness for this speech and in my moments of doubt, I've told myself firmly — if not me, who? If not now, when? If you have similar doubts when opportunities are presented to you, I hope those words might be helpful.
+
+You might be thinking: who is this Harry Potter girl, and what is she doing up on stage at the UN? It's a good question, and trust me when I say I have been asking myself the same thing. I don't know if I am qualified to be here. All I know is that I care about this problem. And I want to make it better.
+
+And having seen what I've seen, and given the chance, I feel it is my duty to say something. English statesman Edmund Burke said: "All that is needed for the forces of evil to triumph is for enough good men and women to do nothing."
+
+In my nervousness for this speech, I told myself: If not me, who? If not now, when? I invite you to step forward, to be seen, and to ask yourself: If not me, who? If not now, when? Thank you.`;
+
+// Malala Yousafzai — Education for All (UN 2013)
+SPEECH_TEXTS['malala-un'] = `In the name of God, the Most Beneficent, the Most Merciful. Honorable UN Secretary General Mr. Ban Ki-moon, respected President of the General Assembly, and dear brothers and sisters: Assalamu alaikum.
+
+Today, it is an honor for me to be speaking again after a long time. Being here with such honorable people is a great moment in my life. And it is an honor for me that today I am wearing a shawl of the late Benazir Bhutto.
+
+I don't know where to begin my speech. I don't know what people would be expecting me to say. But first of all, thank you to God for whom we all are equal, and thank you to every person who has prayed for my fast recovery and a new life. I cannot believe how much love people have shown me.
+
+Dear brothers and sisters, do remember one thing. Malala Day is not my day. Today is the day of every woman, every boy and every girl who have raised their voice for their rights.
+
+There are hundreds of human rights activists and social workers who are not only speaking for human rights, but who are struggling to achieve their goals of education, peace and equality. Thousands of people have been killed by the terrorists, and millions have been injured. I am just one of them.
+
+So here I stand. So here I stand, one girl among many. I speak — not for myself, but for all girls and boys. I raise up my voice — not so that I can shout, but so that those without a voice can be heard. Those who have fought for their rights: Their right to live in peace. Their right to be treated with dignity. Their right to equality of opportunity. Their right to be educated.
+
+We call upon all governments to ensure free compulsory education for every child all over the world. We call upon all governments to fight against terrorism and violence, to protect children from brutality and harm. We call upon the developed nations to support the expansion of educational opportunities for girls in the developing world.
+
+We call upon all communities to be tolerant — to reject prejudice based on caste, creed, sect, religion or gender. To ensure freedom and equality for women so they can flourish. We cannot all succeed when half of us are held back.
+
+We call upon our sisters around the world to be brave — to embrace the strength within themselves and realize their full potential.
+
+Dear brothers and sisters, we want schools and education for every child's bright future. We will continue our journey to our destination of peace and education for everyone. No one can stop us. We will speak for our rights and we will bring change through our voice. We must believe in the power and the strength of our words. Our words can change the world.
+
+Because we are all together, united for the cause of education. And if we want to achieve our goal, then let us empower ourselves with the weapon of knowledge and let us shield ourselves with unity and togetherness.
+
+Let us wage a glorious struggle against illiteracy, poverty and terrorism. Let us pick up our books and our pens. They are our most powerful weapons. One child, one teacher, one book and one pen can change the world. Education is the only solution. Education first. Thank you.`;
 
 // Build speech IReadingContent objects
 export function buildSpeechContent(id: string): IReadingContent | null {
