@@ -787,7 +787,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 // ── Paragraph block with word-click + individual TTS + sentence mode + chapter support ──
 const CIRCLED = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮','⑯','⑰','⑱','⑲','⑳'];
 
-const FONT_SIZES: Record<string, string> = { sm: 'text-sm leading-7', base: 'text-base leading-8', lg: 'text-lg leading-9' };
+const FONT_SIZES: Record<string, string> = { sm: 'text-base leading-7', base: 'text-lg leading-8', lg: 'text-xl leading-9' };
 
 function ParagraphBlock({
   para, paraIndex, transMode, sentenceMode, fontSize, onWordClick, isSpeaking, tts,
