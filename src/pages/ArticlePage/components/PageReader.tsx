@@ -153,6 +153,17 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const goPrev = () => setPageIdx((p) => Math.max(0, p - 1));
   const goNext = () => setPageIdx((p) => Math.min(activePages - 1, p + 1));
 
+  // Keyboard navigation: ← → for pages, Esc to close
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') goPrev();
+      else if (e.key === 'ArrowRight') goNext();
+      else if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [activePages, onClose]);
+
   // Word click — lookup Chinese + English definitions
   const handleWordClick = useCallback(async (e: React.MouseEvent, word: string) => {
     e.stopPropagation();

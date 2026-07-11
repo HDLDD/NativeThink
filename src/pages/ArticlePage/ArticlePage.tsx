@@ -17,12 +17,9 @@ import { useLearningStats } from '@/lib/use-learning-stats';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn, cleanText, extractJson } from '@/lib/utils';
 import { toast } from 'sonner';
-import { ErrorBoundary } from 'react-error-boundary';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import { buildPages } from '@/data/reading';
 import type { SpeechMeta } from '@/data/speeches';
-import PageReader from './components/PageReader';
-
 // ── Types ──
 type Level = 'beginner' | 'intermediate' | 'advanced';
 type MainTab = 'books' | 'publications' | 'ai' | 'speeches';
