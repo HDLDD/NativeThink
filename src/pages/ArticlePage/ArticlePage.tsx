@@ -277,6 +277,7 @@ export default function ArticlePage() {
     try { const s = safeStorage.getItem(HISTORY_KEY); return s ? JSON.parse(s) : []; } catch { return []; }
   });
   const [showHistory, setShowHistory] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   const saveToHistory = (title: string, _wordCount: string, source: string, meta?: HistoryEntry['meta']) => {
     setHistory((prev) => {
@@ -421,6 +422,9 @@ export default function ArticlePage() {
           <p className="text-muted-foreground text-xs font-medium">英文阅读与学习</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowGuide(true)} className="rounded-2xl text-[10px] font-bold gap-1">
+            <HelpCircle className="size-3.5" />指南
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowHistory(!showHistory)} className="rounded-2xl text-[10px] font-bold gap-1">
             <Clock className="size-3.5" />历史
           </Button>
@@ -854,6 +858,68 @@ export default function ArticlePage() {
       {readerVisible && readerContent && (
         <PageReader content={readerContent} onClose={closeReader} />
       )}
+
+      {/* ── Usage Guide Dialog ── */}
+      <Dialog open={showGuide} onOpenChange={setShowGuide}>
+        <DialogContent className="max-w-lg rounded-[32px] p-0 overflow-hidden">
+          <div className="p-6 border-b border-border bg-gradient-to-r from-[#00B894]/5 to-emerald-50 dark:to-emerald-500/10">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-black flex items-center gap-2">
+                <HelpCircle className="size-5 text-[#00B894]" />使用指南
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="p-6 space-y-5 text-sm">
+              {/* Books */}
+              <div className="space-y-2">
+                <h3 className="font-black text-foreground flex items-center gap-2"><Library className="size-4 text-[#00B894]" />书籍</h3>
+                <p className="text-muted-foreground text-xs leading-relaxed">22 本公版英文经典，每本 1000-5000 词。点击即读，支持分页、翻译、朗读、单词收藏。</p>
+                <p className="text-amber-600 text-[11px] font-medium">⚠ 书籍中文翻译需手动点击"AI翻译"（逐段生成，首次较慢）。</p>
+              </div>
+
+              {/* Publications */}
+              <div className="space-y-2">
+                <h3 className="font-black text-foreground flex items-center gap-2"><Newspaper className="size-4 text-[#00B894]" />刊物</h3>
+                <p className="text-muted-foreground text-xs leading-relaxed">预置 5 篇刊物文章（经济学人、自然、哈佛商业评论等），含完整中英对照翻译。</p>
+              </div>
+
+              {/* AI */}
+              <div className="space-y-2">
+                <h3 className="font-black text-foreground flex items-center gap-2"><Sparkles className="size-4 text-[#00B894]" />AI 生成</h3>
+                <p className="text-muted-foreground text-xs leading-relaxed">按主题/等级生成文章或书籍章节。AI 自动附中文翻译。需先配置 AI API Key。</p>
+                <p className="text-amber-600 text-[11px] font-medium">⚠ AI 生成依赖网络和 API 可用性，偶有格式异常需重试。</p>
+              </div>
+
+              {/* Wikipedia */}
+              <div className="space-y-2">
+                <h3 className="font-black text-foreground flex items-center gap-2"><Globe className="size-4 text-[#00B894]" />维基百科</h3>
+                <p className="text-muted-foreground text-xs leading-relaxed">搜索 Wikipedia 英文条目，阅读知识文章。支持精选条目浏览和搜索。</p>
+                <p className="text-amber-600 text-[11px] font-medium">⚠ Wikipedia API 在国内网络可能不稳定或无法访问。如加载失败，请尝试其他网络环境。</p>
+              </div>
+
+              {/* Speeches */}
+              <div className="space-y-2">
+                <h3 className="font-black text-foreground flex items-center gap-2"><Mic className="size-4 text-[#00B894]" />演讲</h3>
+                <p className="text-muted-foreground text-xs leading-relaxed">24 篇经典演讲（MLK、丘吉尔、TED 等），支持分页阅读和朗读。</p>
+                <p className="text-amber-600 text-[11px] font-medium">⚠ 演讲中文翻译需手动点击"AI翻译"。</p>
+              </div>
+
+              {/* Reader tips */}
+              <div className="pt-3 border-t border-border space-y-2">
+                <h3 className="font-black text-foreground text-xs uppercase tracking-wider">阅读器技巧</h3>
+                <ul className="text-muted-foreground text-xs space-y-1.5 leading-relaxed">
+                  <li>· 点击任意单词 → 查词 + 收藏</li>
+                  <li>· 工具栏切换 原文/对照/译文 三种视图</li>
+                  <li>· 朗读按钮 → 逐段朗读，当前段落高亮</li>
+                  <li>· 键盘翻页：← → 方向键</li>
+                  <li>· 关注 TTS 朗读：桌面/Android 优先系统语音（秒启），iOS 走云端引擎</li>
+                </ul>
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
