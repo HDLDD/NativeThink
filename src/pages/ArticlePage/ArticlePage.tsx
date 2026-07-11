@@ -736,7 +736,6 @@ This, and nothing less, is the meaning of human existence: to create, to produce
       setDisplayTitle(parsed.title || displayTitle);
       setDisplayContent(parsed.content);
       setDisplayTranslation(parsed.translation || '');
-      setConvertDialogOpen(false);
       toast.success(`已转换为${targetLevel.label}等级！`);
     } catch { toast.error('转换失败'); }
     finally { setConvertLoading(false); }
@@ -794,10 +793,18 @@ This, and nothing less, is the meaning of human existence: to create, to produce
         </div>
         {hasContent && (
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setConvertDialogOpen(true)} disabled={!isConfigured}
-              className="rounded-2xl text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground hover:text-[#F59E0B] gap-1">
-              <Wand2 className="size-3.5" />转换等级
-            </Button>
+            {/* Inline level conversion — click to convert current article immediately */}
+            <div className="flex items-center gap-0.5 bg-muted rounded-2xl p-0.5">
+              {LEVELS.map(({ key, label, color }) => (
+                <button key={key} onClick={() => { setConvertLevel(key); convertArticleLevel(); }} disabled={convertLoading || !isConfigured}
+                  className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all',
+                    convertLevel === key ? 'text-white shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+                  style={convertLevel === key ? { backgroundColor: color } : undefined} title={`转换为${label}等级`}>
+                  {convertLoading && convertLevel === key ? <Loader2 className="size-3 animate-spin inline mr-0.5" /> : null}
+                  {label}
+                </button>
+              ))}
+            </div>
             <Button variant="ghost" size="sm" onClick={() => tts.speak(cleanText(displayContent), { rate: 0.85 })}
               className="rounded-2xl text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground hover:text-[#00B894] gap-1">
               <Volume2 className="size-3.5" />朗读
@@ -1281,36 +1288,6 @@ This, and nothing less, is the meaning of human existence: to create, to produce
       </Dialog>
 
       {/* ── Level Conversion Dialog ── */}
-      <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
-        <DialogContent className="max-w-sm rounded-[28px] p-0 overflow-hidden">
-          <div className="p-5 border-b border-border bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/10">
-            <DialogHeader>
-              <DialogTitle className="text-lg font-black flex items-center gap-2">
-                <Wand2 className="size-5 text-[#F59E0B]" />转换文章等级
-              </DialogTitle>
-            </DialogHeader>
-          </div>
-          <div className="p-5 space-y-4">
-            <p className="text-sm text-muted-foreground">将当前文章改写为适合不同学习等级的版本</p>
-            <div className="flex gap-2">
-              {LEVELS.map(({ key, label, color, desc }) => (
-                <button key={key} onClick={() => setConvertLevel(key)}
-                  className={cn('flex-1 py-3 rounded-2xl text-center transition-all border-2',
-                    convertLevel === key ? 'text-white shadow-lg' : 'bg-muted text-muted-foreground border-transparent hover:border-muted-foreground/20')}
-                  style={convertLevel === key ? { backgroundColor: color, borderColor: color } : undefined}>
-                  <p className="text-sm font-black">{label}</p>
-                  <p className="text-[9px] font-bold opacity-70">{desc}</p>
-                </button>
-              ))}
-            </div>
-            <Button onClick={convertArticleLevel} disabled={convertLoading}
-              className="w-full rounded-2xl bg-gradient-to-r from-[#F59E0B] to-amber-500 text-white font-black text-sm py-5 shadow-lg">
-              {convertLoading ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Wand2 className="size-4 mr-2" />}
-              {convertLoading ? '转换中…' : '开始转换'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
