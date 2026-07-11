@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
-import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, Play, Pause, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings } from 'lucide-react';
+import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -312,10 +312,6 @@ export default function DeepVocabularyPage() {
     }
   }, []); // run once on mount
 
-  // Auto-play state for browse tab
-  const [autoPlaying, setAutoPlaying] = useState(false);
-  const [autoPlayIdx, setAutoPlayIdx] = useState(0);
-  const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Browse tab: level filter, memory, page size
   const SUB_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] as const;
@@ -454,33 +450,7 @@ export default function DeepVocabularyPage() {
     return words;
   }, [selectedLevel, deferredSearchQuery, sortMode, collocOnly, posFilter, registerFilter, emotionFilter, noChineseEquivOnly, browseMemoryFilter, memorizedWords, dataReady, dataVersion]);
 
-  // tts must be declared BEFORE it's used in the auto-play effect
   const tts = useTTS();
-  const ttsRef = useRef(tts);
-  ttsRef.current = tts;
-
-  const stopAutoPlay = useCallback(() => {
-    setAutoPlaying(false);
-    if (autoPlayTimerRef.current) { clearTimeout(autoPlayTimerRef.current); autoPlayTimerRef.current = null; }
-  }, []);
-
-  const startAutoPlay = useCallback(() => {
-    if (filteredWords.length === 0) return;
-    setAutoPlaying(true);
-    setAutoPlayIdx(0);
-  }, [filteredWords.length]);
-
-  // Auto-play effect: speak each word sequentially
-  useEffect(() => {
-    if (!autoPlaying) return;
-    if (autoPlayIdx >= filteredWords.length) { stopAutoPlay(); return; }
-    const word = filteredWords[autoPlayIdx];
-    ttsRef.current.speak(word.word, { rate: 0.85 });
-    autoPlayTimerRef.current = setTimeout(() => {
-      setAutoPlayIdx((p) => p + 1);
-    }, 2000);
-    return () => { if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current); };
-  }, [autoPlaying, autoPlayIdx, filteredWords, stopAutoPlay]);
 
   // AI-generated word content (sentences + deep explanation)
   const [aiWordData, setAiWordData] = useState<Record<string, IWordAiData>>(() => {
@@ -902,21 +872,7 @@ export default function DeepVocabularyPage() {
                   <X className="size-3" />{activeFilterCount}
                 </button>
               )}
-              {/* 自动朗读 */}
-              <div className="flex items-center gap-1 ml-auto">
-                {autoPlaying ? (
-                  <>
-                    <span className="text-[10px] font-bold text-[#00B894] tabular-nums">{autoPlayIdx + 1}/{filteredWords.length}</span>
-                    <Button variant="ghost" size="icon" onClick={stopAutoPlay} className="rounded-xl size-7 bg-rose-50 dark:bg-rose-500/15 text-rose-500 hover:bg-rose-100">
-                      <Pause className="size-3.5" />
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="ghost" size="sm" onClick={startAutoPlay} disabled={filteredWords.length === 0} className="rounded-xl text-[10px] font-black uppercase tracking-wider bg-[#00B894]/10 text-[#00B894] hover:bg-[#00B894]/20 gap-1">
-                    <Play className="size-3.5" />自动朗读
-                  </Button>
-                )}
-              </div>
+              <span className="text-[10px] font-bold text-muted-foreground/50 ml-auto">点击单词即可朗读</span>
             </div>
             </>
           )}
@@ -1145,20 +1101,7 @@ export default function DeepVocabularyPage() {
                           ))}
                         </div>
 
-                        {/* Auto-play + Page navigation */}
-                        <div className="flex items-center gap-1">
-                          {autoPlaying ? (
-                            <Button variant="ghost" size="icon" onClick={stopAutoPlay}
-                              className="rounded-xl size-7 bg-rose-50 dark:bg-rose-500/15 text-rose-500 hover:bg-rose-100">
-                              <Pause className="size-3.5" />
-                            </Button>
-                          ) : (
-                            <Button variant="ghost" size="sm" onClick={startAutoPlay} disabled={filteredWords.length === 0}
-                              className="rounded-xl text-[9px] font-black uppercase tracking-wider bg-[#00B894]/10 text-[#00B894] hover:bg-[#00B894]/20 gap-1 h-7">
-                              <Play className="size-3" />自动朗读
-                            </Button>
-                          )}
-                        </div>
+                        {/* Page navigation */}
 
                         {/* Page navigation */}
                         <div className="flex items-center gap-1">

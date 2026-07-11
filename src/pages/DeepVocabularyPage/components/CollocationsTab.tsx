@@ -18,8 +18,6 @@ import {
   Loader2,
   Languages,
   Brain,
-  Play,
-  Pause,
   type LucideIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -341,47 +339,19 @@ export default function CollocationsTab({
     if (currentPage >= totalPages) setCurrentPage(Math.max(0, totalPages - 1));
   }, [totalPages, currentPage]);
 
-  // 自动朗读：依次朗读当前页所有搭配（state must be BEFORE effects that use them）
-  const [autoPlaying, setAutoPlaying] = useState(false);
-  const [autoPlayIdx, setAutoPlayIdx] = useState(0);
-  const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // 自动朗读：切换搭配时朗读短语
+  // 点击搭配时朗读短语
   const collocTtsRef = useRef(tts);
   collocTtsRef.current = tts;
   const lastSpokenCollocKey = useRef('');
   useEffect(() => {
-    if (!selectedColloc || autoPlaying) return; // auto-play handles its own speaking
+    if (!selectedColloc) return;
     const entry = allCollocEntries.find((e) => e.phrase.toLowerCase() === selectedColloc.toLowerCase());
     if (!entry) return;
     const key = entry.phrase.toLowerCase();
     if (lastSpokenCollocKey.current === key) return;
     lastSpokenCollocKey.current = key;
     collocTtsRef.current.speak(entry.phrase, { rate: 0.85 });
-  }, [selectedColloc, allCollocEntries, autoPlaying]);
-
-  const stopAutoPlay = useCallback(() => {
-    setAutoPlaying(false);
-    if (autoPlayTimerRef.current) { clearTimeout(autoPlayTimerRef.current); autoPlayTimerRef.current = null; }
-  }, []);
-
-  const startAutoPlay = useCallback(() => {
-    if (pageEntries.length === 0) return;
-    setAutoPlaying(true);
-    setAutoPlayIdx(0);
-  }, [pageEntries.length]);
-
-  useEffect(() => {
-    if (!autoPlaying) return;
-    if (autoPlayIdx >= pageEntries.length) { stopAutoPlay(); return; }
-    const entry = pageEntries[autoPlayIdx];
-    setSelectedColloc(entry.phrase);
-    collocTtsRef.current.speak(entry.phrase, { rate: 0.85 });
-    autoPlayTimerRef.current = setTimeout(() => {
-      setAutoPlayIdx((p) => p + 1);
-    }, 2500);
-    return () => { if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current); };
-  }, [autoPlaying, autoPlayIdx, pageEntries, stopAutoPlay]);
+  }, [selectedColloc, allCollocEntries]);
 
   // Selected collocation detail
   const selectedEntry = useMemo(
@@ -666,21 +636,6 @@ export default function CollocationsTab({
                           {size}
                         </button>
                       ))}
-                    </div>
-
-                    {/* Auto-play + Page navigation */}
-                    <div className="flex items-center gap-1">
-                      {autoPlaying ? (
-                        <Button variant="ghost" size="icon" onClick={stopAutoPlay}
-                          className="rounded-xl size-7 bg-rose-50 dark:bg-rose-500/15 text-rose-500 hover:bg-rose-100">
-                          <Pause className="size-3.5" />
-                        </Button>
-                      ) : (
-                        <Button variant="ghost" size="sm" onClick={startAutoPlay} disabled={pageEntries.length === 0}
-                          className="rounded-xl text-[9px] font-black uppercase tracking-wider bg-[#00B894]/10 text-[#00B894] hover:bg-[#00B894]/20 gap-1 h-7">
-                          <Play className="size-3" />自动朗读
-                        </Button>
-                      )}
                     </div>
 
                     {/* Page navigation */}
