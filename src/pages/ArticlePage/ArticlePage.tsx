@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   FileText, Sparkles, Languages, BookOpen, Volume2, RefreshCw, Loader2,
   Search, ExternalLink, X, Globe, Library, Mic, Wand2, BookMarked,
@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAI } from '@/hooks/use-ai';
 import { useTTS } from '@/lib/use-tts';
 import { useWordLearning } from '@/lib/use-word-learning';
+import { useLearningStats } from '@/lib/use-learning-stats';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn, cleanText, extractJson } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -146,6 +147,10 @@ export default function ArticlePage() {
   const { isConfigured, chat: aiChat } = useAI();
   const tts = useTTS();
   const { dueForReview, state: sm2State } = useWordLearning('all');
+  const { addStudyMinutes } = useLearningStats();
+
+  // ── Reading session timer ──
+  const readingStartRef = useRef(0);
 
   // ── Tab + config state ──
   const [mainTab, setMainTab] = useState<MainTab>('books');
@@ -233,10 +238,36 @@ export default function ArticlePage() {
 
   // ── History ──
   const HISTORY_KEY = '__nativethink_article_history';
-  const [history, setHistory] = useState<{ id: string; title: string; source: string; createdAt: string }[]>(() => {
+  interface HistoryEntry { id: string; title: string; source: string; createdAt: string; meta?: { wikiTitle?: string; speechId?: string; bookId?: string; pubId?: string; }; }
+  const [history, setHistory] = useState<HistoryEntry[]>(() => {
     try { const s = safeStorage.getItem(HISTORY_KEY); return s ? JSON.parse(s) : []; } catch { return []; }
   });
   const [showHistory, setShowHistory] = useState(false);
+
+  const saveToHistory = (title: string, _wordCount: string, source: string, meta?: HistoryEntry['meta']) => {
+    setHistory((prev) => {
+      const entry: HistoryEntry = { id: Date.now().toString(36), title, source, createdAt: new Date().toISOString(), meta };
+      return [entry, ...prev].slice(0, 100);
+    });
+  };
+
+  const handleHistoryClick = (entry: HistoryEntry) => {
+    if (!entry.meta) return;
+    const { wikiTitle, speechId, bookId } = entry.meta;
+    if (wikiTitle) {
+      setWikiQuery(wikiTitle);
+      searchWikipedia(wikiTitle);
+    } else if (speechId) {
+      // Switch to speeches tab and load
+      setMainTab('speeches');
+      // Delay to ensure speechMeta is loaded
+      setTimeout(() => loadSpeech(speechId), 100);
+    } else if (bookId) {
+      // Books can only be reopened from the books tab
+      const book = books?.find((b) => b.id === bookId);
+      if (book) { setReaderContent(book); setReaderVisible(true); }
+    }
+  };
 
   // ── AI generate dialog ──
   const [genDialogOpen, setGenDialogOpen] = useState(false);
@@ -282,13 +313,15 @@ export default function ArticlePage() {
         ], { temperature: 0.8, maxTokens: 4096 });
         const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
         if (!parsed?.paragraphs?.length) { toast.error('AI 生成失败，请重试'); return; }
+        const safeParagraphs: IParagraph[] = (parsed.paragraphs || []).map((p: any) => ({ en: p?.en || '', zh: p?.zh || '' })).filter((p: IParagraph) => p.en.trim());
+        if (!safeParagraphs.length) { toast.error('AI 生成内容为空，请重试'); return; }
         const content: IReadingContent = {
           id: `ai_${genType}_${Date.now()}`, type: 'ai',
           title: parsed.title || genTopic, zhTitle: parsed.title || genTopic,
           author: 'AI Generated', source: genType === 'publication' ? 'AI 生成刊物' : 'AI 生成文章',
           topic: genTopic, difficulty: genLevel,
-          pages: buildPages(parsed.paragraphs),
-          totalWords: parsed.paragraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
+          pages: buildPages(safeParagraphs),
+          totalWords: safeParagraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
         };
         setReaderContent(content); setReaderVisible(true);
         toast.success(genType === 'publication' ? '刊物文章已生成！' : '文章已生成！');
@@ -372,13 +405,6 @@ export default function ArticlePage() {
     finally { setAiLoading(false); }
   }, [isConfigured, dueForReview, level, aiChat]);
 
-  // ── History ──
-  const saveToHistory = (title: string, content: string, source: string) => {
-    setHistory((prev) => {
-      const entry = { id: Date.now().toString(36), title, source, createdAt: new Date().toISOString() };
-      return [entry, ...prev].slice(0, 100);
-    });
-  };
   useEffect(() => { safeStorage.setItem(HISTORY_KEY, JSON.stringify(history)); }, [history]);
 
   // ── Wikipedia thumbnails ──
