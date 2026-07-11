@@ -9,7 +9,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { useTTS } from '@/lib/use-tts';
 import { useAI } from '@/hooks/use-ai';
 import { useFavorites } from '@/lib/use-favorites';
@@ -359,7 +359,7 @@ export default function PageReader({ content, onClose }: Props) {
       </div>
 
       {/* ── Content ── */}
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div ref={contentRef} className="max-w-2xl mx-auto px-6 py-8 space-y-6">
           {page.paragraphs.map((para, i) => (
             <ParagraphBlock
@@ -370,7 +370,7 @@ export default function PageReader({ content, onClose }: Props) {
             />
           ))}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* ── Pagination Footer ── */}
       <div className="shrink-0 border-t border-border px-4 py-3 flex items-center justify-between gap-2">
