@@ -182,21 +182,24 @@ export default function PageReader({ content, onClose }: Props) {
     if (!isConfigured || !currentPageData || !needsTranslation) return;
     setTransLoading(true);
     try {
-      const untranslated = currentPageData.paragraphs.filter((p) => !p.zh).map((p) => p.en);
-      const allEn = untranslated.join('\n---PARA---\n');
-      const result = await aiChat([
-        { role: 'system', content: 'Translate the following English paragraphs to natural Chinese. Each paragraph is separated by "---PARA---". Return Chinese translations separated by "---PARA---", same order, same count. Return ONLY the translations.' },
-        { role: 'user', content: allEn.slice(0, 3000) },
-      ], { temperature: 0.3, maxTokens: 2048 });
-      const zhParts = result.split('---PARA---').map((s: string) => s.trim()).filter(Boolean);
-      const newCache = { ...transCache, [currentPage]: zhParts };
+      const untranslated = currentPageData.paragraphs.filter((p) => !p.zh);
+      // Translate each paragraph individually for reliable alignment
+      const zhResults: string[] = [];
+      for (const p of untranslated) {
+        const result = await aiChat([
+          { role: 'system', content: 'Translate the following English to natural Chinese. Return ONLY the Chinese translation, no extra text, no markdown.' },
+          { role: 'user', content: p.en.slice(0, 1500) },
+        ], { temperature: 0.3, maxTokens: 1024 });
+        zhResults.push(result.trim());
+      }
+      const newCache = { ...transCache, [currentPage]: zhResults };
       setTransCache(newCache);
       safeStorage.setItem(TR_CACHE_KEY, JSON.stringify(newCache));
       const updatedPages = [...activeContent.pages];
       let zi = 0;
       updatedPages[currentPage] = {
         ...currentPageData,
-        paragraphs: currentPageData.paragraphs.map((p) => (!p.zh && zi < zhParts.length ? { ...p, zh: zhParts[zi++] } : p)),
+        paragraphs: currentPageData.paragraphs.map((p) => (!p.zh && zi < zhResults.length ? { ...p, zh: zhResults[zi++] } : p)),
       };
       setDisplayContent({ ...activeContent, pages: updatedPages });
     } catch { toast.error('翻译失败'); }
@@ -208,33 +211,28 @@ export default function PageReader({ content, onClose }: Props) {
     setTransAllLoading(true);
     let count = 0;
     try {
-      const allParas = activeContent.pages.flatMap((p) => p.paragraphs.filter((pp) => !pp.zh).map((pp) => pp.en));
-      if (allParas.length === 0) { toast('所有页面已有翻译'); return; }
-      const batchSize = 8;
+      const allUntranslated = activeContent.pages.flatMap(
+        (p, pi) => p.paragraphs.map((pp, ppi) => ({ en: pp.en, pageIdx: pi, paraIdx: ppi })).filter((x) => !activeContent.pages[pi].paragraphs[ppi].zh),
+      );
+      if (allUntranslated.length === 0) { toast('所有页面已有翻译'); return; }
       const newCache = { ...transCache };
       let updatedPages = [...activeContent.pages];
-      for (let batch = 0; batch < allParas.length; batch += batchSize) {
-        const batchText = allParas.slice(batch, batch + batchSize).join('\n---PARA---\n');
+      for (const item of allUntranslated) {
         const result = await aiChat([
-          { role: 'system', content: 'Translate the following English paragraphs to natural Chinese. Each separated by "---PARA---". Return Chinese translations separated by "---PARA---", same order. Return ONLY translations.' },
-          { role: 'user', content: batchText.slice(0, 3000) },
-        ], { temperature: 0.3, maxTokens: 2048 });
-        const zhParts = result.split('---PARA---').map((s: string) => s.trim()).filter(Boolean);
-        let gi = batch;
-        for (let pi = 0; pi < updatedPages.length && gi < batch + batchSize; pi++) {
-          let changed = false;
-          const newParas = updatedPages[pi].paragraphs.map((p) => {
-            if (p.zh) return p;
-            const zi = gi - batch;
-            if (zi >= 0 && zi < zhParts.length) { gi++; changed = true; count++; return { ...p, zh: zhParts[zi] }; }
-            return p;
-          });
-          if (changed) updatedPages[pi] = { ...updatedPages[pi], paragraphs: newParas };
-        }
-        for (let pi = 0; pi < updatedPages.length; pi++) {
-          const zhs = updatedPages[pi].paragraphs.filter((p) => p.zh).map((p) => p.zh);
-          if (zhs.length > 0) newCache[pi] = zhs;
-        }
+          { role: 'system', content: 'Translate the following English to natural Chinese. Return ONLY the Chinese translation, no extra text.' },
+          { role: 'user', content: item.en.slice(0, 1500) },
+        ], { temperature: 0.3, maxTokens: 1024 });
+        const zh = result.trim();
+        updatedPages[item.pageIdx] = {
+          ...updatedPages[item.pageIdx],
+          paragraphs: updatedPages[item.pageIdx].paragraphs.map((p, i) =>
+            i === item.paraIdx ? { ...p, zh } : p,
+          ),
+        };
+        count++;
+        // Update cache per page
+        const pg = updatedPages[item.pageIdx];
+        newCache[item.pageIdx] = pg.paragraphs.filter((p) => p.zh).map((p) => p.zh);
       }
       setTransCache(newCache);
       safeStorage.setItem(TR_CACHE_KEY, JSON.stringify(newCache));

@@ -734,13 +734,19 @@ export default function DeepVocabularyPage() {
     }
   }, [levelMemory, selectedLevel, selectedWord, persistLevelMemory]);
 
-  // Restore scroll position when switching to browse tab
-  const restoreBrowseScroll = useCallback(() => {
+  // Restore scroll position + selected word when switching to browse tab
+  const restoreBrowseState = useCallback(() => {
     const saved = levelMemory[selectedLevel];
+    // Restore selected word
+    if (saved?.word && !selectedWord) {
+      const found = filteredWords.find((w) => w.word === saved.word);
+      if (found) setSelectedWord(found);
+    }
+    // Restore scroll position
     if (saved?.scrollTop && wordListRef.current) {
       requestAnimationFrame(() => { if (wordListRef.current) wordListRef.current.scrollTop = saved.scrollTop; });
     }
-  }, [levelMemory, selectedLevel]);
+  }, [levelMemory, selectedLevel, selectedWord, filteredWords]);
 
   const handleSelectWord = (w: IWordEntry) => {
     setSelectedWord(w);
@@ -755,7 +761,7 @@ export default function DeepVocabularyPage() {
     setTab(v);
     setMemory((p) => ({ ...p, tab: v }));
     // Restore scroll when switching to browse
-    if (v === 'browse') setTimeout(restoreBrowseScroll, 100);
+    if (v === 'browse') setTimeout(restoreBrowseState, 100);
   };
 
   /** Open word detail in a small popup from collocations tab */
