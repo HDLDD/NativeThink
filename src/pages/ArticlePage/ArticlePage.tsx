@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   FileText, Sparkles, Languages, BookOpen, Volume2, RefreshCw, Loader2,
@@ -20,9 +20,6 @@ import { toast } from 'sonner';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import { buildPages } from '@/data/reading';
 import type { SpeechMeta } from '@/data/speeches';
-
-// Lazy load PageReader to avoid circular dependency (PageReader → wordbank → reading → back to ArticlePage)
-const PageReader = lazy(() => import('./components/PageReader'));
 // ── Types ──
 type Level = 'beginner' | 'intermediate' | 'advanced';
 type MainTab = 'books' | 'publications' | 'ai' | 'speeches';
@@ -134,6 +131,12 @@ export default function ArticlePage() {
   const { dueForReview, state: sm2State } = useWordLearning('all');
   const { addStudyMinutes } = useLearningStats();
   const [searchParams] = useSearchParams();
+
+  // Dynamic import PageReader to break circular dependency
+  const [PageReaderComp, setPageReaderComp] = useState<any>(null);
+  useEffect(() => {
+    import('./components/PageReader').then(m => setPageReaderComp(() => m.default));
+  }, []);
 
   // ── Tab + config state ──
   const [mainTab, setMainTab] = useState<MainTab>('books');
@@ -898,18 +901,14 @@ export default function ArticlePage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── PageReader overlay (lazy-loaded to avoid circular dependency) ── */}
-      {readerVisible && readerContent && (
-        <Suspense fallback={
-          <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
-            <div className="text-center">
-              <Loader2 className="size-8 mx-auto mb-3 animate-spin text-[#00B894]" />
-              <p className="text-sm font-medium text-muted-foreground">加载阅读器…</p>
-            </div>
-          </div>
-        }>
-          <PageReader content={readerContent} onClose={closeReader} />
-        </Suspense>
+      {/* ── PageReader overlay (dynamic import to break circular dependency) ── */}
+      {readerVisible && readerContent && PageReaderComp && (
+        <PageReaderComp content={readerContent} onClose={closeReader} />
+      )}
+      {readerVisible && readerContent && !PageReaderComp && (
+        <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
+          <Loader2 className="size-8 animate-spin text-[#00B894]" />
+        </div>
       )}
 
       {/* ── Usage Guide Dialog ── */}
