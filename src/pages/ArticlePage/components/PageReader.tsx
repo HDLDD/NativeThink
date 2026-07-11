@@ -402,7 +402,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       </div>
 
       {/* ── Content (current page only) ── */}
-      <ScrollArea className="flex-1">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
           {activeContent.pages[currentPage]?.paragraphs.map((para, i) => {
             const displayEn = para.en.startsWith('##CHAPTER##') ? para.en.replace('##CHAPTER##', '') : para.en;
@@ -458,7 +458,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             );
           })}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* ── Pagination Footer ── */}
       <div className="shrink-0 border-t border-border px-4 py-3 flex items-center justify-center gap-3">
