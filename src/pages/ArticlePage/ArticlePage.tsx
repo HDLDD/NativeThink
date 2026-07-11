@@ -276,8 +276,28 @@ export default function ArticlePage() {
   // ── Wikipedia ──
   const [wikiQuery, setWikiQuery] = useState('');
   const [wikiLoading, setWikiLoading] = useState(false);
+  const [wikiResults, setWikiResults] = useState<{ title: string; snippet: string; pageid: number }[]>([]);
+  const [wikiSearched, setWikiSearched] = useState(false);
   const [wikiThumbnails, setWikiThumbnails] = useState<Record<string, string>>({});
   const wikiThumbsLoaded = useRef(false);
+  // Saved Wikipedia articles (persisted)
+  const SAVED_WIKI_KEY = '__nativethink_saved_wiki';
+  const [savedWiki, setSavedWiki] = useState<{ title: string; zhTitle: string }[]>(() => {
+    try { const r = localStorage.getItem(SAVED_WIKI_KEY); return r ? JSON.parse(r) : []; } catch { return []; }
+  });
+  const persistSavedWiki = (list: { title: string; zhTitle: string }[]) => {
+    setSavedWiki(list);
+    try { localStorage.setItem(SAVED_WIKI_KEY, JSON.stringify(list)); } catch { /* */ }
+  };
+  const addToSavedWiki = (title: string, zhTitle: string) => {
+    const exists = savedWiki.some((a) => a.title === title);
+    if (exists) { toast.error('该条目已在列表中'); return; }
+    persistSavedWiki([...savedWiki, { title, zhTitle }]);
+    toast.success(`已添加：${zhTitle || title}`);
+  };
+  const removeFromSavedWiki = (title: string) => {
+    persistSavedWiki(savedWiki.filter((a) => a.title !== title));
+  };
 
   // ── History ──
   const HISTORY_KEY = '__nativethink_article_history';
@@ -299,7 +319,7 @@ export default function ArticlePage() {
     const { wikiTitle, speechId, bookId } = entry.meta;
     if (wikiTitle) {
       setWikiQuery(wikiTitle);
-      searchWikipedia(wikiTitle);
+      openWikipediaArticle(wikiTitle);
     } else if (speechId) {
       // Switch to speeches tab and load
       setMainTab('speeches');
@@ -378,55 +398,77 @@ export default function ArticlePage() {
   }, [isConfigured, genType, genTopic, genLevel, genChapters, aiChat]);
 
   // ── Wikipedia ──
-  const searchWikipedia = useCallback(async (title?: string) => {
-    const q = (title || wikiQuery).trim();
+  // Search Wikipedia and show results list
+  const searchWikipedia = useCallback(async (query?: string) => {
+    const q = (query || wikiQuery).trim();
     if (!q) return;
     setWikiLoading(true);
+    setWikiResults([]);
+    setWikiSearched(false);
     try {
       const encoded = encodeURIComponent(q);
-      const urls = [
-        `https://en.wikipedia.org/api/rest_v1/page/summary/${encoded}`,
-        `https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts|pageimages&exintro&explaintext&piprop=thumbnail&pithumbsize=400&titles=${encoded}&origin=*`,
-      ];
+      // Use Wikipedia's opensearch API for title suggestions + snippets
+      const searchUrl = `https://en.wikipedia.org/w/api.php?format=json&action=query&list=search&srsearch=${encoded}&srlimit=15&utf8=1&origin=*`;
+      const res = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) throw new Error('Search failed');
+      const data = await res.json();
+      const results = (data.query?.search || []).map((r: any) => ({
+        title: r.title,
+        snippet: r.snippet.replace(/<\/?[^>]+(>|$)/g, ''), // strip HTML tags
+        pageid: r.pageid,
+      }));
+      setWikiResults(results);
+      setWikiSearched(true);
+      if (results.length === 0) toast.error('未找到相关条目');
+    } catch { toast.error('搜索失败（网络受限，请尝试其他来源）'); }
+    finally { setWikiLoading(false); }
+  }, [wikiQuery]);
 
+  // Open a specific Wikipedia article in the reader
+  const openWikipediaArticle = useCallback(async (title: string) => {
+    setWikiLoading(true);
+    try {
+      const encoded = encodeURIComponent(title);
+      // Try REST summary API
       let extract = '';
-      let pageTitle = q;
+      let pageTitle = title;
       let pageid = 0;
       let thumbnail = '';
 
-      // Try REST API first
       try {
-        const res = await fetch(urls[0], { signal: AbortSignal.timeout(8000) });
+        const res = await fetch(
+          `https://en.wikipedia.org/api/rest_v1/page/summary/${encoded}`,
+          { signal: AbortSignal.timeout(8000) },
+        );
         if (res.ok) {
           const page: WikiPage = await res.json();
-          if (page.extract) {
-            extract = page.extract;
-            pageTitle = page.title;
-            pageid = page.pageid;
-            thumbnail = page.thumbnail?.source || '';
+          extract = page.extract || '';
+          pageTitle = page.title;
+          pageid = page.pageid;
+          thumbnail = page.thumbnail?.source || '';
+        }
+      } catch { /* fall through */ }
+
+      // Fallback: MediaWiki API
+      if (!extract) {
+        const res = await fetch(
+          `https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts|pageimages&exintro&explaintext&piprop=thumbnail&pithumbsize=400&titles=${encoded}&origin=*`,
+          { signal: AbortSignal.timeout(8000) },
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const pages = data.query?.pages || {};
+          const first: any = Object.values(pages)[0];
+          if (first && !first.missing) {
+            extract = first.extract || '';
+            pageTitle = first.title || title;
+            pageid = first.pageid || 0;
+            thumbnail = first.thumbnail?.source || '';
           }
         }
-      } catch { /* REST API failed, try MediaWiki API */ }
-
-      // Fallback to MediaWiki API
-      if (!extract) {
-        try {
-          const res = await fetch(urls[1], { signal: AbortSignal.timeout(8000) });
-          if (res.ok) {
-            const data = await res.json();
-            const pages = data.query?.pages || {};
-            const firstPage: any = Object.values(pages)[0];
-            if (firstPage && !firstPage.missing) {
-              extract = firstPage.extract || '';
-              pageTitle = firstPage.title || q;
-              pageid = firstPage.pageid || 0;
-              thumbnail = firstPage.thumbnail?.source || '';
-            }
-          }
-        } catch { /* MediaWiki API also failed */ }
       }
 
-      if (!extract) { toast.error('无法加载该条目（网络受限，请尝试其他来源）'); return; }
+      if (!extract) { toast.error('无法加载该条目'); return; }
 
       const paragraphs: IParagraph[] = extract
         .split(/\n\n+/)
@@ -448,7 +490,7 @@ export default function ArticlePage() {
       toast.success(`已加载：${pageTitle}`);
     } catch { toast.error('加载失败'); }
     finally { setWikiLoading(false); }
-  }, [wikiQuery]);
+  }, []);
 
   // ── Speech ──
   const loadSpeech = useCallback(async (speechId: string) => {
@@ -873,41 +915,69 @@ export default function ArticlePage() {
         <div className="space-y-4">
           {/* Search bar */}
           <div className="flex gap-2">
-            <Input
-              value={wikiQuery}
-              onChange={(e) => setWikiQuery(e.target.value)}
-              placeholder="搜索 Wikipedia 英文条目..."
-              className="rounded-2xl text-sm"
-              onKeyDown={(e) => e.key === 'Enter' && searchWikipedia()}
-            />
+            <Input value={wikiQuery} onChange={(e) => setWikiQuery(e.target.value)}
+              placeholder="搜索英文 Wikipedia 条目..." className="rounded-2xl text-sm"
+              onKeyDown={(e) => e.key === 'Enter' && searchWikipedia()} />
             <Button onClick={() => searchWikipedia()} disabled={wikiLoading} className="rounded-2xl">
               {wikiLoading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
             </Button>
           </div>
+
+          {/* Search results */}
+          {wikiResults.length > 0 && (
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-3">搜索结果 ({wikiResults.length})</h3>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {wikiResults.map((r) => (
+                  <div key={r.pageid} className="flex items-start gap-3 p-3 rounded-2xl bg-muted/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors border border-transparent hover:border-[#00B894]/20 group">
+                    <div className="min-w-0 flex-1 cursor-pointer" onClick={() => openWikipediaArticle(r.title)}>
+                      <p className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors">{r.title}</p>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{r.snippet}</p>
+                    </div>
+                    <button onClick={() => addToSavedWiki(r.title, r.title)}
+                      className="shrink-0 px-2 py-1 rounded-xl text-[9px] font-black bg-[#00B894]/10 text-[#00B894] hover:bg-[#00B894]/20 transition-colors">+ 添加</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {wikiSearched && wikiResults.length === 0 && !wikiLoading && (
+            <p className="text-sm text-muted-foreground text-center py-4">未找到相关条目</p>
+          )}
+
+          {/* Saved Wikipedia articles */}
+          {savedWiki.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">我的列表 ({savedWiki.length})</h3>
+                <button onClick={() => { persistSavedWiki([]); toast.success('已清空'); }} className="text-[9px] font-bold text-muted-foreground hover:text-rose-500">清空</button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {savedWiki.map((a) => (
+                  <button key={a.title} onClick={() => openWikipediaArticle(a.title)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 dark:bg-sky-500/10 border border-sky-100 hover:bg-sky-100 transition-colors group">
+                    <span className="text-xs font-bold text-foreground group-hover:text-sky-600">{a.title}</span>
+                    <span onClick={(e) => { e.stopPropagation(); removeFromSavedWiki(a.title); }} className="text-muted-foreground/40 hover:text-rose-500 ml-0.5">×</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Curated articles */}
           <div>
             <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-3">精选条目</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {WIKI_ARTICLES.map((a) => (
-                <Card
-                  key={a.title}
-                  className="rounded-2xl border-border hover:border-[#00B894]/40 hover:shadow-sm transition-all cursor-pointer overflow-hidden"
-                  onClick={() => searchWikipedia(a.title)}
-                >
+                <Card key={a.title} className="rounded-2xl border-border hover:border-[#00B894]/40 hover:shadow-sm transition-all cursor-pointer overflow-hidden"
+                  onClick={() => openWikipediaArticle(a.title)}>
                   {wikiThumbnails[a.title] && (
-                    <img
-                      src={wikiThumbnails[a.title]}
-                      alt=""
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      className="w-full h-24 object-cover"
-                    />
+                    <img src={wikiThumbnails[a.title]} alt="" loading="lazy" referrerPolicy="no-referrer"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} className="w-full h-24 object-cover" />
                   )}
                   <CardContent className="p-3">
                     <p className="text-xs font-bold line-clamp-2">{a.zhTitle}</p>
                     <p className="text-[9px] text-muted-foreground mt-0.5">{a.title}</p>
-                    <Badge className="text-[7px] rounded-full px-2 py-0 mt-1">{a.topic}</Badge>
                   </CardContent>
                 </Card>
               ))}
@@ -965,9 +1035,9 @@ export default function ArticlePage() {
                 )}
                 <CardContent className="p-4">
                   <div className="flex items-center gap-1.5 mb-2">
-                    <Badge className="text-[8px] rounded-full px-2 py-0 bg-amber-50 dark:bg-amber-500/15 text-amber-600">{speech.type}</Badge>
+                    <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">{speech.type}</Badge>
                     {!hasContent && (
-                      <Badge className="text-[8px] rounded-full px-2 py-0 bg-rose-50 dark:bg-rose-500/15 text-rose-500">即将上线</Badge>
+                      <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">即将上线</Badge>
                     )}
                   </div>
                   <h3 className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors line-clamp-2">
