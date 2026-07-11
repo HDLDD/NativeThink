@@ -384,6 +384,24 @@ export default function ChunkTrainingPage() {
     setReviewQuality([]);
   };
 
+  // Review memorized (Brain-toggled) chunks specifically
+  const startMemorizedReview = (count?: number) => {
+    const memorized = allChunks.filter((c) => memorizedChunks.has(c.id));
+    if (memorized.length === 0) {
+      toast.info('还没有标记已记的语块，先去语块库标记吧');
+      return;
+    }
+    // Shuffle and take requested count (or all)
+    const shuffled = [...memorized].sort(() => Math.random() - 0.5);
+    const queue = count ? shuffled.slice(0, count) : shuffled;
+    setReviewQueue(queue);
+    setReviewIdx(0);
+    setReviewFlipped(false);
+    setReviewKnown(0);
+    setReviewTotal(0);
+    setReviewQuality([]);
+  };
+
   const handleReviewMark = (quality: number) => {
     const phrase = reviewQueue[reviewIdx];
     if (!phrase) return;
@@ -2230,6 +2248,9 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                       {reviewIdx + 1}/{reviewQueue.length}
                     </Badge>
                   )}
+                  <Button onClick={() => startMemorizedReview()} variant="outline" size="sm" className="rounded-2xl text-[10px] font-black uppercase tracking-wider gap-1.5 border-[#00B894]/30 text-[#00B894] hover:bg-[#00B894]/10">
+                    <Brain className="size-3.5" />已记 ({memorizedChunks.size})
+                  </Button>
                   <Button onClick={() => startReview(20)} variant="outline" size="sm" className="rounded-2xl text-[10px] font-black uppercase tracking-wider gap-1.5">
                     <Shuffle className="size-3.5" />开始复习
                   </Button>
@@ -2244,10 +2265,15 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   </div>
                   <h3 className="text-xl font-black text-foreground mb-2">准备开始复习</h3>
                   <p className="text-sm text-muted-foreground font-medium mb-6">从 {allChunks.length} 个短语中随机抽取 20 个进行闪卡复习</p>
-                  <div className="flex justify-center gap-3">
+                  <div className="flex justify-center gap-3 flex-wrap">
                     <Button onClick={() => startReview(10)} variant="outline" size="sm" className="rounded-2xl text-xs font-bold">10 个</Button>
                     <Button onClick={() => startReview(20)} size="sm" className="rounded-2xl text-xs font-bold bg-[#00B894] hover:bg-[#00A080] text-white">20 个</Button>
                     <Button onClick={() => startReview(allChunks.length)} variant="outline" size="sm" className="rounded-2xl text-xs font-bold">全部 ({allChunks.length})</Button>
+                    {memorizedChunks.size > 0 && (
+                      <Button onClick={() => startMemorizedReview()} size="sm" className="rounded-2xl text-xs font-bold bg-[#00B894]/10 text-[#00B894] hover:bg-[#00B894]/20 border border-[#00B894]/30 gap-1.5">
+                        <Brain className="size-3.5" />复习已记 ({memorizedChunks.size})
+                      </Button>
+                    )}
                   </div>
                 </div>
               ) : reviewIdx >= reviewQueue.length ? (

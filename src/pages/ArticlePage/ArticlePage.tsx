@@ -40,18 +40,86 @@ const SOURCES: { key: Source; label: string; icon: typeof Globe; desc: string }[
   { key: 'speeches', label: '名人演讲', icon: Mic, desc: '经典英文演讲稿' },
 ];
 
-// ── Cached famous speeches ──
-const FAMOUS_SPEECHES = [
-  { id: 'mlk-dream', title: 'I Have a Dream', author: 'Martin Luther King Jr.', year: 1963, topic: 'history', preview: 'I am happy to join with you today in what will go down in history as the greatest demonstration for freedom in the history of our nation...' },
-  { id: 'gettysburg', title: 'The Gettysburg Address', author: 'Abraham Lincoln', year: 1863, topic: 'history', preview: 'Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty...' },
-  { id: 'churchill-finest', title: 'Their Finest Hour', author: 'Winston Churchill', year: 1940, topic: 'history', preview: 'What General Weygand called the Battle of France is over. I expect that the Battle of Britain is about to begin...' },
-  { id: 'jfk-inaugural', title: 'Inaugural Address', author: 'John F. Kennedy', year: 1961, topic: 'history', preview: 'We observe today not a victory of party but a celebration of freedom—symbolizing an end as well as a beginning...' },
-  { id: 'mandela-1994', title: 'Inaugural Address', author: 'Nelson Mandela', year: 1994, topic: 'history', preview: 'Our deepest fear is not that we are inadequate. Our deepest fear is that we are powerful beyond measure...' },
-  { id: 'susan-anthony', title: 'On Women\'s Right to Vote', author: 'Susan B. Anthony', year: 1873, topic: 'culture', preview: 'Friends and fellow citizens: I stand before you tonight under indictment for the alleged crime of having voted...' },
-  { id: 'jobs-stanford', title: 'Stanford Commencement Address', author: 'Steve Jobs', year: 2005, topic: 'business', preview: 'I am honored to be with you today at your commencement from one of the finest universities in the world...' },
-  { id: 'rowling-harvard', title: 'The Fringe Benefits of Failure', author: 'J.K. Rowling', year: 2008, topic: 'culture', preview: 'President Faust, members of the Harvard Corporation and the Board of Overseers...' },
-  { id: 'obama-yes-we-can', title: 'Yes We Can', author: 'Barack Obama', year: 2008, topic: 'history', preview: 'If there is anyone out there who still doubts that America is a place where all things are possible...' },
-  { id: 'rand-Atlas', title: 'Atlas Shrugged Speech', author: 'Ayn Rand', year: 1957, topic: 'philosophy', preview: 'For twelve years you have been asking: Who is John Galt? This is John Galt speaking...' },
+// ── Curated Gutenberg books with Chinese translations ──
+const GUTENBERG_BOOKS: { id: number; title: string; zhTitle: string; author: string; zhAuthor: string; topic: string }[] = [
+  { id: 1342, title: 'Pride and Prejudice', zhTitle: '傲慢与偏见', author: 'Jane Austen', zhAuthor: '简·奥斯汀', topic: 'literature' },
+  { id: 84, title: 'Frankenstein', zhTitle: '弗兰肯斯坦', author: 'Mary Shelley', zhAuthor: '玛丽·雪莱', topic: 'literature' },
+  { id: 11, title: 'Alice\'s Adventures in Wonderland', zhTitle: '爱丽丝梦游仙境', author: 'Lewis Carroll', zhAuthor: '刘易斯·卡罗尔', topic: 'literature' },
+  { id: 1661, title: 'The Adventures of Sherlock Holmes', zhTitle: '福尔摩斯探案集', author: 'Arthur Conan Doyle', zhAuthor: '柯南·道尔', topic: 'literature' },
+  { id: 345, title: 'Dracula', zhTitle: '德古拉', author: 'Bram Stoker', zhAuthor: '布莱姆·斯托克', topic: 'literature' },
+  { id: 2701, title: 'Moby Dick', zhTitle: '白鲸', author: 'Herman Melville', zhAuthor: '赫尔曼·梅尔维尔', topic: 'literature' },
+  { id: 43, title: 'The Strange Case of Dr. Jekyll and Mr. Hyde', zhTitle: '化身博士', author: 'Robert Louis Stevenson', zhAuthor: '史蒂文森', topic: 'literature' },
+  { id: 174, title: 'The Picture of Dorian Gray', zhTitle: '道林·格雷的画像', author: 'Oscar Wilde', zhAuthor: '奥斯卡·王尔德', topic: 'literature' },
+  { id: 730, title: 'Oliver Twist', zhTitle: '雾都孤儿', author: 'Charles Dickens', zhAuthor: '查尔斯·狄更斯', topic: 'literature' },
+  { id: 1400, title: 'Great Expectations', zhTitle: '远大前程', author: 'Charles Dickens', zhAuthor: '查尔斯·狄更斯', topic: 'literature' },
+  { id: 2600, title: 'War and Peace', zhTitle: '战争与和平', author: 'Leo Tolstoy', zhAuthor: '列夫·托尔斯泰', topic: 'literature' },
+  { id: 1184, title: 'The Count of Monte Cristo', zhTitle: '基督山伯爵', author: 'Alexandre Dumas', zhAuthor: '大仲马', topic: 'literature' },
+  { id: 98, title: 'A Tale of Two Cities', zhTitle: '双城记', author: 'Charles Dickens', zhAuthor: '查尔斯·狄更斯', topic: 'literature' },
+  { id: 1232, title: 'The Prince', zhTitle: '君主论', author: 'Niccolò Machiavelli', zhAuthor: '马基雅维利', topic: 'philosophy' },
+  { id: 1635, title: 'Meditations', zhTitle: '沉思录', author: 'Marcus Aurelius', zhAuthor: '马可·奥勒留', topic: 'philosophy' },
+  { id: 3600, title: 'The Wealth of Nations', zhTitle: '国富论', author: 'Adam Smith', zhAuthor: '亚当·斯密', topic: 'business' },
+  { id: 1228, title: 'On the Origin of Species', zhTitle: '物种起源', author: 'Charles Darwin', zhAuthor: '查尔斯·达尔文', topic: 'science' },
+  { id: 3300, title: 'The Republic', zhTitle: '理想国', author: 'Plato', zhAuthor: '柏拉图', topic: 'philosophy' },
+  { id: 76, title: 'Adventures of Huckleberry Finn', zhTitle: '哈克贝利·费恩历险记', author: 'Mark Twain', zhAuthor: '马克·吐温', topic: 'literature' },
+  { id: 1260, title: 'Jane Eyre', zhTitle: '简·爱', author: 'Charlotte Brontë', zhAuthor: '夏洛蒂·勃朗特', topic: 'literature' },
+  { id: 768, title: 'Wuthering Heights', zhTitle: '呼啸山庄', author: 'Emily Brontë', zhAuthor: '艾米莉·勃朗特', topic: 'literature' },
+  { id: 244, title: 'The Time Machine', zhTitle: '时间机器', author: 'H.G. Wells', zhAuthor: 'H.G.威尔斯', topic: 'literature' },
+];
+
+// ── Curated Wikipedia articles with Chinese translations ──
+const WIKI_ARTICLES: { title: string; zhTitle: string; topic: string }[] = [
+  { title: 'Climate change', zhTitle: '气候变化', topic: 'science' },
+  { title: 'Artificial intelligence', zhTitle: '人工智能', topic: 'tech' },
+  { title: 'Renaissance', zhTitle: '文艺复兴', topic: 'history' },
+  { title: 'Industrial Revolution', zhTitle: '工业革命', topic: 'history' },
+  { title: 'Quantum mechanics', zhTitle: '量子力学', topic: 'science' },
+  { title: 'Ancient Egypt', zhTitle: '古埃及', topic: 'history' },
+  { title: 'Solar System', zhTitle: '太阳系', topic: 'science' },
+  { title: 'World War II', zhTitle: '第二次世界大战', topic: 'history' },
+  { title: 'Democracy', zhTitle: '民主', topic: 'culture' },
+  { title: 'Globalization', zhTitle: '全球化', topic: 'culture' },
+  { title: 'Neuroscience', zhTitle: '神经科学', topic: 'science' },
+  { title: 'Buddhism', zhTitle: '佛教', topic: 'culture' },
+  { title: 'Roman Empire', zhTitle: '罗马帝国', topic: 'history' },
+  { title: 'Internet', zhTitle: '互联网', topic: 'tech' },
+  { title: 'Evolution', zhTitle: '进化论', topic: 'science' },
+  { title: 'French Revolution', zhTitle: '法国大革命', topic: 'history' },
+  { title: 'Renewable energy', zhTitle: '可再生能源', topic: 'science' },
+  { title: 'Psychology', zhTitle: '心理学', topic: 'science' },
+  { title: 'Ancient Greece', zhTitle: '古希腊', topic: 'history' },
+  { title: 'Blockchain', zhTitle: '区块链', topic: 'tech' },
+  { title: 'Philosophy', zhTitle: '哲学', topic: 'philosophy' },
+  { title: 'Great Wall of China', zhTitle: '万里长城', topic: 'history' },
+];
+
+// ── Famous speeches + TED talks ──
+const FAMOUS_SPEECHES: { id: string; title: string; zhTitle: string; author: string; year: number; type: string; topic: string; preview: string }[] = [
+  { id: 'mlk-dream', title: 'I Have a Dream', zhTitle: '我有一个梦想', author: 'Martin Luther King Jr.', year: 1963, type: '历史演讲', topic: 'history', preview: 'I am happy to join with you today in what will go down in history as the greatest demonstration for freedom in the history of our nation...' },
+  { id: 'gettysburg', title: 'The Gettysburg Address', zhTitle: '葛底斯堡演说', author: 'Abraham Lincoln', year: 1863, type: '历史演讲', topic: 'history', preview: 'Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty...' },
+  { id: 'churchill-finest', title: 'Their Finest Hour', zhTitle: '最光辉的时刻', author: 'Winston Churchill', year: 1940, type: '历史演讲', topic: 'history', preview: 'What General Weygand called the Battle of France is over. I expect that the Battle of Britain is about to begin...' },
+  { id: 'jfk-inaugural', title: 'Inaugural Address', zhTitle: '就职演说', author: 'John F. Kennedy', year: 1961, type: '历史演讲', topic: 'history', preview: 'We observe today not a victory of party but a celebration of freedom—symbolizing an end as well as a beginning...' },
+  { id: 'susan-anthony', title: 'On Women\'s Right to Vote', zhTitle: '论妇女选举权', author: 'Susan B. Anthony', year: 1873, type: '历史演讲', topic: 'culture', preview: 'Friends and fellow citizens: I stand before you tonight under indictment for the alleged crime of having voted...' },
+  // TED Talks
+  { id: 'ted-robinson-school', title: 'Do Schools Kill Creativity?', zhTitle: '学校扼杀创造力吗？', author: 'Sir Ken Robinson', year: 2006, type: 'TED', topic: 'culture', preview: 'Good morning. How are you? It\'s been great, hasn\'t it? I\'ve been blown away by the whole thing...' },
+  { id: 'ted-sinek-leaders', title: 'How Great Leaders Inspire Action', zhTitle: '伟大领袖如何激励行动', author: 'Simon Sinek', year: 2009, type: 'TED', topic: 'business', preview: 'How do you explain when things don\'t go as we assume? Or better, how do you explain when others are able to achieve things...' },
+  { id: 'ted-brown-vulnerability', title: 'The Power of Vulnerability', zhTitle: '脆弱的力量', author: 'Brené Brown', year: 2010, type: 'TED', topic: 'culture', preview: 'So, I\'ll start with this: a couple years ago, an event planner called me because I was going to do a speaking event...' },
+  { id: 'ted-cuddy-body', title: 'Your Body Language Shapes Who You Are', zhTitle: '肢体语言塑造你自己', author: 'Amy Cuddy', year: 2012, type: 'TED', topic: 'science', preview: 'So I want to start by offering you a free no-tech life hack, and all it requires of you is this...' },
+  { id: 'ted-duckworth-grit', title: 'Grit: The Power of Passion and Perseverance', zhTitle: '毅力：激情与坚持的力量', author: 'Angela Duckworth', year: 2013, type: 'TED', topic: 'culture', preview: 'When I was 27 years old, I left a very demanding job in management consulting for a job that was even more demanding: teaching...' },
+  { id: 'ted-harari-nationalism', title: 'Why Fascism is so Tempting', zhTitle: '法西斯主义为何诱人', author: 'Yuval Noah Harari', year: 2018, type: 'TED', topic: 'history', preview: 'So, humankind has two great stories: the story of the individual and the story of the collective...' },
+  { id: 'ted-gates-climate', title: 'Innovating to Zero', zhTitle: '创新到零排放', author: 'Bill Gates', year: 2010, type: 'TED', topic: 'science', preview: 'I\'m going to talk today about energy and climate. And that might seem a bit surprising...' },
+  { id: 'ted-adichie-single', title: 'The Danger of a Single Story', zhTitle: '单一故事的危险', author: 'Chimamanda Adichie', year: 2009, type: 'TED', topic: 'culture', preview: 'I\'m a storyteller. And I would like to tell you a few personal stories about what I like to call "the danger of the single story."...' },
+  { id: 'ted-urban-procrastination', title: 'Inside the Mind of a Master Procrastinator', zhTitle: '拖延症大师的内心世界', author: 'Tim Urban', year: 2016, type: 'TED', topic: 'culture', preview: 'So in college, I was a government major, which means I had to write a lot of papers...' },
+  { id: 'ted-godin-tribes', title: 'The Tribes We Lead', zhTitle: '我们领导的部落', author: 'Seth Godin', year: 2009, type: 'TED', topic: 'business', preview: 'Something really important is happening. The Internet has ended the age of mass marketing...' },
+  // More classic speeches
+  { id: 'jobs-stanford', title: 'Stanford Commencement Address', zhTitle: '斯坦福毕业演讲', author: 'Steve Jobs', year: 2005, type: '毕业演讲', topic: 'business', preview: 'I am honored to be with you today at your commencement from one of the finest universities in the world...' },
+  { id: 'rowling-harvard', title: 'The Fringe Benefits of Failure', zhTitle: '失败带来的额外收益', author: 'J.K. Rowling', year: 2008, type: '毕业演讲', topic: 'culture', preview: 'President Faust, members of the Harvard Corporation and the Board of Overseers...' },
+  { id: 'obama-yes-we-can', title: 'Yes We Can Speech', zhTitle: '是的，我们可以', author: 'Barack Obama', year: 2008, type: '政治演讲', topic: 'history', preview: 'If there is anyone out there who still doubts that America is a place where all things are possible...' },
+  { id: 'rand-Atlas', title: 'This is John Galt Speaking', zhTitle: '约翰·高尔特演说', author: 'Ayn Rand', year: 1957, type: '文学演讲', topic: 'philosophy', preview: 'For twelve years you have been asking: Who is John Galt? This is John Galt speaking...' },
+  { id: 'mandela-inaugural', title: 'Inaugural Address', zhTitle: '就职演说', author: 'Nelson Mandela', year: 1994, type: '历史演讲', topic: 'history', preview: 'Our deepest fear is not that we are inadequate. Our deepest fear is that we are powerful beyond measure...' },
+  { id: 'greta-un-climate', title: 'How Dare You', zhTitle: '你们怎么敢', author: 'Greta Thunberg', year: 2019, type: 'UN演讲', topic: 'science', preview: 'My message is that we\'ll be watching you. This is all wrong. I shouldn\'t be up here...' },
+  { id: 'emma-heforshe', title: 'HeForShe Gender Equality', zhTitle: '他为她性别平等', author: 'Emma Watson', year: 2014, type: 'UN演讲', topic: 'culture', preview: 'Today we are launching a campaign called "HeForShe." I am reaching out to you because I need your help...' },
+  { id: 'malala-un', title: 'Education for All', zhTitle: '全民教育', author: 'Malala Yousafzai', year: 2013, type: 'UN演讲', topic: 'culture', preview: 'In the name of God, the most beneficent, the most merciful. Honorable UN Secretary General...' },
+  { id: 'reagan-challenger', title: 'The Challenger Disaster Speech', zhTitle: '挑战者号灾难演说', author: 'Ronald Reagan', year: 1986, type: '历史演讲', topic: 'history', preview: 'Ladies and gentlemen, I\'d planned to speak to you tonight to report on the state of the Union...' },
 ];
 
 interface GutenbergBook { id: number; title: string; authors: { name: string }[]; subjects: string[]; formats: Record<string, string>; download_count: number; }
@@ -234,12 +302,12 @@ export default function ArticlePage() {
   }, []);
 
   // ── Wikipedia Search ──
-  const searchWikipedia = useCallback(async () => {
-    if (!wikiQuery.trim()) return;
+  const searchWikipedia = useCallback(async (title?: string) => {
+    const q = (title || wikiQuery).trim();
+    if (!q) return;
     setWikiLoading(true);
     try {
-      const title = wikiQuery.trim();
-      const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
+      const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`);
       if (!res.ok) { toast.error('未找到该条目，请尝试其他关键词'); return; }
       const page: WikiPage = await res.json();
       setWikiPage(page);
@@ -253,18 +321,21 @@ export default function ArticlePage() {
       toast.success(`已加载：${page.title}`);
     } catch { toast.error('加载失败'); }
     finally { setWikiLoading(false); }
-  }, [wikiQuery]);
+  }, [wikiQuery, saveToHistory]);
 
   // ── Load Speech ──
   const fetchSpeech = useCallback(async (speech: typeof FAMOUS_SPEECHES[0]) => {
     setLoading(true);
     try {
-      // Fetch full speech text from a public domain source
       const knownTexts: Record<string, string> = {
         'mlk-dream': 'I am happy to join with you today in what will go down in history as the greatest demonstration for freedom in the history of our nation. Five score years ago, a great American, in whose symbolic shadow we stand today, signed the Emancipation Proclamation. This momentous decree came as a great beacon light of hope to millions of Negro slaves who had been seared in the flames of withering injustice. It came as a joyous daybreak to end the long night of their captivity. But one hundred years later, the Negro still is not free... I have a dream that one day this nation will rise up and live out the true meaning of its creed: "We hold these truths to be self-evident, that all men are created equal." I have a dream that one day on the red hills of Georgia, the sons of former slaves and the sons of former slave owners will be able to sit down together at the table of brotherhood... I have a dream that my four little children will one day live in a nation where they will not be judged by the color of their skin but by the content of their character. I have a dream today!',
         'gettysburg': 'Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived and so dedicated, can long endure. We are met on a great battlefield of that war. We have come to dedicate a portion of that field, as a final resting place for those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we can not dedicate—we can not consecrate—we can not hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it, far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced... that this nation, under God, shall have a new birth of freedom—and that government of the people, by the people, for the people, shall not perish from the earth.',
+        'jfk-inaugural': 'We observe today not a victory of party but a celebration of freedom—symbolizing an end as well as a beginning—signifying renewal as well as change. For I have sworn before you and Almighty God the same solemn oath our forebears prescribed nearly a century and three quarters ago. The world is very different now. For man holds in his mortal hands the power to abolish all forms of human poverty and all forms of human life. And yet the same revolutionary beliefs for which our forebears fought are still at issue around the globe... And so, my fellow Americans: ask not what your country can do for you—ask what you can do for your country. My fellow citizens of the world: ask not what America will do for you, but what together we can do for the freedom of man.',
+        'churchill-finest': 'What General Weygand called the Battle of France is over. I expect that the Battle of Britain is about to begin. Upon this battle depends the survival of Christian civilization. Upon it depends our own British life, and the long continuity of our institutions and our Empire. The whole fury and might of the enemy must very soon be turned on us. Hitler knows that he will have to break us in this Island or lose the war. If we can stand up to him, all Europe may be free and the life of the world may move forward into broad, sunlit uplands... Let us therefore brace ourselves to our duties, and so bear ourselves that, if the British Empire and its Commonwealth last for a thousand years, men will still say, "This was their finest hour."',
+        'jobs-stanford': 'I am honored to be with you today at your commencement from one of the finest universities in the world. I never graduated from college. Truth be told, this is the closest I\'ve ever gotten to a college graduation. Today I want to tell you three stories from my life. That\'s it. No big deal. Just three stories... Your time is limited, so don\'t waste it living someone else\'s life. Don\'t be trapped by dogma—which is living with the results of other people\'s thinking. Don\'t let the noise of others\' opinions drown out your own inner voice. And most important, have the courage to follow your heart and intuition... Stay hungry, stay foolish.',
+        'susan-anthony': 'Friends and fellow citizens: I stand before you tonight under indictment for the alleged crime of having voted at the last presidential election, without having a lawful right to vote. It shall be my work this evening to prove to you that in thus voting, I not only committed no crime, but, instead, simply exercised my citizen\'s rights, guaranteed to me and all United States citizens by the National Constitution, beyond the power of any state to deny.',
       };
-      const content = knownTexts[speech.id] || speech.preview;
+      const content = knownTexts[speech.id] || speech.preview + '\n\n[注：本文为演讲摘要。TED 及部分演讲因版权限制仅提供摘要，完整内容请访问 ted.com 或相关来源。AI 可基于摘要生成学习文章。]';
       setDisplayTitle(`${speech.title} — ${speech.author} (${speech.year})`);
       setDisplayContent(content);
       setDisplayTranslation('');
@@ -272,10 +343,10 @@ export default function ArticlePage() {
       setDisplayQuestions([]);
       setQuizMode(false);
       saveToHistory(speech.title, content, 'speeches');
-      toast.success(`已加载演讲：${speech.title}`);
+      toast.success(`已加载：${speech.zhTitle || speech.title}`);
     } catch { toast.error('加载失败'); }
     finally { setLoading(false); }
-  }, []);
+  }, [saveToHistory]);
 
   // ── Word Lookup ──
   const handleWordClick = useCallback(async (word: string) => {
@@ -507,34 +578,43 @@ export default function ArticlePage() {
       {source === 'gutenberg' && (
         <Card className="rounded-[28px] border-border shadow-sm">
           <CardContent className="p-4 space-y-4">
-            <div className="flex gap-2">
-              <Input value={gutenbergQuery} onChange={(e) => setGutenbergQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && searchGutenberg()}
-                placeholder="搜索公版书籍 (英文)…" className="flex-1 rounded-2xl h-12 text-sm" />
-              <Button onClick={searchGutenberg} disabled={gutenbergLoading} className="rounded-2xl px-6">
-                {gutenbergLoading ? <Loader2 className="size-5 animate-spin" /> : <Search className="size-5" />}
-              </Button>
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">推荐书籍</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+              {GUTENBERG_BOOKS.map((book) => (
+                <button key={book.id} onClick={() => fetchGutenbergBook({ id: book.id, title: book.title, authors: [{ name: book.author }], subjects: [book.topic], formats: { 'text/plain': `https://www.gutenberg.org/files/${book.id}/${book.id}-0.txt` }, download_count: 0 })}
+                  className="text-left p-3 rounded-2xl bg-muted/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors border border-transparent hover:border-[#00B894]/20">
+                  <p className="text-xs font-black text-foreground">{book.title}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{book.zhTitle} · {book.author}</p>
+                  <p className="text-[9px] text-[#00B894]/70 mt-0.5">{book.zhAuthor}</p>
+                </button>
+              ))}
+            </div>
+            <div className="border-t border-border pt-3">
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">搜索更多</p>
+              <div className="flex gap-2">
+                <Input value={gutenbergQuery} onChange={(e) => setGutenbergQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && searchGutenberg()}
+                  placeholder="搜索公版书籍 (英文)…" className="flex-1 rounded-2xl h-12 text-sm" />
+                <Button onClick={searchGutenberg} disabled={gutenbergLoading} className="rounded-2xl px-6">
+                  {gutenbergLoading ? <Loader2 className="size-5 animate-spin" /> : <Search className="size-5" />}
+                </Button>
+              </div>
             </div>
             {gutenbergSearchDone && gutenbergResults.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">未找到相关书籍，请尝试其他关键词</p>
+              <p className="text-sm text-muted-foreground text-center py-2">未找到相关书籍</p>
             )}
             {gutenbergResults.length > 0 && (
-              <div className="space-y-2 max-h-80 overflow-y-auto">
+              <div className="space-y-2 max-h-60 overflow-y-auto">
                 {gutenbergResults.map((book) => (
                   <button key={book.id} onClick={() => fetchGutenbergBook(book)}
-                    className="w-full text-left p-3 rounded-2xl bg-muted/50 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors border border-transparent hover:border-[#00B894]/20">
+                    className="w-full text-left p-3 rounded-2xl bg-muted/50 hover:bg-emerald-50 transition-colors border border-transparent hover:border-[#00B894]/20">
                     <p className="text-sm font-black text-foreground">{book.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {book.authors[0]?.name || 'Unknown'} {book.download_count > 0 && `· ↓${book.download_count}`}
-                    </p>
-                    {book.subjects?.slice(0, 3).map((s) => (
-                      <Badge key={s} variant="secondary" className="rounded-full px-2 py-0 text-[9px] mr-1 mt-1">{s.split('--').pop()}</Badge>
-                    ))}
+                    <p className="text-xs text-muted-foreground">{book.authors[0]?.name || 'Unknown'}</p>
                   </button>
                 ))}
               </div>
             )}
-            <p className="text-[9px] text-muted-foreground text-center">内容来自 Project Gutenberg 开源书库 (public domain)</p>
+            <p className="text-[9px] text-muted-foreground text-center">内容来自 Project Gutenberg (public domain)</p>
           </CardContent>
         </Card>
       )}
@@ -542,13 +622,26 @@ export default function ArticlePage() {
       {source === 'wikipedia' && (
         <Card className="rounded-[28px] border-border shadow-sm">
           <CardContent className="p-4 space-y-4">
-            <div className="flex gap-2">
-              <Input value={wikiQuery} onChange={(e) => setWikiQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && searchWikipedia()}
-                placeholder="搜索 Wikipedia 条目 (英文)…" className="flex-1 rounded-2xl h-12 text-sm" />
-              <Button onClick={searchWikipedia} disabled={wikiLoading} className="rounded-2xl px-6">
-                {wikiLoading ? <Loader2 className="size-5 animate-spin" /> : <Search className="size-5" />}
-              </Button>
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">推荐条目</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+              {WIKI_ARTICLES.map((article) => (
+                <button key={article.title} onClick={() => { setWikiQuery(article.title); searchWikipedia(article.title); }}
+                  className="text-left p-3 rounded-2xl bg-muted/30 hover:bg-sky-50 dark:hover:bg-sky-500/10 transition-colors border border-transparent hover:border-sky-200">
+                  <p className="text-xs font-black text-foreground">{article.title}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{article.zhTitle}</p>
+                </button>
+              ))}
+            </div>
+            <div className="border-t border-border pt-3">
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">搜索更多</p>
+              <div className="flex gap-2">
+                <Input value={wikiQuery} onChange={(e) => setWikiQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && searchWikipedia()}
+                  placeholder="搜索 Wikipedia 条目 (英文)…" className="flex-1 rounded-2xl h-12 text-sm" />
+                <Button onClick={searchWikipedia} disabled={wikiLoading} className="rounded-2xl px-6">
+                  {wikiLoading ? <Loader2 className="size-5 animate-spin" /> : <Search className="size-5" />}
+                </Button>
+              </div>
             </div>
             <p className="text-[9px] text-muted-foreground text-center">内容来自 Wikipedia (CC BY-SA)</p>
           </CardContent>
@@ -557,16 +650,26 @@ export default function ArticlePage() {
 
       {source === 'speeches' && (
         <Card className="rounded-[28px] border-border shadow-sm">
-          <CardContent className="p-4 space-y-2 max-h-96 overflow-y-auto">
-            {FAMOUS_SPEECHES.map((speech) => (
-              <button key={speech.id} onClick={() => fetchSpeech(speech)}
-                className="w-full text-left p-3 rounded-2xl bg-muted/50 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors border border-transparent hover:border-amber-200">
-                <p className="text-sm font-black text-foreground">{speech.title}</p>
-                <p className="text-xs text-muted-foreground">{speech.author} · {speech.year}</p>
-                <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 italic">"{speech.preview}"</p>
-              </button>
-            ))}
-            <p className="text-[9px] text-muted-foreground text-center pt-2">经典演讲稿 (public domain)</p>
+          <CardContent className="p-4 space-y-3">
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">名人演讲 & TED</p>
+            <div className="max-h-[500px] overflow-y-auto space-y-2">
+              {FAMOUS_SPEECHES.map((speech) => (
+                <button key={speech.id} onClick={() => fetchSpeech(speech)}
+                  className="w-full text-left p-3 rounded-2xl bg-muted/30 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors border border-transparent hover:border-amber-200">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-black text-foreground">{speech.zhTitle}</p>
+                    <Badge className={cn('rounded-full px-1.5 py-0 text-[8px] font-bold shrink-0',
+                      speech.type === 'TED' ? 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400' :
+                      speech.type === 'UN演讲' ? 'bg-sky-100 text-sky-600' :
+                      speech.type === '毕业演讲' ? 'bg-emerald-100 text-emerald-600' :
+                      'bg-amber-100 text-amber-700')}>{speech.type}</Badge>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{speech.title} · {speech.author} ({speech.year})</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1 line-clamp-2 italic">"{speech.preview}"</p>
+                </button>
+              ))}
+            </div>
+            <p className="text-[9px] text-muted-foreground text-center">经典演讲稿 (public domain)</p>
           </CardContent>
         </Card>
       )}
