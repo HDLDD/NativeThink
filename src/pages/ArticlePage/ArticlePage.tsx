@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   FileText, Sparkles, Languages, BookOpen, Volume2, RefreshCw, Loader2,
   Search, ExternalLink, X, Globe, Library, Mic, Wand2, BookMarked,
-  GraduationCap, Clock, RotateCw, History, Newspaper, ChevronRight, Play, HelpCircle,
+  GraduationCap, Clock, RotateCw, History, Newspaper, ChevronLeft, ChevronRight, Play, HelpCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -249,6 +249,7 @@ export default function ArticlePage() {
       safeStorage.setItem(AI_ARTICLES_KEY, JSON.stringify(next));
       return next;
     });
+  };
 
   // Reload AI articles when cloud sync pulls data from other devices
   useEffect(() => {
@@ -259,17 +260,16 @@ export default function ArticlePage() {
       } catch { /* */ }
     };
     const onStorage = (e: StorageEvent) => {
-      if (e.key && e.key.includes("__nativethink_ai_articles")) reload();
+      if (e.key && e.key.includes('__nativethink_ai_articles')) reload();
     };
-    window.addEventListener("storage", onStorage);
-    const onVisible = () => { if (document.visibilityState === "visible") reload(); };
-    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener('storage', onStorage);
+    const onVisible = () => { if (document.visibilityState === 'visible') reload(); };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
-      window.removeEventListener("storage", onStorage);
-      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener('storage', onStorage);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
-  };
 
   // ── History ──
   const HISTORY_KEY = '__nativethink_article_history';
