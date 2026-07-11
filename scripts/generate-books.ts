@@ -119,7 +119,7 @@ async function main() {
 
   for (const book of BOOKS) {
     const key = book.id.toString();
-    allIds.push(`'${key}'`);
+    allIds.push(key);
     console.log(`\nProcessing: ${book.title} (#${book.id})...`);
     const enParas = await fetchBook(book.id);
     if (enParas.length === 0) {

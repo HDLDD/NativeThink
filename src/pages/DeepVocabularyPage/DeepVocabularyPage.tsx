@@ -270,6 +270,7 @@ export default function DeepVocabularyPage() {
     posFilter: 'all',
     registerFilter: 'all',
     collocOnly: false,
+    browseMemoryFilter: 'all' as 'all' | 'memorized' | 'unmemorized',
   });
   const [searchQuery, setSearchQuery] = usePageMemoryDebounced('vocab-search', '');
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -321,7 +322,9 @@ export default function DeepVocabularyPage() {
 
   // Browse tab: level filter, memory, page size
   const SUB_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] as const;
-  const [browseMemoryFilter, setBrowseMemoryFilter] = useState<'all' | 'memorized' | 'unmemorized'>('all');
+  const [browseMemoryFilter, setBrowseMemoryFilter] = useState<'all' | 'memorized' | 'unmemorized'>(
+    () => memory.browseMemoryFilter || 'all',
+  );
   const [browsePageSize, setBrowsePageSize] = useState(20);
   const [memorizedWords, setMemorizedWords] = useState<Set<string>>(() => {
     try { const s = safeStorage.getItem('__nativethink_browse_memorized'); return s ? new Set(JSON.parse(s)) : new Set(); }
@@ -994,7 +997,7 @@ export default function DeepVocabularyPage() {
                       ] as const).map(({ key, label }) => (
                         <button
                           key={key}
-                          onClick={() => setBrowseMemoryFilter(key)}
+                          onClick={() => { setBrowseMemoryFilter(key); setMemory((p) => ({ ...p, browseMemoryFilter: key })); }}
                           className={cn(
                             'px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all',
                             browseMemoryFilter === key
@@ -1071,7 +1074,7 @@ export default function DeepVocabularyPage() {
                                     title={memorized ? '取消记忆' : '标记为已记'}
                                     className={cn(
                                       'p-0.5 rounded-lg transition-colors',
-                                      memorized ? 'text-[#00B894] hover:text-[#00B894]/70' : 'text-muted-foreground/30 hover:text-[#00B894]',
+                                      memorized ? 'text-[#00B894] hover:text-[#00B894]/70' : 'text-muted-foreground/40 hover:text-[#00B894]',
                                     )}
                                   >
                                     <Brain className={cn('size-3.5', memorized && 'fill-[#00B894]/20')} />

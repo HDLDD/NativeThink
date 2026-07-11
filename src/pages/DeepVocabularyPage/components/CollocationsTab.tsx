@@ -136,7 +136,7 @@ export default function CollocationsTab({
 
   function loadPersisted<T>(field: string, fallback: T): T {
     try {
-      const raw = safeStorage.getItem(COLLOC_MEMORY_KEY);
+      const raw = localStorage.getItem(COLLOC_MEMORY_KEY);
       if (!raw) return fallback;
       const saved = JSON.parse(raw);
       const val = saved[field];
@@ -149,10 +149,10 @@ export default function CollocationsTab({
   function persistState(partial: Record<string, unknown>) {
     try {
       let existing: Record<string, unknown> = {};
-      const raw = safeStorage.getItem(COLLOC_MEMORY_KEY);
+      const raw = localStorage.getItem(COLLOC_MEMORY_KEY);
       if (raw) { try { existing = JSON.parse(raw); } catch { /* ignore */ } }
       Object.assign(existing, partial);
-      safeStorage.setItem(COLLOC_MEMORY_KEY, JSON.stringify(existing));
+      localStorage.setItem(COLLOC_MEMORY_KEY, JSON.stringify(existing));
     } catch { /* ignore */ }
   }
 
@@ -180,7 +180,8 @@ export default function CollocationsTab({
   const MEMORIZED_STORAGE_KEY = '__nativethink_colloc_memorized';
   const [memorizedCollocs, setMemorizedCollocs] = useState<Set<string>>(() => {
     try {
-      const raw = safeStorage.getItem(MEMORIZED_STORAGE_KEY);
+      // Use raw localStorage for memory — safeStorage prefix can change with login state
+      const raw = localStorage.getItem(MEMORIZED_STORAGE_KEY);
       return raw ? new Set(JSON.parse(raw)) : new Set<string>();
     } catch { return new Set<string>(); }
   });
@@ -191,7 +192,7 @@ export default function CollocationsTab({
     setMemorizedCollocs((prev) => {
       const next = new Set(prev);
       if (next.has(key)) { next.delete(key); } else { next.add(key); }
-      safeStorage.setItem(MEMORIZED_STORAGE_KEY, JSON.stringify([...next]));
+      try { localStorage.setItem(MEMORIZED_STORAGE_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
       return next;
     });
   };
