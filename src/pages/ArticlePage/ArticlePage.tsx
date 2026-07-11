@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   FileText, Sparkles, Languages, BookOpen, Volume2, RefreshCw, Loader2,
   Search, ExternalLink, X, Globe, Library, Mic, Wand2, BookMarked,
-  GraduationCap, Clock, RotateCw, History, Newspaper, ChevronRight, Play,
+  GraduationCap, Clock, RotateCw, History, Newspaper, ChevronRight, Play, HelpCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import { buildPages } from '@/data/reading';
 import type { SpeechMeta } from '@/data/speeches';
+import PageReader from './components/PageReader';
 
 // ── Types ──
 type Level = 'beginner' | 'intermediate' | 'advanced';
@@ -137,6 +138,26 @@ export default function ArticlePage() {
   const [mainTab, setMainTab] = useState<MainTab>('books');
   const [level, setLevel] = useState<Level>('intermediate');
   const [topic, setTopic] = useState('tech');
+
+  // ── Reader state (no TOC, no chapter nav — open content directly) ──
+  const [readerContent, setReaderContent] = useState<IReadingContent | null>(null);
+  const [readerVisible, setReaderVisible] = useState(false);
+  const readingStartRef = useRef(0);
+
+  const openReader = (content: IReadingContent) => {
+    readingStartRef.current = Date.now();
+    setReaderContent(content);
+    setReaderVisible(true);
+  };
+
+  const closeReader = () => {
+    if (readingStartRef.current > 0) {
+      const minutes = Math.round((Date.now() - readingStartRef.current) / 60000 * 10) / 10;
+      if (minutes >= 0.1) addStudyMinutes(minutes, 'articles');
+      readingStartRef.current = 0;
+    }
+    setReaderVisible(false);
+  };
 
   // ── Lazy-loaded data (books & speeches are large, load on tab switch) ──
   const [books, setBooks] = useState<IReadingContent[] | null>(null);
@@ -274,7 +295,7 @@ export default function ArticlePage() {
     } else if (bookId) {
       // Books can only be reopened from the books tab
       const book = books?.find((b) => b.id === bookId);
-      if (book) { /* direct display */ }
+      if (book) { openReader(book); }
     }
   };
 
@@ -313,7 +334,7 @@ export default function ArticlePage() {
           pages: buildPages(allParagraphs),
           totalWords: allParagraphs.reduce((s, p) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
         };
-        /* content ready */;
+        openReader(content);
         saveAiArticle(content);
         toast.success(`已生成 ${genChapters} 章书籍！`);
       } else {
@@ -334,7 +355,7 @@ export default function ArticlePage() {
           pages: buildPages(safeParagraphs),
           totalWords: safeParagraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
         };
-        /* content ready */;
+        openReader(content);
         saveAiArticle(content);
         toast.success(genType === 'publication' ? '刊物文章已生成！' : '文章已生成！');
       }
@@ -349,7 +370,7 @@ export default function ArticlePage() {
     if (!meta) { toast.error('未找到演讲'); return; }
     const existing = buildSpeechFn?.(speechId);
     if (existing) {
-      /* displayed via history */ existing;
+      openReader(existing);
       saveToHistory(meta.zhTitle || meta.title, existing.totalWords.toString(), 'speeches', { speechId });
       toast.success(`已加载：${meta.zhTitle}`);
       return;
@@ -379,7 +400,7 @@ export default function ArticlePage() {
         pages: buildPages(parsed.paragraphs || []),
         totalWords: (parsed.paragraphs || []).reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
       };
-      /* content ready */;
+      openReader(content);
       saveToHistory(parsed.title || '复习词汇文章', content.totalWords.toString(), 'review-words');
       toast.success(`用 ${words.length} 个词汇生成了文章！`);
     } catch { toast.error('生成失败'); }
@@ -498,7 +519,7 @@ export default function ArticlePage() {
               <Card
                 key={book.id}
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => { saveToHistory(book.zhTitle, '', 'books', { bookId: book.id }); }}
+                onClick={() => { openReader(book); saveToHistory(book.zhTitle, '', 'books', { bookId: book.id }); }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
@@ -550,7 +571,7 @@ export default function ArticlePage() {
               <Card
                 key={pub.id}
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => { saveToHistory(pub.zhTitle, '', 'publications'); }}
+                onClick={() => { openReader(pub); saveToHistory(pub.zhTitle, '', 'publications'); }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
@@ -658,7 +679,7 @@ export default function ArticlePage() {
                   <Card
                     key={a.id}
                     className="rounded-2xl border-border hover:border-[#00B894]/40 hover:shadow-sm transition-all cursor-pointer group"
-                    /* saved AI articles are view-only */
+                    onClick={() => openReader(a)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-2">
@@ -828,6 +849,11 @@ export default function ArticlePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── PageReader (no TOC, no chapters — content opens directly) ── */}
+      {readerVisible && readerContent && (
+        <PageReader content={readerContent} onClose={closeReader} />
+      )}
 
     </div>
   );
