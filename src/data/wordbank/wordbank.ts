@@ -118,7 +118,7 @@ async function loadAll(): Promise<void> {
   // Each level contains 3k–18k word entries with examples, collocations, etc.
   // Loading 9 levels simultaneously (~75k entries) risks tab crashes.
   for (const lvl of ALL_LEVELS) {
-    await loadLevel(lvl);
+    try { await loadLevel(lvl); } catch { /* skip failed level — other levels still load */ }
   }
   _allReady = true;
 }
@@ -223,12 +223,26 @@ export function queryWords(params: IWordQuery = {}): IWordEntry[] {
 export function getRandomWords(count: number, level?: string): IWordEntry[] {
   ensureIndexes();
   const pool = level ? (_levelIndex.get(level) || []) : _allWordsCache!;
-  const arr = [...pool];
-  for (let i = 0; i < Math.min(count, arr.length); i++) {
-    const j = i + Math.floor(Math.random() * (arr.length - i));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+  // When sampling few items from a huge pool (e.g. 200 from 75K), use index-picking
+  // instead of copying the entire array to avoid GC pressure and main-thread block.
+  if (count >= pool.length) {
+    const arr = [...pool];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
   }
-  return arr.slice(0, count);
+  const result: IWordEntry[] = [];
+  const seen = new Set<number>();
+  while (result.length < count) {
+    const idx = Math.floor(Math.random() * pool.length);
+    if (!seen.has(idx)) {
+      seen.add(idx);
+      result.push(pool[idx]);
+    }
+  }
+  return result;
 }
 
 export function findWord(word: string): IWordEntry | undefined {
