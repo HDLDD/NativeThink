@@ -71,6 +71,14 @@ export default function PageReader({ content, onClose }: Props) {
   const [lookupLoading, setLookupLoading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // Translation cache state
+  const TR_CACHE_KEY = `__reader_trans_${content.id}`;
+  const [transCache, setTransCache] = useState<Record<number, string[]>>(() => {
+    try { const r = safeStorage.getItem(TR_CACHE_KEY); return r ? JSON.parse(r) : {}; } catch { return {}; }
+  });
+  const [transLoading, setTransLoading] = useState(false);
+  const [transAllLoading, setTransAllLoading] = useState(false);
+
   // Level conversion
   const [convertLevel, setConvertLevel] = useState<string>(content.difficulty || 'intermediate');
   const [convertLoading, setConvertLoading] = useState(false);
@@ -165,6 +173,95 @@ export default function PageReader({ content, onClose }: Props) {
     toast.success('已收藏当前页');
   };
 
+  // ── AI Translation for untranslated content ──
+  const currentPageData = activeContent.pages[currentPage];
+  const needsTranslation = transMode !== 'en' && currentPageData?.paragraphs.some((p) => !p.zh);
+  const pageHasCache = currentPageData && transCache[currentPage];
+
+  const translateCurrentPage = async () => {
+    if (!isConfigured || !currentPageData || !needsTranslation) return;
+    setTransLoading(true);
+    try {
+      const untranslated = currentPageData.paragraphs.filter((p) => !p.zh).map((p) => p.en);
+      const allEn = untranslated.join('\n---PARA---\n');
+      const result = await aiChat([
+        { role: 'system', content: 'Translate the following English paragraphs to natural Chinese. Each paragraph is separated by "---PARA---". Return Chinese translations separated by "---PARA---", same order, same count. Return ONLY the translations.' },
+        { role: 'user', content: allEn.slice(0, 3000) },
+      ], { temperature: 0.3, maxTokens: 2048 });
+      const zhParts = result.split('---PARA---').map((s: string) => s.trim()).filter(Boolean);
+      const newCache = { ...transCache, [currentPage]: zhParts };
+      setTransCache(newCache);
+      safeStorage.setItem(TR_CACHE_KEY, JSON.stringify(newCache));
+      const updatedPages = [...activeContent.pages];
+      let zi = 0;
+      updatedPages[currentPage] = {
+        ...currentPageData,
+        paragraphs: currentPageData.paragraphs.map((p) => (!p.zh && zi < zhParts.length ? { ...p, zh: zhParts[zi++] } : p)),
+      };
+      setDisplayContent({ ...activeContent, pages: updatedPages });
+    } catch { toast.error('翻译失败'); }
+    finally { setTransLoading(false); }
+  };
+
+  const translateAllPages = async () => {
+    if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
+    setTransAllLoading(true);
+    let count = 0;
+    try {
+      const allParas = activeContent.pages.flatMap((p) => p.paragraphs.filter((pp) => !pp.zh).map((pp) => pp.en));
+      if (allParas.length === 0) { toast('所有页面已有翻译'); return; }
+      const batchSize = 8;
+      const newCache = { ...transCache };
+      let updatedPages = [...activeContent.pages];
+      for (let batch = 0; batch < allParas.length; batch += batchSize) {
+        const batchText = allParas.slice(batch, batch + batchSize).join('\n---PARA---\n');
+        const result = await aiChat([
+          { role: 'system', content: 'Translate the following English paragraphs to natural Chinese. Each separated by "---PARA---". Return Chinese translations separated by "---PARA---", same order. Return ONLY translations.' },
+          { role: 'user', content: batchText.slice(0, 3000) },
+        ], { temperature: 0.3, maxTokens: 2048 });
+        const zhParts = result.split('---PARA---').map((s: string) => s.trim()).filter(Boolean);
+        let gi = batch;
+        for (let pi = 0; pi < updatedPages.length && gi < batch + batchSize; pi++) {
+          let changed = false;
+          const newParas = updatedPages[pi].paragraphs.map((p) => {
+            if (p.zh) return p;
+            const zi = gi - batch;
+            if (zi >= 0 && zi < zhParts.length) { gi++; changed = true; count++; return { ...p, zh: zhParts[zi] }; }
+            return p;
+          });
+          if (changed) updatedPages[pi] = { ...updatedPages[pi], paragraphs: newParas };
+        }
+        for (let pi = 0; pi < updatedPages.length; pi++) {
+          const zhs = updatedPages[pi].paragraphs.filter((p) => p.zh).map((p) => p.zh);
+          if (zhs.length > 0) newCache[pi] = zhs;
+        }
+      }
+      setTransCache(newCache);
+      safeStorage.setItem(TR_CACHE_KEY, JSON.stringify(newCache));
+      setDisplayContent({ ...activeContent, pages: updatedPages });
+      toast.success(`已翻译 ${count} 个段落！`);
+    } catch { toast.error('批量翻译失败'); }
+    finally { setTransAllLoading(false); }
+  };
+
+  // Apply cached translations on page change
+  useEffect(() => {
+    if (!currentPageData || transMode === 'en') return;
+    const cached = transCache[currentPage];
+    if (cached && cached.length > 0) {
+      let ci = 0;
+      const updated = currentPageData.paragraphs.map((p) => {
+        if (!p.zh && ci < cached.length) return { ...p, zh: cached[ci++] };
+        return p;
+      });
+      if (updated.some((p, i) => p.zh !== currentPageData.paragraphs[i]?.zh)) {
+        const updatedPages = [...activeContent.pages];
+        updatedPages[currentPage] = { ...currentPageData, paragraphs: updated };
+        setDisplayContent((prev) => ({ ...prev, pages: updatedPages }));
+      }
+    }
+  }, [currentPage, transMode]);
+
   if (!activeContent.pages.length) {
     return (
       <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
@@ -231,6 +328,28 @@ export default function PageReader({ content, onClose }: Props) {
           ))}
         </div>
         <div className="flex-1" />
+        {needsTranslation && isConfigured && (
+          <Button
+            variant="ghost" size="sm"
+            onClick={translateCurrentPage}
+            disabled={transLoading}
+            className="rounded-xl text-[10px] font-bold gap-1 text-amber-600 hover:text-amber-700"
+          >
+            {transLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Globe className="size-3.5" />}
+            AI翻译
+          </Button>
+        )}
+        {isConfigured && (
+          <Button
+            variant="ghost" size="sm"
+            onClick={translateAllPages}
+            disabled={transAllLoading}
+            className="rounded-xl text-[10px] font-bold gap-1"
+          >
+            {transAllLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
+            翻译全部
+          </Button>
+        )}
         <Button variant="ghost" size="sm" onClick={speakPage} className="rounded-xl text-[10px] font-bold gap-1">
           <Volume2 className="size-3.5" />朗读
         </Button>
