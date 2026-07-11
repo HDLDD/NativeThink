@@ -445,6 +445,7 @@ export default function PageReader({ content, onClose }: Props) {
             <ParagraphBlock
               key={i}
               para={para}
+              paraIndex={i + 1}
               transMode={transMode}
               sentenceMode={sentenceMode}
               onWordClick={handleWordClick}
@@ -543,14 +544,17 @@ export default function PageReader({ content, onClose }: Props) {
 }
 
 // ── Paragraph block with word-click + individual TTS + sentence mode + chapter support ──
+const CIRCLED = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮','⑯','⑰','⑱','⑲','⑳'];
+
 function ParagraphBlock({
-  para, transMode, sentenceMode, onWordClick, isSpeaking, tts,
+  para, paraIndex, transMode, sentenceMode, onWordClick, isSpeaking, tts,
 }: {
-  para: IParagraph; transMode: TransMode; sentenceMode: boolean;
+  para: IParagraph; paraIndex?: number; transMode: TransMode; sentenceMode: boolean;
   onWordClick: (e: React.MouseEvent, word: string) => void;
   isSpeaking?: boolean;
   tts: ReturnType<typeof useTTS>;
 }) {
+  const numLabel = paraIndex && paraIndex <= 20 ? CIRCLED[paraIndex - 1] : paraIndex ? `(${paraIndex})` : null;
   const isChapter = para.en.startsWith('##CHAPTER##');
   const displayEn = isChapter ? para.en.replace('##CHAPTER##', '') : para.en;
   const words = displayEn.split(/\s+/).filter(Boolean);
@@ -601,6 +605,9 @@ function ParagraphBlock({
           >
             <Volume2 className="size-3.5" />
           </button>
+          {numLabel && (
+            <span className="shrink-0 text-xs font-bold text-muted-foreground/50 mt-0.5 select-none">{numLabel} </span>
+          )}
           <div className="space-y-2 flex-1">
             {(transMode === 'en' || transMode === 'bilingual') &&
               sentences.map((s, i) => (
@@ -648,6 +655,9 @@ function ParagraphBlock({
           >
             <Volume2 className="size-3.5" />
           </button>
+          {numLabel && (
+            <span className="shrink-0 text-xs font-bold text-muted-foreground/50 mt-0.5 select-none">{numLabel} </span>
+          )}
           <p className={cn(
             'text-base leading-8 text-foreground/90 font-medium transition-colors rounded-lg px-1 -mx-1 flex-1',
             isSpeaking && 'bg-[#00B894]/10 text-[#00B894]',
