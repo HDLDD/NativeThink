@@ -44,6 +44,24 @@ function isChapterHeader(text: string): boolean {
   return CHAPTER_PATTERNS.some((p) => p.test(trimmed));
 }
 
+// Split a paragraph that contains MULTIPLE chapter-like headers (e.g. "CHAPTER I. One CHAPTER II. Two")
+// into individual chapter entries, each prefixed with ##CHAPTER##.
+const MULTI_CHAPTER_RE = /(?:CHAPTER|Chapter|PART|Part|BOOK|Book|VOLUME|Volume)\s+[IVXLCDM\d]+\.?\s*/g;
+function splitMultiChapterParagraph(text: string): string[] | null {
+  // Count chapter-like markers
+  const matches = [...text.matchAll(MULTI_CHAPTER_RE)];
+  if (matches.length < 2) return null; // single or no chapters — handle normally
+
+  // Build split points from match indices
+  const parts: string[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const start = matches[i].index!;
+    const end = i < matches.length - 1 ? matches[i + 1].index! : text.length;
+    parts.push(text.slice(start, end).trim());
+  }
+  return parts;
+}
+
 function cleanBookParagraphs(enParas: string[]): IParagraph[] {
   const result: IParagraph[] = [];
   let foundStart = false;
@@ -70,8 +88,13 @@ function cleanBookParagraphs(enParas: string[]): IParagraph[] {
 
     if (foundEnd) break; // stop processing after END marker
 
-    // Mark chapters
-    if (isChapterHeader(en)) {
+    // Mark chapters — handle both single-chapter paragraphs and multi-chapter lists
+    const chapterParts = splitMultiChapterParagraph(en);
+    if (chapterParts) {
+      for (const part of chapterParts) {
+        result.push({ en: `##CHAPTER##${part}`, zh: '' });
+      }
+    } else if (isChapterHeader(en)) {
       result.push({ en: `##CHAPTER##${en}`, zh: '' });
     } else {
       result.push({ en, zh: '' });

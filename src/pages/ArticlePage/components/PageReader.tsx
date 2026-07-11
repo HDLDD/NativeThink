@@ -101,7 +101,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   });
   const [transMode, setTransMode] = useState<TransMode>('bilingual');
   const [sentenceMode, setSentenceMode] = useState(false);
-  const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
+  const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('lg');
   const [lookupOpen, setLookupOpen] = useState(false);
   const [lookupWord_State, setLookupWordState] = useState('');
   const [lookupData, setLookupData] = useState<{ word: string; phonetic: string; meaning: string; zhMeaning: string } | null>(null);
@@ -676,7 +676,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           </div>
         ) : (
           /* ── READING MODE ── */
-          <div ref={contentRef} className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+          <div ref={contentRef} className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-white/80 rounded-2xl my-2">
             {page.paragraphs.map((para, i) => {
               const globalIdx = paraChapterIndex ? paraChapterIndex.startCount + i + 1 : i + 1;
               return (
@@ -862,7 +862,7 @@ function ParagraphBlock({
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className={cn(
-                      textClass, 'text-foreground font-bold transition-colors rounded-lg px-1 -mx-1',
+                      textClass, 'text-gray-900 font-bold transition-colors rounded-lg px-1 -mx-1',
                       isSpeaking && 'bg-[#00B894]/10 text-[#00B894]',
                     )}>
                       {renderWordBlock(s)}
@@ -878,7 +878,7 @@ function ParagraphBlock({
                 </div>
               ))}
             {(transMode === 'zh' || transMode === 'bilingual') && para.zh && (
-              <p className="text-base text-foreground/75 leading-7 pl-3 border-l-2 border-[#00B894]/40">
+              <p className="text-base text-gray-700 leading-7 pl-3 border-l-2 border-[#00B894]/50">
                 {para.zh}
               </p>
             )}
@@ -904,7 +904,7 @@ function ParagraphBlock({
             <span className="shrink-0 text-xs font-bold text-muted-foreground/50 mt-0.5 select-none">{numLabel} </span>
           )}
           <p className={cn(
-            textClass, 'text-foreground font-bold transition-colors rounded-lg px-1 -mx-1 flex-1',
+            textClass, 'text-gray-900 font-bold transition-colors rounded-lg px-1 -mx-1 flex-1',
             isSpeaking && 'bg-[#00B894]/10 text-[#00B894]',
           )}>
             {renderWordBlock(displayEn)}
@@ -912,7 +912,7 @@ function ParagraphBlock({
         </div>
       )}
       {(transMode === 'zh' || transMode === 'bilingual') && para.zh && (
-        <p className="text-base text-foreground/75 leading-7 pl-3 border-l-2 border-[#00B894]/40 ml-6">
+        <p className="text-base text-gray-700 leading-7 pl-3 border-l-2 border-[#00B894]/50 ml-6">
           {para.zh}
         </p>
       )}
