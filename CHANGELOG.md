@@ -2,6 +2,13 @@
 
 ## 2026-07-11
 
+### 登录 & 跨设备云同步 🔄
+- **修复本地开发登录 404**：Vite 代理 `/api/auth`、`/api/data` 到生产环境
+- **修复云同步数据不可达**：`syncUp` 改用 `safeStorage` 前缀匹配 localStorage key，`syncDown` 通过 `safeStorage.setItem` 写入保证 key 一致性
+- **修复双写失效**：原 PUT 到不存在端点，改为防抖批量 POST `/api/data/sync`（3 秒合并写入）
+- **接入认证生命周期**：新增 `CloudSyncProvider`，登录自动拉取→推送→注册双写，每 5 分钟周期性同步，切回标签页自动同步，登出清理
+- 登录后电脑 ↔ 手机数据自动同步（学习进度、收藏、统计数据等）
+
 ### 性能优化 🚀
 - **网页加载速度**: 全部页面改为 `React.lazy` + Suspense 懒加载，主包 **2.3MB → 897KB (-61%)**
 - **Dashboard 优化**: `MOCK_CHUNKS` (146KB) 改为动态 `import()`，首页不再捆绑整个语块库

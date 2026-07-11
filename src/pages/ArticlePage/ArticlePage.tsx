@@ -156,12 +156,13 @@ export default function ArticlePage() {
   // Shared article display
   const [displayTitle, setDisplayTitle] = useState('');
   const [displayContent, setDisplayContent] = useState('');
+  const [displayExcerpt, setDisplayExcerpt] = useState(''); // original excerpt for TED speeches
   const [displayTranslation, setDisplayTranslation] = useState('');
+  const [translationLoading, setTranslationLoading] = useState(false);
   const [displayVocab, setDisplayVocab] = useState<{ word: string; meaning: string }[]>([]);
   const [displayQuestions, setDisplayQuestions] = useState<{ q: string; options: string[]; answer: number }[]>([]);
 
   // UI state
-  const [showTranslation, setShowTranslation] = useState(false);
   const [quizMode, setQuizMode] = useState(false);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizChecked, setQuizChecked] = useState(false);
@@ -222,6 +223,21 @@ export default function ArticlePage() {
     return () => { cancelled = true; };
   }, [source]);
 
+  // ── Auto-translate for non-AI sources ──
+  const autoTranslate = useCallback(async (text: string) => {
+    if (!isConfigured || !text || text.length < 100) return;
+    setTranslationLoading(true);
+    try {
+      const result = await aiChat([
+        { role: 'system', content: 'Translate the following English text to natural Chinese. Keep paragraphs aligned. Return ONLY the Chinese translation, no markdown, no explanation.' },
+        { role: 'user', content: text.slice(0, 5000) },
+      ], { temperature: 0.3, maxTokens: 2048 });
+      const cleaned = result.trim().replace(/^```[\s\S]*?\n|```$/g, '');
+      if (cleaned.length > 10) setDisplayTranslation(cleaned);
+    } catch { /* silent */ }
+    finally { setTranslationLoading(false); }
+  }, [isConfigured, aiChat]);
+
   const contentRef = useRef<HTMLDivElement>(null);
 
   // ── AI Article Generation ──
@@ -229,7 +245,6 @@ export default function ArticlePage() {
     if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
     setAiLoading(true);
     setDisplayContent('');
-    setShowTranslation(false);
     setQuizAnswers({});
     setQuizChecked(false);
     try {
@@ -263,7 +278,7 @@ export default function ArticlePage() {
     if (words.length < 3) { toast.error('复习词汇不足（至少需要 3 个），先去学习一些单词吧！'); return; }
     setAiLoading(true);
     setDisplayContent('');
-    setShowTranslation(false); setQuizAnswers({}); setQuizChecked(false);
+    setQuizAnswers({}); setQuizChecked(false);
     try {
       const wordList = words.map((p) => p.wordKey).join(', ');
       const wordDetails = words.map((p) => {
@@ -318,11 +333,13 @@ export default function ArticlePage() {
       setGutenbergBook(gb);
       setDisplayTitle(`${book.title} — ${book.authors[0]?.name || 'Unknown'}`);
       setDisplayContent(text);
+      setDisplayExcerpt('');
       setDisplayTranslation('');
       setDisplayVocab([]);
       setDisplayQuestions([]);
       setQuizMode(false);
       saveToHistory(book.title, text, 'gutenberg');
+      autoTranslate(text);
       toast.success(`已加载：${book.title}`);
     } catch { toast.error('加载失败'); }
     finally { setLoading(false); }
@@ -340,11 +357,13 @@ export default function ArticlePage() {
       setWikiPage(page);
       setDisplayTitle(page.title);
       setDisplayContent(page.extract);
+      setDisplayExcerpt('');
       setDisplayTranslation('');
       setDisplayVocab([]);
       setDisplayQuestions([]);
       setQuizMode(false);
       saveToHistory(page.title, page.extract, 'wikipedia');
+      autoTranslate(page.extract);
       toast.success(`已加载：${page.title}`);
     } catch { toast.error('加载失败'); }
     finally { setWikiLoading(false); }
@@ -625,30 +644,34 @@ This, and nothing less, is the meaning of human existence: to create, to produce
 
       };
       let content = knownTexts[speech.id] || speech.preview;
-      // For TED talks (copyrighted), content is an excerpt — offer AI expansion
-      const needsExpansion = content.length < 1500 && isConfigured;
+      const isTED = speech.type === 'TED';
+      // For TED talks: keep original excerpt visible, add AI expansion below
+      const needsExpansion = isTED && content.length < 2000 && isConfigured;
 
       setDisplayTitle(`${speech.zhTitle} — ${speech.author} (${speech.year})`);
       setDisplayContent(content);
+      setDisplayExcerpt(isTED ? content : ''); // save original excerpt for TED
       setDisplayTranslation('');
       setDisplayVocab([]);
       setDisplayQuestions([]);
       setQuizMode(false);
       saveToHistory(speech.zhTitle || speech.title, content, 'speeches');
+      autoTranslate(content);
       toast.success(`已加载：${speech.zhTitle || speech.title}`);
 
-      // Auto-expand short speeches with AI
+      // Auto-expand TED talks with AI — keeps original excerpt visible
       if (needsExpansion) {
         setExpandLoading(true);
         try {
           const result = await aiChat([
-            { role: 'system', content: `You are an English teacher. Based on the following speech excerpt, write a complete, well-structured English article (500-800 words) about this speech and its key ideas. Include: (1) Background context of the speech (2) The main arguments and key points (3) The speech's impact and significance. Write in clear, engaging English suitable for intermediate learners. Return ONLY the article text, no JSON, no markdown headers.` },
-            { role: 'user', content: `Speech: "${speech.title}" by ${speech.author} (${speech.year})\n\nExcerpt:\n${content}` },
+            { role: 'system', content: `You are an English teacher. Based on the following TED talk excerpt, write a complete, well-structured English article (500-800 words) about this speech and its key ideas. Include: (1) Background context of the speech and the speaker (2) The main arguments and key points in detail (3) The speech's impact and significance. Write in clear, engaging English suitable for intermediate learners. Return ONLY the article text, no headers.` },
+            { role: 'user', content: `Speech: "${speech.title}" by ${speech.author} (${speech.year})\n\nOriginal excerpt:\n${content}` },
           ], { temperature: 0.7, maxTokens: 2048 });
           const expanded = result.trim();
           if (expanded.length > content.length + 200) {
             setDisplayContent(expanded);
-            saveToHistory(speech.zhTitle || speech.title, expanded, 'speeches');
+            setDisplayTranslation('');
+            autoTranslate(expanded); // translate the expanded version too
             toast.success('AI 已扩展为完整文章');
           }
         } catch { /* silent */ }
@@ -656,7 +679,7 @@ This, and nothing less, is the meaning of human existence: to create, to produce
       }
     } catch { toast.error('加载失败'); }
     finally { setLoading(false); }
-  }, [saveToHistory, isConfigured, aiChat]);
+  }, [saveToHistory, isConfigured, aiChat, autoTranslate]);
 
   // ── Word Lookup ──
   const handleWordClick = useCallback(async (word: string) => {
@@ -769,10 +792,6 @@ This, and nothing less, is the meaning of human existence: to create, to produce
         </div>
         {hasContent && (
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setShowTranslation(!showTranslation)}
-              className={cn('rounded-2xl text-[10px] font-black uppercase tracking-wider gap-1', showTranslation ? 'bg-[#6C5CE7]/10 text-[#6C5CE7]' : 'bg-muted text-muted-foreground')}>
-              <Languages className="size-3.5" />{showTranslation ? '隐藏翻译' : '翻译'}
-            </Button>
             <Button variant="ghost" size="sm" onClick={() => setConvertDialogOpen(true)} disabled={!isConfigured}
               className="rounded-2xl text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground hover:text-[#F59E0B] gap-1">
               <Wand2 className="size-3.5" />转换等级
@@ -1075,18 +1094,42 @@ This, and nothing less, is the meaning of human existence: to create, to produce
                 <img src={wikiPage.thumbnail.source} alt={displayTitle}
                   className="w-full max-h-64 object-cover rounded-2xl mb-6 shadow-md" />
               )}
-              <div ref={contentRef} className="text-foreground/85 leading-[1.9] text-[15px] whitespace-pre-line select-text">
-                {renderContent(displayContent)}
-              </div>
-
-              {showTranslation && displayTranslation && (
-                <div className="mt-8 p-5 rounded-2xl bg-violet-50/50 dark:bg-violet-500/10 border border-violet-100 dark:border-violet-500/20">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-[#6C5CE7] mb-2 flex items-center gap-1.5">
-                    <Languages className="size-3.5" />中文翻译
+              {/* TED original excerpt — shown above AI expansion */}
+              {displayExcerpt && displayContent !== displayExcerpt && (
+                <div className="mb-6 p-4 rounded-2xl bg-amber-50/50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-600 mb-2 flex items-center gap-1.5">
+                    <Mic className="size-3" />原始摘要
                   </p>
-                  <p className="text-sm text-foreground/75 leading-relaxed">{displayTranslation}</p>
+                  <div className="text-foreground/75 leading-[1.8] text-[14px] whitespace-pre-line italic">
+                    {displayExcerpt}
+                  </div>
                 </div>
               )}
+
+              {/* Main content */}
+              <div ref={contentRef} className="text-foreground/85 leading-[1.9] text-[15px] whitespace-pre-line select-text">
+                {renderContent(displayContent)}
+                {expandLoading && (
+                  <span className="inline-flex items-center gap-1.5 ml-2 text-[#F59E0B] text-xs font-bold">
+                    <Loader2 className="size-3 animate-spin" />AI 扩展中…
+                  </span>
+                )}
+              </div>
+
+              {/* Translation — always visible if available, or show loading */}
+              {displayTranslation ? (
+                <div className="mt-6 p-5 rounded-2xl bg-violet-50/50 dark:bg-violet-500/10 border border-violet-100 dark:border-violet-500/20">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-[#6C5CE7] mb-3 flex items-center gap-1.5">
+                    <Languages className="size-3.5" />中文翻译
+                  </p>
+                  <p className="text-sm text-foreground/75 leading-relaxed whitespace-pre-line">{displayTranslation}</p>
+                </div>
+              ) : translationLoading ? (
+                <div className="mt-6 p-5 rounded-2xl bg-violet-50/30 dark:bg-violet-500/5 border border-violet-100/50 flex items-center gap-2">
+                  <Loader2 className="size-4 text-[#6C5CE7] animate-spin" />
+                  <span className="text-sm text-muted-foreground">AI 翻译中…</span>
+                </div>
+              ) : null}
 
               {source === 'gutenberg' && (
                 <p className="text-[10px] text-muted-foreground mt-4 pt-4 border-t border-border text-center">
