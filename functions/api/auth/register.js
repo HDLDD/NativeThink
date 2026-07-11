@@ -26,23 +26,48 @@ export async function onRequest(context) {
     return Response.json({ error: '密码至少 6 位' }, { status: 400 });
 
   try {
-    const existing = await env.KV.get(`users:email:${email}`, 'json');
+    // Step 1: Check for existing user
+    let existing;
+    try {
+      existing = await env.KV.get(`users:email:${email}`, 'json');
+    } catch (kvErr) {
+      return Response.json({ error: 'KV读取出错: ' + (kvErr.message || kvErr) }, { status: 500 });
+    }
     if (existing)
       return Response.json({ error: '该邮箱已注册' }, { status: 409 });
 
+    // Step 2: Hash password (CPU-intensive — PBKDF2 210k iterations)
+    let passwordHash;
+    try {
+      passwordHash = await hashPassword(password);
+    } catch (hashErr) {
+      return Response.json({ error: '密码加密失败: ' + (hashErr.message || hashErr) }, { status: 500 });
+    }
+
     const user = {
-      id: crypto.randomUUID(),
+      id: (typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : crypto.randomUUID?.() ?? (Date.now().toString(36) + Math.random().toString(36).slice(2, 10))),
       email,
-      passwordHash: await hashPassword(password),
+      passwordHash,
       createdAt: Date.now(),
     };
 
-    await env.KV.put(`users:email:${email}`, JSON.stringify(user));
+    // Step 3: Save to KV
+    try {
+      await env.KV.put(`users:email:${email}`, JSON.stringify(user));
+    } catch (putErr) {
+      return Response.json({ error: 'KV写入失败: ' + (putErr.message || putErr) }, { status: 500 });
+    }
 
-    const token = await signToken({ userId: user.id, email: user.email }, env);
+    // Step 4: Sign token
+    let token;
+    try {
+      token = await signToken({ userId: user.id, email: user.email }, env);
+    } catch (jwtErr) {
+      return Response.json({ error: '令牌生成失败: ' + (jwtErr.message || jwtErr) }, { status: 500 });
+    }
+
     return Response.json({ token, user: { id: user.id, email: user.email } });
   } catch (e) {
-    console.error('register error:', e);
-    return Response.json({ error: '服务器内部错误，请稍后重试' }, { status: 500 });
+    return Response.json({ error: '未知错误: ' + (e.message || String(e)) }, { status: 500 });
   }
 }
