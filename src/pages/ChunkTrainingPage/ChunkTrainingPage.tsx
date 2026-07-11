@@ -160,31 +160,6 @@ export default function ChunkTrainingPage() {
 
   const libraryScrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-play for chunk library list
-  const [libAutoPlaying, setLibAutoPlaying] = useState(false);
-  const [libAutoIdx, setLibAutoIdx] = useState(0);
-  const libAutoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stopLibAutoPlay = useCallback(() => {
-    setLibAutoPlaying(false);
-    if (libAutoTimerRef.current) { clearTimeout(libAutoTimerRef.current); libAutoTimerRef.current = null; }
-  }, []);
-  const startLibAutoPlay = useCallback(() => {
-    if (activePageChunks.length === 0) return;
-    setLibAutoPlaying(true);
-    setLibAutoIdx(0);
-  }, [activePageChunks.length]);
-  // Auto-play effect
-  useEffect(() => {
-    if (!libAutoPlaying) return;
-    if (libAutoIdx >= activePageChunks.length) { stopLibAutoPlay(); return; }
-    const chunk = activePageChunks[libAutoIdx];
-    tts.speak(chunk.content, { rate: 0.85 });
-    libAutoTimerRef.current = setTimeout(() => setLibAutoIdx((p) => p + 1), 2500);
-    return () => { if (libAutoTimerRef.current) clearTimeout(libAutoTimerRef.current); };
-  }, [libAutoPlaying, libAutoIdx, activePageChunks, tts, stopLibAutoPlay]);
-  // Reset when library source or filters change
-  useEffect(() => { stopLibAutoPlay(); }, [librarySource, categoryFilter, difficultyFilter]);
-
   const [searchQuery, setSearchQuery] = usePageMemoryDebounced('chunk-search', '');
   const [activeTab, setActiveTab] = useState(chunkPosMemory.tab || memory.tab);
   const [categoryFilter, setCategoryFilter] = useState(memory.category);
@@ -546,6 +521,28 @@ export default function ChunkTrainingPage() {
   const activeFilteredCount = librarySource === 'builtin' ? memorizedFilteredBuiltIn.length : filteredAiChunks.length;
   const activePage = librarySource === 'builtin' ? builtinPage : aiPage;
   const setActivePage = librarySource === 'builtin' ? setBuiltinPage : setAiPage;
+
+  // Auto-play for chunk library list (declared AFTER activePageChunks)
+  const [libAutoPlaying, setLibAutoPlaying] = useState(false);
+  const [libAutoIdx, setLibAutoIdx] = useState(0);
+  const libAutoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopLibAutoPlay = useCallback(() => {
+    setLibAutoPlaying(false);
+    if (libAutoTimerRef.current) { clearTimeout(libAutoTimerRef.current); libAutoTimerRef.current = null; }
+  }, []);
+  const startLibAutoPlay = useCallback(() => {
+    if (activePageChunks.length === 0) return;
+    setLibAutoPlaying(true);
+    setLibAutoIdx(0);
+  }, [activePageChunks.length]);
+  useEffect(() => {
+    if (!libAutoPlaying) return;
+    if (libAutoIdx >= activePageChunks.length) { stopLibAutoPlay(); return; }
+    const chunk = activePageChunks[libAutoIdx];
+    tts.speak(chunk.content, { rate: 0.85 });
+    libAutoTimerRef.current = setTimeout(() => setLibAutoIdx((p) => p + 1), 2500);
+    return () => { if (libAutoTimerRef.current) clearTimeout(libAutoTimerRef.current); };
+  }, [libAutoPlaying, libAutoIdx, activePageChunks, tts, stopLibAutoPlay]);
 
   // Restore library scroll position after page data loads
   useEffect(() => {
