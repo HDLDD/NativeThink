@@ -704,7 +704,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
       {/* ── TOC Dialog ── */}
       <Dialog open={tocOpen} onOpenChange={setTocOpen}>
-        <DialogContent className="max-w-md rounded-[32px] p-0 overflow-hidden max-h-[80vh] flex flex-col bg-white">
+        <DialogContent className="max-w-md rounded-[32px] p-0 max-h-[85vh] flex flex-col bg-white overflow-y-auto">
           {/* Header */}
           <div className="shrink-0 px-6 pt-6 pb-4 border-b border-slate-100">
             <div className="flex items-center gap-2.5 mb-1">
