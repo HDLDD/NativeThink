@@ -24,7 +24,7 @@ import PageReader from './components/PageReader';
 
 // ── Types ──
 type Level = 'beginner' | 'intermediate' | 'advanced';
-type MainTab = 'books' | 'publications' | 'ai' | 'wikipedia' | 'speeches';
+type MainTab = 'books' | 'publications' | 'ai' | 'speeches';
 
 const LEVELS: { key: Level; label: string; color: string; desc: string }[] = [
   { key: 'beginner', label: '初级', color: '#00B894', desc: '简单句式，常用词汇' },
@@ -47,7 +47,6 @@ const MAINTABS: { key: MainTab; label: string; icon: typeof BookOpen }[] = [
   { key: 'books', label: '书籍', icon: Library },
   { key: 'publications', label: '刊物', icon: Newspaper },
   { key: 'ai', label: 'AI 生成', icon: Sparkles },
-  { key: 'wikipedia', label: '维基百科', icon: Globe },
   { key: 'speeches', label: '演讲', icon: Mic },
 ];
 
