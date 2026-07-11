@@ -107,8 +107,6 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const [lookupData, setLookupData] = useState<{ word: string; phonetic: string; meaning: string; zhMeaning: string } | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const wheelDebounceRef = useRef(0);
 
   // TTS cleanup on unmount
   useEffect(() => {
@@ -319,32 +317,6 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const goPrev = () => { stopSpeaking(); setPageIdx((p) => Math.max(0, p - 1)); };
   const goNext = () => { stopSpeaking(); setPageIdx((p) => Math.min(activePages - 1, p + 1)); };
   const jumpPage = (n: number) => setPageIdx(Math.max(0, Math.min(activePages - 1, n - 1)));
-
-  // Keep refs for wheel handler to avoid stale closure
-  const goNextRef = useRef(goNext);
-  const goPrevRef = useRef(goPrev);
-  const activePagesRef = useRef(activePages);
-  goNextRef.current = goNext;
-  goPrevRef.current = goPrev;
-  activePagesRef.current = activePages;
-
-  // Scroll wheel → page navigation (placed after goPrev/goNext to avoid TDZ)
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    const el = e.currentTarget as HTMLDivElement;
-    const { scrollTop, scrollHeight, clientHeight } = el;
-    const atBottom = scrollTop + clientHeight >= scrollHeight - 4;
-    const atTop = scrollTop <= 4;
-    const now = Date.now();
-    if (now - wheelDebounceRef.current < 600) return;
-
-    if (e.deltaY > 30 && atBottom && pageIdx < activePagesRef.current - 1) {
-      wheelDebounceRef.current = now;
-      goNextRef.current();
-    } else if (e.deltaY < -30 && atTop && pageIdx > 0) {
-      wheelDebounceRef.current = now;
-      goPrevRef.current();
-    }
-  }, [pageIdx]);
 
   // Word click
   const handleWordClick = useCallback(async (e: React.MouseEvent, word: string) => {
@@ -669,10 +641,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       )}
 
       {/* ── TOC / Reading Content ── */}
-      <div
-        ref={scrollAreaRef}
-        onWheel={handleWheel}
-        className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch"
+      <div className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch"
       >
         {viewMode === 'toc' && hasChapters ? (
           /* ── TABLE OF CONTENTS ── */
