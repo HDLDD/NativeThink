@@ -654,22 +654,8 @@ function ParagraphBlock({
 }) {
   const textClass = FONT_SIZES[fontSize || 'base'];
   const numLabel = paraIndex && paraIndex <= 20 ? CIRCLED[paraIndex - 1] : paraIndex ? `(${paraIndex})` : null;
-  const isChapter = para.en.startsWith('##CHAPTER##');
-  const displayEn = isChapter ? para.en.replace('##CHAPTER##', '') : para.en;
+  const displayEn = para.en.startsWith('##CHAPTER##') ? para.en.replace('##CHAPTER##', '') : para.en;
   const words = displayEn.split(/\s+/).filter(Boolean);
-
-  // Chapter header rendering
-  if (isChapter) {
-    return (
-      <div className="flex items-center gap-3 py-2 my-1">
-        <div className="flex-1 h-px bg-[#00B894]/20" />
-        <h3 className="text-xs font-black uppercase tracking-widest text-[#00B894] whitespace-nowrap px-2">
-          {displayEn}
-        </h3>
-        <div className="flex-1 h-px bg-[#00B894]/20" />
-      </div>
-    );
-  }
 
   const renderWordBlock = (text: string) => {
     const sWords = text.split(/\s+/).filter(Boolean);
