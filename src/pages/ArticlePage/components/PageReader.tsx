@@ -115,24 +115,6 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     return () => { tts.cancel(); };
   }, []);
 
-  // Scroll wheel → page navigation
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    const el = e.currentTarget as HTMLDivElement;
-    const { scrollTop, scrollHeight, clientHeight } = el;
-    const atBottom = scrollTop + clientHeight >= scrollHeight - 4;
-    const atTop = scrollTop <= 4;
-    const now = Date.now();
-    if (now - wheelDebounceRef.current < 600) return;
-
-    if (e.deltaY > 30 && atBottom && currentPage < activePages - 1) {
-      wheelDebounceRef.current = now;
-      goNext();
-    } else if (e.deltaY < -30 && atTop && currentPage > 0) {
-      wheelDebounceRef.current = now;
-      goPrev();
-    }
-  }, [currentPage, activePages]);
-
   // Translation cache state
   const TR_CACHE_KEY = `__reader_trans_${content.id}`;
   const [transCache, setTransCache] = useState<Record<number, string[]>>(() => {
@@ -301,9 +283,30 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     stopSpeaking();
     setTimeout(() => {
       cancelRef.current = false;
-      const paras = page.paragraphs.map((p) => cleanText(p.en)).filter((t) => t.length > 0);
-      if (paras.length === 0) return;
-      paraQueueRef.current = paras;
+      // Split long paragraphs into sentences to avoid TTS engine character limits
+      const chunks: string[] = [];
+      for (const p of page.paragraphs) {
+        const text = cleanText(p.en);
+        if (!text) continue;
+        if (text.length < 250) {
+          chunks.push(text);
+        } else {
+          // Split into sentences, then re-join into ~200-char groups
+          const sentences = splitSentences(text);
+          let batch = '';
+          for (const s of sentences) {
+            if (batch && (batch.length + s.length > 220)) {
+              chunks.push(batch.trim());
+              batch = s;
+            } else {
+              batch = batch ? batch + ' ' + s : s;
+            }
+          }
+          if (batch.trim()) chunks.push(batch.trim());
+        }
+      }
+      if (chunks.length === 0) return;
+      paraQueueRef.current = chunks;
       paraIdxRef.current = 0;
       playNextParagraph();
     }, 150);
@@ -322,6 +325,32 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const goPrev = () => { stopSpeaking(); setPageIdx((p) => Math.max(0, p - 1)); };
   const goNext = () => { stopSpeaking(); setPageIdx((p) => Math.min(activePages - 1, p + 1)); };
   const jumpPage = (n: number) => setPageIdx(Math.max(0, Math.min(activePages - 1, n - 1)));
+
+  // Keep refs for wheel handler to avoid stale closure
+  const goNextRef = useRef(goNext);
+  const goPrevRef = useRef(goPrev);
+  const activePagesRef = useRef(activePages);
+  goNextRef.current = goNext;
+  goPrevRef.current = goPrev;
+  activePagesRef.current = activePages;
+
+  // Scroll wheel → page navigation (placed after goPrev/goNext to avoid TDZ)
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    const el = e.currentTarget as HTMLDivElement;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    const atBottom = scrollTop + clientHeight >= scrollHeight - 4;
+    const atTop = scrollTop <= 4;
+    const now = Date.now();
+    if (now - wheelDebounceRef.current < 600) return;
+
+    if (e.deltaY > 30 && atBottom && pageIdx < activePagesRef.current - 1) {
+      wheelDebounceRef.current = now;
+      goNextRef.current();
+    } else if (e.deltaY < -30 && atTop && pageIdx > 0) {
+      wheelDebounceRef.current = now;
+      goPrevRef.current();
+    }
+  }, [pageIdx]);
 
   // Word click
   const handleWordClick = useCallback(async (e: React.MouseEvent, word: string) => {
