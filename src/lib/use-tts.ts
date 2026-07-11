@@ -33,6 +33,7 @@ export interface SpeakOptions {
 
 export interface TTSHandle {
   speak: (text: string, opts?: SpeakOptions) => void;
+  prewarm: (text: string) => void;
   pause: () => void;
   resume: () => void;
   cancel: () => void;
@@ -398,6 +399,19 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
   // ── Public API ──
 
+  // Prewarm: silently fetch audio URL so browser caches it.
+  // Call with the NEXT word while current word is displayed.
+  const prewarm = useCallback((text: string) => {
+    const cleaned = cleanText(text);
+    if (!cleaned) return;
+    // Only prewarm CF engine (fastest) — fetch URL into browser cache
+    try {
+      const url = cfTtsUrl(cleaned, settings.rate);
+      // Use fetch with low priority so it doesn't compete with current playback
+      fetch(url, { priority: 'low' }).catch(() => {});
+    } catch { /* */ }
+  }, [settings.rate]);
+
   const speak = useCallback(
     (text: string, opts?: SpeakOptions) => {
       // Cancel whatever is playing
@@ -468,5 +482,5 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   // Cleanup
   useEffect(() => () => { stopKeepAlive(); clearSafety(); stopAudio(); }, []);
 
-  return { speak, pause, resume, cancel, isSpeaking, isPaused, currentWordIndex, voices };
+  return { speak, prewarm, pause, resume, cancel, isSpeaking, isPaused, currentWordIndex, voices };
 }

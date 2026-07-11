@@ -149,8 +149,10 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     lastSpokenKey.current = key;
 
     if (!isFlipped) {
-      // 正面：朗读单词
+      // 正面：朗读单词 + 预加载下一个单词的音频
       ttsRef.current.speak(word.word, { rate: 0.85 });
+      const next = sessionWords[currentIdx + 1];
+      if (next) ttsRef.current.prewarm(next.word);
     } else if (word.examples[0]) {
       // 反面：朗读例句（等翻面动画完成）
       const timer = setTimeout(() => {

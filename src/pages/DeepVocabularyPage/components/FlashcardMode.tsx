@@ -70,6 +70,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     lastSpokenKey.current = key;
     if (!isFlipped) {
       ttsRef.current.speak(word.word, { rate: 0.85 });
+      const next = queue[currentIdx + 1];
+      if (next) ttsRef.current.prewarm(next.word);
     } else if (word.examples[0]) {
       const timer = setTimeout(() => { ttsRef.current.speak(cleanText(word.examples[0].en), { rate: 0.85 }); }, 400);
       return () => clearTimeout(timer);
