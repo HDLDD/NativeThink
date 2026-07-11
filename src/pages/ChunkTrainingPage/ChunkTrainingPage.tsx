@@ -260,13 +260,16 @@ export default function ChunkTrainingPage() {
   const [replaceGenLoading, setReplaceGenLoading] = useState(false);
   useEffect(() => { safeStorage.setItem('__nativethink_ai_replacements', JSON.stringify(aiReplacements)); }, [aiReplacements]);
 
-  const allChunks = useMemo(() => [...customChunks, ...MOCK_CHUNKS], [customChunks]);
+  const allChunks = useMemo(() => {
+    try { return [...customChunks, ...MOCK_CHUNKS]; } catch { return [...MOCK_CHUNKS]; }
+  }, [customChunks]);
 
   // Phrase library: sorted alphabetically
-  const sortedChunks = useMemo(
-    () => [...allChunks].sort((a, b) => a.content.toLowerCase().localeCompare(b.content.toLowerCase())),
-    [allChunks],
-  );
+  const sortedChunks = useMemo(() => {
+    try {
+      return [...allChunks].sort((a, b) => (a?.content || '').toLowerCase().localeCompare((b?.content || '').toLowerCase()));
+    } catch { return [...allChunks]; }
+  }, [allChunks]);
   const [phraseGenLoading, setPhraseGenLoading] = useState(false);
   const [selectedPhrase, setSelectedPhrase] = useState<IChunk | null>(null);
   const [phraseExamples, setPhraseExamples] = useState<Record<string, { en: string; zh: string }[]>>(() => {
@@ -518,6 +521,13 @@ export default function ChunkTrainingPage() {
   const activeFilteredCount = librarySource === 'builtin' ? memorizedFilteredBuiltIn.length : filteredAiChunks.length;
   const activePage = librarySource === 'builtin' ? builtinPage : aiPage;
   const setActivePage = librarySource === 'builtin' ? setBuiltinPage : setAiPage;
+
+  // Restore library scroll position after page data loads
+  useEffect(() => {
+    const el = libraryScrollRef.current;
+    if (!el || !chunkPosMemory.scrollTop) return;
+    requestAnimationFrame(() => { el.scrollTop = chunkPosMemory.scrollTop!; });
+  }, [activePageChunks.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openDetail = (chunk: typeof MOCK_CHUNKS[0]) => {
     setDetailChunk(chunk);

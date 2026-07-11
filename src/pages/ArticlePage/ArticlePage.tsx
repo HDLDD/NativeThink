@@ -170,6 +170,43 @@ export default function ArticlePage() {
     import('@/data/books').then((m) => setBooks(m.ALL_BOOKS));
   }, [mainTab, booksLoaded]);
 
+  // ── AI article generation (shared by free-form + topic grid) ──
+  const generateAiArticle = useCallback(async (topic: string) => {
+    if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
+    setAiLoading(true);
+    try {
+      const levelLabel = LEVELS.find((l) => l.key === level)!.label;
+      const result = await aiChat([
+        { role: 'system', content: `Write an English article about "${topic}" for ${levelLabel} learners (3-5 paragraphs). Return ONLY valid JSON: {"title":"...","paragraphs":[{"en":"paragraph","zh":"Chinese translation"}]}` },
+        { role: 'user', content: `Topic: ${topic}. Level: ${levelLabel}.` },
+      ], { temperature: 0.8, maxTokens: 4096 });
+      const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
+      if (!parsed || !parsed.paragraphs?.length) { toast.error('AI 生成失败，请重试'); return; }
+      const content: IReadingContent = {
+        id: `ai_topic_${Date.now()}`, type: 'ai',
+        title: parsed.title || topic, zhTitle: parsed.title || topic,
+        source: 'AI 生成', topic, difficulty: level,
+        pages: buildPages(parsed.paragraphs),
+        totalWords: parsed.paragraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
+      };
+      setReaderContent(content); setReaderVisible(true);
+      saveToHistory(parsed.title || topic, content.totalWords.toString(), 'ai');
+      setAiTopicInput('');
+      toast.success('文章已生成！');
+    } catch { toast.error('生成失败，请重试'); }
+    finally { setAiLoading(false); }
+  }, [isConfigured, aiChat, level]);
+
+  // ── Reading progress check ──
+  const getBookProgress = (bookId: string): { page: number; total: number } | null => {
+    try {
+      const raw = safeStorage.getItem(`__reader_progress_${bookId}`);
+      if (!raw) return null;
+      const p = JSON.parse(raw);
+      return p.page > 0 ? { page: p.page, total: 0 } : null;
+    } catch { return null; }
+  };
+
   // Load speech data when speeches tab is first selected
   useEffect(() => {
     if (mainTab !== 'speeches' || speechesLoaded) return;
@@ -217,10 +254,8 @@ export default function ArticlePage() {
           { role: 'system', content: `You are an English writer. Write a mini-book with ${genChapters} chapters about "${genTopic}" for ${levelLabel} English learners. Each chapter should be 2-3 paragraphs. Return ONLY valid JSON: {"title":"book title","chapters":[{"chapterTitle":"Chapter 1 title","paragraphs":[{"en":"English paragraph","zh":"Chinese translation"}]}]}` },
           { role: 'user', content: `Write a ${genChapters}-chapter mini-book about ${genTopic}. Level: ${levelLabel}.` },
         ], { temperature: 0.8, maxTokens: 4096 });
-        const m = result.match(/\{[\s\S]*\}/);
-        if (!m) { toast.error('格式异常'); return; }
-        const parsed = JSON.parse(m[0]);
-        if (!parsed.chapters?.length) { toast.error('生成失败'); return; }
+        const parsed = extractJson<{ title?: string; chapters?: { chapterTitle?: string; paragraphs: IParagraph[] }[] }>(result);
+        if (!parsed?.chapters?.length) { toast.error('AI 生成失败，请重试'); return; }
         const allParagraphs: IParagraph[] = [];
         for (const ch of parsed.chapters) {
           allParagraphs.push({ en: `📖 ${ch.chapterTitle || ''}`, zh: '' });
@@ -241,10 +276,8 @@ export default function ArticlePage() {
           { role: 'system', content: `You are an English writer. Write an engaging English ${genType === 'publication' ? 'magazine article' : 'article'} about "${genTopic}" for ${levelLabel} learners (4-6 paragraphs). Return ONLY valid JSON: {"title":"...","paragraphs":[{"en":"English paragraph","zh":"Chinese translation"}]}` },
           { role: 'user', content: `Write an article about ${genTopic}. Level: ${levelLabel}.` },
         ], { temperature: 0.8, maxTokens: 4096 });
-        const m = result.match(/\{[\s\S]*\}/);
-        if (!m) { toast.error('格式异常'); return; }
-        const parsed = JSON.parse(m[0]);
-        if (!parsed.paragraphs?.length) { toast.error('生成失败'); return; }
+        const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
+        if (!parsed?.paragraphs?.length) { toast.error('AI 生成失败，请重试'); return; }
         const content: IReadingContent = {
           id: `ai_${genType}_${Date.now()}`, type: 'ai',
           title: parsed.title || genTopic, zhTitle: parsed.title || genTopic,
@@ -316,9 +349,8 @@ export default function ArticlePage() {
         { role: 'system', content: `Write a short English article (3-5 paragraphs) that naturally incorporates ALL these words: ${wordList}. Return ONLY valid JSON: {"title":"...","paragraphs":[{"en":"paragraph","zh":"Chinese translation"}]}` },
         { role: 'user', content: `Create an article using these words: ${wordList}. Level: ${level}.` },
       ], { temperature: 0.7, maxTokens: 4096 });
-      const m = result.match(/\{[\s\S]*\}/);
-      if (!m) { toast.error('格式异常'); return; }
-      const parsed = JSON.parse(m[0]);
+      const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
+      if (!parsed?.paragraphs?.length) { toast.error('AI 生成失败，请重试'); return; }
       const content: IReadingContent = {
         id: `rv_${Date.now()}`, type: 'ai',
         title: parsed.title || '复习词汇文章', zhTitle: parsed.title || '复习词汇文章',
@@ -451,7 +483,11 @@ export default function ArticlePage() {
             </div>
           ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {books.map((book) => (
+            {books.map((book) => {
+              const progress = getBookProgress(book.id);
+              const totalPages = book.pages.length;
+              const pct = progress && totalPages > 0 ? Math.round((progress.page / totalPages) * 100) : 0;
+              return (
               <Card
                 key={book.id}
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
@@ -472,11 +508,24 @@ export default function ArticlePage() {
                         <Badge className="text-[8px] rounded-full px-2 py-0 bg-muted">{book.topic}</Badge>
                         <span className="text-[9px] text-muted-foreground ml-auto">{book.totalWords.toLocaleString()} 词</span>
                       </div>
+                      {/* Reading progress */}
+                      {progress && progress.page > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <div className="flex items-center justify-between text-[9px]">
+                            <span className="font-bold text-[#00B894]">继续阅读 (第{progress.page}页)</span>
+                            <span className="text-muted-foreground font-bold">{pct}%</span>
+                          </div>
+                          <div className="h-1 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-[#00B894] rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
           )}
         </div>
@@ -539,38 +588,42 @@ export default function ArticlePage() {
             </CardContent>
           </Card>
 
+          {/* Free-form AI article generation */}
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-3">AI 自由生成文章</h3>
+            <p className="text-[10px] text-muted-foreground mb-3">输入任意主题，生成英文文章（不限类型）</p>
+            <div className="flex gap-2 mb-4">
+              <Input
+                value={aiTopicInput}
+                onChange={(e) => setAiTopicInput(e.target.value)}
+                placeholder="输入任何你想阅读的主题…（如：太空探索、咖啡文化、古希腊神话）"
+                className="flex-1 rounded-xl text-xs font-bold border-border"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && aiTopicInput.trim() && isConfigured && !aiLoading) {
+                    generateAiArticle(aiTopicInput.trim());
+                  }
+                }}
+              />
+              <Button
+                size="sm"
+                onClick={() => aiTopicInput.trim() && generateAiArticle(aiTopicInput.trim())}
+                disabled={!aiTopicInput.trim() || aiLoading || !isConfigured}
+                className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white text-[10px] font-bold px-4"
+              >
+                {aiLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                <span className="ml-1">生成</span>
+              </Button>
+            </div>
+          </div>
+
           {/* Topic grid for quick AI article generation */}
           <div>
-            <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-3">按主题生成文章</h3>
+            <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-3">或选择预设主题</h3>
             <div className="grid grid-cols-4 gap-2">
               {TOPICS.map((t) => (
                 <button
                   key={t.key}
-                  onClick={async () => {
-                    if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
-                    setAiLoading(true);
-                    try {
-                      const levelLabel = LEVELS.find((l) => l.key === level)!.label;
-                      const result = await aiChat([
-                        { role: 'system', content: `Write an English article about ${t.label} for ${levelLabel} learners (3-5 paragraphs). Return ONLY valid JSON: {"title":"...","paragraphs":[{"en":"paragraph","zh":"Chinese translation"}]}` },
-                        { role: 'user', content: `Topic: ${t.label}. Level: ${levelLabel}.` },
-                      ], { temperature: 0.8, maxTokens: 4096 });
-                      const m = result.match(/\{[\s\S]*\}/);
-                      if (!m) { toast.error('格式异常'); return; }
-                      const parsed = JSON.parse(m[0]);
-                      const content: IReadingContent = {
-                        id: `ai_topic_${Date.now()}`, type: 'ai',
-                        title: parsed.title || t.label, zhTitle: parsed.title || t.label,
-                        source: 'AI 生成', topic: t.key, difficulty: level,
-                        pages: buildPages(parsed.paragraphs || []),
-                        totalWords: (parsed.paragraphs || []).reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
-                      };
-                      setReaderContent(content); setReaderVisible(true);
-                      saveToHistory(parsed.title || t.label, content.totalWords.toString(), 'ai');
-                      toast.success('文章已生成！');
-                    } catch { toast.error('生成失败'); }
-                    finally { setAiLoading(false); }
-                  }}
+                  onClick={() => generateAiArticle(t.label)}
                   disabled={aiLoading}
                   className={cn(
                     'p-4 rounded-2xl border-2 text-center transition-all',
