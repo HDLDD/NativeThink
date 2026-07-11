@@ -5,7 +5,7 @@ import { getRandomWords } from '@/data/wordbank';
 
 const STORAGE_KEY_PREFIX = '__nativethink_word_learning';
 const DAILY_QUOTA_KEY_PREFIX = '__nativethink_daily_quota';
-const SUB_LEVELS = ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'];
+const SUB_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
 
 export function loadLevelState(level: string): ILearningState {
   return loadState(level);

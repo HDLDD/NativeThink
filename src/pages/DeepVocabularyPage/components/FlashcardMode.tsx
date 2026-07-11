@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { useTTS } from '@/lib/use-tts';
 
 const FL_LEVEL_COLORS: Record<string, string> = {
-  all: '#00B894', cet4: '#0EA5E9', cet6: '#6C5CE7', ielts: '#F59E0B', toefl: '#EC4899', advanced: '#64748B',
+  all: '#00B894', zhongkao: '#EF4444', gaokao: '#F97316', cet4: '#0EA5E9', cet6: '#6C5CE7', ielts: '#F59E0B', toefl: '#EC4899', postgraduate: '#8B5CF6', professional: '#14B8A6', advanced: '#64748B',
 };
 
 interface LevelInfo { key: string; label: string; }

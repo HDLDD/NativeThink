@@ -74,20 +74,24 @@ function detectPattern(phrase: string): CollocPattern {
 // Level colors & labels
 // ============================================================
 const LEVEL_COLORS: Record<string, { hex: string; bg: string; bgLight: string; text: string; border: string; badge: string; badgeText: string }> = {
-  all:      { hex: '#00B894', bg: 'bg-emerald-50 dark:bg-emerald-500/15', bgLight: 'bg-emerald-50/50 dark:bg-emerald-500/8', text: 'text-emerald-600', border: 'border-emerald-200 dark:border-emerald-500/20', badge: 'bg-emerald-100 dark:bg-emerald-500/15', badgeText: 'text-emerald-600' },
-  cet4:     { hex: '#0EA5E9', bg: 'bg-sky-50 dark:bg-sky-500/15', bgLight: 'bg-sky-50/50 dark:bg-sky-500/8', text: 'text-sky-600', border: 'border-sky-200 dark:border-sky-500/20', badge: 'bg-sky-100 dark:bg-sky-500/15', badgeText: 'text-sky-600' },
-  cet6:     { hex: '#6C5CE7', bg: 'bg-violet-50 dark:bg-violet-500/15', bgLight: 'bg-violet-50/50 dark:bg-violet-500/8', text: 'text-violet-600', border: 'border-violet-200 dark:border-violet-500/20', badge: 'bg-violet-100 dark:bg-violet-500/15', badgeText: 'text-violet-600' },
-  ielts:    { hex: '#F59E0B', bg: 'bg-amber-50 dark:bg-amber-500/15', bgLight: 'bg-amber-50/50 dark:bg-amber-500/8', text: 'text-amber-600', border: 'border-amber-200 dark:border-amber-500/20', badge: 'bg-amber-100 dark:bg-amber-500/15', badgeText: 'text-amber-600' },
-  toefl:    { hex: '#EC4899', bg: 'bg-rose-50 dark:bg-rose-500/15', bgLight: 'bg-rose-50/50 dark:bg-rose-500/8', text: 'text-rose-600', border: 'border-rose-200 dark:border-rose-500/20', badge: 'bg-rose-100 dark:bg-rose-500/15', badgeText: 'text-rose-600' },
-  advanced: { hex: '#64748B', bg: 'bg-slate-50 dark:bg-slate-500/15', bgLight: 'bg-slate-50/50 dark:bg-slate-500/8', text: 'text-slate-600', border: 'border-slate-200 dark:border-slate-500/20', badge: 'bg-slate-100 dark:bg-slate-500/15', badgeText: 'text-slate-600' },
+  all:          { hex: '#00B894', bg: 'bg-emerald-50 dark:bg-emerald-500/15', bgLight: 'bg-emerald-50/50 dark:bg-emerald-500/8', text: 'text-emerald-600', border: 'border-emerald-200 dark:border-emerald-500/20', badge: 'bg-emerald-100 dark:bg-emerald-500/15', badgeText: 'text-emerald-600' },
+  zhongkao:     { hex: '#EF4444', bg: 'bg-red-50 dark:bg-red-500/15', bgLight: 'bg-red-50/50 dark:bg-red-500/8', text: 'text-red-600', border: 'border-red-200 dark:border-red-500/20', badge: 'bg-red-100 dark:bg-red-500/15', badgeText: 'text-red-600' },
+  gaokao:       { hex: '#F97316', bg: 'bg-orange-50 dark:bg-orange-500/15', bgLight: 'bg-orange-50/50 dark:bg-orange-500/8', text: 'text-orange-600', border: 'border-orange-200 dark:border-orange-500/20', badge: 'bg-orange-100 dark:bg-orange-500/15', badgeText: 'text-orange-600' },
+  cet4:         { hex: '#0EA5E9', bg: 'bg-sky-50 dark:bg-sky-500/15', bgLight: 'bg-sky-50/50 dark:bg-sky-500/8', text: 'text-sky-600', border: 'border-sky-200 dark:border-sky-500/20', badge: 'bg-sky-100 dark:bg-sky-500/15', badgeText: 'text-sky-600' },
+  cet6:         { hex: '#6C5CE7', bg: 'bg-violet-50 dark:bg-violet-500/15', bgLight: 'bg-violet-50/50 dark:bg-violet-500/8', text: 'text-violet-600', border: 'border-violet-200 dark:border-violet-500/20', badge: 'bg-violet-100 dark:bg-violet-500/15', badgeText: 'text-violet-600' },
+  ielts:        { hex: '#F59E0B', bg: 'bg-amber-50 dark:bg-amber-500/15', bgLight: 'bg-amber-50/50 dark:bg-amber-500/8', text: 'text-amber-600', border: 'border-amber-200 dark:border-amber-500/20', badge: 'bg-amber-100 dark:bg-amber-500/15', badgeText: 'text-amber-600' },
+  toefl:        { hex: '#EC4899', bg: 'bg-rose-50 dark:bg-rose-500/15', bgLight: 'bg-rose-50/50 dark:bg-rose-500/8', text: 'text-rose-600', border: 'border-rose-200 dark:border-rose-500/20', badge: 'bg-rose-100 dark:bg-rose-500/15', badgeText: 'text-rose-600' },
+  postgraduate: { hex: '#8B5CF6', bg: 'bg-purple-50 dark:bg-purple-500/15', bgLight: 'bg-purple-50/50 dark:bg-purple-500/8', text: 'text-purple-600', border: 'border-purple-200 dark:border-purple-500/20', badge: 'bg-purple-100 dark:bg-purple-500/15', badgeText: 'text-purple-600' },
+  professional: { hex: '#14B8A6', bg: 'bg-teal-50 dark:bg-teal-500/15', bgLight: 'bg-teal-50/50 dark:bg-teal-500/8', text: 'text-teal-600', border: 'border-teal-200 dark:border-teal-500/20', badge: 'bg-teal-100 dark:bg-teal-500/15', badgeText: 'text-teal-600' },
+  advanced:     { hex: '#64748B', bg: 'bg-slate-50 dark:bg-slate-500/15', bgLight: 'bg-slate-50/50 dark:bg-slate-500/8', text: 'text-slate-600', border: 'border-slate-200 dark:border-slate-500/20', badge: 'bg-slate-100 dark:bg-slate-500/15', badgeText: 'text-slate-600' },
 };
 
 const LEVEL_LABELS: Record<string, string> = {
-  all: '全部', cet4: '四级', cet6: '六级', ielts: '雅思', toefl: '托福', advanced: '高阶',
+  all: '全部', zhongkao: '中考', gaokao: '高考', cet4: '四级', cet6: '六级', ielts: '雅思', toefl: '托福', postgraduate: '考研', professional: '专业', advanced: '高阶',
 };
 
-const LEVEL_KEYS = ['all', 'cet4', 'cet6', 'ielts', 'toefl', 'advanced'] as const;
-const SUB_LEVELS = ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] as const;
+const LEVEL_KEYS = ['all', 'zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] as const;
+const SUB_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] as const;
 const PAGE_SIZES = [15, 30, 50];
 
 // ============================================================

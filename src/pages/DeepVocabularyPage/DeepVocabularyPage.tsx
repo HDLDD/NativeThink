@@ -28,10 +28,14 @@ const MEMORY_KEY = 'vocab-page';
 
 const LEVELS = [
   { key: 'all', label: '全部' },
+  { key: 'zhongkao', label: '中考' },
+  { key: 'gaokao', label: '高考' },
   { key: 'cet4', label: '四级' },
   { key: 'cet6', label: '六级' },
   { key: 'ielts', label: '雅思' },
   { key: 'toefl', label: '托福' },
+  { key: 'postgraduate', label: '考研' },
+  { key: 'professional', label: '专业' },
   { key: 'advanced', label: '高阶' },
 ];
 
@@ -42,11 +46,15 @@ interface SetupStepProps {
 }
 
 const BOOKS = [
-  { key: 'cet4', label: '四级词汇', icon: '📗', color: '#00B894', desc: '大学英语四级考试核心词汇', gradient: 'from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10' },
-  { key: 'cet6', label: '六级词汇', icon: '📘', color: '#0984E3', desc: '大学英语六级考试核心词汇', gradient: 'from-blue-50 to-sky-50 dark:from-blue-500/10 dark:to-sky-500/10' },
-  { key: 'ielts', label: '雅思词汇', icon: '📙', color: '#E17055', desc: 'IELTS 雅思考试核心词汇', gradient: 'from-orange-50 to-amber-50 dark:from-orange-500/10 dark:to-amber-500/10' },
-  { key: 'toefl', label: '托福词汇', icon: '📕', color: '#6C5CE7', desc: 'TOEFL 托福考试核心词汇', gradient: 'from-violet-50 to-purple-50 dark:from-violet-500/10 dark:to-purple-500/10' },
-  { key: 'advanced', label: '高阶词汇', icon: '📓', color: '#2D3436', desc: 'GRE/SAT/考研高阶词汇', gradient: 'from-slate-50 to-gray-50 dark:from-slate-500/10 dark:to-gray-500/10' },
+  { key: 'zhongkao', label: '中考词汇', icon: '📒', color: '#EF4444', desc: '初中英语中考核心词汇', gradient: 'from-red-50 to-rose-50 dark:from-red-500/10 dark:to-rose-500/10' },
+  { key: 'gaokao', label: '高考词汇', icon: '📔', color: '#F97316', desc: '高中英语高考核心词汇', gradient: 'from-orange-50 to-amber-50 dark:from-orange-500/10 dark:to-amber-500/10' },
+  { key: 'cet4', label: '四级词汇', icon: '📗', color: '#0EA5E9', desc: '大学英语四级考试核心词汇', gradient: 'from-sky-50 to-blue-50 dark:from-sky-500/10 dark:to-blue-500/10' },
+  { key: 'cet6', label: '六级词汇', icon: '📘', color: '#6C5CE7', desc: '大学英语六级考试核心词汇', gradient: 'from-violet-50 to-purple-50 dark:from-violet-500/10 dark:to-purple-500/10' },
+  { key: 'ielts', label: '雅思词汇', icon: '📙', color: '#F59E0B', desc: 'IELTS 雅思考试核心词汇', gradient: 'from-amber-50 to-yellow-50 dark:from-amber-500/10 dark:to-yellow-500/10' },
+  { key: 'toefl', label: '托福词汇', icon: '📕', color: '#EC4899', desc: 'TOEFL 托福考试核心词汇', gradient: 'from-pink-50 to-rose-50 dark:from-pink-500/10 dark:to-rose-500/10' },
+  { key: 'postgraduate', label: '考研词汇', icon: '📚', color: '#8B5CF6', desc: '研究生入学考试核心词汇', gradient: 'from-purple-50 to-violet-50 dark:from-purple-500/10 dark:to-violet-500/10' },
+  { key: 'professional', label: '专业词汇', icon: '💼', color: '#14B8A6', desc: 'SAT 学术与职场专业词汇', gradient: 'from-teal-50 to-cyan-50 dark:from-teal-500/10 dark:to-cyan-500/10' },
+  { key: 'advanced', label: '高阶词汇', icon: '📓', color: '#64748B', desc: 'GRE 等高阶英语考试词汇', gradient: 'from-slate-50 to-gray-50 dark:from-slate-500/10 dark:to-gray-500/10' },
 ];
 
 const MODES = [
@@ -72,7 +80,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
 
   // Background preload all word data while user decides — eliminates post-wizard wait
   useEffect(() => {
-    const allLevels = ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'];
+    const allLevels = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
     preloadLevels(allLevels);
   }, []);
 
@@ -312,7 +320,7 @@ export default function DeepVocabularyPage() {
   const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Browse tab: level filter, memory, page size
-  const SUB_LEVELS = ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] as const;
+  const SUB_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] as const;
   const [browseMemoryFilter, setBrowseMemoryFilter] = useState<'all' | 'memorized' | 'unmemorized'>('all');
   const [browsePageSize, setBrowsePageSize] = useState(20);
   const [memorizedWords, setMemorizedWords] = useState<Set<string>>(() => {
@@ -347,7 +355,7 @@ export default function DeepVocabularyPage() {
   // ── Lazy data loading ──
   const levelReady = (lv: string) => {
     if (lv === 'all') {
-      return ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'].every((l) => isLevelReady(l));
+      return ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'].every((l) => isLevelReady(l));
     }
     return isLevelReady(lv);
   };
@@ -355,7 +363,7 @@ export default function DeepVocabularyPage() {
   const [dataVersion, setDataVersion] = useState(0);
   useEffect(() => {
     if (levelReady(selectedLevel)) { setDataReady(true); setDataVersion((v) => v + 1); return; }
-    const levels = selectedLevel === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [selectedLevel];
+    const levels = selectedLevel === 'all' ? ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] : [selectedLevel];
     preloadLevels(levels).then(() => { setDataReady(true); setDataVersion((v) => v + 1); });
   }, [selectedLevel]);
 
@@ -377,7 +385,7 @@ export default function DeepVocabularyPage() {
     if (revMode) { setReviewMode(revMode); try { safeStorage.setItem('__nativethink_review_mode', revMode); } catch { /* ignore */ } }
     markSetupDone();
     setShowWizard(false);
-    const levels = level === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [level];
+    const levels = level === 'all' ? ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] : [level];
     preloadLevels(levels).then(() => setDataReady(true));
   };
 
@@ -388,7 +396,7 @@ export default function DeepVocabularyPage() {
     setTab(lastTab);
     markSetupDone();
     setShowWizard(false);
-    const levels = lastLevel === 'all' ? ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] : [lastLevel];
+    const levels = lastLevel === 'all' ? ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] : [lastLevel];
     preloadLevels(levels).then(() => setDataReady(true));
   };
 
@@ -413,10 +421,10 @@ export default function DeepVocabularyPage() {
 
   // Browse level colors
   const LEVEL_COLORS: Record<string, string> = {
-    cet4: '#00B894', cet6: '#0984E3', ielts: '#F59E0B', toefl: '#6C5CE7', advanced: '#64748B',
+    zhongkao: '#EF4444', gaokao: '#F97316', cet4: '#0EA5E9', cet6: '#6C5CE7', ielts: '#F59E0B', toefl: '#EC4899', postgraduate: '#8B5CF6', professional: '#14B8A6', advanced: '#64748B',
   };
   const LEVEL_LABELS: Record<string, string> = {
-    cet4: '四级', cet6: '六级', ielts: '雅思', toefl: '托福', advanced: '高阶',
+    zhongkao: '中考', gaokao: '高考', cet4: '四级', cet6: '六级', ielts: '雅思', toefl: '托福', postgraduate: '考研', professional: '专业', advanced: '高阶',
   };
 
   // filteredWords must be declared BEFORE it's used in startAutoPlay & useEffect

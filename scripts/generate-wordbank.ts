@@ -20,25 +20,25 @@ const DATA_DIR = path.resolve(__dirname, '../src/data/wordbank/data');
 const SOURCES: { key: string; url: string; label: string; topics: string[] }[] = [
   {
     key: 'zhongkao',
-    url: 'https://raw.githubusercontent.com/KyleBing/english-vocabulary/master/%E5%88%9D%E4%B8%AD-%E9%A1%BA%E5%BA%8F.json',
+    url: 'https://raw.githubusercontent.com/KyleBing/english-vocabulary/master/json/1-%E5%88%9D%E4%B8%AD-%E9%A1%BA%E5%BA%8F.json',
     label: 'zhongkao',
     topics: ['examination', 'middle_school'],
   },
   {
     key: 'gaokao',
-    url: 'https://raw.githubusercontent.com/KyleBing/english-vocabulary/master/%E9%AB%98%E4%B8%AD-%E9%A1%BA%E5%BA%8F.json',
+    url: 'https://raw.githubusercontent.com/KyleBing/english-vocabulary/master/json/2-%E9%AB%98%E4%B8%AD-%E9%A1%BA%E5%BA%8F.json',
     label: 'gaokao',
     topics: ['examination', 'high_school'],
   },
   {
     key: 'postgraduate',
-    url: 'https://raw.githubusercontent.com/KyleBing/english-vocabulary/master/%E8%80%83%E7%A0%94-%E9%A1%BA%E5%BA%8F.json',
+    url: 'https://raw.githubusercontent.com/KyleBing/english-vocabulary/master/json/5-%E8%80%83%E7%A0%94-%E9%A1%BA%E5%BA%8F.json',
     label: 'postgraduate',
     topics: ['examination', 'advanced'],
   },
   {
     key: 'professional',
-    url: 'https://raw.githubusercontent.com/KyleBing/english-vocabulary/master/SAT-%E9%A1%BA%E5%BA%8F.json',
+    url: 'https://raw.githubusercontent.com/KyleBing/english-vocabulary/master/json/7-SAT-%E9%A1%BA%E5%BA%8F.json',
     label: 'professional',
     topics: ['professional', 'academic'],
   },
@@ -50,12 +50,12 @@ interface KyleBingEntry {
   phrases: { phrase: string; translation: string }[];
 }
 
-function cleanPhonetic(entry: KyleBingEntry): string {
-  // KyleBing doesn't include phonetic — leave empty
-  return '';
+function esc(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' ').replace(/\r/g, '');
 }
 
 function buildPos(entry: KyleBingEntry): string {
+  if (!entry.translations || !Array.isArray(entry.translations)) return 'n';
   const types = new Set<string>();
   for (const t of entry.translations) {
     if (t.type) types.add(t.type.trim().toLowerCase());
@@ -65,21 +65,23 @@ function buildPos(entry: KyleBingEntry): string {
 }
 
 function buildMeaning(entry: KyleBingEntry): string {
+  if (!entry.translations || !Array.isArray(entry.translations)) return '';
   return entry.translations
-    .map((t) => t.translation.trim())
+    .map((t) => (t.translation || '').trim())
     .filter(Boolean)
     .join('；');
 }
 
 function buildCollocations(entry: KyleBingEntry): string[] {
-  return entry.phrases.map((p) => p.phrase.trim()).filter(Boolean);
+  if (!entry.phrases || !Array.isArray(entry.phrases)) return [];
+  return entry.phrases.map((p) => p.phrase?.trim() || '').filter(Boolean);
 }
 
 function buildExamples(entry: KyleBingEntry): { en: string; zh: string }[] {
-  // Use first 2 phrases as example sentences
+  if (!entry.phrases || !Array.isArray(entry.phrases)) return [];
   return entry.phrases.slice(0, 2).map((p) => ({
-    en: p.phrase.trim(),
-    zh: p.translation.trim(),
+    en: (p.phrase || '').trim(),
+    zh: (p.translation || '').trim(),
   }));
 }
 
@@ -105,10 +107,10 @@ async function main() {
 
     for (let i = 0; i < raw.length; i++) {
       const e = raw[i];
-      const word = e.word.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-      const pos = buildPos(e).replace(/'/g, "\\'");
-      const meaning = buildMeaning(e).replace(/'/g, "\\'");
-      const phonetic = cleanPhonetic(e);
+      const word = esc(e.word);
+      const pos = esc(buildPos(e));
+      const meaning = esc(buildMeaning(e));
+      const phonetic = '';
       const collocations = JSON.stringify(buildCollocations(e));
       const examples = JSON.stringify(buildExamples(e));
 

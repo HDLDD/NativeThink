@@ -86,11 +86,15 @@ function buildCalendarDays(calendar: { date: string; checkedIn: boolean; minutes
 const WEEK_DAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
 const VOCAB_LEVELS: { key: string; label: string; icon: typeof BookOpen; color: string }[] = [
-  { key: 'cet4', label: '四级词库', icon: BookOpen, color: 'text-emerald-500' },
-  { key: 'cet6', label: '六级词库', icon: BookOpen, color: 'text-sky-500' },
-  { key: 'ielts', label: '雅思词库', icon: BookOpen, color: 'text-indigo-500' },
-  { key: 'toefl', label: '托福词库', icon: BookOpen, color: 'text-amber-500' },
-  { key: 'advanced', label: '高级词库', icon: BookOpen, color: 'text-rose-500' },
+  { key: 'zhongkao', label: '中考词库', icon: BookOpen, color: 'text-red-500' },
+  { key: 'gaokao', label: '高考词库', icon: BookOpen, color: 'text-orange-500' },
+  { key: 'cet4', label: '四级词库', icon: BookOpen, color: 'text-sky-500' },
+  { key: 'cet6', label: '六级词库', icon: BookOpen, color: 'text-violet-500' },
+  { key: 'ielts', label: '雅思词库', icon: BookOpen, color: 'text-amber-500' },
+  { key: 'toefl', label: '托福词库', icon: BookOpen, color: 'text-rose-500' },
+  { key: 'postgraduate', label: '考研词库', icon: BookOpen, color: 'text-purple-500' },
+  { key: 'professional', label: '专业词库', icon: BookOpen, color: 'text-teal-500' },
+  { key: 'advanced', label: '高级词库', icon: BookOpen, color: 'text-slate-500' },
 ];
 
 export default function ProgressPage() {
@@ -111,7 +115,7 @@ export default function ProgressPage() {
   };
   const handleResetWordLearning = () => {
     // Clear all per-level word learning storage
-    const LEVELS = ['all', 'cet4', 'cet6', 'ielts', 'toefl', 'advanced'];
+    const LEVELS = ['all', 'zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
     LEVELS.forEach((l) => {
       safeStorage.removeItem(`__nativethink_word_learning_${l}`);
       safeStorage.removeItem(`__nativethink_daily_quota_${l}`);
@@ -190,7 +194,7 @@ export default function ProgressPage() {
   const handleResetAll = () => {
     resetAll();
     // Clear all per-level word learning storage
-    const LEVELS = ['all', 'cet4', 'cet6', 'ielts', 'toefl', 'advanced'];
+    const LEVELS = ['all', 'zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
     LEVELS.forEach((l) => {
       safeStorage.removeItem(`__nativethink_word_learning_${l}`);
       safeStorage.removeItem(`__nativethink_daily_quota_${l}`);
@@ -527,7 +531,7 @@ export default function ProgressPage() {
                         case 'stats': handleResetStats(); break;
                         case 'words': handleResetWordLearning(); break;
                         case 'history': handleResetDailyHistory(); break;
-                        case 'cet4': case 'cet6': case 'ielts': case 'toefl': case 'advanced': handleResetWordLevel(resetConfirm); break;
+                        case 'zhongkao': case 'gaokao': case 'cet4': case 'cet6': case 'ielts': case 'toefl': case 'postgraduate': case 'professional': case 'advanced': handleResetWordLevel(resetConfirm); break;
                         case 'phrases': handleResetPhraseLearning(); break;
                         case 'ai': handleResetAIContent(); break;
                         case 'favs': handleResetFavorites(); break;

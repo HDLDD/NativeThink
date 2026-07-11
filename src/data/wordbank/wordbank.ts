@@ -5,7 +5,7 @@ import type { IWordEntry, IWordQuery } from './schema';
 
 // ── Pre-computed constants (no data loading needed) ──
 export const WORD_COUNTS: Record<string, number> = {
-  cet4: 4542, cet6: 7404, ielts: 6609, toefl: 10367, advanced: 18471,
+  zhongkao: 3223, gaokao: 6008, cet4: 4542, cet6: 7404, ielts: 6609, toefl: 10367, postgraduate: 9602, professional: 8887, advanced: 18471,
 };
 
 export const ALL_PARTS_OF_SPEECH: string[] = [
@@ -13,7 +13,7 @@ export const ALL_PARTS_OF_SPEECH: string[] = [
 ];
 
 // ── Dynamic level loaders ──
-const ALL_LEVELS = ['cet4', 'cet6', 'ielts', 'toefl', 'advanced'] as const;
+const ALL_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] as const;
 
 const CACHE_VERSION = 1;
 const LS_PREFIX = '__nativethink_wb_';
@@ -86,10 +86,14 @@ async function loadLevel(level: string): Promise<void> {
   const p = (async () => {
     let mod: Record<string, IWordEntry[]>;
     switch (level) {
+      case 'zhongkao': mod = await import('./data/zhongkao'); break;
+      case 'gaokao': mod = await import('./data/gaokao'); break;
       case 'cet4': mod = await import('./data/cet4'); break;
       case 'cet6': mod = await import('./data/cet6'); break;
       case 'ielts': mod = await import('./data/ielts'); break;
       case 'toefl': mod = await import('./data/toefl'); break;
+      case 'postgraduate': mod = await import('./data/postgraduate'); break;
+      case 'professional': mod = await import('./data/professional'); break;
       case 'advanced': mod = await import('./data/advanced'); break;
       default: return;
     }
@@ -196,7 +200,7 @@ export function queryWords(params: IWordQuery = {}): IWordEntry[] {
   } else if (params.sortBy === 'alphabetical') {
     words = [...words].sort((a, b) => a.word.localeCompare(b.word));
   } else if (params.sortBy === 'level') {
-    const ord: Record<string, number> = { cet4: 0, cet6: 1, ielts: 2, toefl: 3, advanced: 4 };
+    const ord: Record<string, number> = { zhongkao: 0, gaokao: 1, cet4: 2, cet6: 3, ielts: 4, toefl: 5, postgraduate: 6, professional: 7, advanced: 8 };
     words = [...words].sort((a, b) => (ord[a.level] || 0) - (ord[b.level] || 0));
   }
   // No sort requested → return the filtered array as-is (or a shallow copy for slicing)

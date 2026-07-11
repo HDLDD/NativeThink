@@ -17,12 +17,16 @@ type ReviewMode = 'flashcard' | 'choice' | 'spelling' | 'listening' | 'matching'
 
 // Level color map
 const LEVEL_COLORS: Record<string, { accent: string; bg: string; border: string; light: string; gradient: string; label: string }> = {
-  all:     { accent: '#00B894', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', light: 'bg-emerald-50 dark:bg-emerald-500/15', gradient: 'from-emerald-500 to-[#00B894]', label: '全部' },
-  cet4:    { accent: '#0EA5E9', bg: 'bg-sky-500/10', border: 'border-sky-500/20', light: 'bg-sky-50 dark:bg-sky-500/15', gradient: 'from-sky-500 to-cyan-500', label: '四级' },
-  cet6:    { accent: '#6C5CE7', bg: 'bg-violet-500/10', border: 'border-violet-500/20', light: 'bg-violet-50 dark:bg-violet-500/15', gradient: 'from-violet-500 to-purple-500', label: '六级' },
-  ielts:   { accent: '#F59E0B', bg: 'bg-amber-500/10', border: 'border-amber-500/20', light: 'bg-amber-50 dark:bg-amber-500/15', gradient: 'from-amber-500 to-orange-500', label: '雅思' },
-  toefl:   { accent: '#EC4899', bg: 'bg-rose-500/10', border: 'border-rose-500/20', light: 'bg-rose-50 dark:bg-rose-500/15', gradient: 'from-rose-500 to-pink-500', label: '托福' },
-  advanced:{ accent: '#64748B', bg: 'bg-slate-500/10', border: 'border-slate-500/20', light: 'bg-slate-50 dark:bg-slate-500/15', gradient: 'from-slate-500 to-gray-500', label: '高阶' },
+  all:          { accent: '#00B894', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', light: 'bg-emerald-50 dark:bg-emerald-500/15', gradient: 'from-emerald-500 to-[#00B894]', label: '全部' },
+  zhongkao:     { accent: '#EF4444', bg: 'bg-red-500/10', border: 'border-red-500/20', light: 'bg-red-50 dark:bg-red-500/15', gradient: 'from-red-500 to-rose-500', label: '中考' },
+  gaokao:       { accent: '#F97316', bg: 'bg-orange-500/10', border: 'border-orange-500/20', light: 'bg-orange-50 dark:bg-orange-500/15', gradient: 'from-orange-500 to-amber-500', label: '高考' },
+  cet4:         { accent: '#0EA5E9', bg: 'bg-sky-500/10', border: 'border-sky-500/20', light: 'bg-sky-50 dark:bg-sky-500/15', gradient: 'from-sky-500 to-cyan-500', label: '四级' },
+  cet6:         { accent: '#6C5CE7', bg: 'bg-violet-500/10', border: 'border-violet-500/20', light: 'bg-violet-50 dark:bg-violet-500/15', gradient: 'from-violet-500 to-purple-500', label: '六级' },
+  ielts:        { accent: '#F59E0B', bg: 'bg-amber-500/10', border: 'border-amber-500/20', light: 'bg-amber-50 dark:bg-amber-500/15', gradient: 'from-amber-500 to-orange-500', label: '雅思' },
+  toefl:        { accent: '#EC4899', bg: 'bg-rose-500/10', border: 'border-rose-500/20', light: 'bg-rose-50 dark:bg-rose-500/15', gradient: 'from-rose-500 to-pink-500', label: '托福' },
+  postgraduate: { accent: '#8B5CF6', bg: 'bg-purple-500/10', border: 'border-purple-500/20', light: 'bg-purple-50 dark:bg-purple-500/15', gradient: 'from-purple-500 to-violet-500', label: '考研' },
+  professional: { accent: '#14B8A6', bg: 'bg-teal-500/10', border: 'border-teal-500/20', light: 'bg-teal-50 dark:bg-teal-500/15', gradient: 'from-teal-500 to-cyan-500', label: '专业' },
+  advanced:     { accent: '#64748B', bg: 'bg-slate-500/10', border: 'border-slate-500/20', light: 'bg-slate-50 dark:bg-slate-500/15', gradient: 'from-slate-500 to-gray-500', label: '高阶' },
 };
 
 // Mode color map
