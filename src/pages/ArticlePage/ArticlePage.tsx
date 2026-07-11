@@ -769,27 +769,23 @@ export default function ArticlePage() {
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all overflow-hidden group cursor-pointer"
                 onClick={() => loadSpeech(speech.id)}
               >
-                {speech.image ? (
-                  <img
-                    src={speech.image}
-                    alt=""
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    className="w-full h-32 object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-32 bg-muted flex items-center justify-center text-3xl">🎙️</div>
-                )}
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">{speech.type}</Badge>
-                  </div>
-                  <h3 className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors line-clamp-2">
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="size-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100 dark:from-amber-500/15 dark:to-orange-500/15 flex items-center justify-center text-2xl shrink-0">
+                      🎙️
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">{speech.type}</Badge>
+                        <span className="text-[10px] text-muted-foreground font-bold">{speech.year}</span>
+                      </div>
+                      <h3 className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors line-clamp-2">
                     {speech.zhTitle}
                   </h3>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{speech.author} · {speech.year}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">{speech.author}</p>
                   <p className="text-[10px] text-muted-foreground/70 mt-1 line-clamp-2 italic">{speech.preview}</p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             ))}

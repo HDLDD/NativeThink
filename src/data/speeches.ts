@@ -5,7 +5,7 @@ import { buildPages } from './reading';
 
 export interface SpeechMeta {
   id: string; title: string; zhTitle: string; author: string; year: number;
-  type: string; topic: string; image?: string; preview: string;
+  type: string; topic: string; preview: string;
 }
 
 /** Build a speech reading content from paragraph array */
@@ -19,7 +19,7 @@ function speechContent(meta: SpeechMeta, paras: IParagraph[]): IReadingContent {
     source: meta.type,
     topic: meta.topic,
     difficulty: 'intermediate',
-    cover: meta.image,
+    
     pages: buildPages(paras),
     totalWords: paras.reduce((s, p) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
   };
@@ -27,30 +27,30 @@ function speechContent(meta: SpeechMeta, paras: IParagraph[]): IReadingContent {
 
 // ── Metadata for all speeches ──
 export const FAMOUS_SPEECHES_META: SpeechMeta[] = [
-  { id: 'mlk-dream', title: 'I Have a Dream', zhTitle: '我有一个梦想', author: 'Martin Luther King Jr.', year: 1963, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Martin_Luther_King%2C_Jr..jpg/440px-Martin_Luther_King%2C_Jr..jpg', preview: 'I am happy to join with you today...' },
-  { id: 'gettysburg', title: 'The Gettysburg Address', zhTitle: '葛底斯堡演说', author: 'Abraham Lincoln', year: 1863, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Abraham_Lincoln_O-77_matte_collodion_print.jpg/440px-Abraham_Lincoln_O-77_matte_collodion_print.jpg', preview: 'Four score and seven years ago...' },
-  { id: 'churchill-finest', title: 'Their Finest Hour', zhTitle: '最光辉的时刻', author: 'Winston Churchill', year: 1940, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Sir_Winston_Churchill_-_19086236948.jpg/440px-Sir_Winston_Churchill_-_19086236948.jpg', preview: 'What General Weygand called the Battle of France is over...' },
-  { id: 'jfk-inaugural', title: 'Inaugural Address', zhTitle: '就职演说', author: 'John F. Kennedy', year: 1961, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/John_F._Kennedy%2C_White_House_color_photo_portrait.jpg/440px-John_F._Kennedy%2C_White_House_color_photo_portrait.jpg', preview: 'We observe today not a victory of party...' },
-  { id: 'susan-anthony', title: "On Women's Right to Vote", zhTitle: '论妇女选举权', author: 'Susan B. Anthony', year: 1873, type: '历史演讲', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Susan_B._Anthony_c1855.png/440px-Susan_B._Anthony_c1855.png', preview: 'Friends and fellow citizens...' },
-  { id: 'ted-robinson-school', title: 'Do Schools Kill Creativity?', zhTitle: '学校扼杀创造力吗？', author: 'Sir Ken Robinson', year: 2006, type: 'TED', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Sir_Ken_Robinson.jpg/440px-Sir_Ken_Robinson.jpg', preview: 'Good morning. How are you?...' },
-  { id: 'ted-sinek-leaders', title: 'How Great Leaders Inspire Action', zhTitle: '伟大领袖如何激励行动', author: 'Simon Sinek', year: 2009, type: 'TED', topic: 'business', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Simon_Sinek_2019.jpg/440px-Simon_Sinek_2019.jpg', preview: 'How do you explain when things...' },
-  { id: 'ted-brown-vulnerability', title: 'The Power of Vulnerability', zhTitle: '脆弱的力量', author: 'Brené Brown', year: 2010, type: 'TED', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Brene_Brown_2018.png/440px-Brene_Brown_2018.png', preview: "So, I'll start with this..." },
-  { id: 'ted-cuddy-body', title: 'Your Body Language Shapes Who You Are', zhTitle: '肢体语言塑造你自己', author: 'Amy Cuddy', year: 2012, type: 'TED', topic: 'science', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/Amy_Cuddy_2018.jpg/440px-Amy_Cuddy_2018.jpg', preview: 'So I want to start by offering...' },
-  { id: 'ted-duckworth-grit', title: 'Grit: The Power of Passion and Perseverance', zhTitle: '毅力：激情与坚持的力量', author: 'Angela Duckworth', year: 2013, type: 'TED', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Angela_Duckworth_2017.jpg/440px-Angela_Duckworth_2017.jpg', preview: 'When I was 27 years old...' },
-  { id: 'ted-harari-nationalism', title: 'Why Fascism is so Tempting', zhTitle: '法西斯主义为何诱人', author: 'Yuval Noah Harari', year: 2018, type: 'TED', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Yuval_Noah_Harari_2022.jpg/440px-Yuval_Noah_Harari_2022.jpg', preview: 'So, humankind has two great stories...' },
-  { id: 'ted-gates-climate', title: 'Innovating to Zero', zhTitle: '创新到零排放', author: 'Bill Gates', year: 2010, type: 'TED', topic: 'science', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Bill_Gates_2018.jpg/440px-Bill_Gates_2018.jpg', preview: "I'm going to talk today about energy..." },
-  { id: 'ted-adichie-single', title: 'The Danger of a Single Story', zhTitle: '单一故事的危险', author: 'Chimamanda Adichie', year: 2009, type: 'TED', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Chimamanda_Adichie_2015.jpg/440px-Chimamanda_Adichie_2015.jpg', preview: "I'm a storyteller..." },
-  { id: 'ted-urban-procrastination', title: 'Inside the Mind of a Master Procrastinator', zhTitle: '拖延症大师的内心世界', author: 'Tim Urban', year: 2016, type: 'TED', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Tim_Urban_2016.jpg/440px-Tim_Urban_2016.jpg', preview: 'So in college, I was a government major...' },
-  { id: 'ted-godin-tribes', title: 'The Tribes We Lead', zhTitle: '我们领导的部落', author: 'Seth Godin', year: 2009, type: 'TED', topic: 'business', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Seth_Godin_2009.jpg/440px-Seth_Godin_2009.jpg', preview: 'Something really important is happening...' },
-  { id: 'jobs-stanford', title: 'Stanford Commencement Address', zhTitle: '斯坦福毕业演讲', author: 'Steve Jobs', year: 2005, type: '毕业演讲', topic: 'business', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Steve_Jobs_Headshot_2010-CROP_%28cropped_2%29.jpg/440px-Steve_Jobs_Headshot_2010-CROP_%28cropped_2%29.jpg', preview: 'I am honored to be with you today...' },
-  { id: 'rowling-harvard', title: 'The Fringe Benefits of Failure', zhTitle: '失败带来的额外收益', author: 'J.K. Rowling', year: 2008, type: '毕业演讲', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/J._K._Rowling_2010.jpg/440px-J._K._Rowling_2010.jpg', preview: 'President Faust, members of the Harvard Corporation...' },
-  { id: 'obama-yes-we-can', title: 'Yes We Can Speech', zhTitle: '是的，我们可以', author: 'Barack Obama', year: 2008, type: '政治演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/President_Barack_Obama.jpg/440px-President_Barack_Obama.jpg', preview: 'If there is anyone out there...' },
-  { id: 'rand-Atlas', title: 'This is John Galt Speaking', zhTitle: '约翰·高尔特演说', author: 'Ayn Rand', year: 1957, type: '文学演讲', topic: 'philosophy', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Ayn_Rand_%281943_Talbot_portrait%29.jpg/440px-Ayn_Rand_%281943_Talbot_portrait%29.jpg', preview: 'For twelve years you have been asking...' },
-  { id: 'mandela-inaugural', title: 'Inaugural Address', zhTitle: '就职演说', author: 'Nelson Mandela', year: 1994, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Nelson_Mandela_1994.jpg/440px-Nelson_Mandela_1994.jpg', preview: 'Our deepest fear is not that we are inadequate...' },
-  { id: 'greta-un-climate', title: 'How Dare You', zhTitle: '你们怎么敢', author: 'Greta Thunberg', year: 2019, type: 'UN演讲', topic: 'science', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Greta_Thunberg_2020_%28cropped%29.jpg/440px-Greta_Thunberg_2020_%28cropped%29.jpg', preview: 'My message is that we\'ll be watching you...' },
-  { id: 'emma-heforshe', title: 'HeForShe Gender Equality', zhTitle: '他为她性别平等', author: 'Emma Watson', year: 2014, type: 'UN演讲', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Emma_Watson_2013.jpg/440px-Emma_Watson_2013.jpg', preview: 'Today we are launching a campaign...' },
-  { id: 'malala-un', title: 'Education for All', zhTitle: '全民教育', author: 'Malala Yousafzai', year: 2013, type: 'UN演讲', topic: 'culture', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Malala_Yousafzai_2015.jpg/440px-Malala_Yousafzai_2015.jpg', preview: 'In the name of God...' },
-  { id: 'reagan-challenger', title: 'The Challenger Disaster Speech', zhTitle: '挑战者号灾难演说', author: 'Ronald Reagan', year: 1986, type: '历史演讲', topic: 'history', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Official_Portrait_of_President_Reagan_1981.jpg/440px-Official_Portrait_of_President_Reagan_1981.jpg', preview: "Ladies and gentlemen, I'd planned to speak..." },
+  { id: 'mlk-dream', title: 'I Have a Dream', zhTitle: '我有一个梦想', author: 'Martin Luther King Jr.', year: 1963, type: '历史演讲', topic: 'history', preview: 'I am happy to join with you today...' },
+  { id: 'gettysburg', title: 'The Gettysburg Address', zhTitle: '葛底斯堡演说', author: 'Abraham Lincoln', year: 1863, type: '历史演讲', topic: 'history', preview: 'Four score and seven years ago...' },
+  { id: 'churchill-finest', title: 'Their Finest Hour', zhTitle: '最光辉的时刻', author: 'Winston Churchill', year: 1940, type: '历史演讲', topic: 'history', preview: 'What General Weygand called the Battle of France is over...' },
+  { id: 'jfk-inaugural', title: 'Inaugural Address', zhTitle: '就职演说', author: 'John F. Kennedy', year: 1961, type: '历史演讲', topic: 'history', preview: 'We observe today not a victory of party...' },
+  { id: 'susan-anthony', title: "On Women's Right to Vote", zhTitle: '论妇女选举权', author: 'Susan B. Anthony', year: 1873, type: '历史演讲', topic: 'culture', preview: 'Friends and fellow citizens...' },
+  { id: 'ted-robinson-school', title: 'Do Schools Kill Creativity?', zhTitle: '学校扼杀创造力吗？', author: 'Sir Ken Robinson', year: 2006, type: 'TED', topic: 'culture', preview: 'Good morning. How are you?...' },
+  { id: 'ted-sinek-leaders', title: 'How Great Leaders Inspire Action', zhTitle: '伟大领袖如何激励行动', author: 'Simon Sinek', year: 2009, type: 'TED', topic: 'business', preview: 'How do you explain when things...' },
+  { id: 'ted-brown-vulnerability', title: 'The Power of Vulnerability', zhTitle: '脆弱的力量', author: 'Brené Brown', year: 2010, type: 'TED', topic: 'culture', preview: "So, I'll start with this..." },
+  { id: 'ted-cuddy-body', title: 'Your Body Language Shapes Who You Are', zhTitle: '肢体语言塑造你自己', author: 'Amy Cuddy', year: 2012, type: 'TED', topic: 'science', preview: 'So I want to start by offering...' },
+  { id: 'ted-duckworth-grit', title: 'Grit: The Power of Passion and Perseverance', zhTitle: '毅力：激情与坚持的力量', author: 'Angela Duckworth', year: 2013, type: 'TED', topic: 'culture', preview: 'When I was 27 years old...' },
+  { id: 'ted-harari-nationalism', title: 'Why Fascism is so Tempting', zhTitle: '法西斯主义为何诱人', author: 'Yuval Noah Harari', year: 2018, type: 'TED', topic: 'history', preview: 'So, humankind has two great stories...' },
+  { id: 'ted-gates-climate', title: 'Innovating to Zero', zhTitle: '创新到零排放', author: 'Bill Gates', year: 2010, type: 'TED', topic: 'science', preview: "I'm going to talk today about energy..." },
+  { id: 'ted-adichie-single', title: 'The Danger of a Single Story', zhTitle: '单一故事的危险', author: 'Chimamanda Adichie', year: 2009, type: 'TED', topic: 'culture', preview: "I'm a storyteller..." },
+  { id: 'ted-urban-procrastination', title: 'Inside the Mind of a Master Procrastinator', zhTitle: '拖延症大师的内心世界', author: 'Tim Urban', year: 2016, type: 'TED', topic: 'culture', preview: 'So in college, I was a government major...' },
+  { id: 'ted-godin-tribes', title: 'The Tribes We Lead', zhTitle: '我们领导的部落', author: 'Seth Godin', year: 2009, type: 'TED', topic: 'business', preview: 'Something really important is happening...' },
+  { id: 'jobs-stanford', title: 'Stanford Commencement Address', zhTitle: '斯坦福毕业演讲', author: 'Steve Jobs', year: 2005, type: '毕业演讲', topic: 'business', preview: 'I am honored to be with you today...' },
+  { id: 'rowling-harvard', title: 'The Fringe Benefits of Failure', zhTitle: '失败带来的额外收益', author: 'J.K. Rowling', year: 2008, type: '毕业演讲', topic: 'culture', preview: 'President Faust, members of the Harvard Corporation...' },
+  { id: 'obama-yes-we-can', title: 'Yes We Can Speech', zhTitle: '是的，我们可以', author: 'Barack Obama', year: 2008, type: '政治演讲', topic: 'history', preview: 'If there is anyone out there...' },
+  { id: 'rand-Atlas', title: 'This is John Galt Speaking', zhTitle: '约翰·高尔特演说', author: 'Ayn Rand', year: 1957, type: '文学演讲', topic: 'philosophy', preview: 'For twelve years you have been asking...' },
+  { id: 'mandela-inaugural', title: 'Inaugural Address', zhTitle: '就职演说', author: 'Nelson Mandela', year: 1994, type: '历史演讲', topic: 'history', preview: 'Our deepest fear is not that we are inadequate...' },
+  { id: 'greta-un-climate', title: 'How Dare You', zhTitle: '你们怎么敢', author: 'Greta Thunberg', year: 2019, type: 'UN演讲', topic: 'science', preview: 'My message is that we\'ll be watching you...' },
+  { id: 'emma-heforshe', title: 'HeForShe Gender Equality', zhTitle: '他为她性别平等', author: 'Emma Watson', year: 2014, type: 'UN演讲', topic: 'culture', preview: 'Today we are launching a campaign...' },
+  { id: 'malala-un', title: 'Education for All', zhTitle: '全民教育', author: 'Malala Yousafzai', year: 2013, type: 'UN演讲', topic: 'culture', preview: 'In the name of God...' },
+  { id: 'reagan-challenger', title: 'The Challenger Disaster Speech', zhTitle: '挑战者号灾难演说', author: 'Ronald Reagan', year: 1986, type: '历史演讲', topic: 'history', preview: "Ladies and gentlemen, I'd planned to speak..." },
 ];
 
 // ── Speech full texts ──
