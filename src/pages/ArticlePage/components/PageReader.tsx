@@ -534,49 +534,27 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       <ScrollArea className="flex-1">
         <div className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch">
           <div ref={contentRef} className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-white/80 rounded-2xl my-2">
-            {page.paragraphs.map((para, i) => (
-                <ParagraphBlock
-                  key={i}
-                  para={para}
-                  paraIndex={paraChapterNumbers[i] || 0}
-                  transMode={transMode}
-                  sentenceMode={sentenceMode}
-                  fontSize={fontSize}
-                  onWordClick={handleWordClick}
-                  isSpeaking={speakingPara === i}
-                  tts={tts}
-                />
+            {activeContent.pages.map((pg, pi) => (
+              <div key={pi}>
+                {pg.paragraphs.map((para, i) => (
+                  <ParagraphBlock
+                    key={`${pi}-${i}`}
+                    para={para}
+                    paraIndex={0}
+                    transMode={transMode}
+                    sentenceMode={sentenceMode}
+                    fontSize={fontSize}
+                    onWordClick={handleWordClick}
+                    isSpeaking={false}
+                    tts={tts}
+                  />
+                ))}
+              </div>
             ))}
           </div>
         </div>
       </ScrollArea>
 
-      {/* ── Pagination Footer ── */}
-      <div className="shrink-0 border-t border-border px-3 sm:px-4 py-3 flex items-center justify-center gap-2 sm:gap-3">
-        <Button variant="outline" size="sm" onClick={goPrev} disabled={currentPage === 0} className="rounded-xl text-[10px] font-bold gap-1 px-2 sm:px-3">
-          <ChevronLeft className="size-4" /><span className="hidden sm:inline">上一页</span>
-        </Button>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-muted-foreground tabular-nums whitespace-nowrap">{currentPage + 1} / {activePages}</span>
-          <Input
-            type="number"
-            min={1}
-            max={activePages}
-            className="w-12 sm:w-14 h-8 text-center text-xs font-bold rounded-xl"
-            placeholder={`${currentPage + 1}`}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const n = parseInt((e.target as HTMLInputElement).value);
-                if (n >= 1 && n <= activePages) jumpPage(n);
-                (e.target as HTMLInputElement).value = '';
-              }
-            }}
-          />
-        </div>
-        <Button variant="outline" size="sm" onClick={goNext} disabled={currentPage >= activePages - 1} className="rounded-xl text-[10px] font-bold gap-1 px-2 sm:px-3">
-          <span className="hidden sm:inline">下一页</span><ChevronRight className="size-4" />
-        </Button>
-      </div>
 
       {/* ── Word Lookup Dialog ── */}
       <Dialog open={lookupOpen} onOpenChange={setLookupOpen}>
