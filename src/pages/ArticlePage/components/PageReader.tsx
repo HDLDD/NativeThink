@@ -157,6 +157,9 @@ export default function PageReader({ content, onClose }: Props) {
   const [viewMode, setViewMode] = useState<'toc' | 'reading'>(hasChapters ? 'toc' : 'reading');
   const [currentChapter, setCurrentChapter] = useState(0);
 
+  // Clamp page
+  const currentPage = Math.max(0, Math.min(pageIdx, activePages - 1));
+
   // Calculate chapter-relative paragraph index for current page
   const paraChapterIndex = useMemo(() => {
     if (!hasChapters) return null;
@@ -177,9 +180,6 @@ export default function PageReader({ content, onClose }: Props) {
     }
     return { chIdx, startCount: count };
   }, [hasChapters, chapters, pageIdx, activeContent.pages, currentPage]);
-
-  // Clamp page
-  const currentPage = Math.max(0, Math.min(pageIdx, activePages - 1));
 
   // Preload wordbank for Chinese word lookup
   useEffect(() => { if (!isAllReady()) preloadAll(); }, []);
