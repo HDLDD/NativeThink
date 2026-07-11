@@ -107,7 +107,6 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const [lookupData, setLookupData] = useState<{ word: string; phonetic: string; meaning: string; zhMeaning: string } | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
-  const tocScrollRef = useRef<HTMLDivElement>(null);
 
   // TTS cleanup on unmount
   useEffect(() => {
@@ -159,21 +158,38 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const activePages = activeContent.pages.length;
 
   // ── Chapter index ──
-  interface ChapterInfo { title: string; pageIndex: number; }
+  interface ChapterInfo { title: string; pageIndex: number; paraCount: number; wordCount: number; }
   const chapters = useMemo<ChapterInfo[]>(() => {
     const result: ChapterInfo[] = [];
     for (let pi = 0; pi < activeContent.pages.length; pi++) {
       for (const p of activeContent.pages[pi].paragraphs) {
         if (p.en.startsWith('##CHAPTER##')) {
-          result.push({ title: p.en.replace('##CHAPTER##', ''), pageIndex: pi });
+          const title = p.en.replace('##CHAPTER##', '').trim();
+          // Count paragraphs & words until next chapter or end
+          let paraCount = 0;
+          let wordCount = 0;
+          let done = false;
+          for (let pp = pi; pp < activeContent.pages.length && !done; pp++) {
+            for (const para of activeContent.pages[pp].paragraphs) {
+              if (para.en.startsWith('##CHAPTER##')) {
+                if (pp > pi) { done = true; break; }
+                continue;
+              }
+              paraCount++;
+              wordCount += para.en.split(/\s+/).filter(Boolean).length;
+            }
+          }
+          result.push({ title, pageIndex: pi, paraCount, wordCount });
         }
       }
     }
     return result;
   }, [activeContent.pages]);
   const hasChapters = chapters.length > 0;
-  const [viewMode, setViewMode] = useState<'toc' | 'reading'>(hasChapters ? 'toc' : 'reading');
   const [currentChapter, setCurrentChapter] = useState(0);
+
+  // ── TOC dialog ──
+  const [tocOpen, setTocOpen] = useState(false);
 
   // Clamp page
   const currentPage = Math.max(0, Math.min(pageIdx, activePages - 1));
@@ -226,15 +242,14 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
   // Sync currentChapter with page changes
   useEffect(() => {
-    if (!hasChapters || viewMode !== 'reading') return;
+    if (!hasChapters) return;
     for (let i = chapters.length - 1; i >= 0; i--) {
       if (pageIdx >= chapters[i].pageIndex) { setCurrentChapter(i); break; }
     }
-  }, [pageIdx, hasChapters, chapters, viewMode]);
+  }, [pageIdx, hasChapters, chapters]);
 
-  // Reset to TOC when content changes (new book opened)
+  // Reset chapter when new book opened
   useEffect(() => {
-    setViewMode(hasChapters ? 'toc' : 'reading');
     setCurrentChapter(0);
   }, [content.id]);
 
@@ -593,15 +608,15 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         >
           <Heart className={cn('size-3.5', articleFaved && 'fill-current')} />{articleFaved ? '已收藏' : '收藏'}
         </Button>
-        {hasChapters && viewMode === 'reading' && (
-          <Button variant="ghost" size="sm" onClick={() => { setViewMode('toc'); }} className="rounded-xl text-[10px] font-bold gap-1">
+        {hasChapters && (
+          <Button variant="ghost" size="sm" onClick={() => setTocOpen(true)} className="rounded-xl text-[10px] font-bold gap-1">
             <BookOpen className="size-3.5" />目录
           </Button>
         )}
       </div>
 
       {/* ── Chapter Navigation ── */}
-      {hasChapters && viewMode === 'reading' && (
+      {hasChapters && (
         <div className="shrink-0 px-4 py-1.5 flex items-center justify-center gap-2 border-b border-border/30 bg-muted/30">
           <Button
             variant="ghost" size="icon"
@@ -617,7 +632,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           </Button>
           <div className="flex-1 text-center min-w-0">
             <button
-              onClick={() => setViewMode('toc')}
+              onClick={() => setTocOpen(true)}
               className="text-[10px] font-black text-foreground hover:text-[#00B894] transition-colors line-clamp-1 px-1"
             >
               {chapters[currentChapter]?.title || activeContent.title}
@@ -641,104 +656,23 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         </div>
       )}
 
-      {/* ── TOC / Reading Content ── */}
-      <div className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch"
-      >
-        {viewMode === 'toc' && hasChapters ? (
-          /* ── TABLE OF CONTENTS (vertical scroll wheel like word browse) ── */
-          <div className="max-w-lg mx-auto px-4 sm:px-6 py-6 flex flex-col h-full">
-            {/* Book info header */}
-            <div className="text-center shrink-0 mb-4">
-              <BookOpen className="size-7 text-[#00B894] mx-auto mb-1.5" />
-              <h2 className="text-base font-black italic text-foreground">{activeContent.zhTitle || activeContent.title}</h2>
-              <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">
-                {activeContent.author || activeContent.source} · {chapters.length} 章节 · {activeContent.totalWords.toLocaleString()} 词
-              </p>
-            </div>
-
-            {/* Chapter list — vertical scrollable, like word bank browse */}
-            <div ref={tocScrollRef} className="flex-1 overflow-y-auto space-y-1 pr-1">
-              {chapters.map((ch, i) => {
-                const endPage = i < chapters.length - 1 ? chapters[i + 1].pageIndex : activePages;
-                const startPage = ch.pageIndex + 1;
-                const isActive = i === currentChapter;
-                return (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      setCurrentChapter(i);
-                      setPageIdx(ch.pageIndex);
-                      setViewMode('reading');
-                    }}
-                    className={cn(
-                      'w-full text-left p-2.5 rounded-xl transition-all duration-200 border-2',
-                      isActive
-                        ? 'border-[#00B894] bg-[#00B894]/5 shadow-sm'
-                        : 'border-transparent bg-muted/30 hover:bg-muted hover:border-border',
-                    )}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className={cn(
-                        'shrink-0 size-6 rounded-lg flex items-center justify-center text-[10px] font-black',
-                        isActive ? 'bg-[#00B894] text-white' : 'bg-muted text-muted-foreground',
-                      )}>
-                        {i + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <span className="text-xs font-black text-foreground line-clamp-1">{ch.title}</span>
-                      </div>
-                      <span className="shrink-0 text-[9px] font-bold text-muted-foreground">
-                        p{startPage}{endPage !== startPage ? `-${endPage}` : ''}
-                      </span>
-                      <ChevronRight className="shrink-0 size-3 text-muted-foreground/30" />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Continue reading */}
-            <div className="shrink-0 pt-3">
-              <Button
-                onClick={() => {
-                  const saved = loadProgress(activeContent.id);
-                  if (saved.page > 0) {
-                    setPageIdx(saved.page);
-                    const ch = chapters.findIndex((c, i) => {
-                      const nextStart = i < chapters.length - 1 ? chapters[i + 1].pageIndex : activePages;
-                      return saved.page >= c.pageIndex && saved.page < nextStart;
-                    });
-                    if (ch >= 0) setCurrentChapter(ch);
-                  } else {
-                    setPageIdx(chapters[0].pageIndex);
-                    setCurrentChapter(0);
-                  }
-                  setViewMode('reading');
-                }}
-                className="w-full rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50"
-              >
-                📖 继续阅读
-              </Button>
-            </div>
-          </div>
-        ) : (
-          /* ── READING MODE ── */
-          <div ref={contentRef} className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-white/80 rounded-2xl my-2">
-            {page.paragraphs.map((para, i) => (
-                <ParagraphBlock
-                  key={i}
-                  para={para}
-                  paraIndex={paraChapterNumbers[i] || 0}
-                  transMode={transMode}
-                  sentenceMode={sentenceMode}
-                  fontSize={fontSize}
-                  onWordClick={handleWordClick}
-                  isSpeaking={speakingPara === i}
-                  tts={tts}
-                />
-            ))}
-          </div>
-        )}
+      {/* ── Reading Content ── */}
+      <div className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch">
+        <div ref={contentRef} className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-white/80 rounded-2xl my-2">
+          {page.paragraphs.map((para, i) => (
+              <ParagraphBlock
+                key={i}
+                para={para}
+                paraIndex={paraChapterNumbers[i] || 0}
+                transMode={transMode}
+                sentenceMode={sentenceMode}
+                fontSize={fontSize}
+                onWordClick={handleWordClick}
+                isSpeaking={speakingPara === i}
+                tts={tts}
+              />
+          ))}
+        </div>
       </div>
 
       {/* ── Pagination Footer ── */}
@@ -767,6 +701,71 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           <span className="hidden sm:inline">下一页</span><ChevronRight className="size-4" />
         </Button>
       </div>
+
+      {/* ── TOC Dialog ── */}
+      <Dialog open={tocOpen} onOpenChange={setTocOpen}>
+        <DialogContent className="max-w-md rounded-[32px] p-0 overflow-hidden max-h-[80vh] flex flex-col bg-white">
+          {/* Header */}
+          <div className="shrink-0 px-6 pt-6 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-2.5 mb-1">
+              <div className="size-8 rounded-xl bg-[#00B894]/10 flex items-center justify-center">
+                <BookOpen className="size-4 text-[#00B894]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <DialogTitle className="text-base font-black text-slate-800 truncate">
+                  {activeContent.zhTitle || activeContent.title}
+                </DialogTitle>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400 font-medium ml-[42px]">
+              {chapters.length} 章节 · {activeContent.totalWords?.toLocaleString()} 词
+            </p>
+          </div>
+
+          {/* Scrollable chapter list */}
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            <div className="space-y-1">
+              {chapters.map((ch, i) => {
+                const isActive = i === currentChapter;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setCurrentChapter(i);
+                      setPageIdx(ch.pageIndex);
+                      setTocOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2.5 rounded-xl transition-colors hover:bg-slate-50 group"
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Number circle */}
+                      <span className={cn(
+                        'shrink-0 size-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors',
+                        isActive
+                          ? 'bg-[#00B894] text-white'
+                          : 'bg-[#00B894]/8 text-[#00B894] group-hover:bg-[#00B894]/15',
+                      )}>
+                        {i + 1}
+                      </span>
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-slate-700 line-clamp-1 leading-snug">
+                          {ch.title}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+                          {ch.paraCount}段 · ~{ch.wordCount}词
+                        </p>
+                      </div>
+                      {/* Arrow */}
+                      <ChevronRight className="shrink-0 size-4 text-slate-300 group-hover:text-[#00B894] transition-colors" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Word Lookup Dialog ── */}
       <Dialog open={lookupOpen} onOpenChange={setLookupOpen}>
