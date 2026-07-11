@@ -140,15 +140,28 @@ export default function PageReader({ content, onClose }: Props) {
     for (let i = 0; i < paras.length; i++) {
       if (ttsCancelRef.current) break;
       setSpeakingPara(i);
+      // Estimate duration: ~150 words/min = 2.5 words/sec, add buffer
+      const wordCount = paras[i].split(/\s+/).filter(Boolean).length;
+      const estimatedMs = Math.max(2000, (wordCount / 2.5) * 1000 + 800);
       await new Promise<void>((resolve) => {
         tts.speak(paras[i], { rate: 0.9 });
-        // Poll until speaking stops (paragraph complete or cancelled)
+        // Use estimated duration as primary timer, with isSpeaking as early-exit check
+        let elapsed = 0;
+        let silentFor = 0;
         const check = setInterval(() => {
-          if (!tts.isSpeaking || ttsCancelRef.current) {
-            clearInterval(check);
-            setTimeout(resolve, 200); // small gap between paragraphs
+          elapsed += 250;
+          if (ttsCancelRef.current) { clearInterval(check); resolve(); return; }
+          if (!tts.isSpeaking) {
+            silentFor += 250;
+            // Must be silent for 1.5s OR elapsed > estimated to advance
+            if (silentFor >= 1500 || elapsed >= estimatedMs) {
+              clearInterval(check);
+              setTimeout(resolve, 250);
+            }
+          } else {
+            silentFor = 0; // reset silence counter when speaking resumes
           }
-        }, 200);
+        }, 250);
       });
     }
     setSpeakingPara(-1);
