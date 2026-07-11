@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   FileText, Sparkles, Languages, BookOpen, Volume2, RefreshCw, Loader2,
   Search, ExternalLink, X, Globe, Library, Mic, Wand2, BookMarked,
@@ -874,11 +874,52 @@ export default function ArticlePage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── PageReader (no TOC, no chapters — content opens directly) ── */}
+      {/* ── Inline content reader (replaces fullscreen PageReader) ── */}
       {readerVisible && readerContent && (
-        <ReaderErrorBoundary onClose={closeReader}>
-          <PageReader content={readerContent} onClose={closeReader} />
-        </ReaderErrorBoundary>
+        <div className="fixed inset-0 z-50 bg-background flex flex-col">
+          {/* Header */}
+          <div className="shrink-0 border-b border-border px-4 py-3 flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={closeReader} className="rounded-xl shrink-0">
+              <X className="size-5" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-sm font-black text-foreground truncate">{readerContent.zhTitle || readerContent.title}</h2>
+              <p className="text-[10px] font-medium text-muted-foreground truncate">
+                {readerContent.author && `${readerContent.author} · `}{readerContent.difficulty}
+              </p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => tts.speak(
+              readerContent.pages.map(p => p.paragraphs.map(pp => cleanText(pp.en)).join(' ')).join(' '), { rate: 0.9 }
+            )} className="rounded-xl text-[10px] font-bold gap-1">
+              <Volume2 className="size-3.5" />朗读
+            </Button>
+          </div>
+          {/* Content — all paragraphs in one scroll */}
+          <ScrollArea className="flex-1">
+            <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+              {readerContent.pages.map((page, pi) => (
+                <div key={pi}>
+                  {page.paragraphs.map((para, i) => {
+                    const displayEn = para.en.startsWith('##CHAPTER##') ? para.en.replace('##CHAPTER##', '') : para.en;
+                    const isChapter = para.en.startsWith('##CHAPTER##');
+                    return (
+                      <div key={i} className={isChapter ? 'text-center py-2' : 'mb-4'}>
+                        {isChapter ? (
+                          <h3 className="text-sm font-black text-[#00B894]">{displayEn}</h3>
+                        ) : (
+                          <>
+                            <p className="text-base leading-relaxed text-foreground/85 whitespace-pre-wrap">{displayEn}</p>
+                            {para.zh && <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{para.zh}</p>}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
       )}
 
       {/* ── Usage Guide Dialog ── */}
