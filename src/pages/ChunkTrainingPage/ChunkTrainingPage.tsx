@@ -158,6 +158,14 @@ export default function ChunkTrainingPage() {
     });
   };
 
+  const libraryScrollRef = useRef<HTMLDivElement>(null);
+  // Restore library scroll position
+  useEffect(() => {
+    const el = libraryScrollRef.current;
+    if (!el || !chunkPosMemory.scrollTop) return;
+    requestAnimationFrame(() => { el.scrollTop = chunkPosMemory.scrollTop!; });
+  }, [activePageChunks.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [searchQuery, setSearchQuery] = usePageMemoryDebounced('chunk-search', '');
   const [activeTab, setActiveTab] = useState(chunkPosMemory.tab || memory.tab);
   const [categoryFilter, setCategoryFilter] = useState(memory.category);
@@ -1250,141 +1258,246 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
               )}
 
               {activePageChunks.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {activePageChunks.map((chunk) => {
-                    const favorited = isFavorited(chunk.content, 'chunk');
-                    return (
-                      <Card
-                        key={chunk.id}
-                        className="rounded-[28px] border-border hover:border-[#00B894]/30 hover:shadow-md transition-all duration-300 group cursor-pointer"
-                        onClick={() => openDetail(chunk)}
-                      >
-                        <CardContent className="p-6">
-                          <div className="flex items-start justify-between gap-3 mb-3">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {chunk.id.startsWith('ai_') && (
-                                <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
-                              )}
-                              <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] border-none">
-                                {CATEGORY_LABELS[chunk.category] || chunk.category}
-                              </Badge>
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-muted"
-                              >
-                                {getDifficultyLabel(chunk.difficulty)}
-                              </Badge>
+                <div className="grid grid-cols-12 gap-6">
+                  {/* LEFT COLUMN — Compact list + pagination */}
+                  <div className="col-span-12 lg:col-span-5 lg:sticky lg:top-40 self-start">
+                    <div
+                      ref={libraryScrollRef}
+                      onScroll={() => {
+                        if (libraryScrollRef.current) {
+                          saveChunkPosition({ scrollTop: libraryScrollRef.current.scrollTop, source: librarySource, page: activePage, tab: activeTab });
+                        }
+                      }}
+                      className="space-y-1 max-h-[480px] overflow-y-auto pr-1"
+                    >
+                      {activePageChunks.map((chunk) => {
+                        const favorited = isFavorited(chunk.content, 'chunk');
+                        return (
+                          <button
+                            key={chunk.id}
+                            onClick={() => setDetailChunk(chunk)}
+                            className={cn(
+                              'w-full text-left p-3 rounded-2xl transition-all duration-200 border-2',
+                              detailChunk?.id === chunk.id
+                                ? 'border-[#00B894] bg-[#00B894]/5 shadow-sm'
+                                : 'border-transparent bg-muted/30 hover:bg-muted hover:border-border',
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); tts.speak(chunk.content); }}
+                                    className="shrink-0 text-muted-foreground/40 hover:text-[#00B894] transition-colors"
+                                    title={`朗读 "${chunk.content}"`}
+                                  >
+                                    <Volume2 className="size-3.5" />
+                                  </button>
+                                  <span className="text-sm font-black text-foreground">{chunk.content}</span>
+                                  {chunk.id.startsWith('ai_') && (
+                                    <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{chunk.meaning}</p>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); toggleMemorized(chunk.id); }}
+                                  title={memorizedChunks.has(chunk.id) ? '取消记忆' : '标记为已记'}
+                                  className={cn(
+                                    'p-0.5 rounded-lg transition-colors',
+                                    memorizedChunks.has(chunk.id)
+                                      ? 'text-[#00B894] hover:text-[#00B894]/70'
+                                      : 'text-muted-foreground/30 hover:text-[#00B894]',
+                                  )}
+                                >
+                                  <Brain className={cn('size-3.5', memorizedChunks.has(chunk.id) && 'fill-[#00B894]/20')} />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); toggleFavorite(chunk); }}
+                                  className={cn(
+                                    'p-0.5 rounded-lg transition-colors',
+                                    favorited ? 'text-rose-500' : 'text-muted-foreground/30 hover:text-rose-500',
+                                  )}
+                                >
+                                  <Heart className={cn('size-3.5', favorited && 'fill-current')} />
+                                </button>
+                                {chunk.id.startsWith('ai_') && (
+                                  <button
+                                    onClick={(e) => handleDeleteCustomChunk(e, chunk.id)}
+                                    className="p-0.5 rounded-lg text-muted-foreground/30 hover:text-rose-500 transition-colors"
+                                    title="删除"
+                                  >
+                                    <X className="size-3.5" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => { e.stopPropagation(); tts.speak(chunk.example, { rate: 0.9 }); }}
-                                aria-label="朗读例句"
-                                className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]"
-                              >
-                                <Volume2 className="size-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => toggleFavorite(chunk)}
-                                className={cn(
-                                  'rounded-xl size-8',
-                                favorited ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500',
-                              )}
-                            >
-                              <Heart className={cn('size-4', favorited && 'fill-current')} />
-                            </Button>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Pagination controls */}
+                    {activeTotalPages > 1 && (
+                      <div className="flex items-center justify-center gap-2 pt-3 mt-3 border-t border-border/50">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setActivePage(Math.max(0, activePage - 1))}
+                          disabled={activePage === 0}
+                          className="rounded-xl h-7 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894]"
+                        >
+                          <ChevronLeft className="size-3.5" />
+                        </Button>
+                        <PageJumpInput
+                          current={activePage + 1}
+                          total={activeTotalPages}
+                          onJump={(pg) => setActivePage(pg - 1)}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setActivePage(Math.min(activeTotalPages - 1, activePage + 1))}
+                          disabled={activePage >= activeTotalPages - 1}
+                          className="rounded-xl h-7 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894]"
+                        >
+                          <ChevronRight className="size-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* RIGHT COLUMN — Detail panel */}
+                  <div className="col-span-12 lg:col-span-7">
+                    {detailChunk ? (
+                      <Card className="rounded-[32px] border-2 border-[#00B894]/20 shadow-sm overflow-hidden">
+                        <CardContent className="p-6">
+                          {/* Badges */}
+                          <div className="flex items-center gap-2 mb-4 flex-wrap">
+                            {detailChunk.id.startsWith('ai_') && (
+                              <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
+                            )}
+                            <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] border-none">
+                              {CATEGORY_LABELS[detailChunk.category] || detailChunk.category}
+                            </Badge>
+                            <Badge variant="secondary" className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-muted">
+                              {getDifficultyLabel(detailChunk.difficulty)}
+                            </Badge>
+                          </div>
+
+                          {/* Title + TTS */}
+                          <div className="flex items-center gap-2 mb-4">
+                            <h2 className="text-2xl font-black italic text-foreground tracking-tight">
+                              {detailChunk.content}
+                            </h2>
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={(e) => { e.stopPropagation(); toggleMemorized(chunk.id); }}
-                              title={memorizedChunks.has(chunk.id) ? '取消记忆' : '标记为已记'}
-                              className={cn(
-                                'rounded-xl size-8',
-                                memorizedChunks.has(chunk.id)
-                                  ? 'text-[#00B894] hover:text-[#00B894]/70'
-                                  : 'text-muted-foreground/30 hover:text-[#00B894]',
-                              )}
+                              onClick={() => tts.speak(detailChunk.content)}
+                              className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894] shrink-0"
                             >
-                              <Brain className={cn('size-4', memorizedChunks.has(chunk.id) && 'fill-[#00B894]/20')} />
+                              <Volume2 className="size-4.5" />
                             </Button>
-                            {chunk.id.startsWith('ai_') && (
+                          </div>
+
+                          {/* Meaning */}
+                          {detailChunk.meaning && (
+                            <div className="mb-4">
+                              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">释义</p>
+                              <p className="text-lg font-bold text-foreground">{detailChunk.meaning}</p>
+                            </div>
+                          )}
+
+                          {/* Introduction */}
+                          {detailChunk.introduction && (
+                            <div className="mb-4 p-3 rounded-2xl bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/8 dark:to-teal-500/8 border border-[#00B894]/10">
+                              <p className="text-[10px] font-black uppercase tracking-wider text-[#00B894] mb-1">English Introduction</p>
+                              <p className="text-sm text-foreground/80 leading-relaxed italic">{detailChunk.introduction}</p>
+                            </div>
+                          )}
+
+                          {/* Usage */}
+                          {detailChunk.usage && (
+                            <div className="mb-4">
+                              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">使用场景</p>
+                              <p className="text-sm text-foreground/80 font-medium">{detailChunk.usage}</p>
+                            </div>
+                          )}
+
+                          {/* Example */}
+                          <div className="p-4 rounded-2xl bg-[#00B894]/5 border border-[#00B894]/10 mb-4">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-[10px] font-black uppercase tracking-wider text-[#00B894]">例句</p>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={(e) => handleDeleteCustomChunk(e, chunk.id)}
-                                className="rounded-xl size-8 text-muted-foreground/50 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                title="删除"
+                                onClick={() => tts.speak(detailChunk.example, { rate: 0.9 })}
+                                className="rounded-lg size-7 text-muted-foreground hover:text-[#00B894]"
                               >
-                                <X className="size-3.5" />
+                                <Volume2 className="size-3.5" />
                               </Button>
+                            </div>
+                            <p className="text-base font-medium text-foreground italic">「{cleanText(detailChunk.example)}」</p>
+                            {(detailChunk.exampleZh || exampleTranslations[detailChunk.id]) ? (
+                              <p className="text-xs text-muted-foreground mt-1.5 font-medium">
+                                {detailChunk.exampleZh || exampleTranslations[detailChunk.id]}
+                              </p>
+                            ) : (
+                              <button
+                                onClick={() => handleTranslateExample(detailChunk)}
+                                disabled={exampleTransLoading === detailChunk.id}
+                                className="text-xs text-violet-500 hover:text-violet-600 font-medium mt-1.5 transition-colors"
+                              >
+                                {exampleTransLoading === detailChunk.id ? '翻译中...' : '翻译例句'}
+                              </button>
                             )}
                           </div>
-                          </div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="text-xl font-black text-foreground group-hover:text-[#00B894] transition-colors">
-                              {chunk.content}
-                            </h3>
+
+                          {/* Action buttons */}
+                          <div className="flex gap-2 pt-2">
                             <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => { e.stopPropagation(); tts.speak(chunk.content); }}
-                              className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              variant="outline"
+                              className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border"
+                              onClick={() => toggleMemorized(detailChunk.id)}
+                              title={memorizedChunks.has(detailChunk.id) ? '取消记忆' : '标记为已记'}
                             >
-                              <Volume2 className="size-4" />
+                              <Brain
+                                className={cn(
+                                  'size-4 mr-2',
+                                  memorizedChunks.has(detailChunk.id) && 'fill-[#00B894]/20 text-[#00B894]',
+                                )}
+                              />
+                              {memorizedChunks.has(detailChunk.id) ? '已记忆' : '记忆'}
                             </Button>
-                          </div>
-                          <p className="text-sm text-muted-foreground font-medium mb-2">
-                            {chunk.meaning}
-                          </p>
-                          {chunk.introduction && (
-                            <p className="text-[11px] text-muted-foreground/70 leading-relaxed mb-3 italic border-l-2 border-[#00B894]/30 pl-3">
-                              {chunk.introduction}
-                            </p>
-                          )}
-                          <div className="p-3 rounded-2xl bg-muted/50 flex items-start gap-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs text-foreground/80 italic">「{cleanText(chunk.example)}」</p>
-                              {(chunk.exampleZh || exampleTranslations[chunk.id]) ? (
-                                <p className="text-[10px] text-muted-foreground mt-1 font-medium">
-                                  {chunk.exampleZh || exampleTranslations[chunk.id]}
-                                </p>
-                              ) : (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleTranslateExample(chunk); }}
-                                  disabled={exampleTransLoading === chunk.id}
-                                  className="text-[10px] text-violet-500 hover:text-violet-600 font-medium mt-1 transition-colors"
-                                >
-                                  {exampleTransLoading === chunk.id ? '翻译中...' : '翻译例句'}
-                                </button>
-                              )}
-                            </div>
                             <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (isFavorited(chunk.example, 'expression')) {
-                                  const fav = favorites.find((f) => f.content === chunk.example && f.type === 'expression');
-                                  if (fav) removeFavorite(fav.id);
-                                } else {
-                                  addFavorite({ type: 'expression', content: chunk.example, meaning: chunk.meaning, category: chunk.category });
-                                }
-                              }}
-                              className={cn(
-                                'rounded-lg size-6 shrink-0',
-                                isFavorited(chunk.example, 'expression') ? 'text-rose-500' : 'text-muted-foreground/50 hover:text-rose-500',
-                              )}
+                              variant="outline"
+                              className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+                              onClick={() => toggleFavorite(detailChunk)}
                             >
-                              <Heart className={cn('size-3.5', isFavorited(chunk.example, 'expression') && 'fill-current')} />
+                              <Heart
+                                className={cn(
+                                  'size-4 mr-2',
+                                  isFavorited(detailChunk.content, 'chunk') && 'fill-current text-rose-500',
+                                )}
+                              />
+                              {isFavorited(detailChunk.content, 'chunk') ? '已收藏' : '收藏'}
                             </Button>
                           </div>
                         </CardContent>
                       </Card>
-                    );
-                  })}
+                    ) : (
+                      <Card className="rounded-[40px] border-dashed border-2 border-border/50 shadow-sm">
+                        <CardContent className="p-16 text-center">
+                          <div className="size-20 rounded-3xl bg-muted mx-auto mb-4 flex items-center justify-center text-muted-foreground">
+                            <Puzzle className="size-9" />
+                          </div>
+                          <h3 className="text-xl font-black text-foreground mb-2">选择一个语块</h3>
+                          <p className="text-sm text-muted-foreground font-medium">← 选择一个语块查看详情</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
@@ -1400,35 +1513,6 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                       <p className="text-sm font-medium">没有找到匹配的语块</p>
                     </>
                   )}
-                </div>
-              )}
-
-              {/* Pagination controls */}
-              {activeTotalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 pt-4 mt-3 border-t border-border/50">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setActivePage(Math.max(0, activePage - 1))}
-                    disabled={activePage === 0}
-                    className="rounded-xl h-7 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894]"
-                  >
-                    <ChevronLeft className="size-3.5" />
-                  </Button>
-                  <PageJumpInput
-                    current={activePage + 1}
-                    total={activeTotalPages}
-                    onJump={(pg) => setActivePage(pg - 1)}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setActivePage(Math.min(activeTotalPages - 1, activePage + 1))}
-                    disabled={activePage >= activeTotalPages - 1}
-                    className="rounded-xl h-7 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894]"
-                  >
-                    <ChevronRight className="size-3.5" />
-                  </Button>
                 </div>
               )}
             </CardContent>

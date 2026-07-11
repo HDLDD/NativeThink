@@ -456,6 +456,8 @@ export default function DeepVocabularyPage() {
 
   // tts must be declared BEFORE it's used in the auto-play effect
   const tts = useTTS();
+  const ttsRef = useRef(tts);
+  ttsRef.current = tts;
 
   const stopAutoPlay = useCallback(() => {
     setAutoPlaying(false);
@@ -473,12 +475,12 @@ export default function DeepVocabularyPage() {
     if (!autoPlaying) return;
     if (autoPlayIdx >= filteredWords.length) { stopAutoPlay(); return; }
     const word = filteredWords[autoPlayIdx];
-    tts.speak(word.word, { rate: 0.85 });
+    ttsRef.current.speak(word.word, { rate: 0.85 });
     autoPlayTimerRef.current = setTimeout(() => {
       setAutoPlayIdx((p) => p + 1);
     }, 2000);
     return () => { if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current); };
-  }, [autoPlaying, autoPlayIdx, filteredWords, tts, stopAutoPlay]);
+  }, [autoPlaying, autoPlayIdx, filteredWords, stopAutoPlay]);
 
   // AI-generated word content (sentences + deep explanation)
   const [aiWordData, setAiWordData] = useState<Record<string, IWordAiData>>(() => {

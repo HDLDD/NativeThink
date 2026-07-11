@@ -57,10 +57,19 @@ interface Props {
 }
 
 export default function PageReader({ content, onClose }: Props) {
-  const tts = useTTS();
   const { isConfigured, chat: aiChat } = useAI();
   const { addFavorite, isFavorited, favorites, removeFavorite } = useFavorites();
   const totalPages = content.pages.length;
+
+  // TTS paragraph queue — sequential playback with onEnd callback
+  const [speakingPara, setSpeakingPara] = useState(-1);
+  const paraQueueRef = useRef<string[]>([]);
+  const paraIdxRef = useRef(0);
+  const onEndRef = useRef<() => void>(null);
+
+  const tts = useTTS({
+    onEnd: () => onEndRef.current?.(),
+  });
 
   // ── State ──
   const [pageIdx, setPageIdx] = useState(() => loadProgress(content.id).page);

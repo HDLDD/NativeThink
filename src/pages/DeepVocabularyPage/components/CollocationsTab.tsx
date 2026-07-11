@@ -185,20 +185,6 @@ export default function CollocationsTab({
     }
   }, []);
 
-  // Restore scroll position on mount
-  useEffect(() => {
-    const el = collocListRef.current;
-    if (!el) return;
-    try {
-      const saved = localStorage.getItem(SCROLL_MEMORY_KEY);
-      if (saved) {
-        const top = parseInt(saved, 10);
-        // Delay to let the list render first
-        requestAnimationFrame(() => { el.scrollTop = top; });
-      }
-    } catch { /* ignore */ }
-  }, [allCollocEntries.length > 0]);
-
   // ===== 记忆功能：标记已记住的搭配 =====
   const MEMORIZED_STORAGE_KEY = '__nativethink_colloc_memorized';
   const [memorizedCollocs, setMemorizedCollocs] = useState<Set<string>>(() => {
@@ -310,6 +296,19 @@ export default function CollocationsTab({
       return [];
     }
   }, [selectedLevels]);
+
+  // Restore scroll position after collocation data loads
+  useEffect(() => {
+    const el = collocListRef.current;
+    if (!el) return;
+    try {
+      const saved = localStorage.getItem(SCROLL_MEMORY_KEY);
+      if (saved) {
+        const top = parseInt(saved, 10);
+        requestAnimationFrame(() => { el.scrollTop = top; });
+      }
+    } catch { /* ignore */ }
+  }, [allCollocEntries.length > 0]);
 
   // Search + memory filter
   const filteredEntries = useMemo(() => {

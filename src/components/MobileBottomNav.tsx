@@ -40,12 +40,12 @@ export default function MobileBottomNav() {
                 'flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 h-full py-1 transition-colors',
                 isActive
                   ? 'text-[#00B894]'
-                  : 'text-muted-foreground hover:text-foreground',
+                  : 'text-foreground/60 hover:text-foreground',
               )}
             >
               <Icon
                 className={cn(
-                  'size-5 transition-all',
+                  'size-5.5 transition-all',
                   isActive && 'drop-shadow-[0_0_6px_rgba(0,184,148,0.4)]',
                 )}
                 strokeWidth={isActive ? 2.5 : 2}

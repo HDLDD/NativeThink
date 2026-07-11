@@ -79,10 +79,10 @@ export default function AppSidebar() {
                         'flex items-center gap-3 transition-all duration-200 rounded-2xl',
                         isActive
                           ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30 hover:bg-[#00B894] hover:text-white'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                          : 'text-foreground/60 hover:bg-muted hover:text-foreground',
                       )}
                     >
-                      <Icon className="size-4.5 shrink-0" />
+                      <Icon className="size-5 shrink-0" />
                       <span className="group-data-[state=collapsed]:hidden text-xs font-bold uppercase tracking-wider">
                         {item.label}
                       </span>
