@@ -268,7 +268,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   // Translate a single paragraph
   const translateParagraph = async (pageNum: number, paraIdx: number) => {
     if (!isConfigured) return;
-    const page = activeContent.pages[pageNum];
+    const page = validPages[pageNum];
     if (!page) return;
     const para = page.paragraphs[paraIdx];
     if (!para || para.zh || para.en.startsWith('##CHAPTER##')) return;
@@ -280,7 +280,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         { role: 'user', content: para.en.slice(0, 1500) },
       ], { temperature: 0.3, maxTokens: 1024 });
       const zh = result.trim();
-      const updatedPages = [...activeContent.pages];
+      const updatedPages = [...validPages];
       updatedPages[pageNum] = {
         ...page,
         paragraphs: page.paragraphs.map((p, i) => i === paraIdx ? { ...p, zh } : p),
