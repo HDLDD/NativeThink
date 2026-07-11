@@ -1031,23 +1031,34 @@ export default function ArticlePage() {
             <div className="space-y-1">
               {tocContent?.pages.map((page, i) => {
                 const firstPara = page.paragraphs[0];
-                const preview = firstPara?.en?.slice(0, 80) || `第 ${i + 1} 页`;
+                const preview = firstPara?.en?.slice(0, 200) || `第 ${i + 1} 页`;
+                const zhPreview = firstPara?.zh?.slice(0, 120) || '';
+                const wordCount = page.paragraphs.reduce((s, p) => s + p.en.split(/\s+/).filter(Boolean).length, 0);
                 return (
                   <button key={i} onClick={() => startReading(i)}
                     className="w-full text-left p-3 rounded-2xl hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors border border-transparent hover:border-[#00B894]/20 group">
-                    <div className="flex items-center gap-3">
-                      <span className="size-7 rounded-xl bg-[#00B894]/10 text-[#00B894] flex items-center justify-center text-xs font-black shrink-0">
+                    <div className="flex gap-2">
+                      <span className="size-7 rounded-xl bg-[#00B894]/10 text-[#00B894] flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
                         {i + 1}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-foreground group-hover:text-[#00B894] transition-colors line-clamp-1">
-                          {preview}
+                        <p className="text-xs font-bold text-foreground group-hover:text-[#00B894] transition-colors line-clamp-2 leading-relaxed">
+                          {preview}{preview.length >= 200 ? '…' : ''}
                         </p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {page.paragraphs.length} 段 · ~{page.paragraphs.reduce((s, p) => s + p.en.split(/\s+/).filter(Boolean).length, 0)} 词
-                        </p>
+                        {zhPreview ? (
+                          <p className="text-[11px] text-[#6C5CE7]/70 line-clamp-1 mt-0.5 leading-relaxed">
+                            {zhPreview}{zhPreview.length >= 120 ? '…' : ''}
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {page.paragraphs.length} 段 · ~{wordCount} 词
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[9px] text-muted-foreground/60">{page.paragraphs.length} 段 · ~{wordCount} 词</span>
+                        </div>
                       </div>
-                      <ChevronRight className="size-4 text-muted-foreground/30 group-hover:text-[#00B894] transition-colors shrink-0" />
+                      <ChevronRight className="size-4 text-muted-foreground/30 group-hover:text-[#00B894] transition-colors shrink-0 self-center" />
                     </div>
                   </button>
                 );
