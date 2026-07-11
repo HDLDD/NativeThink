@@ -198,6 +198,7 @@ export default function ArticlePage() {
         totalWords: safeParagraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
       };
       openReader(content);
+      saveAiArticle(content);
       saveToHistory(parsed.title || topic, content.totalWords.toString(), 'ai');
       setAiTopicInput('');
       toast.success('文章已生成！');
@@ -229,6 +230,28 @@ export default function ArticlePage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiTitle, setAiTitle] = useState('');
   const [aiTopicInput, setAiTopicInput] = useState('');
+
+  // ── Saved AI articles ──
+  const AI_ARTICLES_KEY = '__nativethink_ai_articles';
+  const [aiArticles, setAiArticles] = useState<IReadingContent[]>(() => {
+    try { const s = safeStorage.getItem(AI_ARTICLES_KEY); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+
+  const saveAiArticle = (content: IReadingContent) => {
+    setAiArticles((prev) => {
+      const next = [content, ...prev].slice(0, 50);
+      safeStorage.setItem(AI_ARTICLES_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const deleteAiArticle = (id: string) => {
+    setAiArticles((prev) => {
+      const next = prev.filter((a) => a.id !== id);
+      safeStorage.setItem(AI_ARTICLES_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
 
   // ── Wikipedia ──
   const [wikiQuery, setWikiQuery] = useState('');
@@ -304,6 +327,7 @@ export default function ArticlePage() {
           totalWords: allParagraphs.reduce((s, p) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
         };
         openReader(content);
+        saveAiArticle(content);
         toast.success(`已生成 ${genChapters} 章书籍！`);
       } else {
         // Generate article/publication
@@ -324,6 +348,7 @@ export default function ArticlePage() {
           totalWords: safeParagraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
         };
         openReader(content);
+        saveAiArticle(content);
         toast.success(genType === 'publication' ? '刊物文章已生成！' : '文章已生成！');
       }
       setGenDialogOpen(false);
@@ -355,7 +380,7 @@ export default function ArticlePage() {
         pages: buildPages(paragraphs),
         totalWords: paragraphs.reduce((s, p) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
       };
-      setReaderContent(content); setReaderVisible(true);
+      openReader(content);
       saveToHistory(page.title, content.totalWords.toString(), 'wikipedia', { wikiTitle: page.title });
       toast.success(`已加载：${page.title}`);
     } catch { toast.error('加载失败'); }
@@ -398,7 +423,7 @@ export default function ArticlePage() {
         pages: buildPages(parsed.paragraphs || []),
         totalWords: (parsed.paragraphs || []).reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
       };
-      setReaderContent(content); setReaderVisible(true);
+      openReader(content);
       saveToHistory(parsed.title || '复习词汇文章', content.totalWords.toString(), 'review-words');
       toast.success(`用 ${words.length} 个词汇生成了文章！`);
     } catch { toast.error('生成失败'); }
@@ -708,6 +733,46 @@ export default function ArticlePage() {
               ))}
             </div>
           </div>
+
+          {/* Saved AI articles */}
+          {aiArticles.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">
+                  已保存的 AI 文章 ({aiArticles.length})
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {aiArticles.map((a) => (
+                  <Card
+                    key={a.id}
+                    className="rounded-2xl border-border hover:border-[#00B894]/40 hover:shadow-sm transition-all cursor-pointer group"
+                    onClick={() => openReader(a)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors line-clamp-1">
+                            {a.zhTitle || a.title}
+                          </h4>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {a.totalWords.toLocaleString()} 词 · {a.difficulty}
+                          </p>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteAiArticle(a.id); }}
+                          className="shrink-0 p-1 rounded-lg text-muted-foreground/30 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                          title="删除"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
