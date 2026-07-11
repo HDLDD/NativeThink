@@ -18,8 +18,7 @@ import { cn, cleanText, extractJson } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import { buildPages } from '@/data/reading';
-import { ALL_BOOKS } from '@/data/books';
-import { FAMOUS_SPEECHES_META, buildSpeechContent, getSpeechContent } from '@/data/speeches';
+import type { SpeechMeta } from '@/data/speeches';
 import PageReader from './components/PageReader';
 
 // ── Types ──
@@ -157,6 +156,30 @@ export default function ArticlePage() {
   const [readerContent, setReaderContent] = useState<IReadingContent | null>(null);
   const [readerVisible, setReaderVisible] = useState(false);
 
+  // ── Lazy-loaded data (books & speeches are large, load on tab switch) ──
+  const [books, setBooks] = useState<IReadingContent[] | null>(null);
+  const [booksLoaded, setBooksLoaded] = useState(false);
+  const [speechMeta, setSpeechMeta] = useState<SpeechMeta[] | null>(null);
+  const [buildSpeechFn, setBuildSpeechFn] = useState<((id: string) => IReadingContent | null) | null>(null);
+  const [speechesLoaded, setSpeechesLoaded] = useState(false);
+
+  // Load books data when books tab is first selected
+  useEffect(() => {
+    if (mainTab !== 'books' || booksLoaded) return;
+    setBooksLoaded(true);
+    import('@/data/books').then((m) => setBooks(m.ALL_BOOKS));
+  }, [mainTab, booksLoaded]);
+
+  // Load speech data when speeches tab is first selected
+  useEffect(() => {
+    if (mainTab !== 'speeches' || speechesLoaded) return;
+    setSpeechesLoaded(true);
+    import('@/data/speeches').then((m) => {
+      setSpeechMeta(m.FAMOUS_SPEECHES_META);
+      setBuildSpeechFn(() => m.buildSpeechContent);
+    });
+  }, [mainTab, speechesLoaded]);
+
   // ── AI generation ──
   const [aiLoading, setAiLoading] = useState(false);
   const [aiTitle, setAiTitle] = useState('');
@@ -269,18 +292,17 @@ export default function ArticlePage() {
 
   // ── Speech ──
   const loadSpeech = useCallback(async (speechId: string) => {
-    const meta = FAMOUS_SPEECHES_META.find((m) => m.id === speechId);
+    const meta = speechMeta?.find((m) => m.id === speechId);
     if (!meta) { toast.error('未找到演讲'); return; }
-    const existing = buildSpeechContent(speechId);
+    const existing = buildSpeechFn?.(speechId);
     if (existing) {
       setReaderContent(existing); setReaderVisible(true);
       saveToHistory(meta.zhTitle || meta.title, existing.totalWords.toString(), 'speeches');
       toast.success(`已加载：${meta.zhTitle}`);
       return;
     }
-    // TED fallback: use existing article generation pattern
     toast.error('该演讲暂不可用');
-  }, []);
+  }, [speechMeta, buildSpeechFn]);
 
   // ── AI article generation (from review words) ──
   const generateFromReviewWords = useCallback(async () => {
@@ -407,10 +429,29 @@ export default function ArticlePage() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Library className="size-5 text-[#00B894]" />
-            <span className="text-sm font-black">{ALL_BOOKS.length} 本公版书籍 · 点击阅读</span>
+            <span className="text-sm font-black">{books ? `${books.length} 本公版书籍` : '加载中...'} · 点击阅读</span>
           </div>
+          {!books ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="rounded-[24px] border-border border bg-muted/30 animate-pulse p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="size-12 rounded-2xl bg-muted shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-muted rounded-lg w-3/4" />
+                      <div className="h-3 bg-muted rounded-lg w-1/2" />
+                      <div className="flex gap-2">
+                        <div className="h-4 bg-muted rounded-full w-12" />
+                        <div className="h-4 bg-muted rounded-full w-10" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {ALL_BOOKS.map((book) => (
+            {books.map((book) => (
               <Card
                 key={book.id}
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
