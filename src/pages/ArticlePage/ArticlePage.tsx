@@ -20,7 +20,6 @@ import { toast } from 'sonner';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import { buildPages } from '@/data/reading';
 import type { SpeechMeta } from '@/data/speeches';
-import PageReader from './components/PageReader';
 
 // ── Types ──
 type Level = 'beginner' | 'intermediate' | 'advanced';
@@ -134,17 +133,10 @@ export default function ArticlePage() {
   const { dueForReview, state: sm2State } = useWordLearning('all');
   const { addStudyMinutes } = useLearningStats();
 
-  // ── Reading session timer ──
-  const readingStartRef = useRef(0);
-
   // ── Tab + config state ──
   const [mainTab, setMainTab] = useState<MainTab>('books');
   const [level, setLevel] = useState<Level>('intermediate');
   const [topic, setTopic] = useState('tech');
-
-  // ── Reader state ──
-  const [readerContent, setReaderContent] = useState<IReadingContent | null>(null);
-  const [readerVisible, setReaderVisible] = useState(false);
 
   // ── Lazy-loaded data (books & speeches are large, load on tab switch) ──
   const [books, setBooks] = useState<IReadingContent[] | null>(null);
@@ -182,7 +174,6 @@ export default function ArticlePage() {
         pages: buildPages(safeParagraphs),
         totalWords: safeParagraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
       };
-      openReader(content);
       saveAiArticle(content);
       saveToHistory(parsed.title || topic, content.totalWords.toString(), 'ai');
       setAiTopicInput('');
@@ -283,7 +274,7 @@ export default function ArticlePage() {
     } else if (bookId) {
       // Books can only be reopened from the books tab
       const book = books?.find((b) => b.id === bookId);
-      if (book) { openReader(book); }
+      if (book) { /* direct display */ }
     }
   };
 
@@ -322,7 +313,7 @@ export default function ArticlePage() {
           pages: buildPages(allParagraphs),
           totalWords: allParagraphs.reduce((s, p) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
         };
-        openReader(content);
+        /* content ready */;
         saveAiArticle(content);
         toast.success(`已生成 ${genChapters} 章书籍！`);
       } else {
@@ -343,7 +334,7 @@ export default function ArticlePage() {
           pages: buildPages(safeParagraphs),
           totalWords: safeParagraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
         };
-        openReader(content);
+        /* content ready */;
         saveAiArticle(content);
         toast.success(genType === 'publication' ? '刊物文章已生成！' : '文章已生成！');
       }
@@ -358,7 +349,7 @@ export default function ArticlePage() {
     if (!meta) { toast.error('未找到演讲'); return; }
     const existing = buildSpeechFn?.(speechId);
     if (existing) {
-      openReader(existing);
+      /* displayed via history */ existing;
       saveToHistory(meta.zhTitle || meta.title, existing.totalWords.toString(), 'speeches', { speechId });
       toast.success(`已加载：${meta.zhTitle}`);
       return;
@@ -388,7 +379,7 @@ export default function ArticlePage() {
         pages: buildPages(parsed.paragraphs || []),
         totalWords: (parsed.paragraphs || []).reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
       };
-      openReader(content);
+      /* content ready */;
       saveToHistory(parsed.title || '复习词汇文章', content.totalWords.toString(), 'review-words');
       toast.success(`用 ${words.length} 个词汇生成了文章！`);
     } catch { toast.error('生成失败'); }
@@ -398,50 +389,6 @@ export default function ArticlePage() {
   useEffect(() => { safeStorage.setItem(HISTORY_KEY, JSON.stringify(history)); }, [history]);
 
   
-  // ── TOC (table of contents) for books/publications ──
-  const [tocVisible, setTocVisible] = useState(false);
-  const [tocContent, setTocContent] = useState<IReadingContent | null>(null);
-  const [readerStartPage, setReaderStartPage] = useState(0);
-
-  const showToc = (content: IReadingContent) => {
-    setTocContent(content);
-    setTocVisible(true);
-  };
-
-  const startReading = (startPage: number) => {
-    if (!tocContent) return;
-    setTocVisible(false);
-    readingStartRef.current = Date.now();
-    setReaderStartPage(startPage);
-    setReaderContent(tocContent);
-    setReaderVisible(true);
-  };
-
-  // ── Reader open/close — track reading time ──
-  const openReader = (content: IReadingContent, startPage = 0) => {
-    readingStartRef.current = Date.now();
-    setReaderStartPage(startPage);
-    setReaderContent(content);
-    setReaderVisible(true);
-  };
-
-  const closeReader = () => {
-    if (readingStartRef.current > 0) {
-      const minutes = Math.round((Date.now() - readingStartRef.current) / 60000 * 10) / 10;
-      if (minutes >= 0.1) addStudyMinutes(minutes, 'articles');
-      readingStartRef.current = 0;
-    }
-    setReaderVisible(false);
-  };
-
-  // For books/publications: show TOC first instead of opening reader directly
-  const handleOpenBook = (content: IReadingContent) => {
-    if (content.pages.length > 4) {
-      showToc(content); // multi-page → show TOC
-    } else {
-      openReader(content); // short → open directly
-    }
-  };
 
   // ── Render ──
   return (
@@ -551,7 +498,7 @@ export default function ArticlePage() {
               <Card
                 key={book.id}
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => { handleOpenBook(book); saveToHistory(book.zhTitle, '', 'books', { bookId: book.id }); }}
+                onClick={() => { saveToHistory(book.zhTitle, '', 'books', { bookId: book.id }); }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
@@ -603,7 +550,7 @@ export default function ArticlePage() {
               <Card
                 key={pub.id}
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => { handleOpenBook(pub); saveToHistory(pub.zhTitle, '', 'publications'); }}
+                onClick={() => { saveToHistory(pub.zhTitle, '', 'publications'); }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
@@ -711,7 +658,7 @@ export default function ArticlePage() {
                   <Card
                     key={a.id}
                     className="rounded-2xl border-border hover:border-[#00B894]/40 hover:shadow-sm transition-all cursor-pointer group"
-                    onClick={() => openReader(a)}
+                    /* saved AI articles are view-only */
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-2">
@@ -882,65 +829,6 @@ export default function ArticlePage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── TOC Dialog (chapter selection for books/publications) ── */}
-      <Dialog open={tocVisible} onOpenChange={setTocVisible}>
-        <DialogContent className="max-w-md rounded-[32px] p-0 overflow-hidden max-h-[80vh] flex flex-col">
-          <div className="p-5 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 shrink-0">
-            <DialogHeader>
-              <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
-                <BookOpen className="size-5 text-[#00B894]" />
-                {tocContent?.zhTitle || tocContent?.title || '目录'}
-              </DialogTitle>
-              {tocContent?.author && (
-                <p className="text-xs text-muted-foreground mt-1">{tocContent.author}</p>
-              )}
-            </DialogHeader>
-          </div>
-          <ScrollArea className="flex-1 p-4">
-            <div className="space-y-1">
-              {tocContent?.pages.map((page, i) => {
-                const firstPara = page.paragraphs[0];
-                const preview = firstPara?.en?.slice(0, 200) || `第 ${i + 1} 页`;
-                const zhPreview = firstPara?.zh?.slice(0, 120) || '';
-                const wordCount = page.paragraphs.reduce((s, p) => s + p.en.split(/\s+/).filter(Boolean).length, 0);
-                return (
-                  <button key={i} onClick={() => startReading(i)}
-                    className="w-full text-left p-3 rounded-2xl hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors border border-transparent hover:border-[#00B894]/20 group">
-                    <div className="flex gap-2">
-                      <span className="size-7 rounded-xl bg-[#00B894]/10 text-[#00B894] flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
-                        {i + 1}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-foreground group-hover:text-[#00B894] transition-colors line-clamp-2 leading-relaxed">
-                          {preview}{preview.length >= 200 ? '…' : ''}
-                        </p>
-                        {zhPreview ? (
-                          <p className="text-[11px] text-[#6C5CE7]/70 line-clamp-1 mt-0.5 leading-relaxed">
-                            {zhPreview}{zhPreview.length >= 120 ? '…' : ''}
-                          </p>
-                        ) : (
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            {page.paragraphs.length} 段 · ~{wordCount} 词
-                          </p>
-                        )}
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[9px] text-muted-foreground/60">{page.paragraphs.length} 段 · ~{wordCount} 词</span>
-                        </div>
-                      </div>
-                      <ChevronRight className="size-4 text-muted-foreground/30 group-hover:text-[#00B894] transition-colors shrink-0 self-center" />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── PageReader Fullscreen ── */}
-      {readerVisible && readerContent && (
-        <PageReader content={readerContent} onClose={closeReader} startPage={readerStartPage} />
-      )}
     </div>
   );
 }
