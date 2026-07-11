@@ -157,101 +157,30 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const activeContent = displayContent;
   const activePages = activeContent.pages.length;
 
-  // ── Chapter index ──
-  interface ChapterInfo { title: string; pageIndex: number; paraCount: number; wordCount: number; }
-  const chapters = useMemo<ChapterInfo[]>(() => {
-    const result: ChapterInfo[] = [];
-    for (let pi = 0; pi < activeContent.pages.length; pi++) {
-      for (const p of activeContent.pages[pi].paragraphs) {
-        if (p.en.startsWith('##CHAPTER##')) {
-          const title = p.en.replace('##CHAPTER##', '').trim();
-          // Count paragraphs & words until next chapter or end
-          let paraCount = 0;
-          let wordCount = 0;
-          let done = false;
-          for (let pp = pi; pp < activeContent.pages.length && !done; pp++) {
-            for (const para of activeContent.pages[pp].paragraphs) {
-              if (para.en.startsWith('##CHAPTER##')) {
-                if (pp > pi) { done = true; break; }
-                continue;
-              }
-              paraCount++;
-              wordCount += para.en.split(/\s+/).filter(Boolean).length;
-            }
-          }
-          result.push({ title, pageIndex: pi, paraCount, wordCount });
-        }
-      }
-    }
-    return result;
-  }, [activeContent.pages]);
-  const hasChapters = chapters.length > 0;
-  const [currentChapter, setCurrentChapter] = useState(0);
-
-  // ── TOC dialog ──
-  const [tocOpen, setTocOpen] = useState(false);
-
   // Clamp page
   const currentPage = Math.max(0, Math.min(pageIdx, activePages - 1));
 
-  // Calculate chapter-relative paragraph numbering for current page
-  // Returns an array of per-paragraph numbers (1-based, within chapter, non-header only)
+  // Sequential paragraph numbering across all pages (no chapter grouping)
   const paraChapterNumbers = useMemo<number[]>(() => {
     const cp = activeContent.pages[currentPage];
     if (!cp) return [];
-    if (!hasChapters) {
-      // No chapters: global sequential across all pages
-      let globalCount = 0;
-      for (let pi = 0; pi < currentPage; pi++) {
-        globalCount += activeContent.pages[pi].paragraphs.filter((p) => !p.en.startsWith('##CHAPTER##')).length;
-      }
-      const result: number[] = [];
-      for (const p of cp.paragraphs) {
-        if (p.en.startsWith('##CHAPTER##')) { result.push(0); continue; }
-        result.push(++globalCount);
-      }
-      return result;
+    let globalCount = 0;
+    for (let pi = 0; pi < currentPage; pi++) {
+      globalCount += activeContent.pages[pi].paragraphs.filter((p) => !p.en.startsWith('##CHAPTER##')).length;
     }
-    // Has chapters: reset counter at each chapter start
-    let chIdx = chapters.length - 1;
-    for (let i = chapters.length - 1; i >= 0; i--) {
-      if (currentPage >= chapters[i].pageIndex) { chIdx = i; break; }
-    }
-    // Count paragraphs from chapter start up to current page
-    let count = 0;
-    for (let pi = chapters[chIdx].pageIndex; pi <= currentPage; pi++) {
-      for (const p of activeContent.pages[pi].paragraphs) {
-        if (p.en.startsWith('##CHAPTER##')) continue;
-        if (pi < currentPage) count++;
-      }
-    }
-    // Now assign numbers to current page paragraphs
     const result: number[] = [];
     for (const p of cp.paragraphs) {
       if (p.en.startsWith('##CHAPTER##')) { result.push(0); continue; }
-      result.push(++count);
+      result.push(++globalCount);
     }
     return result;
-  }, [hasChapters, chapters, currentPage, activeContent.pages]);
+  }, [currentPage, activeContent.pages]);
 
   // Preload wordbank for Chinese word lookup
   useEffect(() => { if (!isAllReady()) preloadAll(); }, []);
 
   // Save progress
   useEffect(() => { saveProgress(activeContent.id, currentPage); }, [activeContent.id, currentPage]);
-
-  // Sync currentChapter with page changes
-  useEffect(() => {
-    if (!hasChapters) return;
-    for (let i = chapters.length - 1; i >= 0; i--) {
-      if (pageIdx >= chapters[i].pageIndex) { setCurrentChapter(i); break; }
-    }
-  }, [pageIdx, hasChapters, chapters]);
-
-  // Reset chapter when new book opened
-  useEffect(() => {
-    setCurrentChapter(0);
-  }, [content.id]);
 
   const cancelRef = useRef(false);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
