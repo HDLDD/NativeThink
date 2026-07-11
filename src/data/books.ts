@@ -50,19 +50,25 @@ function cleanBookParagraphs(enParas: string[]): IParagraph[] {
   let foundEnd = false;
 
   for (const en of enParas) {
-    if (isGutenbergBoilerplate(en)) {
-      if (/\*\*\* END OF THE PROJECT GUTENBERG EBOOK/i.test(en)) foundEnd = true;
-      if (!foundStart) continue; // skip before start marker
-      if (foundEnd) continue; // skip after end marker
-    }
-
-    // Mark end-of-frontmatter boundary
+    // Handle START/END markers BEFORE the general boilerplate check
     if (/\*\*\* START OF THE PROJECT GUTENBERG EBOOK/i.test(en)) {
       foundStart = true;
       continue; // skip the marker itself
     }
+    if (/\*\*\* END OF THE PROJECT GUTENBERG EBOOK/i.test(en)) {
+      foundEnd = true;
+      continue; // skip the marker itself
+    }
 
-    if (!foundStart) continue;
+    // Skip boilerplate before content starts
+    if (!foundStart) {
+      if (isGutenbergBoilerplate(en)) continue;
+      // If this paragraph doesn't look like boilerplate and we haven't found a START marker,
+      // it's probably a book without explicit markers — include it
+      foundStart = true;
+    }
+
+    if (foundEnd) break; // stop processing after END marker
 
     // Mark chapters
     if (isChapterHeader(en)) {

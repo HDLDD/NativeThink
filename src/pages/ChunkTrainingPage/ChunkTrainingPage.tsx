@@ -160,6 +160,31 @@ export default function ChunkTrainingPage() {
 
   const libraryScrollRef = useRef<HTMLDivElement>(null);
 
+  // Auto-play for chunk library list
+  const [libAutoPlaying, setLibAutoPlaying] = useState(false);
+  const [libAutoIdx, setLibAutoIdx] = useState(0);
+  const libAutoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopLibAutoPlay = useCallback(() => {
+    setLibAutoPlaying(false);
+    if (libAutoTimerRef.current) { clearTimeout(libAutoTimerRef.current); libAutoTimerRef.current = null; }
+  }, []);
+  const startLibAutoPlay = useCallback(() => {
+    if (activePageChunks.length === 0) return;
+    setLibAutoPlaying(true);
+    setLibAutoIdx(0);
+  }, [activePageChunks.length]);
+  // Auto-play effect
+  useEffect(() => {
+    if (!libAutoPlaying) return;
+    if (libAutoIdx >= activePageChunks.length) { stopLibAutoPlay(); return; }
+    const chunk = activePageChunks[libAutoIdx];
+    tts.speak(chunk.content, { rate: 0.85 });
+    libAutoTimerRef.current = setTimeout(() => setLibAutoIdx((p) => p + 1), 2500);
+    return () => { if (libAutoTimerRef.current) clearTimeout(libAutoTimerRef.current); };
+  }, [libAutoPlaying, libAutoIdx, activePageChunks, tts, stopLibAutoPlay]);
+  // Reset when library source or filters change
+  useEffect(() => { stopLibAutoPlay(); }, [librarySource, categoryFilter, difficultyFilter]);
+
   const [searchQuery, setSearchQuery] = usePageMemoryDebounced('chunk-search', '');
   const [activeTab, setActiveTab] = useState(chunkPosMemory.tab || memory.tab);
   const [categoryFilter, setCategoryFilter] = useState(memory.category);
@@ -1342,9 +1367,24 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                       })}
                     </div>
 
-                    {/* Pagination controls */}
+                    {/* Auto-play + pagination */}
+                    <div className="flex items-center justify-between pt-3 mt-3 border-t border-border/50">
+                      <div className="flex items-center gap-1">
+                        {libAutoPlaying ? (
+                          <>
+                            <span className="text-[10px] font-bold text-[#00B894] tabular-nums">{libAutoIdx + 1}/{activePageChunks.length}</span>
+                            <Button variant="ghost" size="icon" onClick={stopLibAutoPlay}
+                              className="rounded-xl size-7 bg-rose-50 dark:bg-rose-500/15 text-rose-500 hover:bg-rose-100"><Pause className="size-3.5" /></Button>
+                          </>
+                        ) : (
+                          <Button variant="ghost" size="sm" onClick={startLibAutoPlay} disabled={activePageChunks.length === 0}
+                            className="rounded-xl text-[10px] font-black uppercase tracking-wider bg-[#00B894]/10 text-[#00B894] hover:bg-[#00B894]/20 gap-1">
+                            <Play className="size-3.5" />自动朗读
+                          </Button>
+                        )}
+                      </div>
                     {activeTotalPages > 1 && (
-                      <div className="flex items-center justify-center gap-2 pt-3 mt-3 border-t border-border/50">
+                      <div className="flex items-center justify-center gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1370,6 +1410,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                         </Button>
                       </div>
                     )}
+                    </div>
                   </div>
 
                   {/* RIGHT COLUMN — Detail panel */}
