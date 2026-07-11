@@ -1393,18 +1393,35 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                             </Badge>
                           </div>
 
-                          {/* Title + TTS */}
+                          {/* Title + TTS + prev/next */}
                           <div className="flex items-center gap-2 mb-4">
+                            <Button variant="ghost" size="icon"
+                              onClick={() => {
+                                const idx = activePageChunks.findIndex((c) => c.id === detailChunk.id);
+                                if (idx > 0) setDetailChunk(activePageChunks[idx - 1]);
+                              }}
+                              disabled={activePageChunks.findIndex((c) => c.id === detailChunk.id) <= 0}
+                              className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+                              title="上一个语块">
+                              <ChevronLeft className="size-4" />
+                            </Button>
                             <h2 className="text-2xl font-black italic text-foreground tracking-tight">
                               {detailChunk.content}
                             </h2>
-                            <Button
-                              variant="ghost"
-                              size="icon"
+                            <Button variant="ghost" size="icon"
                               onClick={() => tts.speak(detailChunk.content)}
-                              className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894] shrink-0"
-                            >
+                              className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894] shrink-0">
                               <Volume2 className="size-4.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon"
+                              onClick={() => {
+                                const idx = activePageChunks.findIndex((c) => c.id === detailChunk.id);
+                                if (idx < activePageChunks.length - 1) setDetailChunk(activePageChunks[idx + 1]);
+                              }}
+                              disabled={activePageChunks.findIndex((c) => c.id === detailChunk.id) >= activePageChunks.length - 1}
+                              className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+                              title="下一个语块">
+                              <ChevronRight className="size-4" />
                             </Button>
                           </div>
 
