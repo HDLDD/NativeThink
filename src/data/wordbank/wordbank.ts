@@ -114,7 +114,12 @@ async function loadLevel(level: string): Promise<void> {
 let _allReady = false;
 async function loadAll(): Promise<void> {
   if (_allReady) return;
-  await Promise.all(ALL_LEVELS.map(loadLevel));
+  // Load levels SEQUENTIALLY to avoid memory spikes from parallel imports.
+  // Each level contains 3k–18k word entries with examples, collocations, etc.
+  // Loading 9 levels simultaneously (~75k entries) risks tab crashes.
+  for (const lvl of ALL_LEVELS) {
+    await loadLevel(lvl);
+  }
   _allReady = true;
 }
 
