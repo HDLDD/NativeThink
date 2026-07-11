@@ -6,6 +6,7 @@ import {
   Mic,
   FileText,
   BookOpen,
+  Heart,
   BarChart3,
   Sparkles,
   PenLine,
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { path: '/shadowing', label: '影子跟读', icon: Mic },
   { path: '/articles', label: '文章阅读', icon: FileText },
   { path: '/vocabulary', label: '词汇深度', icon: BookOpen },
+  { path: '/favorites', label: '我的收藏', icon: Heart },
   { path: '/writing', label: 'AI 写作练习', icon: PenLine },
   { path: '/progress', label: '学习记录', icon: BarChart3 },
 ];

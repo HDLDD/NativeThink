@@ -12,6 +12,7 @@ const ArticlePage = lazy(() => import("@/pages/ArticlePage/ArticlePage"));
 const DeepVocabularyPage = lazy(() => import("@/pages/DeepVocabularyPage/DeepVocabularyPage"));
 const WritingPage = lazy(() => import("@/pages/WritingPage/WritingPage"));
 const ProgressPage = lazy(() => import("@/pages/ProgressPage/ProgressPage"));
+const FavoritesPage = lazy(() => import("@/pages/FavoritesPage/FavoritesPage"));
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="vocabulary" element={<DeepVocabularyPage />} />
         <Route path="writing" element={<WritingPage />} />
         <Route path="progress" element={<ProgressPage />} />
+        <Route path="favorites" element={<FavoritesPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

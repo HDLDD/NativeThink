@@ -40,30 +40,30 @@ const SOURCES: { key: Source; label: string; icon: typeof Globe; desc: string }[
   { key: 'speeches', label: '名人演讲', icon: Mic, desc: '经典英文演讲稿' },
 ];
 
-// ── Curated Gutenberg books with Chinese translations ──
-const GUTENBERG_BOOKS: { id: number; title: string; zhTitle: string; author: string; zhAuthor: string; topic: string }[] = [
-  { id: 1342, title: 'Pride and Prejudice', zhTitle: '傲慢与偏见', author: 'Jane Austen', zhAuthor: '简·奥斯汀', topic: 'literature' },
-  { id: 84, title: 'Frankenstein', zhTitle: '弗兰肯斯坦', author: 'Mary Shelley', zhAuthor: '玛丽·雪莱', topic: 'literature' },
-  { id: 11, title: 'Alice\'s Adventures in Wonderland', zhTitle: '爱丽丝梦游仙境', author: 'Lewis Carroll', zhAuthor: '刘易斯·卡罗尔', topic: 'literature' },
-  { id: 1661, title: 'The Adventures of Sherlock Holmes', zhTitle: '福尔摩斯探案集', author: 'Arthur Conan Doyle', zhAuthor: '柯南·道尔', topic: 'literature' },
-  { id: 345, title: 'Dracula', zhTitle: '德古拉', author: 'Bram Stoker', zhAuthor: '布莱姆·斯托克', topic: 'literature' },
-  { id: 2701, title: 'Moby Dick', zhTitle: '白鲸', author: 'Herman Melville', zhAuthor: '赫尔曼·梅尔维尔', topic: 'literature' },
-  { id: 43, title: 'The Strange Case of Dr. Jekyll and Mr. Hyde', zhTitle: '化身博士', author: 'Robert Louis Stevenson', zhAuthor: '史蒂文森', topic: 'literature' },
-  { id: 174, title: 'The Picture of Dorian Gray', zhTitle: '道林·格雷的画像', author: 'Oscar Wilde', zhAuthor: '奥斯卡·王尔德', topic: 'literature' },
-  { id: 730, title: 'Oliver Twist', zhTitle: '雾都孤儿', author: 'Charles Dickens', zhAuthor: '查尔斯·狄更斯', topic: 'literature' },
-  { id: 1400, title: 'Great Expectations', zhTitle: '远大前程', author: 'Charles Dickens', zhAuthor: '查尔斯·狄更斯', topic: 'literature' },
-  { id: 2600, title: 'War and Peace', zhTitle: '战争与和平', author: 'Leo Tolstoy', zhAuthor: '列夫·托尔斯泰', topic: 'literature' },
-  { id: 1184, title: 'The Count of Monte Cristo', zhTitle: '基督山伯爵', author: 'Alexandre Dumas', zhAuthor: '大仲马', topic: 'literature' },
-  { id: 98, title: 'A Tale of Two Cities', zhTitle: '双城记', author: 'Charles Dickens', zhAuthor: '查尔斯·狄更斯', topic: 'literature' },
-  { id: 1232, title: 'The Prince', zhTitle: '君主论', author: 'Niccolò Machiavelli', zhAuthor: '马基雅维利', topic: 'philosophy' },
-  { id: 1635, title: 'Meditations', zhTitle: '沉思录', author: 'Marcus Aurelius', zhAuthor: '马可·奥勒留', topic: 'philosophy' },
-  { id: 3600, title: 'The Wealth of Nations', zhTitle: '国富论', author: 'Adam Smith', zhAuthor: '亚当·斯密', topic: 'business' },
-  { id: 1228, title: 'On the Origin of Species', zhTitle: '物种起源', author: 'Charles Darwin', zhAuthor: '查尔斯·达尔文', topic: 'science' },
-  { id: 3300, title: 'The Republic', zhTitle: '理想国', author: 'Plato', zhAuthor: '柏拉图', topic: 'philosophy' },
-  { id: 76, title: 'Adventures of Huckleberry Finn', zhTitle: '哈克贝利·费恩历险记', author: 'Mark Twain', zhAuthor: '马克·吐温', topic: 'literature' },
-  { id: 1260, title: 'Jane Eyre', zhTitle: '简·爱', author: 'Charlotte Brontë', zhAuthor: '夏洛蒂·勃朗特', topic: 'literature' },
-  { id: 768, title: 'Wuthering Heights', zhTitle: '呼啸山庄', author: 'Emily Brontë', zhAuthor: '艾米莉·勃朗特', topic: 'literature' },
-  { id: 244, title: 'The Time Machine', zhTitle: '时间机器', author: 'H.G. Wells', zhAuthor: 'H.G.威尔斯', topic: 'literature' },
+// ── Curated Gutenberg books with Chinese translations + cover images ──
+const GUTENBERG_BOOKS: { id: number; title: string; zhTitle: string; author: string; zhAuthor: string; topic: string; cover: string }[] = [
+  { id: 1342, title: 'Pride and Prejudice', zhTitle: '傲慢与偏见', author: 'Jane Austen', zhAuthor: '简·奥斯汀', topic: 'literature', cover: '' },
+  { id: 84, title: 'Frankenstein', zhTitle: '弗兰肯斯坦', author: 'Mary Shelley', zhAuthor: '玛丽·雪莱', topic: 'literature', cover: '' },
+  { id: 11, title: 'Alice\'s Adventures in Wonderland', zhTitle: '爱丽丝梦游仙境', author: 'Lewis Carroll', zhAuthor: '刘易斯·卡罗尔', topic: 'literature', cover: '' },
+  { id: 1661, title: 'The Adventures of Sherlock Holmes', zhTitle: '福尔摩斯探案集', author: 'Arthur Conan Doyle', zhAuthor: '柯南·道尔', topic: 'literature', cover: '' },
+  { id: 345, title: 'Dracula', zhTitle: '德古拉', author: 'Bram Stoker', zhAuthor: '布莱姆·斯托克', topic: 'literature', cover: '' },
+  { id: 2701, title: 'Moby Dick', zhTitle: '白鲸', author: 'Herman Melville', zhAuthor: '赫尔曼·梅尔维尔', topic: 'literature', cover: '' },
+  { id: 43, title: 'Dr. Jekyll and Mr. Hyde', zhTitle: '化身博士', author: 'Robert Louis Stevenson', zhAuthor: '史蒂文森', topic: 'literature', cover: '' },
+  { id: 174, title: 'The Picture of Dorian Gray', zhTitle: '道林·格雷的画像', author: 'Oscar Wilde', zhAuthor: '奥斯卡·王尔德', topic: 'literature', cover: '' },
+  { id: 730, title: 'Oliver Twist', zhTitle: '雾都孤儿', author: 'Charles Dickens', zhAuthor: '查尔斯·狄更斯', topic: 'literature', cover: '' },
+  { id: 1400, title: 'Great Expectations', zhTitle: '远大前程', author: 'Charles Dickens', zhAuthor: '查尔斯·狄更斯', topic: 'literature', cover: '' },
+  { id: 2600, title: 'War and Peace', zhTitle: '战争与和平', author: 'Leo Tolstoy', zhAuthor: '列夫·托尔斯泰', topic: 'literature', cover: '' },
+  { id: 1184, title: 'The Count of Monte Cristo', zhTitle: '基督山伯爵', author: 'Alexandre Dumas', zhAuthor: '大仲马', topic: 'literature', cover: '' },
+  { id: 98, title: 'A Tale of Two Cities', zhTitle: '双城记', author: 'Charles Dickens', zhAuthor: '查尔斯·狄更斯', topic: 'literature', cover: '' },
+  { id: 1260, title: 'Jane Eyre', zhTitle: '简·爱', author: 'Charlotte Brontë', zhAuthor: '夏洛蒂·勃朗特', topic: 'literature', cover: '' },
+  { id: 768, title: 'Wuthering Heights', zhTitle: '呼啸山庄', author: 'Emily Brontë', zhAuthor: '艾米莉·勃朗特', topic: 'literature', cover: '' },
+  { id: 76, title: 'Huckleberry Finn', zhTitle: '哈克贝利·费恩历险记', author: 'Mark Twain', zhAuthor: '马克·吐温', topic: 'literature', cover: '' },
+  { id: 244, title: 'The Time Machine', zhTitle: '时间机器', author: 'H.G. Wells', zhAuthor: 'H.G.威尔斯', topic: 'literature', cover: '' },
+  { id: 1232, title: 'The Prince', zhTitle: '君主论', author: 'Niccolò Machiavelli', zhAuthor: '马基雅维利', topic: 'philosophy', cover: '' },
+  { id: 1635, title: 'Meditations', zhTitle: '沉思录', author: 'Marcus Aurelius', zhAuthor: '马可·奥勒留', topic: 'philosophy', cover: '' },
+  { id: 3600, title: 'The Wealth of Nations', zhTitle: '国富论', author: 'Adam Smith', zhAuthor: '亚当·斯密', topic: 'business', cover: '' },
+  { id: 1228, title: 'On the Origin of Species', zhTitle: '物种起源', author: 'Charles Darwin', zhAuthor: '查尔斯·达尔文', topic: 'science', cover: '' },
+  { id: 3300, title: 'The Republic', zhTitle: '理想国', author: 'Plato', zhAuthor: '柏拉图', topic: 'philosophy', cover: '' },
 ];
 
 // ── Curated Wikipedia articles with Chinese translations ──
@@ -838,14 +838,28 @@ This, and nothing less, is the meaning of human existence: to create, to produce
       {source === 'gutenberg' && (
         <Card className="rounded-[28px] border-border shadow-sm">
           <CardContent className="p-4 space-y-4">
-            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">推荐书籍</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Library className="size-3.5 text-amber-500" />推荐书籍 · 公版英文原著 ({GUTENBERG_BOOKS.length} 本)
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[500px] overflow-y-auto">
               {GUTENBERG_BOOKS.map((book) => (
                 <button key={book.id} onClick={() => fetchGutenbergBook({ id: book.id, title: book.title, authors: [{ name: book.author }], subjects: [book.topic], formats: { 'text/plain': `https://www.gutenberg.org/files/${book.id}/${book.id}-0.txt` }, download_count: 0 })}
-                  className="text-left p-3 rounded-2xl bg-muted/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors border border-transparent hover:border-[#00B894]/20">
-                  <p className="text-xs font-black text-foreground">{book.title}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{book.zhTitle} · {book.author}</p>
-                  <p className="text-[9px] text-[#00B894]/70 mt-0.5">{book.zhAuthor}</p>
+                  className="group text-left rounded-2xl bg-muted/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all border border-transparent hover:border-[#00B894]/30 hover:shadow-lg overflow-hidden">
+                  {/* Book cover */}
+                  <div className="aspect-[3/4] bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center relative overflow-hidden"
+                    style={{ backgroundImage: book.cover ? `url(${book.cover})` : undefined, backgroundSize: 'cover' }}>
+                    {!book.cover && (
+                      <div className="text-center p-2">
+                        <span className="text-3xl mb-1 block">📖</span>
+                        <p className="text-white/90 text-[9px] font-black leading-tight line-clamp-2">{book.title}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2.5">
+                    <p className="text-[11px] font-black text-foreground line-clamp-1 group-hover:text-[#00B894] transition-colors">{book.title}</p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5 line-clamp-1">{book.zhTitle}</p>
+                    <p className="text-[8px] text-muted-foreground/60 mt-0.5">{book.author} · {book.zhAuthor}</p>
+                  </div>
                 </button>
               ))}
             </div>
@@ -882,13 +896,21 @@ This, and nothing less, is the meaning of human existence: to create, to produce
       {source === 'wikipedia' && (
         <Card className="rounded-[28px] border-border shadow-sm">
           <CardContent className="p-4 space-y-4">
-            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">推荐条目</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Globe className="size-3.5 text-sky-500" />推荐条目 · Wikipedia ({WIKI_ARTICLES.length} 篇)
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[500px] overflow-y-auto">
               {WIKI_ARTICLES.map((article) => (
                 <button key={article.title} onClick={() => { setWikiQuery(article.title); searchWikipedia(article.title); }}
-                  className="text-left p-3 rounded-2xl bg-muted/30 hover:bg-sky-50 dark:hover:bg-sky-500/10 transition-colors border border-transparent hover:border-sky-200">
-                  <p className="text-xs font-black text-foreground">{article.title}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{article.zhTitle}</p>
+                  className="group text-left rounded-2xl bg-muted/30 hover:bg-sky-50 dark:hover:bg-sky-500/10 transition-all border border-transparent hover:border-sky-200 hover:shadow-lg overflow-hidden">
+                  {/* Topic gradient icon card */}
+                  <div className="aspect-[4/3] bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center">
+                    <span className="text-3xl">{TOPICS.find((t) => t.key === article.topic)?.icon || '📄'}</span>
+                  </div>
+                  <div className="p-2.5">
+                    <p className="text-[11px] font-black text-foreground line-clamp-1 group-hover:text-sky-500 transition-colors">{article.title}</p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5">{article.zhTitle}</p>
+                  </div>
                 </button>
               ))}
             </div>
