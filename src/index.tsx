@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { AppContainer, ErrorRender } from "@lark-apaas/client-toolkit-lite";
+import { AuthProvider } from "./lib/auth-provider";
 import App from "./app";
 import "./index.css";
 
@@ -57,13 +58,15 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter basename={process.env.CLIENT_BASE_PATH || "/"}>
       <SafeShell>
-        <ErrorBoundary
-          fallbackRender={({ error, resetErrorBoundary }) => (
-            <ErrorRender error={error} resetErrorBoundary={resetErrorBoundary} />
-          )}
-        >
-          <App />
-        </ErrorBoundary>
+        <AuthProvider>
+          <ErrorBoundary
+            fallbackRender={({ error, resetErrorBoundary }) => (
+              <ErrorRender error={error} resetErrorBoundary={resetErrorBoundary} />
+            )}
+          >
+            <App />
+          </ErrorBoundary>
+        </AuthProvider>
       </SafeShell>
     </BrowserRouter>
   </StrictMode>,

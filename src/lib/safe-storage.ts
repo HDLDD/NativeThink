@@ -120,6 +120,15 @@ function tryMigrate(key: string): void {
   } catch { /* ignore */ }
 }
 
+// Cloud sync handler — registered by useCloudSync when user is authenticated.
+// After every setItem, this fires with (key, value) to dual-write to Vercel KV.
+type CloudSyncHandler = (key: string, value: string) => void;
+let _cloudSyncHandler: CloudSyncHandler | null = null;
+
+export function setCloudSyncHandler(handler: CloudSyncHandler | null): void {
+  _cloudSyncHandler = handler;
+}
+
 export const safeStorage = {
   getItem(key: string): string | null {
     try {
@@ -134,6 +143,10 @@ export const safeStorage = {
     try {
       _migratedKeys.add(key); // No need to check old on write
       localStorage.setItem(prefixKey(key), value);
+      // Dual-write to cloud if handler registered (fire-and-forget)
+      if (_cloudSyncHandler) {
+        try { _cloudSyncHandler(key, value); } catch { /* ignore */ }
+      }
     } catch {
       // Storage full or unavailable — silently ignore
     }

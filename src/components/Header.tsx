@@ -1,10 +1,11 @@
-import { Sun, Moon, Bell, User, Calendar, Clock, Target, Settings } from 'lucide-react';
+import { Sun, Moon, Bell, Calendar, Clock, Target, Settings } from 'lucide-react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/lib/use-theme';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { formatDate } from '@/lib/utils';
 import { useState, useEffect } from 'react';
+import UserMenu from './UserMenu';
 import {
   Dialog,
   DialogContent,
@@ -147,14 +148,7 @@ export default function Header() {
             >
               {theme === 'light' ? <Moon className="size-4.5" /> : <Sun className="size-4.5" />}
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="通知"
-              className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894] transition-colors"
-            >
-              <Bell className="size-4.5" />
-            </Button>
+            <UserMenu />
           </div>
         </div>
       </div>
