@@ -3,7 +3,6 @@ import {
   Heart,
   Volume2,
   Trash2,
-  Filter,
   Sparkles,
   BookOpen,
   ExternalLink,
@@ -12,13 +11,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useFavorites } from '@/lib/use-favorites';
 import { useTTS } from '@/lib/use-tts';
 import { cn, cleanText } from '@/lib/utils';
@@ -141,34 +133,30 @@ export default function FavoritesPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Type filter */}
-          <div className="flex items-center gap-2">
-            <Filter className="size-4 text-muted-foreground" />
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-[120px] rounded-2xl border-border bg-muted text-xs font-bold uppercase tracking-wider">
-                <SelectValue placeholder="分类" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl">
-                <SelectItem value="all" className="text-xs font-bold">
-                  全部 ({typeCounts.all})
-                </SelectItem>
-                <SelectItem value="vocabulary" className="text-xs font-bold">
-                  词汇 ({typeCounts.vocabulary || 0})
-                </SelectItem>
-                <SelectItem value="chunk" className="text-xs font-bold">
-                  语块 ({typeCounts.chunk || 0})
-                </SelectItem>
-                <SelectItem value="expression" className="text-xs font-bold">
-                  表达 ({typeCounts.expression || 0})
-                </SelectItem>
-                <SelectItem value="think" className="text-xs font-bold">
-                  思维训练 ({typeCounts.think || 0})
-                </SelectItem>
-                <SelectItem value="shadowing" className="text-xs font-bold">
-                  影子跟读 ({typeCounts.shadowing || 0})
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Type filter tabs */}
+          <div className="flex items-center gap-1 bg-muted rounded-xl p-1 flex-wrap">
+            {([
+              { key: 'all' as const, label: '全部', icon: '📋' },
+              { key: 'vocabulary' as const, label: '词汇', icon: '📗' },
+              { key: 'chunk' as const, label: '语块', icon: '🔗' },
+              { key: 'expression' as const, label: '表达', icon: '💬' },
+              { key: 'article' as const, label: '文章', icon: '📰' },
+              { key: 'shadowing' as const, label: '跟读', icon: '🎤' },
+            ]).map(({ key, label, icon }) => (
+              <button
+                key={key}
+                onClick={() => setFilterType(key)}
+                className={cn(
+                  'flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap',
+                  filterType === key
+                    ? 'bg-white dark:bg-card text-[#00B894] shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <span>{icon}</span> {label}
+                <span className="text-[9px] opacity-60">({typeCounts[key] || 0})</span>
+              </button>
+            ))}
           </div>
 
           {/* Review toggle */}
