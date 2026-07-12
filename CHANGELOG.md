@@ -2,7 +2,17 @@
 
 ## 2026-07-11
 
-### 文章阅读 📖 — 重大重构 + Bug 修复
+### 文章阅读 Bug 修复 🐛 — 循环依赖 + TDZ 崩溃
+- **TDZ ReferenceError 根因**：`aiArticles` 的 `useState` 声明在自动打开 `useEffect` 之后 → 依赖数组求值时变量尚未初始化 → `Cannot access '...' before initialization`
+  - 修复方式：将 `aiArticles`/`saveAiArticle`/`deleteAiArticle` 声明移到所有 effect 之前
+- **动态 import 打破循环依赖**：`PageReader` 改为 `useEffect` 内动态 `import()` 加载，避免模块初始化时的循环引用
+- **连带修复**：`validPages` 统一替换 `activeContent.pages`，过滤无 `paragraphs` 的坏页
+- **内容校验**：PageReader 入口 `pages?.filter(p => p && Array.isArray(p.paragraphs))` 防止空引用
+- **内存清理**：PageReader 卸载时清空翻译缓存 + 重置 displayContent，帮助 GC 回收
+- **TTS 安全包装**：`safeSpeak()` try/catch 包裹所有 `tts.speak()` 调用
+- **ErrorBoundary 兜底**：PageReader 外层包裹错误边界，崩溃时显示"阅读器加载失败"而非白屏
+
+### 文章阅读 📖 — 重大重构 + 功能恢复
 - **PageReader 组件恢复**：基于旧版代码重写，剔除朗读后恢复完整功能
   - **点击查词**：文章内任意单词可点击 → 弹窗显示中文释义（离线词库）+ 英文释义（在线词典 API）+ 音标
   - **全文对照/译文切换**：原文 / 双语对照 / 纯译文 三种显示模式
