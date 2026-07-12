@@ -8,7 +8,6 @@
 import {
   type AIProvider,
   PROVIDER_CONFIGS,
-  getAPIKey,
   getActiveProvider,
   getConfiguredProviders,
 } from './ai-config';
@@ -52,9 +51,6 @@ export async function* streamChat(
   const provider = resolveProvider(options.provider);
   const config = PROVIDER_CONFIGS[provider];
 
-  // Try server proxy first, fall back to client-side if server key not configured
-  const useProxy = true; // Always prefer proxy; server will return 503 if not configured
-
   const body = {
     provider,
     model: options.model || config.freeModel,
@@ -64,67 +60,21 @@ export async function* streamChat(
     stream: true,
   };
 
-  let response: Response;
+  // Always route through server proxy to protect API key
+  let response = await fetch('/api/ai/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: options.signal,
+  });
 
-  if (useProxy) {
-    // Route through server proxy to protect API key
-    response = await fetch('/api/ai/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: options.signal,
-    });
-
-    // If server proxy returns 503 (not configured), fall back to client-side
-    if (response.status === 503) {
-      const apiKey = getAPIKey(provider);
-      if (!apiKey) {
-        throw new Error(
-          `未配置 ${config.name} API Key。请在设置页面输入您的 API Key。\n` +
-            `DeepSeek: https://platform.deepseek.com\n` +
-            `豆包: https://console.volcengine.com/ark`,
-        );
-      }
-      response = await fetch(config.apiEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: body.model,
-          messages,
-          max_tokens: body.max_tokens,
-          temperature: body.temperature,
-          stream: true,
-        }),
-        signal: options.signal,
-      });
-    }
-  } else {
-    const apiKey = getAPIKey(provider);
-    if (!apiKey) {
-      throw new Error(
-        `未配置 ${config.name} API Key。请在设置页面输入您的 API Key。\n` +
-          `DeepSeek: https://platform.deepseek.com\n` +
-          `豆包: https://console.volcengine.com/ark`,
-      );
-    }
-    response = await fetch(config.apiEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: body.model,
-        messages,
-        max_tokens: body.max_tokens,
-        temperature: body.temperature,
-        stream: true,
-      }),
-      signal: options.signal,
-    });
+  // If server proxy returns 503 (not configured), throw with setup instructions
+  if (response.status === 503) {
+    throw new Error(
+      `服务端 AI Key 未配置。请在服务端设置 ${config.name} API Key。\n` +
+        `DeepSeek: https://platform.deepseek.com\n` +
+        `豆包: https://console.volcengine.com/ark`,
+    );
   }
 
   if (!response.ok) {
@@ -208,6 +158,7 @@ export async function* streamChat(
 
 /**
  * Non-streaming chat completion. Returns the full response text.
+ * Routes through server proxy to protect API keys.
  */
 export async function chat(
   messages: ChatMessage[],
@@ -215,17 +166,9 @@ export async function chat(
 ): Promise<string> {
   const provider = resolveProvider(options.provider);
   const config = PROVIDER_CONFIGS[provider];
-  const apiKey = getAPIKey(provider);
-
-  if (!apiKey) {
-    throw new Error(
-      `未配置 ${config.name} API Key。请在设置页面输入您的 API Key。\n` +
-        `DeepSeek: https://platform.deepseek.com\n` +
-        `豆包: https://console.volcengine.com/ark`,
-    );
-  }
 
   const body = {
+    provider,
     model: options.model || config.freeModel,
     messages,
     max_tokens: options.maxTokens ?? 4096,
@@ -233,15 +176,21 @@ export async function chat(
     stream: false,
   };
 
-  const response = await fetch(config.apiEndpoint, {
+  // Route through server proxy to protect API key
+  const response = await fetch('/api/ai/chat', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal: options.signal,
   });
+
+  if (response.status === 503) {
+    throw new Error(
+      `服务端 AI Key 未配置。请在服务端设置 ${config.name} API Key。\n` +
+        `DeepSeek: https://platform.deepseek.com\n` +
+        `豆包: https://console.volcengine.com/ark`,
+    );
+  }
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => 'Unknown error');

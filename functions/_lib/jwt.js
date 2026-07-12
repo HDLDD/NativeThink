@@ -2,7 +2,10 @@
 import { SignJWT, jwtVerify } from 'jose';
 
 function getSecret(env) {
-  return new TextEncoder().encode(env.JWT_SECRET || 'native-think-dev-secret-do-not-use-in-production');
+  if (!env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  return new TextEncoder().encode(env.JWT_SECRET);
 }
 
 export async function signToken(payload, env) {
