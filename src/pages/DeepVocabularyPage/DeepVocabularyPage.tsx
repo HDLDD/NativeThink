@@ -20,6 +20,7 @@ import { queryWords, preloadLevels, isLevelReady, WORD_COUNTS, ALL_PARTS_OF_SPEE
 import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
 import DailyLearningMode from './components/DailyLearningMode';
 import FlashcardMode from './components/FlashcardMode';
+import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
 import CollocationsTab from './components/CollocationsTab';
 
 interface IWordAiData { sentences: { en: string; zh: string }[]; explanation: string; }
@@ -774,6 +775,7 @@ export default function DeepVocabularyPage() {
   useEffect(() => { setWordPage(0); }, [filteredWords.length]);
 
   return (
+    <LazyFramerProvider>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -1565,6 +1567,7 @@ export default function DeepVocabularyPage() {
       </Dialog>
 
     </div>
+    </LazyFramerProvider>
   );
 }
 

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import { RotateCw, Volume2, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ const FL_LEVEL_COLORS: Record<string, string> = {
 
 interface LevelInfo { key: string; label: string; }
 export default function FlashcardMode({ level, onLevelChange, levels, counts }: { level?: string; onLevelChange?: (key: string) => void; levels?: LevelInfo[]; counts?: Record<string, number> }) {
+  const { LazyMotionDiv: MotionDiv, LazyAnimatePresence: AnimatePresence } = useFramerMotion();
   const currentLevel = level || 'all';
   const { addStudyMinutes } = useLearningStats();
   const { state, dueForReview, getNewWords, recordReview } = useWordLearning(currentLevel);
@@ -180,7 +181,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       {/* Flashcard */}
       <div className="flex justify-center">
         <AnimatePresence mode="wait">
-          <motion.div key={cw.word + (isFlipped ? '-back' : '-front')}
+          <MotionDiv key={cw.word + (isFlipped ? '-back' : '-front')}
             initial={{ opacity: 0, x: dir * 100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -dir * 100 }}
             transition={{ type: 'spring', stiffness: 260, damping: 24 }}
             className="w-full max-w-sm cursor-pointer" onClick={() => flip()}>
@@ -224,7 +225,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                 )}
               </CardContent>
             </Card>
-          </motion.div>
+          </MotionDiv>
         </AnimatePresence>
       </div>
 

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import { Brain, Target, CheckCircle2, RotateCw, Sparkles, Volume2, BookOpen, ArrowRight, XCircle, Edit3, Shuffle, Headphones, Link2, PenLine } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ const MODE_COLORS: Record<ReviewMode, { accent: string; bg: string; gradient: st
 
 interface LevelInfo { key: string; label: string; }
 export default function DailyLearningMode({ level, onLevelChange, levels, counts, simple }: { level: string; onLevelChange?: (key: string) => void; levels?: LevelInfo[]; counts?: Record<string, number>; simple?: boolean }) {
+  const { LazyMotionDiv: MotionDiv, LazyAnimatePresence: AnimatePresence } = useFramerMotion();
   const { state, dailyQuota, setDailyQuota, todayRemaining, dueForReview, getNewWords, recordReview, resetProgress } = useWordLearning(level);
   const tts = useTTS();
 
@@ -445,17 +446,14 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
             <h2 className="text-sm font-black italic text-foreground">学习模式</h2>
           </div>
         </div>
-        {/* Level switch toast */}
+        {/* Level switch toast — CSS animation (no framer-motion needed) */}
         {levelToast && (
-          <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10 }}
+          <div
             className="absolute -top-8 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-black text-white shadow-lg whitespace-nowrap"
-            style={{ backgroundColor: levelColor.accent }}
+            style={{ backgroundColor: levelColor.accent, animation: 'toast-in 1.2s ease forwards' }}
           >
             已切换至 {levelToast}
-          </motion.div>
+          </div>
         )}
         {onLevelChange && levels && (
           <div className="flex gap-1 flex-wrap">
@@ -584,7 +582,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       {/* Learning session */}
       {sessionWords.length > 0 && currentWord ? (
         <AnimatePresence mode="wait">
-          <motion.div
+          <MotionDiv
             key={level + reviewMode}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -615,7 +613,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
             <>
               <div className="flex justify-center">
                 <AnimatePresence mode="wait">
-                  <motion.div
+                  <MotionDiv
                     key={currentWord.word + (isFlipped ? '-back' : '-front')}
                     initial={{ opacity: 0, x: 60 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -666,7 +664,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                         )}
                       </CardContent>
                     </Card>
-                  </motion.div>
+                  </MotionDiv>
                 </AnimatePresence>
               </div>
 
@@ -1150,7 +1148,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               </div>
             );
           })()}
-          </motion.div>
+          </MotionDiv>
         </AnimatePresence>
       ) : (
         <Card className={cn('rounded-[40px] border-border shadow-sm overflow-hidden')}>

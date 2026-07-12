@@ -61,6 +61,7 @@ import { WORD_COUNTS } from '@/data/wordbank/meta';
 import { cn, cleanText } from '@/lib/utils';
 import { toast } from 'sonner';
 import FavoriteReviewMode from './components/FavoriteReviewMode';
+import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
 
 // 从真实日历数据生成日历视图
 function buildCalendarDays(calendar: { date: string; checkedIn: boolean; minutes: number }[], year: number, month: number) {
@@ -1057,7 +1058,9 @@ export default function ProgressPage() {
             </CardHeader>
             <CardContent>
               {favReviewMode ? (
-                <FavoriteReviewMode favorites={filteredFavorites} onExit={() => setFavReviewMode(false)} />
+                <LazyFramerProvider>
+                  <FavoriteReviewMode favorites={filteredFavorites} onExit={() => setFavReviewMode(false)} />
+                </LazyFramerProvider>
               ) : filteredFavorites.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {filteredFavorites.map((item) => (

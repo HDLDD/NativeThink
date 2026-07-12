@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import { Heart, Volume2, Sparkles, CheckCircle2, XCircle, RotateCw, ArrowLeft, ExternalLink, Mic } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ interface Props {
 }
 
 export default function FavoriteReviewMode({ favorites, onExit }: Props) {
+  const { LazyMotionDiv: MotionDiv, LazyAnimatePresence: AnimatePresence } = useFramerMotion();
   const tts = useTTS();
   const [filterType, setFilterType] = useState<string>('all');
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -335,7 +336,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
       {cw && (
         <div className="flex justify-center">
           <AnimatePresence mode="wait">
-            <motion.div
+            <MotionDiv
               key={cw.id + (isFlipped ? '-back' : '-front')}
               initial={{ opacity: 0, x: dir * 100 }}
               animate={{ opacity: 1, x: 0 }}
@@ -419,7 +420,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
                   )}
                 </CardContent>
               </Card>
-            </motion.div>
+            </MotionDiv>
           </AnimatePresence>
         </div>
       )}

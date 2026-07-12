@@ -57,9 +57,14 @@ export default defineConfig({
     },
   },
   build: {
+    sourcemap: false,
     rolldownOptions: {
       output: {
         manualChunks(id) {
+          // Extract framer-motion into its own chunk (~150KB) so it stays off the main bundle
+          if (id.includes('node_modules/framer-motion') || id.includes('node_modules/motion')) {
+            return 'framer-motion';
+          }
           // Split wordbank data into per-level chunks to stay under Cloudflare's 25 MiB limit
           if (id.includes('data/cet4.ts')) return 'wordbank-cet4';
           if (id.includes('data/cet6.ts')) return 'wordbank-cet6';
