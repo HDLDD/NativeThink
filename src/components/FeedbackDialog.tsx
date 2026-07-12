@@ -29,8 +29,7 @@ import { cn } from '@/lib/utils';
 import {
   useFeedback,
   checkRateLimit,
-  sendToFeishu,
-  getBuildWebhookUrl,
+  submitFeedbackToServer,
   type IFeedbackItem,
 } from '@/lib/use-feedback';
 
@@ -54,7 +53,6 @@ const TYPE_LABELS: Record<IFeedbackItem['type'], string> = {
 
 export default function FeedbackDialog() {
   const { feedbacks, addFeedback, deleteFeedback } = useFeedback();
-  const buildWebhookUrl = getBuildWebhookUrl();
 
   const [open, setOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -113,11 +111,8 @@ export default function FeedbackDialog() {
       rating,
     });
 
-    // Send to Feishu webhook if configured at build time
-    let sentToFeishu = false;
-    if (buildWebhookUrl) {
-      sentToFeishu = await sendToFeishu(item, buildWebhookUrl);
-    }
+    // Send to server proxy (hides webhook URL from client)
+    const sentToFeishu = await submitFeedbackToServer(item);
 
     setTimeout(() => {
       if (sentToFeishu) {

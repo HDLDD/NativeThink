@@ -155,8 +155,7 @@ export function useFeedback() {
 // --- Webhook ---
 /**
  * Build-time webhook URL (from VITE_FEISHU_WEBHOOK_URL env var).
- * This is embedded in the JS bundle — NOT user-configurable.
- * For local development, create a .env file with this variable.
+ * @deprecated Use submitFeedbackToServer() instead to avoid exposing webhook URL in frontend.
  */
 export function getBuildWebhookUrl(): string {
   try {
@@ -164,6 +163,25 @@ export function getBuildWebhookUrl(): string {
     return (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_FEISHU_WEBHOOK_URL) || '';
   } catch {
     return '';
+  }
+}
+
+/** Submit feedback via server proxy (preferred — hides webhook URL from client) */
+export async function submitFeedbackToServer(feedback: IFeedbackItem): Promise<boolean> {
+  try {
+    const resp = await fetch('/api/feedback/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: feedback.type,
+        title: feedback.title,
+        description: feedback.description,
+        rating: feedback.rating,
+      }),
+    });
+    return resp.ok;
+  } catch {
+    return false;
   }
 }
 
