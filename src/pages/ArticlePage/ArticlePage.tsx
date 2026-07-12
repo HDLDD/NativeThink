@@ -132,6 +132,26 @@ export default function ArticlePage() {
   const { addStudyMinutes } = useLearningStats();
   const [searchParams] = useSearchParams();
 
+  // ── Saved AI articles — declared before effects that reference it ──
+  const AI_ARTICLES_KEY = '__nativethink_ai_articles';
+  const [aiArticles, setAiArticles] = useState<IReadingContent[]>(() => {
+    try { const s = safeStorage.getItem(AI_ARTICLES_KEY); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  const saveAiArticle = (content: IReadingContent) => {
+    setAiArticles((prev) => {
+      const next = [content, ...prev].slice(0, 50);
+      safeStorage.setItem(AI_ARTICLES_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+  const deleteAiArticle = (id: string) => {
+    setAiArticles((prev) => {
+      const next = prev.filter((a) => a.id !== id);
+      safeStorage.setItem(AI_ARTICLES_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
   // Dynamic import PageReader to break circular dependency
   const [PageReaderComp, setPageReaderComp] = useState<any>(null);
   useEffect(() => {
@@ -274,28 +294,6 @@ export default function ArticlePage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiTitle, setAiTitle] = useState('');
   const [aiTopicInput, setAiTopicInput] = useState('');
-
-  // ── Saved AI articles ──
-  const AI_ARTICLES_KEY = '__nativethink_ai_articles';
-  const [aiArticles, setAiArticles] = useState<IReadingContent[]>(() => {
-    try { const s = safeStorage.getItem(AI_ARTICLES_KEY); return s ? JSON.parse(s) : []; } catch { return []; }
-  });
-
-  const saveAiArticle = (content: IReadingContent) => {
-    setAiArticles((prev) => {
-      const next = [content, ...prev].slice(0, 50);
-      safeStorage.setItem(AI_ARTICLES_KEY, JSON.stringify(next));
-      return next;
-    });
-  };
-
-  const deleteAiArticle = (id: string) => {
-    setAiArticles((prev) => {
-      const next = prev.filter((a) => a.id !== id);
-      safeStorage.setItem(AI_ARTICLES_KEY, JSON.stringify(next));
-      return next;
-    });
-  };
 
   // Reload AI articles when cloud sync pulls data from other devices
   useEffect(() => {
