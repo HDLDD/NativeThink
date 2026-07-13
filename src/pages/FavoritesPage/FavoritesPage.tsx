@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Heart,
   Volume2,
@@ -30,7 +31,7 @@ const TYPE_LABELS: Record<string, string> = {
   word: '单词',
 };
 
-const TYPE_COLORS: Record<string, { bg: string; badge: string; icon: LucideIcon }> = {
+const TYPE_COLORS: Record<string, { bg: string; badge: string }> = {
   chunk:      { bg: 'bg-amber-50 dark:bg-amber-500/10',   badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-600' },
   expression: { bg: 'bg-sky-50 dark:bg-sky-500/10',       badge: 'bg-sky-100 dark:bg-sky-500/20 text-sky-600' },
   vocabulary: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600' },
@@ -46,6 +47,7 @@ const FILTER_TYPES = ['all', 'vocabulary', 'chunk', 'expression', 'think', 'shad
 // Component
 // ============================================================
 export default function FavoritesPage() {
+  const navigate = useNavigate();
   const { favorites, removeFavorite, loaded } = useFavorites();
   const tts = useTTS();
   const [filterType, setFilterType] = useState<string>('all');
@@ -282,7 +284,7 @@ export default function FavoritesPage() {
                           className="flex-1 rounded-xl text-[10px] font-black gap-1 border-teal-200 text-teal-500 hover:bg-teal-50 dark:hover:bg-teal-500/10"
                           onClick={() => {
                             const source = item.category || 'ai';
-                            window.location.href = `/articles?open=${encodeURIComponent(item.content)}&source=${encodeURIComponent(source)}`;
+                            navigate(`/articles?open=${encodeURIComponent(item.content)}&source=${encodeURIComponent(source)}`);
                           }}
                         >
                           <ExternalLink className="size-3" />
@@ -301,7 +303,7 @@ export default function FavoritesPage() {
                           size="sm"
                           className="flex-1 rounded-xl text-[10px] font-black gap-1 border-rose-200 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10"
                           onClick={() => {
-                            window.location.href = `/shadowing?material=${encodeURIComponent(item.content)}`;
+                            navigate(`/shadowing?material=${encodeURIComponent(item.content)}`);
                           }}
                         >
                           <ExternalLink className="size-3" />

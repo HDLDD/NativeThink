@@ -127,9 +127,11 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   }, []);
 
   // ── Touch swipe navigation (refs + state declared early, handlers below after page vars) ──
-  const SWIPE_THRESHOLD = 50;
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const SWIPE_THRESHOLD = 80; // increased from 50 to prevent accidental swipes
+  const SWIPE_LOCK_THRESHOLD = 15; // minimum horizontal movement to lock into swipe mode
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const isSwipingRef = useRef(false);
+  const gestureDecidedRef = useRef(false); // whether we've decided scroll vs swipe
   const [swipeOffset, setSwipeOffset] = useState(0);
 
   const convertArticleLevel = async (targetLevel: string) => {
@@ -178,49 +180,78 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
   // Touch swipe handlers (must be after goPrev/goNext and currentPage/activePages are defined)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // Stop propagation to prevent parent navigation handlers from intercepting
+    e.stopPropagation();
     const touch = e.touches[0];
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
     isSwipingRef.current = false;
+    gestureDecidedRef.current = false;
     setSwipeOffset(0);
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (!touchStartRef.current) return;
+    e.stopPropagation();
+
     const touch = e.touches[0];
     const deltaX = touch.clientX - touchStartRef.current.x;
     const deltaY = touch.clientY - touchStartRef.current.y;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
 
-    // Vertical scroll dominant and not yet swiping horizontally -- let browser scroll
-    if (Math.abs(deltaY) > Math.abs(deltaX) && !isSwipingRef.current) {
-      touchStartRef.current = null;
-      return;
+    // If gesture not yet decided, determine scroll vs swipe
+    if (!gestureDecidedRef.current) {
+      // Need significant movement to decide (20px deadzone)
+      if (absDeltaX < 20 && absDeltaY < 20) return;
+
+      // If vertical movement dominates, this is a scroll -- release gesture
+      if (absDeltaY > absDeltaX * 1.5) {
+        touchStartRef.current = null;
+        return;
+      }
+
+      // If horizontal movement dominates (or close), lock into swipe mode
+      gestureDecidedRef.current = true;
+      isSwipingRef.current = true;
     }
 
-    if (Math.abs(deltaX) > 10) isSwipingRef.current = true;
-
+    // Now in swipe mode -- track horizontal offset only
     if (isSwipingRef.current) {
       let clamped = deltaX;
-      // Rubber-band effect at boundaries
-      if (deltaX > 0 && currentPage === 0) clamped = deltaX * 0.3;
-      if (deltaX < 0 && currentPage >= activePages - 1) clamped = deltaX * 0.3;
+      // Rubber-band effect at boundaries (resistance increases as you go further)
+      if (deltaX > 0 && currentPage === 0) {
+        clamped = deltaX * Math.max(0.1, 0.4 - deltaX * 0.001);
+      }
+      if (deltaX < 0 && currentPage >= activePages - 1) {
+        clamped = deltaX * Math.max(0.1, 0.4 - Math.abs(deltaX) * 0.001);
+      }
       setSwipeOffset(clamped);
     }
   }, [currentPage, activePages]);
 
-  const handleTouchEnd = useCallback(() => {
-    if (!touchStartRef.current || !isSwipingRef.current) {
-      touchStartRef.current = null;
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+    if (!touchStartRef.current) {
       setSwipeOffset(0);
       return;
     }
+
     const dx = swipeOffset;
-    if (Math.abs(dx) > SWIPE_THRESHOLD) {
+    const elapsed = Date.now() - touchStartRef.current.time;
+    const velocity = Math.abs(dx) / Math.max(elapsed, 1); // px/ms
+
+    // Trigger page change if: enough displacement OR fast flick
+    const shouldChange = Math.abs(dx) > SWIPE_THRESHOLD || (Math.abs(dx) > 40 && velocity > 0.5);
+
+    if (shouldChange && isSwipingRef.current) {
       if (dx < 0 && currentPage < activePages - 1) goNext();
       else if (dx > 0 && currentPage > 0) goPrev();
     }
+
     touchStartRef.current = null;
     setSwipeOffset(0);
     isSwipingRef.current = false;
+    gestureDecidedRef.current = false;
   }, [swipeOffset, currentPage, activePages]);
 
   // Keyboard navigation: ← → for pages, Esc to close
@@ -317,7 +348,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     let count = 0;
     try {
       const allUntranslated = validPages.flatMap(
-        (p, pi) => p.paragraphs.map((pp, ppi) => ({ en: pp.en, pageIdx: pi, paraIdx: ppi })).filter((x) => !validPages[pi].paragraphs[ppi].zh),
+        (p, pi) => p.paragraphs.map((pp, ppi) => ({ en: pp.en, pageIdx: pi, paraIdx: ppi })).filter((x) => !validPages[x.pageIdx].paragraphs[x.paraIdx].zh),
       );
       if (allUntranslated.length === 0) { toast('所有页面已有翻译'); return; }
       const newCache = { ...transCache };
@@ -692,6 +723,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       {/* ── Content (current page only) with touch swipe ── */}
       <div
         className="flex-1 min-h-0 overflow-y-auto overscroll-contain relative"
+        style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

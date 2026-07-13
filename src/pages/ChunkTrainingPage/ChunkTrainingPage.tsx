@@ -525,7 +525,7 @@ export default function ChunkTrainingPage() {
     const el = libraryScrollRef.current;
     if (!el || !chunkPosMemory.scrollTop) return;
     requestAnimationFrame(() => { el.scrollTop = chunkPosMemory.scrollTop!; });
-  }, [activePageChunks.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activePageChunks.length > 0]);
 
   const openDetail = (chunk: typeof MOCK_CHUNKS[0]) => {
     setDetailChunk(chunk);
@@ -744,8 +744,8 @@ Make chunks practical and commonly used by native speakers. Each chunk should be
         content: item.content,
         meaning: item.meaning,
         introduction: item.introduction || '',
-        category: (item.category as IChunk['category']) || genCategory,
-        difficulty: (item.difficulty as IChunk['difficulty']) || genDifficulty,
+        category: (item.category || genCategory) as IChunk['category'],
+        difficulty: (item.difficulty || genDifficulty) as IChunk['difficulty'],
         usage: item.usage || '',
         example: item.example || `Here's an example with "${item.content}".`,
         exampleZh: item.exampleZh || '',

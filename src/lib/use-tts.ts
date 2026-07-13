@@ -81,7 +81,7 @@ function edgeTTSBlob(text: string, rate: number): Promise<Blob> {
       try { ws.close(); } catch { /* */ }
       if (err) reject(err);
       else if (parts.length === 0) reject(new Error('empty'));
-      else resolve(new Blob(parts, { type: 'audio/mpeg' }));
+      else resolve(new Blob(parts as BlobPart[], { type: 'audio/mpeg' }));
     };
 
     ws.onopen = () => {

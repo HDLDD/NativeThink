@@ -54,6 +54,14 @@ export default defineConfig({
         target: 'https://nativethink.pages.dev',
         changeOrigin: true,
       },
+      '/api/ai': {
+        target: 'https://nativethink.pages.dev',
+        changeOrigin: true,
+      },
+      '/api/feedback': {
+        target: 'https://nativethink.pages.dev',
+        changeOrigin: true,
+      },
     },
   },
   build: {

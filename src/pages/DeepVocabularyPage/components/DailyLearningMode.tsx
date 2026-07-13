@@ -177,7 +177,6 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       ttsRef.current.speak(word.word, { rate: 0.85 });
     }, 400);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewMode, currentIdx, sessionWords]);
 
   // 听写模式：只在换单词时朗读一次，拼写过程中不中断

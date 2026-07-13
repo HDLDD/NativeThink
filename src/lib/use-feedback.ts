@@ -159,7 +159,6 @@ export function useFeedback() {
  */
 export function getBuildWebhookUrl(): string {
   try {
-    // @ts-expect-error — Vite injects import.meta.env at build time
     return (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_FEISHU_WEBHOOK_URL) || '';
   } catch {
     return '';

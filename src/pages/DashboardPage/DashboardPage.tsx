@@ -43,7 +43,7 @@ export default function DashboardPage() {
   // Placeholder shown while chunk data loads lazily (avoids 146KB in main bundle)
   const PLACEHOLDER_CHUNK: IChunk = {
     id: '__placeholder__', content: 'Loading...', meaning: '加载中…', category: 'daily',
-    usage: '', example: 'Loading daily chunk...', difficulty: 'beginner', tags: [],
+    usage: '', example: 'Loading daily chunk...', difficulty: 'beginner',
   };
 
   // Lazy-load chunk data (146KB) — avoids bloating the main bundle for a single daily quote

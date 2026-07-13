@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   X,
@@ -47,6 +48,7 @@ const MAX_RESULTS = 100;
 // Component
 // ============================================================
 export default function GlobalWordSearch() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -371,7 +373,7 @@ export default function GlobalWordSearch() {
                             className="w-full rounded-xl text-[10px] font-black uppercase tracking-wider border-sky-200 text-sky-500 hover:bg-sky-50 gap-1.5"
                             onClick={() => {
                               setOpen(false);
-                              window.location.href = `/vocabulary?word=${encodeURIComponent(word.word)}&level=${encodeURIComponent(word.level)}`;
+                              navigate(`/vocabulary?word=${encodeURIComponent(word.word)}&level=${encodeURIComponent(word.level)}`);
                             }}
                           >
                             <ExternalLink className="size-3" />

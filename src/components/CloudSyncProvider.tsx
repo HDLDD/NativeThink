@@ -25,7 +25,7 @@ export default function CloudSyncProvider({ children }: { children: React.ReactN
     } else {
       unregister();
     }
-  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   // Periodic sync every 5 minutes
   useEffect(() => {

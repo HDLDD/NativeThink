@@ -99,7 +99,6 @@ export default function ShadowingPage() {
       setSelectedId(match.id);
       setCurrentSentenceIdx(0);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const [showGenDialog, setShowGenDialog] = useState(false);
@@ -691,7 +690,7 @@ Keep it concise and practical.`,
                               onClick={(e) => toggleMaterialFavorite(e, corpus)}
                               role="button"
                               tabIndex={0}
-                              onKeyDown={(e) => { if (e.key === 'Enter') toggleMaterialFavorite(e, corpus); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); toggleMaterialFavorite(e as unknown as React.MouseEvent, corpus); } }}
                               className={cn(
                                 'p-1 rounded-lg transition-colors cursor-pointer',
                                 isFavorited(corpus.title, 'shadowing')

@@ -10,6 +10,7 @@ import {
   PROVIDER_CONFIGS,
   getActiveProvider,
   getConfiguredProviders,
+  getAPIKey,
 } from './ai-config';
 
 export interface ChatMessage {

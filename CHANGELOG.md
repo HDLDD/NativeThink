@@ -3,6 +3,10 @@
 
 
 
+
+## 2026-07-13
+- fix: 修复文章页面崩溃问题 (`e0b8302`)
+
 ## 2026-07-13
 - perf: lazy-load DashboardPage + NotFoundPage, add Suspense for 404 route (`9972e11`)
 

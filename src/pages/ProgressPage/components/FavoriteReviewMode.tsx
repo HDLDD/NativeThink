@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import { Heart, Volume2, Sparkles, CheckCircle2, XCircle, RotateCw, ArrowLeft, ExternalLink, Mic } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,6 +31,7 @@ interface Props {
 }
 
 export default function FavoriteReviewMode({ favorites, onExit }: Props) {
+  const navigate = useNavigate();
   const { LazyMotionDiv: MotionDiv, LazyAnimatePresence: AnimatePresence } = useFramerMotion();
   const tts = useTTS();
   const [filterType, setFilterType] = useState<string>('all');
@@ -222,7 +224,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
               </p>
             </div>
             <Button
-              onClick={() => { window.location.href = '/shadowing'; }}
+              onClick={() => { navigate('/shadowing'); }}
               className="rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-black text-sm shadow-lg shadow-rose-200/50 gap-2"
             >
               <ExternalLink className="size-4" />前往影子跟读
