@@ -20,6 +20,10 @@
 
 
 
+
+## 2026-07-13
+- fix: add @tailwindcss/vite plugin for CSS processing (`d64b89d`)
+
 ## 2026-07-13
 - fix: improve virtual:capabilities mock for dynamic imports (`e326ac3`)
 

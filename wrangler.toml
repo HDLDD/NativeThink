@@ -1,3 +1,9 @@
 name = "nativethink"
 compatibility_date = "2024-12-01"
 pages_build_output_dir = "dist/client"
+
+# KV namespace for auth, sync, passages storage
+# Replace <KV_NAMESPACE_ID> with your actual KV namespace ID
+[[kv_namespaces]]
+binding = "KV"
+id = "68391cb5146345739b4ca78181141017"
