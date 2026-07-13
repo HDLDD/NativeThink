@@ -17,7 +17,7 @@ export function useFavorites() {
   const [favorites, setFavorites] = useState<IFavoriteItem[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
+  const loadFromStorage = useCallback(() => {
     try {
       const saved = safeStorage.getItem(FAVORITES_KEY);
       if (saved) {
@@ -25,10 +25,21 @@ export function useFavorites() {
       }
     } catch {
       // storage unavailable — use defaults
-    } finally {
-      setLoaded(true);
     }
   }, []);
+
+  // Load on mount
+  useEffect(() => {
+    loadFromStorage();
+    setLoaded(true);
+  }, [loadFromStorage]);
+
+  // Re-load when cloud sync completes (syncDown populates localStorage)
+  useEffect(() => {
+    const onSyncDown = () => loadFromStorage();
+    window.addEventListener('nativethink-sync-down', onSyncDown);
+    return () => window.removeEventListener('nativethink-sync-down', onSyncDown);
+  }, [loadFromStorage]);
 
   const persist = useCallback((items: IFavoriteItem[]) => {
     setFavorites(items);

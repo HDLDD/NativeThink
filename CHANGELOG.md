@@ -1,6 +1,10 @@
 # NativeThink 开发日志
 
 
+
+## 2026-07-13
+- docs: 整理 CHANGELOG — 合并重复日期，分类记录更新和修复 (`4d7a6dc`)
+
 ## 2026-07-13
 - feat: add password hint text on register form (`272e88d`)
 

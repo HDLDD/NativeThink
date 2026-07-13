@@ -66,11 +66,10 @@ export function useLearningStats() {
   const [calendar, setCalendar] = useState<ICalendarRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
+  const loadFromStorage = useCallback(() => {
     try {
       const savedStats = safeStorage.getItem(STATS_KEY);
       if (savedStats) {
-        // Merge saved data with defaults to fill missing fields (e.g., 'writing' added later)
         const parsed = JSON.parse(savedStats);
         const merged = {
           ...DEFAULT_STATS,
@@ -89,11 +88,21 @@ export function useLearningStats() {
       }
     } catch {
       // scopedStorage unavailable — use defaults (already set in useState)
-    } finally {
-      // Always mark as loaded so the UI doesn't hang
-      setLoaded(true);
     }
   }, []);
+
+  // Load on mount
+  useEffect(() => {
+    loadFromStorage();
+    setLoaded(true);
+  }, [loadFromStorage]);
+
+  // Re-load when cloud sync completes (syncDown populates localStorage)
+  useEffect(() => {
+    const onSyncDown = () => loadFromStorage();
+    window.addEventListener('nativethink-sync-down', onSyncDown);
+    return () => window.removeEventListener('nativethink-sync-down', onSyncDown);
+  }, [loadFromStorage]);
 
   const saveStats = useCallback((newStats: ILearningStats) => {
     setStats(newStats);

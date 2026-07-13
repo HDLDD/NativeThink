@@ -69,6 +69,8 @@ export function useCloudSync() {
         }
       }
       lastSyncRef.current = Date.now();
+      // Notify other hooks that localStorage was updated from cloud
+      window.dispatchEvent(new Event('nativethink-sync-down'));
     } catch { /* offline */ }
     finally { setSyncing(false); }
   }, [isAuthenticated]);
