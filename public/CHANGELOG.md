@@ -9,6 +9,10 @@
 
 
 
+
+## 2026-07-13
+- chore: update CHANGELOG (`21cc3a7`)
+
 ## 2026-07-13
 - perf: 优化 LCP 性能 - 词库懒加载 + IndexedDB 缓存 + Vendor Chunking (`a8e4a88`)
 
