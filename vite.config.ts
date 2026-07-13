@@ -1,6 +1,6 @@
 import path from 'path'
 import type { Plugin } from 'vite'
-import { defineConfig } from '@lark-apaas/coding-preset-vite-react'
+import { defineConfig } from 'vite'
 
 // Replace platform template placeholders and strip platform-only analytics for Cloudflare
 function fixHtmlPlaceholders(): Plugin {
@@ -68,6 +68,7 @@ export default defineConfig({
   build: {
     sourcemap: false,
     rolldownOptions: {
+      external: ['virtual:capabilities'],
       output: {
         manualChunks(id) {
           // ── Vendor chunks (third-party libraries) ──
