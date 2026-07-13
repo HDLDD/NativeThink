@@ -18,7 +18,7 @@ import {
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useFavorites } from '@/lib/use-favorites';
 import type { IChunk } from '@/data/chunks';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
 import { toast } from 'sonner';
 import { useAI } from '@/hooks/use-ai';
@@ -71,7 +71,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (didSaveRef.current) return;
     if (dailyChunk.id === '__placeholder__') return; // wait for real chunk
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatDate(new Date());
     setHistory((prev) => {
       const alreadySaved = prev.some((h) => h.date === today && h.content === dailyChunk.content);
       if (alreadySaved) return prev;
@@ -105,11 +105,11 @@ export default function DashboardPage() {
     const prevDays = new Date(historyYear, historyMonth, 0).getDate();
     for (let i = firstDay - 1; i >= 0; i--) {
       const d = new Date(historyYear, historyMonth - 1, prevDays - i);
-      days.push({ date: d.toISOString().slice(0, 10), day: prevDays - i, isCurrentMonth: false });
+      days.push({ date: formatDate(d), day: prevDays - i, isCurrentMonth: false });
     }
     for (let i = 1; i <= daysInMonth; i++) {
       const d = new Date(historyYear, historyMonth, i);
-      days.push({ date: d.toISOString().slice(0, 10), day: i, isCurrentMonth: true });
+      days.push({ date: formatDate(d), day: i, isCurrentMonth: true });
     }
     return days;
   }, [historyYear, historyMonth]);
@@ -117,7 +117,7 @@ export default function DashboardPage() {
   const monthLabel = `${historyYear}年 ${historyMonth + 1}月`;
 
   const saveToHistory = (chunk: typeof dailyChunk) => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatDate(new Date());
     setHistory((prev) => {
       // 去重：同一天不重复保存相同内容的句子
       const alreadySaved = prev.some((h) => h.date === today && h.content === chunk.content);
@@ -225,8 +225,9 @@ export default function DashboardPage() {
   }, [historyMonth, historyYear]);
 
   const handleGoToToday = useCallback(() => {
-    setHistoryMonth(todayDate.getMonth());
-    setHistoryYear(todayDate.getFullYear());
+    const now = new Date();
+    setHistoryMonth(now.getMonth());
+    setHistoryYear(now.getFullYear());
   }, []);
 
   if (!loaded) {
@@ -249,7 +250,6 @@ export default function DashboardPage() {
             icon={Flame}
             label="连续天数"
             value={`${stats.streakDays} 天`}
-            trend="+12%"
             color="#F97316"
             onClick={() => navigate('/progress')}
           />
@@ -257,7 +257,6 @@ export default function DashboardPage() {
             icon={Target}
             label="今日目标"
             value={`${Math.round(stats.todayMinutes)}/${stats.dailyGoalMinutes}m`}
-            trend="50%"
             color="#00B894"
             onClick={() => navigate('/progress')}
           />

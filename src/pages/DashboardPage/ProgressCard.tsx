@@ -19,11 +19,11 @@ function ProgressCardInner({ todayMinutes, dailyGoalMinutes, progressPercent }: 
           <div className="flex gap-3 text-[9px] font-black uppercase text-gray-400">
             <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-[#00B894]"></span>
-              Goal
+              Done
             </span>
             <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-white/40"></span>
-              Done
+              Goal
             </span>
           </div>
         </div>

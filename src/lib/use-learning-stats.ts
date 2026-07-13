@@ -133,59 +133,59 @@ export function useLearningStats() {
   const addStudyMinutes = useCallback(
     (minutes: number, module: string) => {
       const today = formatDate(new Date());
-      const newStats = { ...stats };
-      newStats.todayMinutes += minutes;
-
-      // Update streak and total days
-      if (stats.lastStudyDate !== today) {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = formatDate(yesterday);
-        if (stats.lastStudyDate === yesterdayStr) {
-          // Studied yesterday, continue streak
-          newStats.streakDays += 1;
-        } else {
-          // Didn't study yesterday, reset streak
-          newStats.streakDays = 1;
+      // Use functional state updates to avoid stale closure bugs on rapid calls
+      setStats((prev) => {
+        const newStats = { ...prev };
+        // Reset todayMinutes when crossing midnight
+        if (prev.lastStudyDate !== today) {
+          newStats.todayMinutes = 0;
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayStr = formatDate(yesterday);
+          if (prev.lastStudyDate === yesterdayStr) {
+            newStats.streakDays = prev.streakDays + 1;
+          } else {
+            newStats.streakDays = 1;
+          }
+          newStats.lastStudyDate = today;
+          newStats.totalDays = prev.totalDays + 1;
         }
-        newStats.lastStudyDate = today;
-        newStats.totalDays += 1;
-      }
+        newStats.todayMinutes += minutes;
 
-      // Update module progress (cap at 100)
-      const modKey = module as keyof typeof newStats.moduleProgress;
-      if (modKey in newStats.moduleProgress) {
-        newStats.moduleProgress[modKey] = Math.min(
-          100,
-          newStats.moduleProgress[modKey] + minutes * 0.5,
-        );
-      }
+        // Update module progress (cap at 100)
+        const modKey = module as keyof typeof newStats.moduleProgress;
+        if (modKey in newStats.moduleProgress) {
+          newStats.moduleProgress[modKey] = Math.min(
+            100,
+            newStats.moduleProgress[modKey] + minutes * 0.5,
+          );
+        }
 
-      saveStats(newStats);
+        try { safeStorage.setItem(STATS_KEY, JSON.stringify(newStats)); } catch { /* ignore */ }
+        return newStats;
+      });
 
       // Update calendar
-      const newCalendar = [...calendar];
-      const todayIdx = newCalendar.findIndex((r) => r.date === today);
-      if (todayIdx >= 0) {
-        newCalendar[todayIdx] = {
-          ...newCalendar[todayIdx],
-          checkedIn: true,
-          minutes: newCalendar[todayIdx].minutes + minutes,
-          modules: newCalendar[todayIdx].modules.includes(module)
-            ? newCalendar[todayIdx].modules
-            : [...newCalendar[todayIdx].modules, module],
-        };
-      } else {
-        newCalendar.push({
-          date: today,
-          checkedIn: true,
-          minutes,
-          modules: [module],
-        });
-      }
-      saveCalendar(newCalendar);
+      setCalendar((prev) => {
+        const newCalendar = [...prev];
+        const todayIdx = newCalendar.findIndex((r) => r.date === today);
+        if (todayIdx >= 0) {
+          newCalendar[todayIdx] = {
+            ...newCalendar[todayIdx],
+            checkedIn: true,
+            minutes: newCalendar[todayIdx].minutes + minutes,
+            modules: newCalendar[todayIdx].modules.includes(module)
+              ? newCalendar[todayIdx].modules
+              : [...newCalendar[todayIdx].modules, module],
+          };
+        } else {
+          newCalendar.push({ date: today, checkedIn: true, minutes, modules: [module] });
+        }
+        try { safeStorage.setItem(CALENDAR_KEY, JSON.stringify(newCalendar)); } catch { /* ignore */ }
+        return newCalendar;
+      });
     },
-    [stats, calendar, saveStats, saveCalendar],
+    [],
   );
 
   const resetAll = useCallback(() => {
