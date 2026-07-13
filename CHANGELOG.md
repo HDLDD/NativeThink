@@ -18,6 +18,10 @@
 
 
 
+
+## 2026-07-13
+- fix: remove Lark platform dependencies for Cloudflare Pages (`72706ed`)
+
 ## 2026-07-13
 - fix: mock virtual:capabilities for Cloudflare Pages (`1cef63b`)
 

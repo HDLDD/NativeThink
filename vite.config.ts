@@ -3,6 +3,7 @@ import type { Plugin } from 'vite'
 import { defineConfig } from 'vite'
 
 // Mock virtual:capabilities for Cloudflare Pages (Lark platform virtual module)
+// This plugin resolves the virtual module to an empty object at build time
 function mockVirtualCapabilities(): Plugin {
   return {
     name: 'mock-virtual-capabilities',
@@ -12,6 +13,16 @@ function mockVirtualCapabilities(): Plugin {
     load(id) {
       if (id === '\0virtual:capabilities') {
         return 'export default {}'
+      }
+    },
+    // Handle dynamic imports of virtual:capabilities
+    transform(code, id) {
+      // Replace dynamic imports of virtual:capabilities with the mock
+      if (code.includes('virtual:capabilities')) {
+        return {
+          code: code.replace(/import\(['"]virtual:capabilities['"]\)/g, 'Promise.resolve({ default: {} })'),
+          map: null,
+        }
       }
     },
   }
@@ -83,7 +94,6 @@ export default defineConfig({
   build: {
     sourcemap: false,
     rolldownOptions: {
-      external: ['virtual:capabilities'],
       output: {
         manualChunks(id) {
           // ── Vendor chunks (third-party libraries) ──
