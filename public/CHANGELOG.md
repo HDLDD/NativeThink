@@ -12,6 +12,10 @@
 
 
 
+
+## 2026-07-13
+- fix: use local vite for Cloudflare build compatibility (`cd071b6`)
+
 ## 2026-07-13
 - fix: replace Lark preset with standard vite for Cloudflare build (`b1dc980`)
 

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build": "bash scripts/build.sh",
-    "build:web": "node node_modules/vite/bin/vite.js build --outDir dist/client --emptyOutDir && cp dist/client/index.html dist/client/404.html",
+    "build:web": "node node_modules/vite/bin/vite.js build --outDir dist/client --emptyOutDir && node -e \"require('fs').copyFileSync('dist/client/index.html','dist/client/404.html')\"",
     "preview": "npx vite preview --outDir dist/client --port 4173",
     "typecheck": "tsc -p tsconfig.app.json",
     "lint": "concurrently npm:typecheck npm:lint:eslint",
