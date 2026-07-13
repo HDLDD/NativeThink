@@ -2,6 +2,21 @@ import path from 'path'
 import type { Plugin } from 'vite'
 import { defineConfig } from 'vite'
 
+// Mock virtual:capabilities for Cloudflare Pages (Lark platform virtual module)
+function mockVirtualCapabilities(): Plugin {
+  return {
+    name: 'mock-virtual-capabilities',
+    resolveId(id) {
+      if (id === 'virtual:capabilities') return '\0virtual:capabilities'
+    },
+    load(id) {
+      if (id === '\0virtual:capabilities') {
+        return 'export default {}'
+      }
+    },
+  }
+}
+
 // Replace platform template placeholders and strip platform-only analytics for Cloudflare
 function fixHtmlPlaceholders(): Plugin {
   return {
@@ -34,7 +49,7 @@ function fixHtmlPlaceholders(): Plugin {
 
 export default defineConfig({
   base: process.env.CLIENT_BASE_PATH || '/',
-  plugins: [fixHtmlPlaceholders()],
+  plugins: [mockVirtualCapabilities(), fixHtmlPlaceholders()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
