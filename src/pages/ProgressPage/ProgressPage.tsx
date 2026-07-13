@@ -92,7 +92,7 @@ const VOCAB_LEVELS: { key: string; label: string; icon: typeof BookOpen; color: 
 export default function ProgressPage() {
   const { stats, calendar, loaded, resetAll } = useLearningStats();
   const { favorites, removeFavorite } = useFavorites();
-  const { unlocked, definitions, isUnlocked } = useAchievements();
+  const { unlocked, definitions, isUnlocked, resetAchievements } = useAchievements();
   const tts = useTTS();
   const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -104,6 +104,7 @@ export default function ProgressPage() {
   // Reset handlers
   const handleResetStats = () => {
     resetAll();
+    resetAchievements();
     toast.success('学习统计已重置');
     setShowResetDialog(false); setResetConfirm(null);
   };
@@ -187,6 +188,7 @@ export default function ProgressPage() {
   };
   const handleResetAll = () => {
     resetAll();
+    resetAchievements();
     // Clear all per-level word learning storage
     const LEVELS = ['all', 'zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
     LEVELS.forEach((l) => {

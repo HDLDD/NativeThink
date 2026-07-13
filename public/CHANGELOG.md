@@ -4,6 +4,10 @@
 
 
 
+
+## 2026-07-13
+- fix: 修复词汇复习模式在无学习单词时随机切换问题 (`67cc0ae`)
+
 ## 2026-07-13
 - perf: vocabulary page renders UI immediately, skeleton fallback for page transitions (`7fde02f`)
 

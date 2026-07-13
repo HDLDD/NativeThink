@@ -156,16 +156,33 @@ export function useAchievements() {
 
   const checkAndUnlock = useCallback(
     (stats: Parameters<IAchievement['condition']>[0]) => {
-      let anyUnlocked = false;
+      // Build list of newly unlocked achievements in one pass to avoid stale closure issues
+      const newlyUnlocked: IUnlockedAchievement[] = [];
       ACHIEVEMENT_DEFINITIONS.forEach((achievement) => {
         if (!unlocked.some((a) => a.id === achievement.id) && achievement.condition(stats)) {
-          unlock(achievement.id);
-          anyUnlocked = true;
+          newlyUnlocked.push({ id: achievement.id, unlockedAt: Date.now() });
         }
       });
-      return anyUnlocked;
+
+      if (newlyUnlocked.length > 0) {
+        // Persist all new unlocks at once
+        persist([...unlocked, ...newlyUnlocked]);
+
+        // Show toast for each new unlock
+        newlyUnlocked.forEach((nu) => {
+          const def = ACHIEVEMENT_DEFINITIONS.find((a) => a.id === nu.id);
+          if (def) {
+            toast.success(`${def.icon} 成就解锁：${def.name}！`, {
+              description: def.description,
+              duration: 4000,
+            });
+          }
+        });
+      }
+
+      return newlyUnlocked.length > 0;
     },
-    [unlocked, unlock],
+    [unlocked, persist],
   );
 
   const isUnlocked = useCallback(
@@ -173,12 +190,17 @@ export function useAchievements() {
     [unlocked],
   );
 
+  const resetAchievements = useCallback(() => {
+    persist([]);
+  }, [persist]);
+
   return {
     unlocked,
     loaded,
     checkAndUnlock,
     isUnlocked,
     unlock,
+    resetAchievements,
     definitions: ACHIEVEMENT_DEFINITIONS,
   };
 }
