@@ -14,6 +14,10 @@
 
 
 
+
+## 2026-07-13
+- fix: remove NODE_ENV production from wrangler.toml (enables devDeps install) (`87909ad`)
+
 ## 2026-07-13
 - fix: use Node.js fs for 404.html copy (Cloudflare compat) (`564ad88`)
 
