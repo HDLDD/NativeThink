@@ -19,6 +19,10 @@
 
 
 
+
+## 2026-07-13
+- fix: improve virtual:capabilities mock for dynamic imports (`e326ac3`)
+
 ## 2026-07-13
 - fix: remove Lark platform dependencies for Cloudflare Pages (`72706ed`)
 

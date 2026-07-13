@@ -1,6 +1,7 @@
 import path from 'path'
 import type { Plugin } from 'vite'
 import { defineConfig } from 'vite'
+import tailwindcss from '@tailwindcss/vite'
 
 // Mock virtual:capabilities for Cloudflare Pages (Lark platform virtual module)
 // This plugin resolves the virtual module to an empty object at build time
@@ -60,7 +61,7 @@ function fixHtmlPlaceholders(): Plugin {
 
 export default defineConfig({
   base: process.env.CLIENT_BASE_PATH || '/',
-  plugins: [mockVirtualCapabilities(), fixHtmlPlaceholders()],
+  plugins: [tailwindcss(), mockVirtualCapabilities(), fixHtmlPlaceholders()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
