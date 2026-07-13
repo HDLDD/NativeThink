@@ -810,13 +810,13 @@ export default function DeepVocabularyPage() {
       )}
 
       {!showWizard && !dataReady && (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="size-6 text-[#00B894] animate-spin mr-2" />
-          <span className="text-sm font-bold text-muted-foreground">加载词库数据中…</span>
+        <div className="flex items-center gap-2 px-4 py-2 mb-2 rounded-xl bg-[#00B894]/5 border border-[#00B894]/20">
+          <Loader2 className="size-4 text-[#00B894] animate-spin shrink-0" />
+          <span className="text-xs font-bold text-[#00B894]">词库加载中，部分功能暂不可用…</span>
         </div>
       )}
 
-      {!showWizard && dataReady && (
+      {!showWizard && (
       <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
         {/* Sticky header: browse level scroller + filter chips + tab buttons */}
         <div className="sticky top-20 z-30 bg-background/95 backdrop-blur-md pb-3 -mx-1 px-1">

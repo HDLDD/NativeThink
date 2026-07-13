@@ -4,13 +4,24 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/AppSidebar';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import Header from '@/components/Header';
-import { Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 function PageFallback() {
   return (
-    <div className="flex items-center justify-center py-24">
-      <Loader2 className="size-8 animate-spin text-[#00B894]" />
+    <div className="animate-pulse space-y-6 py-4">
+      {/* Title skeleton */}
+      <div className="h-7 w-40 rounded-xl bg-muted" />
+      {/* Content skeleton */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="rounded-2xl border border-border/50 bg-card p-4 space-y-3">
+            <div className="h-4 w-3/4 rounded-lg bg-muted" />
+            <div className="h-3 w-1/2 rounded-lg bg-muted/60" />
+            <div className="h-3 w-full rounded-lg bg-muted/40" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

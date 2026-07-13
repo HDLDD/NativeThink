@@ -2,6 +2,10 @@
 
 
 
+
+## 2026-07-13
+- fix: re-read localStorage after cloud sync completes (`dc3dc98`)
+
 ## 2026-07-13
 - docs: 整理 CHANGELOG — 合并重复日期，分类记录更新和修复 (`4d7a6dc`)
 
