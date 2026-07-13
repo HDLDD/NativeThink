@@ -73,12 +73,26 @@ export default defineConfig({
           if (id.includes('node_modules/framer-motion') || id.includes('node_modules/motion')) {
             return 'framer-motion';
           }
+          // Extract recharts (~200KB) into its own chunk — only ProgressPage needs it
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) {
+            return 'recharts';
+          }
+          // Extract react-markdown + remark-gfm into shared chunk — used by 7 pages
+          if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark-') ||
+              id.includes('node_modules/unified') || id.includes('node_modules/mdast-') ||
+              id.includes('node_modules/micromark') || id.includes('node_modules/unist-')) {
+            return 'markdown';
+          }
           // Split wordbank data into per-level chunks to stay under Cloudflare's 25 MiB limit
           if (id.includes('data/cet4.ts')) return 'wordbank-cet4';
           if (id.includes('data/cet6.ts')) return 'wordbank-cet6';
           if (id.includes('data/ielts.ts')) return 'wordbank-ielts';
           if (id.includes('data/toefl.ts')) return 'wordbank-toefl';
           if (id.includes('data/advanced.ts')) return 'wordbank-advanced';
+          if (id.includes('data/zhongkao.ts')) return 'wordbank-zhongkao';
+          if (id.includes('data/gaokao.ts')) return 'wordbank-gaokao';
+          if (id.includes('data/postgraduate.ts')) return 'wordbank-postgraduate';
+          if (id.includes('data/professional.ts')) return 'wordbank-professional';
         },
       },
     },

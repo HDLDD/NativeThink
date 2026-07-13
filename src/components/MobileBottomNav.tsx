@@ -10,6 +10,17 @@ import {
 import { cn } from '@/lib/utils';
 import { preloadLevels } from '@/data/wordbank';
 
+// Route chunk prefetch map — triggers dynamic import() on touch to warm the browser cache
+const ROUTE_PREFETCH: Record<string, () => Promise<unknown>> = {
+  '/': () => import('@/pages/DashboardPage/DashboardPage'),
+  '/think': () => import('@/pages/ThinkInEnglishPage/ThinkInEnglishPage'),
+  '/chunks': () => import('@/pages/ChunkTrainingPage/ChunkTrainingPage'),
+  '/conversation': () => import('@/pages/ConversationPage/ConversationPage'),
+  '/shadowing': () => import('@/pages/ShadowingPage/ShadowingPage'),
+  '/articles': () => import('@/pages/ArticlePage/ArticlePage'),
+  '/vocabulary': () => import('@/pages/DeepVocabularyPage/DeepVocabularyPage'),
+};
+
 const MOBILE_NAV = [
   { path: '/', label: '首页', icon: LayoutDashboard },
   { path: '/think', label: '思维', icon: Brain },
@@ -35,7 +46,7 @@ export default function MobileBottomNav() {
             <button
               key={path}
               onClick={() => navigate(path)}
-              onTouchStart={() => { if (path === '/vocabulary') preloadLevels(['cet4']); }}
+              onTouchStart={() => { ROUTE_PREFETCH[path]?.(); if (path === '/vocabulary') preloadLevels(['cet4']); }}
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 h-full py-1 transition-colors',
                 isActive

@@ -24,6 +24,20 @@ import {
 import { cn } from '@/lib/utils';
 import { preloadLevels } from '@/data/wordbank';
 
+// Route chunk prefetch map — triggers dynamic import() on hover to warm the browser cache
+const ROUTE_PREFETCH: Record<string, () => Promise<unknown>> = {
+  '/': () => import('@/pages/DashboardPage/DashboardPage'),
+  '/think': () => import('@/pages/ThinkInEnglishPage/ThinkInEnglishPage'),
+  '/chunks': () => import('@/pages/ChunkTrainingPage/ChunkTrainingPage'),
+  '/conversation': () => import('@/pages/ConversationPage/ConversationPage'),
+  '/shadowing': () => import('@/pages/ShadowingPage/ShadowingPage'),
+  '/articles': () => import('@/pages/ArticlePage/ArticlePage'),
+  '/vocabulary': () => import('@/pages/DeepVocabularyPage/DeepVocabularyPage'),
+  '/favorites': () => import('@/pages/FavoritesPage/FavoritesPage'),
+  '/writing': () => import('@/pages/WritingPage/WritingPage'),
+  '/progress': () => import('@/pages/ProgressPage/ProgressPage'),
+};
+
 const NAV_ITEMS = [
   { path: '/', label: '首页仪表盘', icon: LayoutDashboard },
   { path: '/think', label: '母语思维训练', icon: Brain },
@@ -68,8 +82,8 @@ export default function AppSidebar() {
                   : pathname === item.path || pathname.startsWith(`${item.path}/`);
               return (
                 <SidebarMenuItem key={item.path}
-                  onMouseEnter={() => { if (item.path === '/vocabulary') preloadLevels(['cet4']); }}
-                  onTouchStart={() => { if (item.path === '/vocabulary') preloadLevels(['cet4']); }}
+                  onMouseEnter={() => { ROUTE_PREFETCH[item.path]?.(); if (item.path === '/vocabulary') preloadLevels(['cet4']); }}
+                  onTouchStart={() => { ROUTE_PREFETCH[item.path]?.(); if (item.path === '/vocabulary') preloadLevels(['cet4']); }}
                 >
                   <SidebarMenuButton asChild tooltip={item.label} isActive={isActive}>
                     <NavLink
