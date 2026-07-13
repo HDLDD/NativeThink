@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useAI } from './use-ai';
 import { useAuth } from '@/lib/auth-provider';
 import { apiFetch } from '@/lib/api-client';
+import { getAPIKey, getActiveProvider } from '@/services/ai-config';
 
 export interface GeneratedPassage {
   id: string;
@@ -26,7 +27,7 @@ export function usePassageGenerator() {
       if (isAuthenticated) {
         const res = await apiFetch('/api/ai/passage', {
           method: 'POST',
-          body: JSON.stringify({ words, level, mode: 'server' }),
+          body: JSON.stringify({ words, level, mode: 'server', apiKey: getAPIKey(getActiveProvider()) || undefined }),
         });
         if (res.ok) {
           const data = await res.json();

@@ -4,7 +4,7 @@
  * Proxies AI requests through the server to avoid exposing API keys in the frontend.
  * Supports all configured providers via the `provider` field in the request body.
  *
- * Request body: { provider?, model?, messages, max_tokens?, temperature?, stream? }
+ * Request body: { provider?, model?, messages, max_tokens?, temperature?, stream?, apiKey? }
  * Response: SSE stream (when stream=true) or JSON
  */
 
@@ -42,15 +42,15 @@ export async function onRequest(context) {
     return Response.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { provider = 'deepseek', model, messages, max_tokens = 4096, temperature = 0.7, stream = true } = body;
+  const { provider = 'deepseek', model, messages, max_tokens = 4096, temperature = 0.7, stream = true, apiKey: clientApiKey } = body;
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return Response.json({ error: 'Messages array is required' }, { status: 400 });
   }
 
-  // Get API key from server env (supports per-provider keys: AI_KEY_DEEPSEEK, AI_KEY_DOUBAO, etc.)
+  // Get API key: prefer client-sent key, fallback to server env (AI_KEY_<PROVIDER> or SERVER_AI_KEY)
   const envKey = `AI_KEY_${provider.toUpperCase()}`;
-  const apiKey = env[envKey] || env.SERVER_AI_KEY;
+  const apiKey = clientApiKey || env[envKey] || env.SERVER_AI_KEY;
 
   if (!apiKey) {
     return Response.json({ error: `Server AI key not configured for ${provider}` }, { status: 503 });

@@ -7,6 +7,10 @@
 
 
 
+
+## 2026-07-13
+- fix: 修复 Cloudflare Pages 部署问题 (`fee7b86`)
+
 ## 2026-07-13
 - perf: route chunk prefetch on hover + shared chunk extraction (`d45f434`)
 

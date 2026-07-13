@@ -59,6 +59,7 @@ export async function* streamChat(
     max_tokens: options.maxTokens ?? 4096,
     temperature: options.temperature ?? 0.7,
     stream: true,
+    apiKey: getAPIKey(provider) || undefined,
   };
 
   // Always route through server proxy to protect API key
@@ -175,6 +176,7 @@ export async function chat(
     max_tokens: options.maxTokens ?? 4096,
     temperature: options.temperature ?? 0.7,
     stream: false,
+    apiKey: getAPIKey(provider) || undefined,
   };
 
   // Route through server proxy to protect API key

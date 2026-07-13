@@ -16,7 +16,8 @@ export async function onRequest(context) {
   if (words.length === 0) return Response.json({ error: 'No words provided' }, { status: 400 });
   if (body.mode === 'client') return Response.json({ mode: 'client' });
 
-  const apiKey = env.SERVER_AI_KEY;
+  // Prefer client-sent key, fallback to server env
+  const apiKey = body.apiKey || env.SERVER_AI_KEY;
   if (!apiKey) return Response.json({ error: 'Server AI not configured', fallback: 'client' }, { status: 503 });
 
   const endpoint = env.SERVER_AI_ENDPOINT || DEFAULT_AI_ENDPOINT;
