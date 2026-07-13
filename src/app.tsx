@@ -1,4 +1,4 @@
-import { lazy } from "react";
+import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { Layout } from "@/components/Layout";
@@ -50,7 +50,7 @@ export default function App() {
         <Route path="progress" element={<ErrorBoundary fallback={<PageErrorFallback page="学习记录" />}><ProgressPage /></ErrorBoundary>} />
         <Route path="favorites" element={<ErrorBoundary fallback={<PageErrorFallback page="我的收藏" />}><FavoritesPage /></ErrorBoundary>} />
       </Route>
-      <Route path="*" element={<ErrorBoundary fallback={<PageErrorFallback page="页面未找到" />}><NotFoundPage /></ErrorBoundary>} />
+      <Route path="*" element={<Suspense fallback={<div className="flex items-center justify-center py-24"><span className="text-sm text-muted-foreground">加载中...</span></div>}><ErrorBoundary fallback={<PageErrorFallback page="页面未找到" />}><NotFoundPage /></ErrorBoundary></Suspense>} />
     </Routes>
   );
 }
