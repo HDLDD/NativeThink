@@ -13,6 +13,10 @@
 
 
 
+
+## 2026-07-13
+- fix: use Node.js fs for 404.html copy (Cloudflare compat) (`564ad88`)
+
 ## 2026-07-13
 - fix: use local vite for Cloudflare build compatibility (`cd071b6`)
 
