@@ -21,6 +21,10 @@
 
 
 
+
+## 2026-07-13
+- fix: add KV namespace binding for auth/sync storage (`0911cd9`)
+
 ## 2026-07-13
 - fix: add @tailwindcss/vite plugin for CSS processing (`d64b89d`)
 
