@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
 import { useFavorites, type IFavoriteItem } from '@/lib/use-favorites';
-import { queryWords, preloadAll, isAllReady, getWordCounts, WORD_COUNTS } from '@/data/wordbank';
+import { queryWords, preloadLevels, getEssentialLevels, isAllReady, getWordCounts, WORD_COUNTS } from '@/data/wordbank';
 import type { IWordEntry } from '@/data/wordbank';
 
 // ============================================================
@@ -60,13 +60,19 @@ export default function GlobalWordSearch() {
   // Expanded word for detail view
   const [expandedWord, setExpandedWord] = useState<string | null>(null);
 
-  // Preload all wordbanks when dialog first opens
+  // Progressive preload: load essential levels first, then load remaining in background
   useEffect(() => {
     if (open && !dataReady) {
       setLoading(true);
-      preloadAll().then(() => {
+      const essential = getEssentialLevels();
+      // Phase 1: Load essential levels for instant search capability
+      preloadLevels(essential).then(() => {
         setDataReady(true);
         setLoading(false);
+        // Phase 2: Load remaining levels in background (non-blocking)
+        const allLevels = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
+        const remaining = allLevels.filter(l => !essential.includes(l));
+        remaining.forEach(level => preloadLevels([level]));
       });
     }
   }, [open, dataReady]);

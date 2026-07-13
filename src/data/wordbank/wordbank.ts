@@ -274,4 +274,52 @@ export function getWordsByLevel(): Record<string, IWordEntry[]> {
   return groups;
 }
 
+// ── User level utilities for smart preloading ──
+
+/** Get the user's currently selected learning level from localStorage. */
+export function getUserLevel(): string {
+  try {
+    const saved = localStorage.getItem('__nativethink_level_memory');
+    if (saved) {
+      const lm = JSON.parse(saved);
+      // levelMemory structure: { [level]: { word, scrollTop } }
+      // Find which level has been used most recently
+      const levels = Object.keys(lm);
+      if (levels.length > 0) return levels[levels.length - 1]; // Return last used level
+    }
+  } catch { /* ignore */ }
+  return 'cet4'; // Default fallback
+}
+
+/** Get a small set of "essential" levels for fast preload (user's level + 1 adjacent). */
+export function getEssentialLevels(): string[] {
+  const userLevel = getUserLevel();
+  const levelOrder = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
+  const idx = levelOrder.indexOf(userLevel);
+  const essential = [userLevel];
+  // Add one adjacent level for broader coverage without loading all
+  if (idx > 0) essential.push(levelOrder[idx - 1]);
+  if (idx < levelOrder.length - 1) essential.push(levelOrder[idx + 1]);
+  return essential;
+}
+
+/** Progressive preload: load user's level first, then others in background. */
+export async function preloadProgressive(
+  onLevelLoaded?: (level: string) => void,
+): Promise<void> {
+  // Phase 1: Load user's essential levels (fast)
+  const essential = getEssentialLevels();
+  await preloadLevels(essential);
+  onLevelLoaded?.('essential');
+
+  // Phase 2: Load remaining levels in background (non-blocking)
+  const remaining = ALL_LEVELS.filter(l => !essential.includes(l));
+  for (const level of remaining) {
+    try {
+      await loadLevel(level);
+      onLevelLoaded?.(level);
+    } catch { /* skip failed level */ }
+  }
+}
+
 export type { IWordEntry, IWordQuery };

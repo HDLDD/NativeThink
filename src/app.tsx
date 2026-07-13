@@ -35,11 +35,10 @@ function PageErrorFallback({ page }: { page: string }) {
   );
 }
 
-// eslint-disable-next-line @lark-apaas/no-duplicate-route-component
 export default function App() {
   return (
-    {/* eslint-disable @lark-apaas/no-duplicate-route-component */}
     <Routes>
+      {/* eslint-disable @lark-apaas/no-duplicate-route-component */}
       <Route element={<Layout />}>
         <Route index element={<ErrorBoundary fallback={<PageErrorFallback page="仪表盘" />}><DashboardPage /></ErrorBoundary>} />
         <Route path="think" element={<ErrorBoundary fallback={<PageErrorFallback page="母语思维训练" />}><ThinkInEnglishPage /></ErrorBoundary>} />
@@ -53,7 +52,7 @@ export default function App() {
         <Route path="favorites" element={<ErrorBoundary fallback={<PageErrorFallback page="我的收藏" />}><FavoritesPage /></ErrorBoundary>} />
       </Route>
       <Route path="*" element={<Suspense fallback={<div className="flex items-center justify-center py-24"><span className="text-sm text-muted-foreground">加载中...</span></div>}><ErrorBoundary fallback={<PageErrorFallback page="页面未找到" />}><NotFoundPage /></ErrorBoundary></Suspense>} />
+      {/* eslint-enable @lark-apaas/no-duplicate-route-component */}
     </Routes>
-    {/* eslint-enable @lark-apaas/no-duplicate-route-component */}
   );
 }

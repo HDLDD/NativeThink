@@ -21,7 +21,7 @@ import { cn, cleanText, extractJson } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { IReadingContent, TransMode, IParagraph } from '@/data/reading';
 import { buildPages } from '@/data/reading';
-import { queryWords, preloadAll, isAllReady } from '@/data/wordbank';
+import { queryWords, preloadLevels, getEssentialLevels, isAllReady } from '@/data/wordbank';
 
 const LEVELS = [
   { key: 'beginner' as const, label: '初级', color: '#00B894' },
@@ -127,12 +127,15 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   }, []);
 
   // ── Touch swipe navigation (refs + state declared early, handlers below after page vars) ──
-  const SWIPE_THRESHOLD = 80; // increased from 50 to prevent accidental swipes
-  const SWIPE_LOCK_THRESHOLD = 15; // minimum horizontal movement to lock into swipe mode
+  const SWIPE_THRESHOLD = 80; // minimum displacement (px) to trigger page change
+  const SWIPE_LOCK_THRESHOLD = 20; // minimum movement to decide scroll vs swipe
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const isSwipingRef = useRef(false);
-  const gestureDecidedRef = useRef(false); // whether we've decided scroll vs swipe
-  const [swipeOffset, setSwipeOffset] = useState(0);
+  const gestureDecidedRef = useRef(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const swipeOffsetRef = useRef(0); // ref for tracking during gesture (no re-render)
+  const [isAnimating, setIsAnimating] = useState(false); // controls CSS transition
+  const [swipeOffset, setSwipeOffset] = useState(0); // state for final animation only
 
   const convertArticleLevel = async (targetLevel: string) => {
     if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
@@ -168,8 +171,13 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const currentPage = activePages > 0 ? Math.max(0, Math.min(pageIdx, activePages - 1)) : 0;
   const currentPageData = validPages[currentPage] || null;
 
-  // Preload wordbank for Chinese word lookup
-  useEffect(() => { if (!isAllReady()) preloadAll(); }, []);
+  // Preload only essential wordbank levels for Chinese word lookup (not all 9 levels)
+  useEffect(() => {
+    if (!isAllReady()) {
+      const essential = getEssentialLevels(); // User's level + 1 adjacent (~3 levels max)
+      preloadLevels(essential);
+    }
+  }, []);
 
   // Save progress
   useEffect(() => { saveProgress(activeContent.id, currentPage); }, [activeContent.id, currentPage]);
@@ -180,13 +188,17 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
   // Touch swipe handlers (must be after goPrev/goNext and currentPage/activePages are defined)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    // Stop propagation to prevent parent navigation handlers from intercepting
     e.stopPropagation();
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
     isSwipingRef.current = false;
     gestureDecidedRef.current = false;
-    setSwipeOffset(0);
+    swipeOffsetRef.current = 0;
+    setIsAnimating(false);
+    if (contentRef.current) {
+      contentRef.current.style.transition = 'none';
+      contentRef.current.style.transform = 'translateX(0px)';
+    }
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
@@ -201,46 +213,43 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
     // If gesture not yet decided, determine scroll vs swipe
     if (!gestureDecidedRef.current) {
-      // Need significant movement to decide (20px deadzone)
-      if (absDeltaX < 20 && absDeltaY < 20) return;
+      if (absDeltaX < SWIPE_LOCK_THRESHOLD && absDeltaY < SWIPE_LOCK_THRESHOLD) return;
 
-      // If vertical movement dominates, this is a scroll -- release gesture
+      // Vertical movement dominates -> scroll
       if (absDeltaY > absDeltaX * 1.5) {
         touchStartRef.current = null;
         return;
       }
 
-      // If horizontal movement dominates (or close), lock into swipe mode
+      // Horizontal dominates -> lock into swipe mode
       gestureDecidedRef.current = true;
       isSwipingRef.current = true;
     }
 
-    // Now in swipe mode -- track horizontal offset only
+    // Swipe mode -- update DOM directly via ref (no React re-render)
     if (isSwipingRef.current) {
       let clamped = deltaX;
-      // Rubber-band effect at boundaries (resistance increases as you go further)
       if (deltaX > 0 && currentPage === 0) {
         clamped = deltaX * Math.max(0.1, 0.4 - deltaX * 0.001);
       }
       if (deltaX < 0 && currentPage >= activePages - 1) {
         clamped = deltaX * Math.max(0.1, 0.4 - Math.abs(deltaX) * 0.001);
       }
-      setSwipeOffset(clamped);
+      swipeOffsetRef.current = clamped;
+      if (contentRef.current) {
+        contentRef.current.style.transform = `translateX(${clamped}px)`;
+      }
     }
   }, [currentPage, activePages]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     e.stopPropagation();
-    if (!touchStartRef.current) {
-      setSwipeOffset(0);
-      return;
-    }
+    if (!touchStartRef.current) return;
 
-    const dx = swipeOffset;
+    const dx = swipeOffsetRef.current;
     const elapsed = Date.now() - touchStartRef.current.time;
-    const velocity = Math.abs(dx) / Math.max(elapsed, 1); // px/ms
+    const velocity = Math.abs(dx) / Math.max(elapsed, 1);
 
-    // Trigger page change if: enough displacement OR fast flick
     const shouldChange = Math.abs(dx) > SWIPE_THRESHOLD || (Math.abs(dx) > 40 && velocity > 0.5);
 
     if (shouldChange && isSwipingRef.current) {
@@ -248,11 +257,32 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       else if (dx > 0 && currentPage > 0) goPrev();
     }
 
-    touchStartRef.current = null;
+    // Snap back with CSS transition
+    setIsAnimating(true);
+    if (contentRef.current) {
+      contentRef.current.style.transition = '';
+      contentRef.current.style.transform = '';
+    }
     setSwipeOffset(0);
+
+    touchStartRef.current = null;
     isSwipingRef.current = false;
     gestureDecidedRef.current = false;
-  }, [swipeOffset, currentPage, activePages]);
+    swipeOffsetRef.current = 0;
+  }, [currentPage, activePages]);
+
+  const handleTouchCancel = useCallback(() => {
+    setIsAnimating(true);
+    if (contentRef.current) {
+      contentRef.current.style.transition = '';
+      contentRef.current.style.transform = '';
+    }
+    setSwipeOffset(0);
+    touchStartRef.current = null;
+    isSwipingRef.current = false;
+    gestureDecidedRef.current = false;
+    swipeOffsetRef.current = 0;
+  }, []);
 
   // Keyboard navigation: ← → for pages, Esc to close
   useEffect(() => {
@@ -722,11 +752,16 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
       {/* ── Content (current page only) with touch swipe ── */}
       <div
-        className="flex-1 min-h-0 overflow-y-auto overscroll-contain relative"
+        ref={contentRef}
+        className={cn(
+          "flex-1 min-h-0 overflow-y-auto overscroll-contain relative",
+          isAnimating && "transition-transform duration-200 ease-out"
+        )}
         style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
       >
         {/* Swipe edge indicators -- visual feedback during horizontal swipe */}
         {swipeOffset > 20 && (
@@ -745,10 +780,9 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 size-6 text-[#00B894]" style={{ opacity: Math.min((-swipeOffset - 20) / 80, 0.6) }} />
           </div>
         )}
-        {/* Page content with swipe translate + CSS transition */}
+        {/* Page content with swipe translate */}
         <div
-          className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 transition-transform duration-200 ease-out"
-          style={{ transform: `translateX(${swipeOffset}px)` }}
+          className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5"
         >
           {currentPageData?.paragraphs.map((para, i) => {
             const displayEn = para.en.startsWith('##CHAPTER##') ? para.en.replace('##CHAPTER##', '') : para.en;
