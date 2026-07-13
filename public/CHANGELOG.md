@@ -2,6 +2,10 @@
 
 
 
+
+## 2026-07-13
+- perf: lazy-load DashboardPage + NotFoundPage, add Suspense for 404 route (`9972e11`)
+
 ## 2026-07-13
 - feat: 文章换页功能手机浏览器适配 (`fa99611`)
 

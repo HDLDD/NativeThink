@@ -126,12 +126,57 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  // ── Touch swipe navigation ──
-  const SWIPE_THRESHOLD = 50; // minimum horizontal displacement (px) to trigger page change
+  // ── Touch swipe navigation (refs + state declared early, handlers below after page vars) ──
+  const SWIPE_THRESHOLD = 50;
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const isSwipingRef = useRef(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
 
+  const convertArticleLevel = async (targetLevel: string) => {
+    if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
+    const lvl = LEVELS.find((l) => l.key === targetLevel)!;
+    setConvertLevel(targetLevel);
+    setConvertLoading(true);
+    try {
+      const allText = validPages.map((p) => p.paragraphs.map((pp) => pp.en).join(' ')).join('\n\n');
+      const result = await aiChat([
+        { role: 'system', content: `Rewrite the following English text for ${lvl.label} English learners. Return ONLY valid JSON (no markdown): {"title":"adapted title","paragraphs":[{"en":"English paragraph","zh":"Chinese translation"}]}. Keep the core meaning but adjust vocabulary, sentence length, and complexity.` },
+        { role: 'user', content: `Title: ${displayContent.title}\n\n${allText.slice(0, 5000)}` },
+      ], { temperature: 0.6, maxTokens: 4096 });
+      const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
+      if (!parsed?.paragraphs?.length) { toast.error('转换失败，请重试'); return; }
+      const newContent: IReadingContent = {
+        ...displayContent,
+        title: parsed.title || displayContent.title,
+        pages: buildPages(parsed.paragraphs),
+        difficulty: targetLevel as any,
+        totalWords: parsed.paragraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
+      };
+      setDisplayContent(newContent);
+      setPageIdx(0);
+      toast.success(`已转换为${lvl.label}等级！`);
+    } catch { toast.error('转换失败'); }
+    finally { setConvertLoading(false); }
+  };
+
+  const activeContent = displayContent;
+  // Guard against malformed content (missing pages array, null paragraphs)
+  const validPages = activeContent?.pages?.filter(p => p && Array.isArray(p.paragraphs)) || [];
+  const activePages = validPages.length;
+  const currentPage = activePages > 0 ? Math.max(0, Math.min(pageIdx, activePages - 1)) : 0;
+  const currentPageData = validPages[currentPage] || null;
+
+  // Preload wordbank for Chinese word lookup
+  useEffect(() => { if (!isAllReady()) preloadAll(); }, []);
+
+  // Save progress
+  useEffect(() => { saveProgress(activeContent.id, currentPage); }, [activeContent.id, currentPage]);
+
+  // Page navigation
+  const goPrev = () => setPageIdx((p) => Math.max(0, p - 1));
+  const goNext = () => setPageIdx((p) => Math.min(activePages - 1, p + 1));
+
+  // Touch swipe handlers (must be after goPrev/goNext and currentPage/activePages are defined)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
@@ -177,50 +222,6 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     setSwipeOffset(0);
     isSwipingRef.current = false;
   }, [swipeOffset, currentPage, activePages]);
-
-  const convertArticleLevel = async (targetLevel: string) => {
-    if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
-    const lvl = LEVELS.find((l) => l.key === targetLevel)!;
-    setConvertLevel(targetLevel);
-    setConvertLoading(true);
-    try {
-      const allText = validPages.map((p) => p.paragraphs.map((pp) => pp.en).join(' ')).join('\n\n');
-      const result = await aiChat([
-        { role: 'system', content: `Rewrite the following English text for ${lvl.label} English learners. Return ONLY valid JSON (no markdown): {"title":"adapted title","paragraphs":[{"en":"English paragraph","zh":"Chinese translation"}]}. Keep the core meaning but adjust vocabulary, sentence length, and complexity.` },
-        { role: 'user', content: `Title: ${displayContent.title}\n\n${allText.slice(0, 5000)}` },
-      ], { temperature: 0.6, maxTokens: 4096 });
-      const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
-      if (!parsed?.paragraphs?.length) { toast.error('转换失败，请重试'); return; }
-      const newContent: IReadingContent = {
-        ...displayContent,
-        title: parsed.title || displayContent.title,
-        pages: buildPages(parsed.paragraphs),
-        difficulty: targetLevel as any,
-        totalWords: parsed.paragraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
-      };
-      setDisplayContent(newContent);
-      setPageIdx(0);
-      toast.success(`已转换为${lvl.label}等级！`);
-    } catch { toast.error('转换失败'); }
-    finally { setConvertLoading(false); }
-  };
-
-  const activeContent = displayContent;
-  // Guard against malformed content (missing pages array, null paragraphs)
-  const validPages = activeContent?.pages?.filter(p => p && Array.isArray(p.paragraphs)) || [];
-  const activePages = validPages.length;
-  const currentPage = activePages > 0 ? Math.max(0, Math.min(pageIdx, activePages - 1)) : 0;
-  const currentPageData = validPages[currentPage] || null;
-
-  // Preload wordbank for Chinese word lookup
-  useEffect(() => { if (!isAllReady()) preloadAll(); }, []);
-
-  // Save progress
-  useEffect(() => { saveProgress(activeContent.id, currentPage); }, [activeContent.id, currentPage]);
-
-  // Page navigation
-  const goPrev = () => setPageIdx((p) => Math.max(0, p - 1));
-  const goNext = () => setPageIdx((p) => Math.min(activePages - 1, p + 1));
 
   // Keyboard navigation: ← → for pages, Esc to close
   useEffect(() => {
