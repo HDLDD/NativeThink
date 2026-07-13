@@ -2,6 +2,7 @@
 // Data files are dynamically imported per-level. Components preload via `preloadLevel()` / `preloadAll()`
 // then use sync wrappers once `isLevelReady()` returns true.
 import type { IWordEntry, IWordQuery } from './schema';
+import { idbGet, idbSet } from '@/lib/idb';
 
 // ── Pre-computed constants (no data loading needed) ──
 export const WORD_COUNTS: Record<string, number> = {
@@ -15,26 +16,55 @@ export const ALL_PARTS_OF_SPEECH: string[] = [
 // ── Dynamic level loaders ──
 const ALL_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] as const;
 
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2; // Bump version for IndexedDB migration
 const LS_PREFIX = '__nativethink_wb_';
+const IDB_PREFIX = 'wb_';
 
 const _levelCache: Record<string, IWordEntry[]> = {};
 const _loaded: Set<string> = new Set();
 const _loading: Map<string, Promise<void>> = new Map();
 
-function loadFromCache(level: string): IWordEntry[] | null {
+/**
+ * Load wordbank from IndexedDB (async, high capacity) or localStorage (sync, limited).
+ * IndexedDB can store much larger datasets (50%+ disk vs 5-10MB localStorage limit).
+ */
+async function loadFromCache(level: string): Promise<IWordEntry[] | null> {
+  // Try IndexedDB first (async, higher capacity)
+  try {
+    const idbData = await idbGet<{ v: number; d: IWordEntry[] }>(`${IDB_PREFIX}${level}`);
+    if (idbData?.v === CACHE_VERSION && Array.isArray(idbData.d)) {
+      return idbData.d;
+    }
+  } catch { /* IndexedDB not available */ }
+
+  // Fallback to localStorage (sync, limited capacity)
   try {
     const raw = localStorage.getItem(`${LS_PREFIX}${level}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed.v === CACHE_VERSION && Array.isArray(parsed.d)) return parsed.d;
+    if (parsed.v === CACHE_VERSION && Array.isArray(parsed.d)) {
+      // Migrate to IndexedDB for future loads
+      idbSet(`${IDB_PREFIX}${level}`, parsed).catch(() => {});
+      return parsed.d;
+    }
   } catch { /* quota exceeded or corrupt */ }
   return null;
 }
 
-function saveToCache(level: string, words: IWordEntry[]) {
+/**
+ * Save wordbank to IndexedDB (primary) and localStorage (fallback).
+ */
+async function saveToCache(level: string, words: IWordEntry[]): Promise<void> {
+  const data = { v: CACHE_VERSION, d: words };
+
+  // Save to IndexedDB (async, higher capacity)
   try {
-    localStorage.setItem(`${LS_PREFIX}${level}`, JSON.stringify({ v: CACHE_VERSION, d: words }));
+    await idbSet(`${IDB_PREFIX}${level}`, data);
+  } catch { /* IndexedDB not available */ }
+
+  // Also save to localStorage as fallback (fire-and-forget)
+  try {
+    localStorage.setItem(`${LS_PREFIX}${level}`, JSON.stringify(data));
   } catch { /* quota exceeded — silently skip */ }
 }
 
@@ -73,13 +103,13 @@ async function loadLevel(level: string): Promise<void> {
   if (_loaded.has(level)) return;
   if (_loading.has(level)) { await _loading.get(level); return; }
 
-  // ── Fast path: try localStorage synchronously (instant on repeat visits) ──
-  const cached = loadFromCache(level);
+  // ── Fast path: try IndexedDB/localStorage (instant on repeat visits) ──
+  const cached = await loadFromCache(level);
   if (cached) {
     _levelCache[level] = cached;
     _loaded.add(level);
     invalidateIndexes();
-    return; // async fn wraps in resolved promise — effectively sync
+    return;
   }
 
   // ── Slow path: dynamic import from network ──

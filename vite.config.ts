@@ -33,6 +33,7 @@ function fixHtmlPlaceholders(): Plugin {
 }
 
 export default defineConfig({
+  base: process.env.CLIENT_BASE_PATH || '/',
   plugins: [fixHtmlPlaceholders()],
   resolve: {
     alias: {
@@ -69,21 +70,48 @@ export default defineConfig({
     rolldownOptions: {
       output: {
         manualChunks(id) {
-          // Extract framer-motion into its own chunk (~150KB) so it stays off the main bundle
+          // ── Vendor chunks (third-party libraries) ──
+
+          // React core (~130KB) — loaded on every page
+          if (id.includes('node_modules/react-dom/') || id.includes('node_modules/react/')) {
+            return 'vendor-react';
+          }
+          // React Router (~40KB) — navigation
+          if (id.includes('node_modules/react-router') || id.includes('node_modules/@remix-run')) {
+            return 'vendor-router';
+          }
+          // Radix UI components (~100KB) — UI primitives
+          if (id.includes('node_modules/@radix-ui/')) {
+            return 'vendor-radix';
+          }
+          // Lucide icons (~50KB) — icon library
+          if (id.includes('node_modules/lucide-react/')) {
+            return 'vendor-icons';
+          }
+          // Framer Motion (~130KB) — animations
           if (id.includes('node_modules/framer-motion') || id.includes('node_modules/motion')) {
-            return 'framer-motion';
+            return 'vendor-motion';
           }
-          // Extract recharts (~200KB) into its own chunk — only ProgressPage needs it
+          // Recharts (~200KB) — charts (only ProgressPage)
           if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) {
-            return 'recharts';
+            return 'vendor-charts';
           }
-          // Extract react-markdown + remark-gfm into shared chunk — used by 7 pages
+          // React Markdown (~100KB) — markdown rendering
           if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark-') ||
               id.includes('node_modules/unified') || id.includes('node_modules/mdast-') ||
               id.includes('node_modules/micromark') || id.includes('node_modules/unist-')) {
-            return 'markdown';
+            return 'vendor-markdown';
           }
-          // Split wordbank data into per-level chunks to stay under Cloudflare's 25 MiB limit
+          // Date utilities (~20KB)
+          if (id.includes('node_modules/date-fns/')) {
+            return 'vendor-date';
+          }
+          // Zod (~30KB) — validation
+          if (id.includes('node_modules/zod/')) {
+            return 'vendor-zod';
+          }
+
+          // ── Wordbank data chunks (lazy-loaded) ──
           if (id.includes('data/cet4.ts')) return 'wordbank-cet4';
           if (id.includes('data/cet6.ts')) return 'wordbank-cet6';
           if (id.includes('data/ielts.ts')) return 'wordbank-ielts';

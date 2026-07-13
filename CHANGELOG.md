@@ -6,6 +6,10 @@
 
 
 
+
+## 2026-07-13
+- perf: route chunk prefetch on hover + shared chunk extraction (`d45f434`)
+
 ## 2026-07-13
 - fix: 优化触摸滑动性能和稳定性 (`c6bf5d5`)
 
