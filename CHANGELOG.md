@@ -1,94 +1,40 @@
 # NativeThink 开发日志
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## 2026-07-13
-- fix: reduce PBKDF2 iterations to 100k (Cloudflare Workers limit) (`2459864`)
-
-## 2026-07-13
-- fix: add KV namespace binding for auth/sync storage (`0911cd9`)
-
-## 2026-07-13
-- fix: add @tailwindcss/vite plugin for CSS processing (`d64b89d`)
-
-## 2026-07-13
-- fix: improve virtual:capabilities mock for dynamic imports (`e326ac3`)
-
-## 2026-07-13
-- fix: remove Lark platform dependencies for Cloudflare Pages (`72706ed`)
-
-## 2026-07-13
-- fix: mock virtual:capabilities for Cloudflare Pages (`1cef63b`)
-
-## 2026-07-13
-- docs: 更新 CHANGELOG (`44391e6`)
+- feat: add password hint text on register form (`272e88d`)
 
 ## 2026-07-13
 
-## 2026-07-13
-- fix: remove NODE_ENV production from wrangler.toml (enables devDeps install) (`87909ad`)
+### LCP 性能优化 🚀
+- **Google Fonts 非阻塞加载**: `@import`（渲染阻塞）→ `<link rel="stylesheet" media="print" onload>` + `preconnect` 提示，字重从 13 个减至 6 个
+- **DashboardPage 懒加载**: 从主包分离为独立 chunk，首包减少 ~170KB
+- **路由悬停预加载**: AppSidebar/MobileBottomNav 的 `onMouseEnter`/`onTouchStart` 触发 `import()` 预热 chunk 缓存
+- **共享 chunk 提取**: recharts（396KB）、react-markdown+remark-gfm（151KB）从页面包中分离为共享 chunk
+- **主包体积**: 1.07MB → 897KB（↓16%）
+- **wordbank 分包补全**: 新增 zhongkao/gaokao/postgraduate/professional 四个等级的 manualChunks
 
-## 2026-07-13
-- fix: use Node.js fs for 404.html copy (Cloudflare compat) (`564ad88`)
+### 依赖清理 🧹
+- 移除 `gsap` + `@gsap/react`（6.4MB 死依赖，零引用）
+- 移除 `next-themes`（Next.js 专用，已用本地 `useTheme` 替代）
 
-## 2026-07-13
-- fix: use local vite for Cloudflare build compatibility (`cd071b6`)
+### 修复 🐛
+- NotFoundPage 路由添加 `<Suspense>` 边界，防止慢网络下 404 页面崩溃
+- PBKDF2 迭代次数降至 100k（Cloudflare Workers CPU 限制）
+- 添加 KV namespace binding 用于 auth/sync 存储
+- 添加 `@tailwindcss/vite` 插件修复 CSS 处理
+- 改进 `virtual:capabilities` mock 支持动态导入
+- 移除 Lark 平台依赖适配 Cloudflare Pages
+- 移除 `wrangler.toml` 中的 NODE_ENV production（启用 devDeps 安装）
+- 使用 Node.js fs 复制 404.html（Cloudflare 兼容）
+- 使用本地 vite 替代全局安装（Cloudflare build 兼容）
+- 替换 Lark preset 为标准 vite 配置（Cloudflare build 兼容）
 
-## 2026-07-13
-- fix: replace Lark preset with standard vite for Cloudflare build (`b1dc980`)
+### Cloudflare Pages 部署修复 🔧
+- 修复 Cloudflare Pages 部署问题
+- 部署需要配置 GitHub Secrets：`CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`
 
-## 2026-07-13
-
-## 2026-07-13
-- chore: update CHANGELOG (`21cc3a7`)
-
-## 2026-07-13
-- perf: 优化 LCP 性能 - 词库懒加载 + IndexedDB 缓存 + Vendor Chunking (`a8e4a88`)
-
-## 2026-07-13
-- fix: 修复 Cloudflare Pages 部署问题 (`fee7b86`)
-
-## 2026-07-13
-- perf: route chunk prefetch on hover + shared chunk extraction (`d45f434`)
-
-## 2026-07-13
-- fix: 优化触摸滑动性能和稳定性 (`c6bf5d5`)
-
-## 2026-07-13
-- fix: 改进文章页面触摸滑动体验 (`1e0cb03`)
-
-## 2026-07-13
-- fix: 修复文章页面崩溃问题 (`e0b8302`)
-
-## 2026-07-13
-- perf: lazy-load DashboardPage + NotFoundPage, add Suspense for 404 route (`9972e11`)
-
-## 2026-07-13
-- feat: 文章换页功能手机浏览器适配 (`fa99611`)
-
-## 2026-07-13
-- perf: 多项性能优化，dist 体积减少 63% (`6fb933f`)
+---
 
 ## 2026-07-11
 
@@ -115,11 +61,6 @@
   - 使用单次 `tts.speak()` 调用，无复杂队列，避免旧版竞态条件导致崩溃
   - 组件卸载自动 `tts.cancel()` 清理
 
-### 文章阅读 Bug 修复 🐛
-- **崩溃修复 1**：`useEffect` 嵌套在 `deleteAiArticle` 函数内部 → 违反 React Hooks 规则 → 点击删除 AI 文章崩溃
-- **崩溃修复 2**：`ChevronLeft` 图标未 import → 打开文章阅读器 `ReferenceError` 白屏
-- **崩溃修复 3**：`ReaderErrorBoundary` 类组件导致 React undefined 错误 → 移除
-
 ### 登录 & 注册 🔐 — 完整修复
 - **修复注册/登录 1101 错误**：后端 Functions 缺少 KV 绑定 → 增加防御性空检查 + 分步 try/catch，返回中文错误信息
 - **修复 PBKDF2 迭代超限**：Cloudflare Workers 限制 PBKDF2 最多 100,000 次迭代，原代码 210,000 次导致 `hashPassword()` 抛异常 → 改为 100,000 次
@@ -142,7 +83,6 @@
 - **并行加载 → 顺序加载**：`preloadAll()` 从 `Promise.all`（9 个等级同时导入，~75K 词条，内存峰值 ~200MB）→ `for...of` 逐个加载（每次仅一个等级驻留，释放后再加载下一个）
 - **`getRandomWords` 蓄水池采样**：修复 `level='all'` 时复制整个 75K 数组来取 200 个随机词 → 改为索引随机选取（`seen Set`），避免 GC 压力和主线程阻塞
 - **加载容错**：单个等级导入失败不再中断全部加载 → try/catch 跳过失败等级，其余继续加载
-- **PBKDF2 迭代 210,000 → 100,000**：适配 Cloudflare Workers CPU 限制
 
 ### 性能优化 🚀
 - **网页加载**: 全部页面 React.lazy 懒加载，主包 **2.3MB → 897KB (-61%)**
