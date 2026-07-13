@@ -8,6 +8,10 @@
 
 
 
+
+## 2026-07-13
+- perf: 优化 LCP 性能 - 词库懒加载 + IndexedDB 缓存 + Vendor Chunking (`a8e4a88`)
+
 ## 2026-07-13
 - fix: 修复 Cloudflare Pages 部署问题 (`fee7b86`)
 
