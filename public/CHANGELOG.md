@@ -3,6 +3,10 @@
 
 
 
+
+## 2026-07-13
+- perf: vocabulary page renders UI immediately, skeleton fallback for page transitions (`7fde02f`)
+
 ## 2026-07-13
 - fix: re-read localStorage after cloud sync completes (`dc3dc98`)
 

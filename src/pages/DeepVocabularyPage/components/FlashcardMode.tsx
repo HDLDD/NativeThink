@@ -53,6 +53,12 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
         if (w) { seen.add(key); otherWords.push(w); }
       }
     }
+    // Only add new words if there are no due or learning words
+    // This prevents random word switching when user hasn't learned anything yet
+    if (dueWords.length === 0 && otherWords.length === 0) {
+      return []; // Return empty queue - show "no words to review" message
+    }
+    // Otherwise, fill with new words to reach 20 cards
     const fillCount = Math.max(0, 20 - dueWords.length - otherWords.length);
     const newWords = fillCount > 0 ? getNewWords(fillCount).filter((w) => !seen.has(w.word.toLowerCase())) : [];
     return [...dueWords, ...otherWords, ...newWords];
@@ -127,8 +133,15 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
           <p className="text-muted-foreground text-sm font-medium">
             {stats.due > 0
               ? `还有 ${stats.due} 个单词待复习，开始巩固记忆吧！`
-              : '当前没有需要复习的单词，先去学习模式学习吧！'}
+              : stats.learning > 0
+                ? `有 ${stats.learning} 个单词正在学习中，继续加油！`
+                : '当前没有已学习的单词，请先到「每日学习」模式学习新单词后再来复习。'}
           </p>
+          {stats.due === 0 && stats.learning === 0 && (
+            <p className="text-xs text-muted-foreground/70 mt-2">
+              复习模式需要先有已学习的单词才能使用
+            </p>
+          )}
         </div>
       </div>
     );
