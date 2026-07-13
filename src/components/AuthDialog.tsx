@@ -99,6 +99,9 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
+            {mode === 'register' && (
+              <p className="text-[10px] text-muted-foreground font-medium -mt-1 pl-1">密码至少 6 位，请牢记设置的密码</p>
+            )}
           </div>
 
           {error && (

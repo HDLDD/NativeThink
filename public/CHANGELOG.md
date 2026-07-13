@@ -22,6 +22,10 @@
 
 
 
+
+## 2026-07-13
+- fix: reduce PBKDF2 iterations to 100k (Cloudflare Workers limit) (`2459864`)
+
 ## 2026-07-13
 - fix: add KV namespace binding for auth/sync storage (`0911cd9`)
 
