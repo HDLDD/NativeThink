@@ -2,9 +2,9 @@ import { lazy } from "react";
 import { Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { Layout } from "@/components/Layout";
-import DashboardPage from "@/pages/DashboardPage/DashboardPage";
-import NotFoundPage from "@/pages/NotFoundPage/NotFoundPage";
 
+const DashboardPage = lazy(() => import("@/pages/DashboardPage/DashboardPage"));
+const NotFoundPage = lazy(() => import("@/pages/NotFoundPage/NotFoundPage"));
 const ThinkInEnglishPage = lazy(() => import("@/pages/ThinkInEnglishPage/ThinkInEnglishPage"));
 const ChunkTrainingPage = lazy(() => import("@/pages/ChunkTrainingPage/ChunkTrainingPage"));
 const ConversationPage = lazy(() => import("@/pages/ConversationPage/ConversationPage"));
@@ -39,7 +39,7 @@ export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<DashboardPage />} />
+        <Route index element={<ErrorBoundary fallback={<PageErrorFallback page="仪表盘" />}><DashboardPage /></ErrorBoundary>} />
         <Route path="think" element={<ErrorBoundary fallback={<PageErrorFallback page="母语思维训练" />}><ThinkInEnglishPage /></ErrorBoundary>} />
         <Route path="chunks" element={<ErrorBoundary fallback={<PageErrorFallback page="语块训练" />}><ChunkTrainingPage /></ErrorBoundary>} />
         <Route path="conversation" element={<ErrorBoundary fallback={<PageErrorFallback page="AI对话" />}><ConversationPage /></ErrorBoundary>} />
@@ -50,7 +50,7 @@ export default function App() {
         <Route path="progress" element={<ErrorBoundary fallback={<PageErrorFallback page="学习记录" />}><ProgressPage /></ErrorBoundary>} />
         <Route path="favorites" element={<ErrorBoundary fallback={<PageErrorFallback page="我的收藏" />}><FavoritesPage /></ErrorBoundary>} />
       </Route>
-      <Route path="*" element={<NotFoundPage />} />
+      <Route path="*" element={<ErrorBoundary fallback={<PageErrorFallback page="页面未找到" />}><NotFoundPage /></ErrorBoundary>} />
     </Routes>
   );
 }

@@ -10,7 +10,7 @@ import {
   Loader2Icon,
   XIcon,
 } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/lib/use-theme';
 import { Toaster as Sonner, type ToasterProps } from 'sonner';
 
 function Toaster({ className, style, icons, ...props }: ToasterProps) {
