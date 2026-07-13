@@ -17,6 +17,10 @@
 
 
 
+
+## 2026-07-13
+- fix: mock virtual:capabilities for Cloudflare Pages (`1cef63b`)
+
 ## 2026-07-13
 - docs: 更新 CHANGELOG (`44391e6`)
 
