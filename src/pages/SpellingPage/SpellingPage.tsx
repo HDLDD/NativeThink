@@ -139,28 +139,34 @@ function DictationInput({
           return (
             <div
               key={i}
-              className="relative inline-flex flex-col items-center min-w-[28px] cursor-text group"
+              className="relative inline-flex flex-col items-center min-w-[28px] cursor-text group focus-within:z-10"
               onClick={() => inputRefs.current[i]?.focus()}
             >
-              {/* Text above underline — no ___ placeholders, just empty space or typed word */}
-              <span
-                className={cn(
-                  'text-sm font-mono leading-tight min-h-[1.3em] text-center transition-colors duration-150',
-                  submitted
-                    ? isCorrect
-                      ? 'text-emerald-600 dark:text-emerald-400 font-bold'
-                      : 'text-rose-600 dark:text-rose-400 font-bold'
-                    : 'text-foreground/90',
-                )}
-              >
-                {submitted && !userInputs[i] ? (
-                  <span className="tracking-[0.2em] text-muted-foreground/40">——</span>
-                ) : (
-                  userInputs[i] || ' '
-                )}
+              {/* Text above underline — with focus indicator vertical bar */}
+              <span className="relative flex items-center">
+                {/* Vertical bar — shows on focus */}
+                <span className="absolute -left-[3px] text-[#00B894] font-black text-base leading-none select-none opacity-0 group-focus-within:opacity-100 transition-opacity duration-150">
+                  |
+                </span>
+                <span
+                  className={cn(
+                    'text-sm font-mono leading-tight min-h-[1.3em] text-center transition-colors duration-150',
+                    submitted
+                      ? isCorrect
+                        ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                        : 'text-rose-600 dark:text-rose-400 font-bold'
+                      : 'text-foreground/90',
+                  )}
+                >
+                  {submitted && !userInputs[i] ? (
+                    <span className="tracking-[0.2em] text-muted-foreground/40">——</span>
+                  ) : (
+                    userInputs[i] || ' '
+                  )}
+                </span>
               </span>
 
-              {/* Underline — the visual input line */}
+              {/* Underline — thicker brand color on focus */}
               <div
                 className={cn(
                   'h-[2px] w-full mt-0.5 rounded-full transition-all duration-200',
@@ -171,6 +177,7 @@ function DictationInput({
                     : hasValue
                       ? 'bg-[#00B894]/60'
                       : 'bg-muted-foreground/25 group-hover:bg-muted-foreground/50',
+                  'group-focus-within:h-[3px] group-focus-within:bg-[#00B894]',
                 )}
               />
 

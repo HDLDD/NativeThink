@@ -18,6 +18,10 @@
 
 
 
+
+## 2026-07-16
+- fix: submitted results no longer cleared by effect, remove completed sentences from queue, Tab nav + auto-focus, cancel stale TTS (`397cb11`)
+
 ## 2026-07-16
 - fix: exclude /api/* from _redirects rewrite (`4bdfd00`)
 
