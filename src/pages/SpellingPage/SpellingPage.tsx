@@ -1,6 +1,6 @@
 /**
  * 句子拼写页面 — SpellingPage
- * 提供听写填空 & 单词填空两种拼写模式
+ * 提供句子拼写 & 单词拼写两种拼写模式
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -113,82 +113,60 @@ function splitForFill(
 
 // ── Sub-components ──
 
-/** Single continuous input for dictation mode */
+/** Per-word input fields for 句子拼写 mode — each field shows ___ placeholder, normal spaces between */
 function DictationInput({
-  value,
-  onChange,
-  wordHints,
-  submitted,
   words,
-  userWords,
+  userInputs,
+  setUserInput,
+  submitted,
+  correctWords,
+  inputRefs,
 }: {
-  value: string;
-  onChange: (value: string) => void;
-  wordHints: string;
-  submitted: boolean;
   words: string[];
-  userWords: string[];
+  userInputs: string[];
+  setUserInput: (index: number, value: string) => void;
+  submitted: boolean;
+  correctWords: Record<number, boolean>;
+  inputRefs: React.MutableRefObject<(HTMLInputElement | null)[]>;
 }) {
-  if (submitted) {
-    return (
-      <div className="flex flex-wrap gap-x-3 gap-y-2 justify-center text-lg font-mono leading-relaxed px-2">
-        {words.map((correctWord, i) => {
-          const userWord = userWords[i] || '';
-          const isCorrect = userWord.toLowerCase() === correctWord.toLowerCase();
-          return (
-            <span key={i} className="inline-flex items-baseline gap-1.5">
-              <span
-                className={cn(
-                  'px-1.5 py-0.5 rounded-lg text-sm font-bold',
-                  isCorrect
-                    ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400'
-                    : 'bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400',
-                )}
-              >
-                {userWord || '___'}
-              </span>
-              {!isCorrect && (
-                <span className="text-emerald-600 dark:text-emerald-400 text-sm font-bold">
-                  → {correctWord}
-                </span>
-              )}
-            </span>
-          );
-        })}
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="text-xs font-mono text-muted-foreground/50 tracking-[0.3em] select-none">
-        {wordHints}
-      </div>
-      <div className="w-full max-w-2xl mx-auto">
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          autoFocus
-          placeholder="在此输入整句英文…"
-          className={cn(
-            'w-full h-12 px-5 text-center text-lg font-mono',
-            'rounded-2xl border-2 outline-none transition-all duration-200',
-            'bg-background placeholder:text-muted-foreground/30',
-            'focus:border-[#00B894] focus:ring-4 focus:ring-[#00B894]/15',
-            'border-muted-foreground/20 hover:border-muted-foreground/40',
-          )}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              // Submit is triggered by the button — the Enter key is a convenience
-              document.getElementById('spelling-submit-btn')?.click();
-            }
-          }}
-        />
-      </div>
-      <div className="text-[11px] text-muted-foreground/50 font-medium">
-        {words.length} 个单词 · 用空格分隔 · 按 Enter 快速提交
-      </div>
+    <div className="flex flex-wrap gap-x-2 gap-y-3 justify-center items-end">
+      {words.map((clean, i) => {
+        const isCorrect = submitted ? correctWords[i] : undefined;
+        return (
+          <div key={i} className="flex flex-col items-center gap-1">
+            <input
+              ref={(el) => { inputRefs.current[i] = el; }}
+              value={userInputs[i] || ''}
+              onChange={(e) => setUserInput(i, e.target.value)}
+              disabled={submitted}
+              maxLength={clean.length + 2}
+              placeholder={'_'.repeat(clean.length)}
+              className={cn(
+                'h-10 w-[calc(1ch*' + Math.max(clean.length + 2, 6) + '+ 16px)] min-w-[56px]',
+                'text-center text-sm font-mono rounded-xl border-2 outline-none transition-all duration-200',
+                'bg-background placeholder:text-muted-foreground/30 placeholder:tracking-[0.15em]',
+                'focus:border-[#00B894] focus:ring-2 focus:ring-[#00B894]/20',
+                submitted
+                  ? isCorrect
+                    ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300'
+                    : 'border-rose-400 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300'
+                  : 'border-muted-foreground/20 hover:border-muted-foreground/40',
+              )}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                  e.preventDefault();
+                  const next = i + 1;
+                  if (next < words.length) inputRefs.current[next]?.focus();
+                }
+                if (e.key === 'Backspace' && !userInputs[i] && i > 0) {
+                  inputRefs.current[i - 1]?.focus();
+                }
+              }}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -264,6 +242,7 @@ export default function SpellingPage() {
   const {
     sentences,
     addSentence,
+    addSentences,
     importFromWordExamples,
     aiBatchAdd,
   } = useSpellingSentences();
@@ -291,8 +270,8 @@ export default function SpellingPage() {
   );
 
   // Input state
-  const [dictationInput, setDictationInput] = useState('');       // single input for dictation mode
-  const [fillInputs, setFillInputs] = useState<string[]>([]);      // per-blank inputs for fill mode
+  const [dictationInputs, setDictationInputs] = useState<string[]>([]);  // per-word inputs for 句子拼写
+  const [fillInputs, setFillInputs] = useState<string[]>([]);           // per-blank inputs for 单词拼写
   const [submitted, setSubmitted] = useState(false);
   const [results, setResults] = useState<{ wordResults: Record<number, boolean>; score: number; total: number } | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -347,8 +326,8 @@ export default function SpellingPage() {
     if (currentSentence) {
       const words = getWords(currentSentence.en);
       if (mode === 'dictation') {
-        setDictationInput('');
-        inputRefs.current = [];
+        setDictationInputs(new Array(words.length).fill(''));
+        inputRefs.current = new Array(words.length).fill(null);
       } else {
         // Fill mode: compute blanks
         const blanks = selectBlanks(words);
@@ -359,9 +338,9 @@ export default function SpellingPage() {
         inputRefs.current = new Array(blankCount).fill(null);
       }
 
-      // Auto-play audio
+      // Auto-play audio only in 句子拼写 mode (dictation)
       const timer = setTimeout(() => {
-        tts.speak(currentSentence.en);
+        if (mode === 'dictation') tts.speak(currentSentence.en);
       }, 300);
       return () => clearTimeout(timer);
     }
@@ -379,9 +358,8 @@ export default function SpellingPage() {
 
     if (mode === 'dictation') {
       totalWords = words.length;
-      const userWords = dictationInput.trim().split(/\s+/).filter(Boolean);
       for (let i = 0; i < words.length; i++) {
-        const user = (userWords[i] || '').trim().toLowerCase();
+        const user = (dictationInputs[i] || '').trim().toLowerCase();
         const correct = words[i].toLowerCase();
         const isCorrect = user === correct;
         wordResults[i] = isCorrect;
@@ -416,7 +394,7 @@ export default function SpellingPage() {
 
     setResults({ wordResults, score: correctCount, total: totalWords });
     setSubmitted(true);
-  }, [currentSentence, mode, dictationInput, fillInputs, fillParts, calculateQuality, recordAttempt]);
+  }, [currentSentence, mode, dictationInputs, fillInputs, fillParts, calculateQuality, recordAttempt]);
 
   /** Navigate to next sentence */
   const handleNext = useCallback(() => {
@@ -444,17 +422,22 @@ export default function SpellingPage() {
     setSubmitted(false);
     setResults(null);
     if (mode === 'dictation') {
-      setDictationInput('');
+      const words = currentSentence ? getWords(currentSentence.en) : [];
+      setDictationInputs(new Array(words.length).fill(''));
     } else {
       setFillInputs(new Array(fillInputs.length).fill(''));
     }
-  }, [mode, fillInputs.length]);
+  }, [mode, fillInputs.length, currentSentence]);
 
-  /** Retry only wrong words (dictation: clear entire input; fill: clear wrong blanks) */
+  /** Retry only wrong words (句子拼写: clear wrong word inputs; 单词拼写: clear wrong blanks) */
   const handleRetryWrong = useCallback(() => {
     if (!currentSentence || !results) return;
     if (mode === 'dictation') {
-      setDictationInput('');
+      const newInputs = [...dictationInputs];
+      for (const [wordIdxStr, isCorrect] of Object.entries(results.wordResults)) {
+        if (!isCorrect) newInputs[Number(wordIdxStr)] = '';
+      }
+      setDictationInputs(newInputs);
     } else {
       const newInputs = [...fillInputs];
       for (const [wordIdxStr, isCorrect] of Object.entries(results.wordResults)) {
@@ -589,7 +572,7 @@ export default function SpellingPage() {
           onOpenChange={setShowImportDialog}
           level={importLevel}
           onLevelChange={setImportLevel}
-          importFromWordExamples={importFromWordExamples}
+          addSentences={addSentences}
           getDifficulty={getDifficulty}
           onImported={rebuildSession}
         />
@@ -670,7 +653,7 @@ export default function SpellingPage() {
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
-                听写填空
+                句子拼写
               </button>
               <button
                 onClick={() => setMode('fill')}
@@ -681,7 +664,7 @@ export default function SpellingPage() {
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
-                单词填空
+                单词拼写
               </button>
             </div>
           </div>
@@ -770,22 +753,28 @@ export default function SpellingPage() {
 
       {/* ── Sentence Card ── */}
       <Card className="rounded-2xl border-border/50 shadow-sm overflow-hidden">
-        {/* Chinese translation */}
-        <div className="bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5 px-6 py-4 border-b border-border/50">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">中文</span>
-            {currentSentence?.source === 'word_example' && currentSentence.sourceWord && (
+        {/* Chinese translation — centered */}
+        <div className="bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5 px-6 py-5 border-b border-border/50 text-center">
+          <p className="text-lg font-bold text-foreground/90">{currentSentence?.zh}</p>
+          {(currentSentence?.source === 'word_example' && currentSentence.sourceWord) && (
+            <div className="flex items-center justify-center gap-2 mt-2">
               <Badge variant="outline" className="rounded-md text-[10px] h-5 font-bold text-[#00B894] border-[#00B894]/30">
                 单词: {currentSentence.sourceWord}
               </Badge>
-            )}
-            {currentProgress && currentProgress.status !== 'new' && (
+              {currentProgress && currentProgress.status !== 'new' && (
+                <Badge variant="secondary" className="rounded-md text-[10px] h-5 font-bold">
+                  {currentProgress.status === 'mastered' ? '已掌握' : currentProgress.status === 'reviewing' ? '复习中' : '学习中'}
+                </Badge>
+              )}
+            </div>
+          )}
+          {(!(currentSentence?.source === 'word_example' && currentSentence.sourceWord) && currentProgress && currentProgress.status !== 'new') && (
+            <div className="flex items-center justify-center gap-2 mt-2">
               <Badge variant="secondary" className="rounded-md text-[10px] h-5 font-bold">
                 {currentProgress.status === 'mastered' ? '已掌握' : currentProgress.status === 'reviewing' ? '复习中' : '学习中'}
               </Badge>
-            )}
-          </div>
-          <p className="text-lg font-bold text-foreground/90 mt-1">{currentSentence?.zh}</p>
+            </div>
+          )}
         </div>
 
         {/* Input area */}
@@ -794,7 +783,7 @@ export default function SpellingPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-2 mb-3 justify-center">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  听写输入
+                  句子拼写
                 </span>
                 <span className="text-[11px] text-muted-foreground/60">
                   ({currentSentence ? getWords(currentSentence.en).length : 0} 个单词)
@@ -802,12 +791,16 @@ export default function SpellingPage() {
               </div>
               {currentSentence && (
                 <DictationInput
-                  value={dictationInput}
-                  onChange={setDictationInput}
-                  wordHints={getWords(currentSentence.en).map((w) => '_'.repeat(w.length)).join(' ')}
-                  submitted={submitted}
                   words={getWords(currentSentence.en)}
-                  userWords={dictationInput.trim().split(/\s+/).filter(Boolean)}
+                  userInputs={dictationInputs}
+                  setUserInput={(i, v) => setDictationInputs((prev) => {
+                    const next = [...prev];
+                    next[i] = v;
+                    return next;
+                  })}
+                  submitted={submitted}
+                  correctWords={results?.wordResults || {}}
+                  inputRefs={inputRefs}
                 />
               )}
             </div>
@@ -815,7 +808,7 @@ export default function SpellingPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-2 mb-3 justify-center">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  填空
+                  单词拼写
                 </span>
                 <span className="text-[11px] text-muted-foreground/60">
                   ({fillParts?.filter((p) => p.type === 'blank').length || 0} 个空)
@@ -854,7 +847,6 @@ export default function SpellingPage() {
 
             {!submitted ? (
               <Button
-                id="spelling-submit-btn"
                 onClick={handleSubmit}
                 className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
               >
@@ -973,26 +965,13 @@ export default function SpellingPage() {
                       }
                     }
                     if (wrongList.length === 0) return null;
-                    if (mode === 'dictation') {
-                      const userWords = dictationInput.trim().split(/\s+/).filter(Boolean);
-                      return (
-                        <div>
-                          <span className="font-bold">正确答案：</span>
-                          {wrongList.map((w) => (
-                            <span key={w.index} className="inline-block mr-3">
-                              <span className="text-rose-500 line-through">{userWords[w.index] || '___'}</span>
-                              <span className="text-emerald-600 dark:text-emerald-400 font-bold ml-1">→ {w.correct}</span>
-                            </span>
-                          ))}
-                        </div>
-                      );
-                    }
+                    const inputs = mode === 'dictation' ? dictationInputs : fillInputs;
                     return (
                       <div>
                         <span className="font-bold">正确答案：</span>
                         {wrongList.map((w) => (
                           <span key={w.index} className="inline-block mr-3">
-                            <span className="text-rose-500 line-through">{fillInputs[w.index] || '___'}</span>
+                            <span className="text-rose-500 line-through">{inputs[w.index] || '___'}</span>
                             <span className="text-emerald-600 dark:text-emerald-400 font-bold ml-1">→ {w.correct}</span>
                           </span>
                         ))}
@@ -1066,7 +1045,7 @@ export default function SpellingPage() {
         onOpenChange={setShowImportDialog}
         level={importLevel}
         onLevelChange={setImportLevel}
-        importFromWordExamples={importFromWordExamples}
+        addSentences={addSentences}
         getDifficulty={getDifficulty}
         onImported={rebuildSession}
       />
@@ -1252,13 +1231,13 @@ function AIBatchAddDialog({
 }
 
 function ImportDialog({
-  open, onOpenChange, level, onLevelChange, importFromWordExamples, getDifficulty, onImported,
+  open, onOpenChange, level, onLevelChange, addSentences, getDifficulty, onImported,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   level: string;
   onLevelChange: (l: string) => void;
-  importFromWordExamples: (examples: { en: string; zh: string }[], sourceWord: string, difficulty: SpellingDifficulty) => number;
+  addSentences: (items: Omit<ISpellingSentence, 'id' | 'createdAt'>[]) => number;
   getDifficulty: (level: string) => SpellingDifficulty;
   onImported: () => void;
 }) {
@@ -1338,13 +1317,17 @@ function ImportDialog({
     if (!seg) return;
 
     setImportingSegments((prev) => new Set(prev).add(segIndex));
-    let count = 0;
     try {
       const difficulty = getDifficulty(level);
-      for (const ex of seg.examples) {
-        const added = importFromWordExamples([{ en: ex.en, zh: ex.zh }], ex.word, difficulty);
-        count += added;
-      }
+      // Batch all examples into a single addSentences call
+      const items: Omit<ISpellingSentence, 'id' | 'createdAt'>[] = seg.examples.map((ex) => ({
+        en: ex.en,
+        zh: ex.zh,
+        source: 'word_example' as const,
+        sourceWord: ex.word,
+        difficulty,
+      }));
+      const count = addSentences(items);
       setImportedSet((prev) => new Set(prev).add(segIndex));
       setTotalImported((prev) => prev + count);
       toast.success(`第 ${segIndex + 1} 段导入完成：新增 ${count} 条`);
@@ -1356,7 +1339,7 @@ function ImportDialog({
       next.delete(segIndex);
       return next;
     });
-  }, [segments, level, importFromWordExamples, getDifficulty]);
+  }, [segments, level, addSentences, getDifficulty]);
 
   const handleImportAll = useCallback(async () => {
     for (let i = 0; i < segments.length; i++) {

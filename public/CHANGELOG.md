@@ -10,6 +10,10 @@
 
 
 
+
+## 2026-07-16
+- feat: segmented batch import from word bank — scan all words, split into segments of 200+, import by segment (`7281c72`)
+
 ## 2026-07-16
 - refactor: dictation mode - single continuous input instead of per-word fields (`12945d5`)
 
