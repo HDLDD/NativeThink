@@ -13,6 +13,10 @@
 
 
 
+
+## 2026-07-16
+- feat: underline-only input style, auto-read toggle (`00ffb4b`)
+
 ## 2026-07-16
 - fix: handleImportAll batches all segments in single addSentences call to avoid stale closure overwrite (`e2f7e34`)
 

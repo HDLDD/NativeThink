@@ -113,7 +113,7 @@ function splitForFill(
 
 // ── Sub-components ──
 
-/** 句子拼写: 下划线即输入区 — 无边框盒, 一行排列, 间距一个字母 */
+/** 句子拼写: 每个下划线即隐形输入载体 — 点击区域唤起键盘, 文字显示在线上面 */
 function DictationInput({
   words,
   userInputs,
@@ -130,44 +130,85 @@ function DictationInput({
   inputRefs: React.MutableRefObject<(HTMLInputElement | null)[]>;
 }) {
   return (
-    <div className="flex flex-wrap justify-center gap-x-[0.6em] gap-y-3">
-      {words.map((clean, i) => {
-        const isCorrect = submitted ? correctWords[i] : undefined;
-        return (
-          <input
-            key={i}
-            ref={(el) => { inputRefs.current[i] = el; }}
-            value={userInputs[i] || ''}
-            onChange={(e) => setUserInput(i, e.target.value)}
-            disabled={submitted}
-            maxLength={clean.length + 2}
-            placeholder={'_'.repeat(clean.length)}
-            className={cn(
-              'h-7 w-[calc(1ch*' + Math.max(clean.length, 3) + '+ 4px)] min-w-[28px]',
-              'text-center text-sm font-mono outline-none transition-all duration-200',
-              'bg-transparent border-0 border-b-2 border-dotted border-muted-foreground/30',
-              'placeholder:text-muted-foreground/30 placeholder:tracking-[0.2em] placeholder:select-none',
-              'focus:border-[#00B894] focus:border-solid',
-              submitted
-                ? isCorrect
-                  ? 'border-emerald-400 text-emerald-600 dark:text-emerald-400'
-                  : 'border-rose-400 text-rose-600 dark:text-rose-400'
-                : 'hover:border-muted-foreground/60',
-            )}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === 'Tab') {
-                e.preventDefault();
-                const next = i + 1;
-                if (next < words.length) inputRefs.current[next]?.focus();
-              }
-              if (e.key === 'Backspace' && !userInputs[i] && i > 0) {
-                inputRefs.current[i - 1]?.focus();
-              }
-            }}
-          />
-        );
-      })}
-    </div>
+    <>
+      {/* One sentence window — no word windows */}
+      <div className="flex flex-wrap justify-center gap-x-[0.6em] gap-y-4">
+        {words.map((clean, i) => {
+          const isCorrect = submitted ? correctWords[i] : undefined;
+          const hasValue = !!userInputs[i];
+          return (
+            <div
+              key={i}
+              className="relative inline-flex flex-col items-center min-w-[28px] cursor-text group"
+              onClick={() => inputRefs.current[i]?.focus()}
+            >
+              {/* Text above underline */}
+              <span
+                className={cn(
+                  'text-sm font-mono leading-tight min-h-[1.3em] text-center transition-colors duration-150',
+                  submitted
+                    ? isCorrect
+                      ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                      : 'text-rose-600 dark:text-rose-400 font-bold'
+                    : hasValue
+                      ? 'text-foreground/90'
+                      : 'text-muted-foreground/30 tracking-[0.2em] select-none',
+                )}
+              >
+                {submitted
+                  ? (userInputs[i] || '___')
+                  : (userInputs[i] || '_'.repeat(clean.length))}
+              </span>
+
+              {/* Underline — the visual input line */}
+              <div
+                className={cn(
+                  'h-[2px] w-full mt-0.5 rounded-full transition-all duration-200',
+                  submitted
+                    ? isCorrect
+                      ? 'bg-emerald-400'
+                      : 'bg-rose-400'
+                    : hasValue
+                      ? 'bg-[#00B894]/60'
+                      : 'bg-muted-foreground/25 group-hover:bg-muted-foreground/50',
+                )}
+              />
+
+              {/* Invisible input — the actual input carrier */}
+              <input
+                ref={(el) => { inputRefs.current[i] = el; }}
+                value={userInputs[i] || ''}
+                onChange={(e) => setUserInput(i, e.target.value)}
+                disabled={submitted}
+                maxLength={clean.length + 2}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-text"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === 'Tab') {
+                    e.preventDefault();
+                    const next = i + 1;
+                    if (next < words.length) inputRefs.current[next]?.focus();
+                  }
+                  if (e.key === 'Backspace' && !userInputs[i] && i > 0) {
+                    inputRefs.current[i - 1]?.focus();
+                  }
+                }}
+                onFocus={() => {
+                  // Scroll the word into view if needed
+                  inputRefs.current[i]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Hint text */}
+      {!submitted && (
+        <p className="text-[11px] text-muted-foreground/40 text-center mt-2 font-medium">
+          点击下划线输入 · Tab 切换
+        </p>
+      )}
+    </>
   );
 }
 
