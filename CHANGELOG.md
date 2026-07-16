@@ -45,6 +45,13 @@
 
 
 
+
+## 2026-07-17
+- fix: shadowing center play/pause button now correctly stops playback — ref-based isSpeaking avoids stale closure (`ac0397f`..HEAD)
+
+## 2026-07-17
+- feat: shadowing voice recording + AI comparison, fix favorites persistence (`ac0397f`)
+
 ## 2026-07-17
 - fix: favorites dual-write to direct localStorage key (survives prefix changes) (`7ebcf68`)
 

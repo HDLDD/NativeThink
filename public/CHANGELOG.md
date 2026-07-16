@@ -1,5 +1,13 @@
 # NativeThink 开发日志
 
+## 2026-07-17
+- fix: shadowing 中间播放/暂停按钮无法停止播放的问题（ref 避免闭包陈旧）
+- feat: 影子跟读新增录音+AI对比分析功能
+- fix: 句子拼写收藏在新开网站后重置的问题（dual-write localStorage）
+- feat: 句子拼写新增语音输入
+- feat: 例句来源词支持同义词
+- refactor: 词库句子全局缓存，根因修复答案显示闪烁
+- fix: 答案显示不再被 effect 误清
 
 
 
@@ -44,6 +52,11 @@
 
 
 
+
+
+
+## 2026-07-17
+- feat: shadowing voice recording + AI comparison, fix favorites persistence (`ac0397f`)
 
 ## 2026-07-17
 - fix: favorites dual-write to direct localStorage key (survives prefix changes) (`7ebcf68`)

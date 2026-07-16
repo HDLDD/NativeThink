@@ -222,8 +222,10 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
     },
   });
 
+  const isSpeakingRef = useRef(false);
+  isSpeakingRef.current = tts.isSpeaking;
   const togglePlay = useCallback(() => {
-    if (tts.isSpeaking) {
+    if (isSpeakingRef.current) {
       tts.cancel();
     } else if (currentSentence) {
       tts.speak(currentSentence.text, {
@@ -232,7 +234,7 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
       });
       addStudyMinutes(1, 'shadowing');
     }
-  }, [tts.isSpeaking, tts.cancel, tts.speak, currentSentence, selectedCorpus?.accent, playbackRate, addStudyMinutes]);
+  }, [tts.cancel, tts.speak, currentSentence, selectedCorpus?.accent, playbackRate, addStudyMinutes]);
 
   const playCurrentSentence = useCallback(() => {
     if (currentSentence) {
