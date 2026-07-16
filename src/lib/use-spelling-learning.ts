@@ -211,8 +211,9 @@ export function useSpellingLearning() {
       mastered: entries.filter((p) => p.status === 'mastered').length,
       todayPracticed: state.todayPracticed.length,
       totalWrongWords: entries.reduce((sum, p) => sum + Object.keys(p.wrongWords).length, 0),
+      completedCount: completedSentenceIds.length,
     };
-  }, [state.progress, state.todayPracticed]);
+  }, [state.progress, state.todayPracticed, completedSentenceIds]);
 
   /** Build session queue: new sentences first, then learning/reviewing ones. Completed and mastered excluded. */
   const buildSessionQueue = useCallback(

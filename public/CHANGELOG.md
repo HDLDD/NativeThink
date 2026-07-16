@@ -34,6 +34,10 @@
 
 
 
+
+## 2026-07-16
+- fix: move auto-reset useEffect before early returns (hooks rule), remove duplicate (`3b8c943`)
+
 ## 2026-07-16
 - fix: buildSessionQueue includes all non-mastered, add manage dialog, reset fixes (`eb2a67a`)
 

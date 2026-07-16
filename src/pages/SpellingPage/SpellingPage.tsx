@@ -379,10 +379,16 @@ export default function SpellingPage() {
     [sentences, buildSessionQueue, activeLevel],
   );
 
-  // Initialize session on sentences load
+  // Initialize session on sentences load — auto-reset completed if all done
   useEffect(() => {
     if (sentences.length > 0 && sessionQueue.length === 0) {
-      rebuildSession();
+      if (learningStats.completedCount >= sentences.length) {
+        // All sentences are marked completed — auto-reset for fresh session
+        resetCompletedAll();
+        setImportDirty((c) => c + 1);
+      } else {
+        rebuildSession();
+      }
     }
   }, [sentences.length, rebuildSession, sessionQueue.length]);
 
@@ -744,14 +750,6 @@ export default function SpellingPage() {
       }
     } catch { /* ignore */ }
   }, [sentences.length]);
-
-  // ── Auto-reset: when queue empties without explicit completion, start a new round ──
-  useEffect(() => {
-    if (sentences.length > 0 && sessionQueue.length === 0 && !completionShown && !levelLoading) {
-      resetCompletedAll();
-      setImportDirty((c) => c + 1);
-    }
-  }, [sentences.length, sessionQueue.length, completionShown, levelLoading]);
 
   // Progress  // Progress
   const isFav = currentSentence ? isFavorited(currentSentence.en, 'spelling') : false;
@@ -1268,8 +1266,14 @@ export default function SpellingPage() {
                   <p className="text-sm font-mono leading-relaxed text-foreground/90">
                     {(() => {
                       const words = getWords(currentSentence.en);
+                      // In fill mode, non-blank words were visible — show as correct
+                      const blankSet = mode === 'fill' && fillParts
+                        ? new Set(fillParts.filter(p => p.type === 'blank').map(p => p.wordIndex))
+                        : null;
                       return words.map((word, i) => {
-                        const isCorrect = results.wordResults[i];
+                        const isCorrect = blankSet
+                          ? !blankSet.has(i) || !!results.wordResults[i]
+                          : !!results.wordResults[i];
                         return (
                           <span
                             key={i}
@@ -1280,7 +1284,7 @@ export default function SpellingPage() {
                                 : 'text-rose-600 dark:text-rose-400 font-bold',
                             )}
                           >
-                            {isCorrect ? word : <><span className="line-through opacity-50">{word}</span> <span className="not-italic">{word}</span></>}
+                            {word}
                           </span>
                         );
                       });
