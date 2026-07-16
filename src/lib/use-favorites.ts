@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { safeStorage } from './safe-storage';
 
 const FAVORITES_KEY = '__nativethink_favorites';
+const FAVORITES_BACKUP_KEY = '__nativethink_favorites_v2';
 
 export interface IFavoriteItem {
   id: string;
@@ -19,9 +20,18 @@ export function useFavorites() {
 
   const loadFromStorage = useCallback(() => {
     try {
+      // Try direct key first (survives safeStorage prefix changes)
+      const direct = localStorage.getItem(FAVORITES_BACKUP_KEY);
+      if (direct) {
+        setFavorites(JSON.parse(direct));
+        return;
+      }
+      // Fallback to safeStorage (prefixed, user-scoped)
       const saved = safeStorage.getItem(FAVORITES_KEY);
       if (saved) {
-        setFavorites(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setFavorites(parsed);
+        try { localStorage.setItem(FAVORITES_BACKUP_KEY, JSON.stringify(parsed)); } catch { /* ignore */ }
       }
     } catch {
       // storage unavailable — use defaults
@@ -45,6 +55,7 @@ export function useFavorites() {
     setFavorites(items);
     try {
       safeStorage.setItem(FAVORITES_KEY, JSON.stringify(items));
+      localStorage.setItem(FAVORITES_BACKUP_KEY, JSON.stringify(items));
     } catch {
       // ignore
     }

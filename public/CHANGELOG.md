@@ -43,6 +43,10 @@
 
 
 
+
+## 2026-07-17
+- feat: add voice input via Web Speech API (`3d64289`)
+
 ## 2026-07-17
 - feat: accept synonyms for sourceWord in sentence spelling (`d199f13`)
 
