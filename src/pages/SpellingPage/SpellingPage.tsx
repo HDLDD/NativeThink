@@ -181,6 +181,7 @@ function DictationInput({
                 onChange={(e) => setUserInput(i, e.target.value)}
                 disabled={submitted}
                 maxLength={clean.length + 2}
+                tabIndex={0}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-text"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === 'Tab') {
@@ -249,6 +250,7 @@ function FillDisplay({
               value={userInputs[fi] || ''}
               onChange={(e) => setUserInput(fi, e.target.value)}
               disabled={submitted}
+              tabIndex={0}
               className={cn(
                 'h-9 w-[calc(1ch*' + Math.max(part.content.replace(/[^a-zA-Z]/g, '').length + 2, 6) + '+ 12px)] min-w-[60px]',
                 'text-center text-sm font-mono rounded-xl border-2 outline-none transition-all duration-200',
@@ -369,17 +371,16 @@ export default function SpellingPage() {
     }
   }, [importDirty, rebuildSession]);
 
-  // Reset inputs when sentence changes
+  // Reset inputs when sentence changes — NEVER clear submitted/results here (causes flash)
   useEffect(() => {
-    setSubmitted(false);
-    setResults(null);
     if (currentSentence) {
+      setSubmitted(false);
+      setResults(null);
       const words = getWords(currentSentence.en);
       if (mode === 'dictation') {
         setDictationInputs(new Array(words.length).fill(''));
         inputRefs.current = new Array(words.length).fill(null);
       } else {
-        // Fill mode: compute blanks
         const blanks = selectBlanks(words);
         const parts = splitForFill(currentSentence.en, blanks);
         setFillParts(parts);
@@ -388,13 +389,17 @@ export default function SpellingPage() {
         inputRefs.current = new Array(blankCount).fill(null);
       }
 
-      // Auto-play audio (only in 句子拼写 mode + autoRead enabled)
+      // Auto-focus first input
+      setTimeout(() => inputRefs.current[0]?.focus(), 150);
+
+      // Cancel any lingering TTS, then auto-play
+      tts.cancel();
       const timer = setTimeout(() => {
         if (mode === 'dictation' && autoRead) tts.speak(currentSentence.en);
-      }, 300);
-      return () => clearTimeout(timer);
+      }, 500);
+      return () => { clearTimeout(timer); tts.cancel(); };
     }
-  }, [currentSentence?.id, mode, autoRead]);
+  }, [currentSentence?.id]); // Only sentence change — NOT mode/autoRead (those cause unwanted resets)
 
   /** Check answers */
   const handleSubmit = useCallback(() => {
@@ -446,26 +451,39 @@ export default function SpellingPage() {
     setSubmitted(true);
   }, [currentSentence, mode, dictationInputs, fillInputs, fillParts, calculateQuality, recordAttempt]);
 
-  /** Navigate to next sentence */
+  /** Navigate to next sentence — remove current from queue so it doesn't repeat */
   const handleNext = useCallback(() => {
+    const currentId = sessionQueue[currentIndex];
     if (currentIndex < sessionQueue.length - 1) {
-      setCurrentIndex((i) => i + 1);
+      // Remove current sentence from queue so it won't repeat
+      setSessionQueue((prev) => prev.filter((id) => id !== currentId));
+      // Keep same index (next item slides into place)
     } else {
+      // Last item — remove it, queue becomes empty → completion shown
+      setSessionQueue((prev) => prev.filter((id) => id !== currentId));
       setCompletionShown(true);
     }
+    setSubmitted(false);
+    setResults(null);
   }, [currentIndex, sessionQueue.length]);
 
   /** Navigate to previous sentence */
   const handlePrev = useCallback(() => {
     if (currentIndex > 0) {
       setCurrentIndex((i) => i - 1);
+      setSubmitted(false);
+      setResults(null);
     }
   }, [currentIndex]);
 
-  /** Skip current sentence */
+  /** Skip current sentence — remove from queue */
   const handleSkip = useCallback(() => {
-    handleNext();
-  }, [handleNext]);
+    const currentId = sessionQueue[currentIndex];
+    setSessionQueue((prev) => prev.filter((id) => id !== currentId));
+    if (sessionQueue.length <= 1) setCompletionShown(true);
+    setSubmitted(false);
+    setResults(null);
+  }, [currentIndex, sessionQueue]);
 
   /** Retry current sentence (reset input state) */
   const handleRetry = useCallback(() => {

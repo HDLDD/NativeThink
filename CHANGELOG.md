@@ -17,6 +17,10 @@
 
 
 
+
+## 2026-07-16
+- fix: exclude /api/* from _redirects rewrite (`4bdfd00`)
+
 ## 2026-07-16
 - feat: remove ___ placeholders, one-click full word bank import, fix sentence count not updating (`de4f924`)
 
