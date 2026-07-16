@@ -32,6 +32,10 @@
 
 
 
+
+## 2026-07-16
+- fix: remove local updated array (ID mismatch), add race-condition guard, prevent loading flash (`eed7ce9`)
+
 ## 2026-07-16
 - perf: cache extracted sentences per level, Map O(1) upsert, remove empty-level screen (`52b7508`)
 

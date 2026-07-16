@@ -214,14 +214,13 @@ export function useSpellingLearning() {
     };
   }, [state.progress, state.todayPracticed]);
 
-  /** Build session queue: due sentences first, then new ones. Completed sentences are excluded entirely. */
+  /** Build session queue: new sentences first, then learning/reviewing ones. Completed and mastered excluded. */
   const buildSessionQueue = useCallback(
     (allSentences: ISpellingSentence[]): string[] => {
-      const now = Date.now();
       const progress = state.progress;
       const completedSet = new Set(completedSentenceIds);
 
-      // Exclude all completed sentences
+      // Exclude completed sentences
       const pending = allSentences.filter((s) => !completedSet.has(s.id));
 
       const due: string[] = [];
@@ -232,15 +231,11 @@ export function useSpellingLearning() {
         if (!p || p.status === 'new') {
           newOnes.push(s.id);
         } else if (p.status === 'mastered') {
-          // Mastered sentences do not repeat — skip entirely
+          // Mastered sentences do not repeat
           continue;
-        } else if (p.nextReview <= now) {
-          due.push(s.id);
         } else {
-          // Not due yet — include if near review time (within 1 day)
-          if (p.nextReview - now < 24 * 60 * 60 * 1000) {
-            due.push(s.id);
-          }
+          // Learning/reviewing — always include (ignore SM-2 timing for linear flow)
+          due.push(s.id);
         }
       }
 
@@ -275,6 +270,11 @@ export function useSpellingLearning() {
     });
   }, []);
 
+  /** Reset all completed marks (for "再来一轮") */
+  const resetCompletedAll = useCallback(() => {
+    setCompletedSentenceIds([]);
+  }, []);
+
   return {
     state,
     getProgress,
@@ -286,5 +286,6 @@ export function useSpellingLearning() {
     resetSentenceProgress,
     resetAllProgress,
     markCompleted,
+    resetCompletedAll,
   };
 }

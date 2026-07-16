@@ -304,6 +304,7 @@ export default function SpellingPage() {
     stats: learningStats,
     markCompleted,
     resetAllProgress,
+    resetCompletedAll,
   } = useSpellingLearning();
   const tts = useTTS();
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
@@ -333,7 +334,7 @@ export default function SpellingPage() {
   // UI state
   const [showFavorites, setShowFavorites] = useState(false);
   const [showAIDialog, setShowAIDialog] = useState(false);
-  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [showManageDialog, setShowManageDialog] = useState(false);
   const [completionShown, setCompletionShown] = useState(false);
   const [autoRead, setAutoRead] = useState(true);         // 自动朗读
   const [importDirty, setImportDirty] = useState(0);       // import → rebuild trigger
@@ -818,7 +819,10 @@ export default function SpellingPage() {
         </p>
         <div className="flex gap-3">
           <Button
-            onClick={() => rebuildSession()}
+            onClick={() => {
+              resetCompletedAll();
+              setImportDirty(c => c + 1);
+            }}
             className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
           >
             <RefreshCw className="size-4" />
@@ -833,48 +837,70 @@ export default function SpellingPage() {
             添加新句子
           </Button>
           <Button
-            onClick={() => setShowResetDialog(true)}
+            onClick={() => setShowManageDialog(true)}
             variant="outline"
-            className="rounded-2xl font-bold gap-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:border-rose-800 dark:hover:bg-rose-950/30"
+            className="rounded-2xl font-bold gap-2"
           >
-            <RotateCcw className="size-4" />
-            重置学习记录
+            <BookOpen className="size-4" />
+            学习记录
           </Button>
         </div>
 
-        {/* Reset progress confirmation */}
-        <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-          <DialogContent className="rounded-2xl sm:max-w-sm" aria-describedby="reset-dialog-desc">
+        {/* Manage learning records dialog */}
+        <Dialog open={showManageDialog} onOpenChange={setShowManageDialog}>
+          <DialogContent className="rounded-2xl sm:max-w-sm" aria-describedby="manage-dialog-desc">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-base font-black text-rose-600">
-                <RotateCcw className="size-5" />
-                重置学习记录
+              <DialogTitle className="flex items-center gap-2 text-base font-black">
+                <BookOpen className="size-5 text-[#00B894]" />
+                管理学习记录
               </DialogTitle>
-              <p id="reset-dialog-desc" className="text-xs text-muted-foreground">
-                此操作将清除所有句子的学习进度和完成记录，包括 SM-2 间隔数据、错词记录和每日练习统计。句子库本身不受影响。
+              <p id="manage-dialog-desc" className="text-xs text-muted-foreground">
+                查看学习进度或重置所有记录
               </p>
             </DialogHeader>
-            <DialogFooter className="gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowResetDialog(false)}
-                className="rounded-xl font-bold"
-              >
-                取消
-              </Button>
-              <Button
-                onClick={() => {
-                  resetAllProgress();
-                  setShowResetDialog(false);
-                  rebuildSession();
-                  toast.success('学习记录已重置');
-                }}
-                className="rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold gap-2"
-              >
-                <RotateCcw className="size-4" />
-                确认重置
-              </Button>
-            </DialogFooter>
+            <div className="space-y-4 py-2">
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl bg-muted/50 p-3 text-center">
+                  <p className="text-lg font-black text-[#00B894]">{learningStats.mastered}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground">已掌握</p>
+                </div>
+                <div className="rounded-xl bg-muted/50 p-3 text-center">
+                  <p className="text-lg font-black text-amber-500">{learningStats.learning}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground">学习中</p>
+                </div>
+                <div className="rounded-xl bg-muted/50 p-3 text-center">
+                  <p className="text-lg font-black text-blue-500">{learningStats.reviewing}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground">待复习</p>
+                </div>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">
+                  今日已练习 <span className="font-bold">{learningStats.todayPracticed}</span> 句
+                </p>
+              </div>
+              <Separator />
+              <div className="text-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    resetAllProgress();
+                    resetCompletedAll();
+                    setShowManageDialog(false);
+                    setImportDirty(c => c + 1);
+                    toast.success('学习记录已重置');
+                  }}
+                  className="rounded-xl font-bold gap-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:border-rose-800 dark:hover:bg-rose-950/30"
+                >
+                  <RotateCcw className="size-4" />
+                  重置所有学习记录
+                </Button>
+                <p className="text-[10px] text-muted-foreground/60 mt-2">
+                  清除所有进度和完成记录，句子库不受影响
+                </p>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -1357,7 +1383,10 @@ export default function SpellingPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => rebuildSession()}
+            onClick={() => {
+              resetCompletedAll();
+              setImportDirty(c => c + 1);
+            }}
             className="rounded-xl gap-1 text-muted-foreground"
           >
             <RefreshCw className="size-3.5" /> 重新排队
@@ -1365,10 +1394,10 @@ export default function SpellingPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setShowResetDialog(true)}
-            className="rounded-xl gap-1 text-rose-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+            onClick={() => setShowManageDialog(true)}
+            className="rounded-xl gap-1 text-muted-foreground"
           >
-            <RotateCcw className="size-3.5" /> 重置记录
+            <BookOpen className="size-3.5" /> 学习记录
           </Button>
         </div>
         <Button
@@ -1405,39 +1434,60 @@ export default function SpellingPage() {
         isConfigured={ai.isConfigured}
       />
 
-      {/* Reset progress confirmation */}
-      <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-        <DialogContent className="rounded-2xl sm:max-w-sm" aria-describedby="reset-dialog-desc-main">
+      {/* Manage learning records dialog */}
+      <Dialog open={showManageDialog} onOpenChange={setShowManageDialog}>
+        <DialogContent className="rounded-2xl sm:max-w-sm" aria-describedby="manage-dialog-desc-main">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-black text-rose-600">
-              <RotateCcw className="size-5" />
-              重置学习记录
+            <DialogTitle className="flex items-center gap-2 text-base font-black">
+              <BookOpen className="size-5 text-[#00B894]" />
+              管理学习记录
             </DialogTitle>
-            <p id="reset-dialog-desc-main" className="text-xs text-muted-foreground">
-              此操作将清除所有句子的学习进度和完成记录，包括 SM-2 间隔数据、错词记录和每日练习统计。句子库本身不受影响。
+            <p id="manage-dialog-desc-main" className="text-xs text-muted-foreground">
+              查看学习进度或重置所有记录
             </p>
           </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowResetDialog(false)}
-              className="rounded-xl font-bold"
-            >
-              取消
-            </Button>
-            <Button
-              onClick={() => {
-                resetAllProgress();
-                setShowResetDialog(false);
-                rebuildSession();
-                toast.success('学习记录已重置');
-              }}
-              className="rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold gap-2"
-            >
-              <RotateCcw className="size-4" />
-              确认重置
-            </Button>
-          </DialogFooter>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl bg-muted/50 p-3 text-center">
+                <p className="text-lg font-black text-[#00B894]">{learningStats.mastered}</p>
+                <p className="text-[10px] font-bold text-muted-foreground">已掌握</p>
+              </div>
+              <div className="rounded-xl bg-muted/50 p-3 text-center">
+                <p className="text-lg font-black text-amber-500">{learningStats.learning}</p>
+                <p className="text-[10px] font-bold text-muted-foreground">学习中</p>
+              </div>
+              <div className="rounded-xl bg-muted/50 p-3 text-center">
+                <p className="text-lg font-black text-blue-500">{learningStats.reviewing}</p>
+                <p className="text-[10px] font-bold text-muted-foreground">待复习</p>
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">
+                今日已练习 <span className="font-bold">{learningStats.todayPracticed}</span> 句
+              </p>
+            </div>
+            <Separator />
+            <div className="text-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  resetAllProgress();
+                  resetCompletedAll();
+                  setShowManageDialog(false);
+                  setImportDirty(c => c + 1);
+                  toast.success('学习记录已重置');
+                }}
+                className="rounded-xl font-bold gap-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:border-rose-800 dark:hover:bg-rose-950/30"
+              >
+                <RotateCcw className="size-4" />
+                重置所有学习记录
+              </Button>
+              <p className="text-[10px] text-muted-foreground/60 mt-2">
+                清除所有进度和完成记录，句子库不受影响
+              </p>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
