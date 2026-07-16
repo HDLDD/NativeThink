@@ -20,6 +20,7 @@ import {
   ChevronRight,
   ChevronRight as ChevronRightIcon,
   Loader2,
+  Mic,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -356,6 +357,7 @@ export default function SpellingPage() {
   const [showManageDialog, setShowManageDialog] = useState(false);
   const [completionShown, setCompletionShown] = useState(false);
   const [autoRead, setAutoRead] = useState(true);         // 自动朗读
+  const [recording, setRecording] = useState(false);       // 语音输入中
   const [importDirty, setImportDirty] = useState(0);       // import → rebuild trigger
   const [building, setBuilding] = useState(false);          // building sentence database (full rebuild)
   const [levelLoading, setLevelLoading] = useState(false);  // loading word bank data for level switch
@@ -590,6 +592,55 @@ export default function SpellingPage() {
     }
   }, [currentSentence, isFavorited, favorites, removeFavorite, addFavorite]);
 
+  /** Voice input via Web Speech API */
+  const recognitionRef = useRef<any>(null);
+  const handleVoiceInput = useCallback(() => {
+    if (!currentSentence || recording) return;
+    const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) { toast.error('当前浏览器不支持语音输入'); return; }
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: any) => {
+      const transcript = (event.results[0][0].transcript || '').trim().toLowerCase();
+      if (!transcript) { setRecording(false); return; }
+
+      const spokenWords = transcript.split(/\s+/).filter(Boolean);
+
+      if (mode === 'dictation') {
+        const newInputs = [...dictationInputs];
+        const expectedCount = getWords(currentSentence.en).length;
+        for (let i = 0; i < Math.min(spokenWords.length, expectedCount); i++) {
+          newInputs[i] = spokenWords[i];
+        }
+        setDictationInputs(newInputs);
+        const firstEmpty = newInputs.findIndex((v) => !v);
+        if (firstEmpty >= 0) setTimeout(() => inputRefs.current[firstEmpty]?.focus(), 100);
+      } else if (fillParts) {
+        const blanks = fillParts.filter((p) => p.type === 'blank');
+        const newInputs = [...fillInputs];
+        for (let i = 0; i < Math.min(spokenWords.length, blanks.length); i++) {
+          newInputs[i] = spokenWords[i];
+        }
+        setFillInputs(newInputs);
+        const firstEmpty = newInputs.findIndex((v) => !v);
+        if (firstEmpty >= 0) setTimeout(() => inputRefs.current[firstEmpty]?.focus(), 100);
+      }
+
+      setRecording(false);
+    };
+
+    recognition.onerror = () => { setRecording(false); toast.error('语音识别失败，请重试'); };
+    recognition.onend = () => setRecording(false);
+
+    recognitionRef.current = recognition;
+    setRecording(true);
+    recognition.start();
+  }, [currentSentence, recording, mode, dictationInputs, fillInputs, fillParts]);
   /** Load a specific sentence from favorites */
   const handleLoadFavorite = useCallback(
     (sentence: ISpellingSentence) => {
@@ -1147,6 +1198,22 @@ export default function SpellingPage() {
               <Volume2 className="size-4" />
               {audioMode === 'sentence' ? '播放句子' : '逐词播放'}
             </Button>
+
+            {!submitted && (
+              <Button
+                variant={recording ? 'default' : 'outline'}
+                size="sm"
+                onClick={handleVoiceInput}
+                disabled={recording}
+                className={cn(
+                  'rounded-xl font-bold gap-2',
+                  recording ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' : '',
+                )}
+              >
+                <Mic className="size-4" />
+                {recording ? '正在听...' : '语音输入'}
+              </Button>
+            )}
 
             {!submitted ? (
               <Button

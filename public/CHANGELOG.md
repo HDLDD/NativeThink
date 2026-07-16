@@ -42,6 +42,10 @@
 
 
 
+
+## 2026-07-17
+- feat: accept synonyms for sourceWord in sentence spelling (`d199f13`)
+
 ## 2026-07-17
 - fix: stable currentSentence via ref — immune to useMemo flicker (`4465a4c`)
 
