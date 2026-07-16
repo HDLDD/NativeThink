@@ -7,6 +7,10 @@
 
 
 
+
+## 2026-07-16
+- feat: add sentence spelling feature with dictation & fill modes, AI batch add, SM-2 memory, favorites (`08c8750`)
+
 ## 2026-07-14
 - fix: learning time tracking bugs — midnight reset, stale closure, UTC dates (`87070f2`)
 

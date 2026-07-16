@@ -1133,12 +1133,15 @@ function AIBatchAddDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl sm:max-w-md">
+      <DialogContent className="rounded-2xl sm:max-w-md" aria-describedby="ai-dialog-desc">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base font-black">
             <Sparkles className="size-5 text-[#00B894]" />
             AI 批量添加句子
           </DialogTitle>
+          <p id="ai-dialog-desc" className="text-xs text-muted-foreground">
+            输入主题或关键词，AI 将生成英文句子并添加到你的拼写练习库
+          </p>
         </DialogHeader>
 
         {!isConfigured ? (
@@ -1249,12 +1252,15 @@ function ImportDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl sm:max-w-sm">
+      <DialogContent className="rounded-2xl sm:max-w-sm" aria-describedby="import-dialog-desc">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base font-black">
             <BookOpen className="size-5 text-[#00B894]" />
             从单词库导入例句
           </DialogTitle>
+          <p id="import-dialog-desc" className="text-xs text-muted-foreground">
+            选择词库级别，随机抽取单词的例句添加到拼写练习库
+          </p>
         </DialogHeader>
 
         <div className="py-2">
