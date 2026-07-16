@@ -30,6 +30,10 @@
 
 
 
+
+## 2026-07-16
+- feat: remember last practice position (level + sentence index) (`3670753`)
+
 ## 2026-07-16
 - fix: rebuildSession onClick wrappers (type compat with override params) (`b221704`)
 

@@ -606,96 +606,102 @@ export default function SpellingPage() {
     return 'intermediate';
   }, []);
 
-  /** Extract example sentences from word bank data for a level */
-  const extractLevelSentences = useCallback(
-    (level: string): Omit<ISpellingSentence, 'id' | 'createdAt'>[] => {
-      const words = queryWords({ level });
-      const difficulty = getDifficulty(level);
-      const items: Omit<ISpellingSentence, 'id' | 'createdAt'>[] = [];
-      for (const w of words) {
-        if (w.examples) {
-          for (const ex of w.examples) {
-            if (ex.en && ex.zh) {
-              items.push({
-                en: ex.en.trim(),
-                zh: ex.zh.trim(),
-                source: 'word_example',
-                sourceWord: w.word,
-                level,
-                difficulty,
-              });
-            }
+  const ALL_LEVELS = ['zhongkao','gaokao','cet4','cet6','ielts','toefl','postgraduate','professional','advanced'];
+
+  /** Cache extracted sentences per level to avoid redundant work */
+  const levelSentencesCache = useRef<Record<string, Omit<ISpellingSentence, 'id' | 'createdAt'>[]>>({});
+
+  const extractLevelSentences = useCallback((level: string): Omit<ISpellingSentence, 'id' | 'createdAt'>[] => {
+    if (levelSentencesCache.current[level]) return levelSentencesCache.current[level];
+    const words = queryWords({ level });
+    const difficulty = getDifficulty(level);
+    const items: Omit<ISpellingSentence, 'id' | 'createdAt'>[] = [];
+    for (const w of words) {
+      if (w.examples) {
+        for (const ex of w.examples) {
+          if (ex.en && ex.zh) {
+            items.push({
+              en: ex.en.trim(),
+              zh: ex.zh.trim(),
+              source: 'word_example',
+              sourceWord: w.word,
+              level,
+              difficulty,
+            });
           }
         }
       }
-      return items;
-    },
-    [getDifficulty],
-  );
+    }
+    levelSentencesCache.current[level] = items;
+    return items;
+  }, [getDifficulty]);
 
-  /** Switch level — lazy-load sentences on demand (like DeepVocabularyPage) */
+  /** Switch level — lazy-load once, cache, then instant subsequent switches */
   const handleLevelChange = useCallback(
     async (lvl: string) => {
       if (lvl === activeLevel) return;
       setActiveLevel(lvl);
       setSubmitted(false);
       setResults(null);
+      setCompletionShown(false);
 
-      // Check if we already have sentences tagged with this level
-      const hasSentences = lvl === 'all' || sentences.some((s) => s.level === lvl);
+      // Already have sentences tagged with this level → instant rebuild
+      if (lvl === 'all' || sentences.some((s) => s.level === lvl)) {
+        rebuildSession({ level: lvl });
+        return;
+      }
 
-      if (lvl !== 'all' && !hasSentences) {
-        // Need to load this level's sentences
-        setLevelLoading(true);
-        try {
-          if (!isLevelReady(lvl)) {
-            await preloadLevels([lvl]);
-          }
-          const items = extractLevelSentences(lvl);
-          if (items.length > 0) {
-            const count = upsertSentences(items);
-            toast.success(`已加载 ${({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'})[lvl] || lvl} 词库 ${count} 条例句`);
-          } else {
-            toast.info('该词库没有例句');
-          }
-        } catch {
-          toast.error('加载词库失败');
+      // First visit to this level: preload → extract (cached) → persist → rebuild
+      let updated: ISpellingSentence[] = sentences; // fallback
+      setLevelLoading(true);
+      try {
+        if (!isLevelReady(lvl)) {
+          await preloadLevels([lvl]);
         }
-        setLevelLoading(false);
+        const items = extractLevelSentences(lvl);
 
-        // Compute fresh sentences locally (upsert applied) and rebuild with override
-        const existingTexts = new Set(sentences.map((s) => s.en.trim().toLowerCase()));
-        const freshSentences = [...sentences];
-        const newItems = extractLevelSentences(lvl);
-        for (const item of newItems) {
+        // Build Map for O(1) lookup — replaces O(n²) findIndex loops
+        const idxMap = new Map<string, number>();
+        sentences.forEach((s, i) => idxMap.set(s.en.trim().toLowerCase(), i));
+
+        updated = [...sentences];
+        const seenKeys = new Set(idxMap.keys());
+        let changed = 0;
+
+        for (const item of items) {
           const key = item.en.trim().toLowerCase();
-          const idx = freshSentences.findIndex((s) => s.en.trim().toLowerCase() === key);
-          if (idx >= 0) {
-            // Update existing: add level field
-            if (freshSentences[idx].level !== item.level) {
-              freshSentences[idx] = { ...freshSentences[idx], level: item.level };
+          const idx = idxMap.get(key);
+          if (idx !== undefined) {
+            if (updated[idx].level !== item.level) {
+              updated[idx] = { ...updated[idx], level: item.level };
+              changed++;
             }
-          } else if (!existingTexts.has(key)) {
-            existingTexts.add(key);
-            freshSentences.push({
+          } else if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            updated.push({
               ...item,
               id: `spell_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
               createdAt: Date.now(),
             });
+            changed++;
           }
         }
-        rebuildSession({ sentences: freshSentences, level: lvl });
-        return;
-      }
 
-      // Sentences already exist for this level — rebuild directly
-      rebuildSession({ level: lvl });
+        if (changed > 0) {
+          // Persist asynchronously — UI rebuilds immediately with local copy
+          upsertSentences(items);
+        }
+        toast.success(`已加载 ${({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'})[lvl] || lvl} 词库 ${items.length} 条例句`);
+      } catch {
+        toast.error('加载词库失败');
+      }
+      setLevelLoading(false);
+      rebuildSession({ sentences: updated, level: lvl });
     },
     [activeLevel, sentences, extractLevelSentences, upsertSentences, rebuildSession],
   );
 
   /** Build sentence database from ALL word bank levels */
-  const ALL_LEVELS = ['zhongkao','gaokao','cet4','cet6','ielts','toefl','postgraduate','professional','advanced'];
   const handleBuildDatabase = useCallback(async () => {
     setBuilding(true);
     try {
@@ -753,7 +759,7 @@ export default function SpellingPage() {
         handleLevelChange(saved.activeLevel);
       }
     } catch { /* ignore */ }
-  }, [sentences.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sentences.length]);
 
   // Progress  // Progress
   const isFav = currentSentence ? isFavorited(currentSentence.en, 'spelling') : false;
@@ -813,46 +819,7 @@ export default function SpellingPage() {
     );
   }
 
-  // ── Completion / Empty-Level State ──
-  const hasLevelSentences = activeLevel === 'all' || sentences.some((s) => s.level === activeLevel);
-
-  if (sessionQueue.length === 0 && !hasLevelSentences && !completionShown) {
-    // Level with no sentences at all
-    return (
-      <div className="flex flex-col items-center justify-center py-32 px-4">
-        <div className="size-20 rounded-3xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/10 flex items-center justify-center mb-6">
-          <BookOpen className="size-10 text-amber-500" />
-        </div>
-        <h2 className="text-2xl font-black italic mb-2">当前词库没有句子</h2>
-        <p className="text-muted-foreground mb-8 text-center max-w-md">
-          {sentences.length > 0
-            ? '试试切换回全部词库，或重建句子数据库'
-            : '首次使用需要建立句子数据库'}
-        </p>
-
-        <div className="flex gap-3">
-          <Button
-            onClick={() => handleLevelChange('all')}
-            className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
-          >
-            <BookOpen className="size-4" />
-            返回全部词库
-          </Button>
-          <Button
-            onClick={handleBuildDatabase}
-            className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold gap-2"
-          >
-            <RefreshCw className="size-4" />
-            重建句子库
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground/60 mt-4">
-          重建将清除旧例句并用带词库标记的句子替换
-        </p>
-      </div>
-    );
-  }
-
+  // ── Completion State ──
   if (completionShown || sessionQueue.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-32 px-4">
@@ -1074,14 +1041,22 @@ export default function SpellingPage() {
           {/* Progress */}
           <div className="flex items-center gap-3">
             <span className="text-sm font-bold text-foreground/80">
-              {currentIndex + 1} / {sessionQueue.length}
+              {sessionQueue.length > 0 ? `${currentIndex + 1}/${sessionQueue.length}` : '0/0'}
             </span>
             <div className="w-32 h-1.5 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-[#00B894] rounded-full transition-all duration-300"
-                style={{ width: `${((currentIndex + 1) / sessionQueue.length) * 100}%` }}
+                style={{ width: `${sessionQueue.length > 0 ? ((currentIndex + 1) / sessionQueue.length) * 100 : 0}%` }}
               />
             </div>
+            {(() => {
+              const totalInLevel = activeLevel === 'all' ? sentences.length : sentences.filter(s => s.level === activeLevel).length;
+              return (
+                <Badge variant="secondary" className="rounded-lg text-[10px] font-bold whitespace-nowrap">
+                  共 {totalInLevel} 句
+                </Badge>
+              );
+            })()}
             <Badge variant="secondary" className="rounded-lg text-[10px] font-bold">
               今日 {learningStats.todayPracticed} 句
             </Badge>
