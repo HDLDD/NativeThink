@@ -24,6 +24,10 @@
 
 
 
+
+## 2026-07-16
+- feat: import all 9 word banks on build, add level filter UI (`018fecf`)
+
 ## 2026-07-16
 - fix: word bank selector buttons, persist completed sentences, fill mode init + wrong-words fix, index-based prev/next nav (`72ee5a9`)
 

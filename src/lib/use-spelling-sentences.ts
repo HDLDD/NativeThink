@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { safeStorage } from './safe-storage';
 import { extractJson } from './utils';
-import type { ISpellingSentence, SpellingDifficulty } from '@/types/spelling';
+import type { ISpellingSentence, SpellingDifficulty, SpellingSentenceSource } from '@/types/spelling';
 
 const SENTENCES_KEY = '__nativethink_spelling_sentences';
 const BATCH_COUNTER_KEY = '__nativethink_spelling_batch_counter';
@@ -93,6 +93,17 @@ export function useSpellingSentences() {
   const removeSentence = useCallback(
     (id: string) => {
       persist(sentences.filter((s) => s.id !== id));
+    },
+    [sentences, persist],
+  );
+
+  /** Remove all sentences with a given source (e.g. 'word_example' for rebuild) */
+  const removeBySource = useCallback(
+    (source: SpellingSentenceSource) => {
+      const remaining = sentences.filter((s) => s.source !== source);
+      if (remaining.length < sentences.length) {
+        persist(remaining);
+      }
     },
     [sentences, persist],
   );
@@ -203,6 +214,7 @@ export function useSpellingSentences() {
     addSentence,
     addSentences,
     removeSentence,
+    removeBySource,
     clearAll,
     getSentence,
     importFromWordExamples,

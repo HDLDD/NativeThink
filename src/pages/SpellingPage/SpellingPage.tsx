@@ -290,9 +290,9 @@ export default function SpellingPage() {
   // Hooks
   const {
     sentences,
-    addSentence,
     addSentences,
-aiBatchAdd,
+    removeBySource,
+    aiBatchAdd,
   } = useSpellingSentences();
   const {
     getProgress,
@@ -301,6 +301,7 @@ aiBatchAdd,
     buildSessionQueue,
     stats: learningStats,
     markCompleted,
+    resetAllProgress,
   } = useSpellingLearning();
   const tts = useTTS();
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
@@ -331,6 +332,7 @@ aiBatchAdd,
   // UI state
   const [showFavorites, setShowFavorites] = useState(false);
   const [showAIDialog, setShowAIDialog] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
   const [completionShown, setCompletionShown] = useState(false);
   const [autoRead, setAutoRead] = useState(true);         // 自动朗读
   const [importDirty, setImportDirty] = useState(0);       // import → rebuild trigger
@@ -368,7 +370,14 @@ aiBatchAdd,
     if (sentences.length > 0 && sessionQueue.length === 0) {
       rebuildSession();
     }
-  }, [sentences.length, rebuildSession, sessionQueue.length, activeLevel]);
+  }, [sentences.length, rebuildSession, sessionQueue.length]);
+
+  // Rebuild session when level filter changes
+  useEffect(() => {
+    if (sentences.length > 0) {
+      rebuildSession();
+    }
+  }, [activeLevel]);
 
   // Rebuild session when import completes (importDirty incremented)
   useEffect(() => {
@@ -597,8 +606,10 @@ aiBatchAdd,
   const handleBuildDatabase = useCallback(async () => {
     setBuilding(true);
     try {
-      let totalItems = 0;
-      let totalAdded = 0;
+      // Step 1: Remove all old word_example sentences so they are re-imported with correct level field
+      removeBySource('word_example');
+
+      let totalImported = 0;
       for (const level of ALL_LEVELS) {
         await preloadLevels([level]);
         const words = queryWords({ level });
@@ -621,19 +632,20 @@ aiBatchAdd,
           }
         }
         if (items.length > 0) {
-          const added = addSentences(items);
-          totalItems += items.length;
-          totalAdded += added;
+          addSentences(items);
+          totalImported += items.length;
         }
         await new Promise(r => setTimeout(r, 50)); // yield between levels
       }
-      toast.success(`数据库建立完成：共 ${totalItems} 条，新增 ${totalAdded} 条`);
-      setImportDirty((c) => c + 1);
+      toast.success(`数据库建立完成：共导入 ${totalImported} 条例句`);
+      if (activeLevel === 'all') {
+        rebuildSession();
+      }
     } catch {
       toast.error('建库失败，请重试');
     }
     setBuilding(false);
-  }, [addSentences, getDifficulty]);
+  }, [addSentences, getDifficulty, removeBySource, activeLevel, rebuildSession]);
 
   // Progress  // Progress
   const isFav = currentSentence ? isFavorited(currentSentence.en, 'spelling') : false;
@@ -723,7 +735,51 @@ aiBatchAdd,
             <Sparkles className="size-4" />
             添加新句子
           </Button>
+          <Button
+            onClick={() => setShowResetDialog(true)}
+            variant="outline"
+            className="rounded-2xl font-bold gap-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:border-rose-800 dark:hover:bg-rose-950/30"
+          >
+            <RotateCcw className="size-4" />
+            重置学习记录
+          </Button>
         </div>
+
+        {/* Reset progress confirmation */}
+        <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+          <DialogContent className="rounded-2xl sm:max-w-sm" aria-describedby="reset-dialog-desc">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base font-black text-rose-600">
+                <RotateCcw className="size-5" />
+                重置学习记录
+              </DialogTitle>
+              <p id="reset-dialog-desc" className="text-xs text-muted-foreground">
+                此操作将清除所有句子的学习进度和完成记录，包括 SM-2 间隔数据、错词记录和每日练习统计。句子库本身不受影响。
+              </p>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowResetDialog(false)}
+                className="rounded-xl font-bold"
+              >
+                取消
+              </Button>
+              <Button
+                onClick={() => {
+                  resetAllProgress();
+                  setShowResetDialog(false);
+                  rebuildSession();
+                  toast.success('学习记录已重置');
+                }}
+                className="rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold gap-2"
+              >
+                <RotateCcw className="size-4" />
+                确认重置
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <AIBatchAddDialog
           open={showAIDialog}
@@ -1154,14 +1210,24 @@ aiBatchAdd,
         >
           <ChevronLeft className="size-4" /> 上一句
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={rebuildSession}
-          className="rounded-xl gap-1 text-muted-foreground"
-        >
-          <RefreshCw className="size-3.5" /> 重新排队
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={rebuildSession}
+            className="rounded-xl gap-1 text-muted-foreground"
+          >
+            <RefreshCw className="size-3.5" /> 重新排队
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowResetDialog(true)}
+            className="rounded-xl gap-1 text-rose-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+          >
+            <RotateCcw className="size-3.5" /> 重置记录
+          </Button>
+        </div>
         <Button
           variant="ghost"
           size="sm"
@@ -1196,7 +1262,41 @@ aiBatchAdd,
         isConfigured={ai.isConfigured}
       />
 
-      {/* Import Dialog */}
+      {/* Reset progress confirmation */}
+      <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <DialogContent className="rounded-2xl sm:max-w-sm" aria-describedby="reset-dialog-desc-main">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-black text-rose-600">
+              <RotateCcw className="size-5" />
+              重置学习记录
+            </DialogTitle>
+            <p id="reset-dialog-desc-main" className="text-xs text-muted-foreground">
+              此操作将清除所有句子的学习进度和完成记录，包括 SM-2 间隔数据、错词记录和每日练习统计。句子库本身不受影响。
+            </p>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowResetDialog(false)}
+              className="rounded-xl font-bold"
+            >
+              取消
+            </Button>
+            <Button
+              onClick={() => {
+                resetAllProgress();
+                setShowResetDialog(false);
+                rebuildSession();
+                toast.success('学习记录已重置');
+              }}
+              className="rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold gap-2"
+            >
+              <RotateCcw className="size-4" />
+              确认重置
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Favorites Sidebar (Sheet) ── */}
       <Sheet open={showFavorites} onOpenChange={setShowFavorites}>

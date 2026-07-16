@@ -214,26 +214,26 @@ export function useSpellingLearning() {
     };
   }, [state.progress, state.todayPracticed]);
 
-  /** Build session queue: due sentences first, then new ones */
+  /** Build session queue: due sentences first, then new ones. Completed sentences are excluded entirely. */
   const buildSessionQueue = useCallback(
     (allSentences: ISpellingSentence[]): string[] => {
       const now = Date.now();
       const progress = state.progress;
+      const completedSet = new Set(completedSentenceIds);
 
-      // Separate into due and new
+      // Exclude all completed sentences
+      const pending = allSentences.filter((s) => !completedSet.has(s.id));
+
       const due: string[] = [];
       const newOnes: string[] = [];
-      const mastered: string[] = [];
 
-      for (const s of allSentences) {
+      for (const s of pending) {
         const p = progress[s.id];
         if (!p || p.status === 'new') {
-          // Skip completed sentences that have no SM-2 progress yet
-          if (!completedSentenceIds.includes(s.id)) {
-            newOnes.push(s.id);
-          }
-        } else if (p.status === 'mastered' && p.nextReview > now) {
-          mastered.push(s.id);
+          newOnes.push(s.id);
+        } else if (p.status === 'mastered') {
+          // Mastered sentences do not repeat — skip entirely
+          continue;
         } else if (p.nextReview <= now) {
           due.push(s.id);
         } else {
@@ -248,7 +248,7 @@ export function useSpellingLearning() {
       due.sort((a, b) => (progress[a]?.nextReview || 0) - (progress[b]?.nextReview || 0));
       const shuffled = [...newOnes].sort(() => Math.random() - 0.5);
 
-      return [...due, ...shuffled, ...mastered];
+      return [...due, ...shuffled];
     },
     [state.progress, completedSentenceIds],
   );
