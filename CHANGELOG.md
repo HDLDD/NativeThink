@@ -19,6 +19,10 @@
 
 
 
+
+## 2026-07-16
+- feat: add vertical bar and brand-color underline on focus to show active word (`c917832`)
+
 ## 2026-07-16
 - fix: submitted results no longer cleared by effect, remove completed sentences from queue, Tab nav + auto-focus, cancel stale TTS (`397cb11`)
 
