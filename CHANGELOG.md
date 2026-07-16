@@ -9,6 +9,10 @@
 
 
 
+
+## 2026-07-16
+- refactor: dictation mode - single continuous input instead of per-word fields (`12945d5`)
+
 ## 2026-07-16
 - fix: add _redirects for SPA client-side routing, fix Dialog aria-describedby warning (`bd46d45`)
 

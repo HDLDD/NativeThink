@@ -57,7 +57,7 @@ import { useSpellingSentences } from '@/lib/use-spelling-sentences';
 import { useSpellingLearning } from '@/lib/use-spelling-learning';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { getRandomWords } from '@/data/wordbank';
+import { queryWords, preloadLevels } from '@/data/wordbank';
 import type { IWordEntry } from '@/data/wordbank/schema';
 import type {
   ISpellingSentence,
@@ -316,7 +316,6 @@ export default function SpellingPage() {
 
   // Import dialog state
   const [importLevel, setImportLevel] = useState('cet4');
-  const [importLoading, setImportLoading] = useState(false);
 
   /** Build/rebuild session */
   const rebuildSession = useCallback(() => {
@@ -529,29 +528,12 @@ export default function SpellingPage() {
     setAiLoading(false);
   }, [aiTopic, aiDifficulty, aiCount, ai.isConfigured, ai.chat, ai.buildMessages, aiBatchAdd]);
 
-  /** Import from word bank */
-  const handleImportFromWords = useCallback(async () => {
-    setImportLoading(true);
-    try {
-      const words = getRandomWords(50, importLevel as any);
-      let totalImported = 0;
-      for (const w of words) {
-        if (w.examples && w.examples.length > 0) {
-          const count = importFromWordExamples(
-            w.examples,
-            w.word,
-            importLevel === 'cet4' || importLevel === 'zhongkao' || importLevel === 'gaokao' ? 'beginner' : 'intermediate',
-          );
-          totalImported += count;
-        }
-      }
-      toast(`从单词库导入了 ${totalImported} 条例句`);
-    } catch {
-      toast('导入失败，请重试');
-    }
-    setImportLoading(false);
-    setShowImportDialog(false);
-  }, [importLevel, importFromWordExamples]);
+  /** Map wordbank level to difficulty */
+  const getDifficulty = useCallback((level: string): SpellingDifficulty => {
+    if (['zhongkao', 'gaokao', 'cet4'].includes(level)) return 'beginner';
+    if (['advanced'].includes(level)) return 'advanced';
+    return 'intermediate';
+  }, []);
 
   // Progress
   const isFav = currentSentence ? isFavorited(currentSentence.en, 'spelling') : false;
@@ -607,8 +589,9 @@ export default function SpellingPage() {
           onOpenChange={setShowImportDialog}
           level={importLevel}
           onLevelChange={setImportLevel}
-          loading={importLoading}
-          onImport={handleImportFromWords}
+          importFromWordExamples={importFromWordExamples}
+          getDifficulty={getDifficulty}
+          onImported={rebuildSession}
         />
       </div>
     );
@@ -1083,11 +1066,9 @@ export default function SpellingPage() {
         onOpenChange={setShowImportDialog}
         level={importLevel}
         onLevelChange={setImportLevel}
-        loading={importLoading}
-        onImport={async () => {
-          await handleImportFromWords();
-          rebuildSession();
-        }}
+        importFromWordExamples={importFromWordExamples}
+        getDifficulty={getDifficulty}
+        onImported={rebuildSession}
       />
 
       {/* ── Favorites Sidebar (Sheet) ── */}
@@ -1271,51 +1252,248 @@ function AIBatchAddDialog({
 }
 
 function ImportDialog({
-  open, onOpenChange, level, onLevelChange, loading, onImport,
+  open, onOpenChange, level, onLevelChange, importFromWordExamples, getDifficulty, onImported,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   level: string;
   onLevelChange: (l: string) => void;
-  loading: boolean;
-  onImport: () => Promise<void>;
+  importFromWordExamples: (examples: { en: string; zh: string }[], sourceWord: string, difficulty: SpellingDifficulty) => number;
+  getDifficulty: (level: string) => SpellingDifficulty;
+  onImported: () => void;
 }) {
+  const [scanning, setScanning] = useState(false);
+  const [importingSegments, setImportingSegments] = useState<Set<number>>(new Set());
+  const [segments, setSegments] = useState<
+    Array<{ index: number; from: number; to: number; examples: { en: string; zh: string; word: string }[] }>
+  >([]);
+  const [importedSet, setImportedSet] = useState<Set<number>>(new Set());
+  const [totalFound, setTotalFound] = useState(0);
+  const [totalImported, setTotalImported] = useState(0);
+  const [scanned, setScanned] = useState(false);
+
+  const SEGMENT_SIZE = 200;
+
+  // Reset when dialog opens/closes or level changes
+  useEffect(() => {
+    if (!open) {
+      setScanned(false);
+      setSegments([]);
+      setImportedSet(new Set());
+      setTotalFound(0);
+      setTotalImported(0);
+      setScanning(false);
+      setImportingSegments(new Set());
+    }
+  }, [open]);
+
+  const handleScan = useCallback(async () => {
+    setScanning(true);
+    setScanned(false);
+    try {
+      // Preload the level
+      await preloadLevels([level]);
+      const words = queryWords({ level });
+      if (!words || words.length === 0) {
+        toast('该词库暂无数据');
+        setScanning(false);
+        return;
+      }
+
+      // Collect all examples from all words
+      const allExamples: { en: string; zh: string; word: string }[] = [];
+      for (const w of words) {
+        if (w.examples && w.examples.length > 0) {
+          for (const ex of w.examples) {
+            if (ex.en && ex.zh) {
+              allExamples.push({ en: ex.en.trim(), zh: ex.zh.trim(), word: w.word });
+            }
+          }
+        }
+      }
+
+      setTotalFound(allExamples.length);
+
+      // Build segments of SEGMENT_SIZE
+      const segs: Array<{ index: number; from: number; to: number; examples: { en: string; zh: string; word: string }[] }> = [];
+      for (let i = 0; i < allExamples.length; i += SEGMENT_SIZE) {
+        const chunk = allExamples.slice(i, i + SEGMENT_SIZE);
+        segs.push({
+          index: segs.length,
+          from: i + 1,
+          to: Math.min(i + SEGMENT_SIZE, allExamples.length),
+          examples: chunk,
+        });
+      }
+      setSegments(segs);
+      setScanned(true);
+    } catch (e) {
+      toast('扫描词库失败，请重试');
+    }
+    setScanning(false);
+  }, [level]);
+
+  const handleImportSegment = useCallback(async (segIndex: number) => {
+    const seg = segments[segIndex];
+    if (!seg) return;
+
+    setImportingSegments((prev) => new Set(prev).add(segIndex));
+    let count = 0;
+    try {
+      const difficulty = getDifficulty(level);
+      for (const ex of seg.examples) {
+        const added = importFromWordExamples([{ en: ex.en, zh: ex.zh }], ex.word, difficulty);
+        count += added;
+      }
+      setImportedSet((prev) => new Set(prev).add(segIndex));
+      setTotalImported((prev) => prev + count);
+      toast.success(`第 ${segIndex + 1} 段导入完成：新增 ${count} 条`);
+    } catch {
+      toast.error(`第 ${segIndex + 1} 段导入失败`);
+    }
+    setImportingSegments((prev) => {
+      const next = new Set(prev);
+      next.delete(segIndex);
+      return next;
+    });
+  }, [segments, level, importFromWordExamples, getDifficulty]);
+
+  const handleImportAll = useCallback(async () => {
+    for (let i = 0; i < segments.length; i++) {
+      if (!importedSet.has(i)) {
+        await handleImportSegment(i);
+      }
+    }
+    onImported();
+  }, [segments, importedSet, handleImportSegment, onImported]);
+
+  const allImported = scanned && segments.length > 0 && importedSet.size === segments.length;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl sm:max-w-sm" aria-describedby="import-dialog-desc">
+      <DialogContent className="rounded-2xl sm:max-w-md" aria-describedby="import-dialog-desc">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base font-black">
             <BookOpen className="size-5 text-[#00B894]" />
             从单词库导入例句
           </DialogTitle>
           <p id="import-dialog-desc" className="text-xs text-muted-foreground">
-            选择词库级别，随机抽取单词的例句添加到拼写练习库
+            分段导入词库中所有单词的例句，每段至少 {SEGMENT_SIZE} 条
           </p>
         </DialogHeader>
 
-        <div className="py-2">
-          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">
-            选择词库级别
-          </label>
-          <Select value={level} onValueChange={onLevelChange}>
-            <SelectTrigger className="rounded-xl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="zhongkao">中考</SelectItem>
-              <SelectItem value="gaokao">高考</SelectItem>
-              <SelectItem value="cet4">大学四级</SelectItem>
-              <SelectItem value="cet6">大学六级</SelectItem>
-              <SelectItem value="ielts">雅思</SelectItem>
-              <SelectItem value="toefl">托福</SelectItem>
-              <SelectItem value="postgraduate">考研</SelectItem>
-              <SelectItem value="professional">专业英语</SelectItem>
-              <SelectItem value="advanced">高级</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-[11px] text-muted-foreground/60 mt-2">
-            系统将随机抽取该词库中单词的例句，添加到拼写句子库中（已存在的不会重复添加）。
-          </p>
+        <div className="py-2 space-y-4">
+          {/* Level selector */}
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">
+              选择词库级别
+            </label>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Select value={level} onValueChange={(v) => { onLevelChange(v); setScanned(false); setSegments([]); }}>
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="zhongkao">中考 · 3,223 词</SelectItem>
+                    <SelectItem value="gaokao">高考 · 6,008 词</SelectItem>
+                    <SelectItem value="cet4">大学四级 · 4,542 词</SelectItem>
+                    <SelectItem value="cet6">大学六级 · 7,404 词</SelectItem>
+                    <SelectItem value="ielts">雅思 · 6,609 词</SelectItem>
+                    <SelectItem value="toefl">托福 · 10,367 词</SelectItem>
+                    <SelectItem value="postgraduate">考研 · 9,602 词</SelectItem>
+                    <SelectItem value="professional">专业英语 · 8,887 词</SelectItem>
+                    <SelectItem value="advanced">高级 · 18,471 词</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={handleScan}
+                disabled={scanning}
+                className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold shrink-0"
+              >
+                {scanning ? '扫描中...' : '扫描词库'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Scan result */}
+          {scanned && (
+            <div className="rounded-xl bg-muted/50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold">共扫描到 {totalFound} 条例句</span>
+                <span className="text-xs text-muted-foreground">
+                  分为 {segments.length} 段
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              {segments.length > 0 && (
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#00B894] rounded-full transition-all duration-300"
+                    style={{ width: `${(importedSet.size / segments.length) * 100}%` }}
+                  />
+                </div>
+              )}
+
+              {/* Segment list */}
+              <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                {segments.map((seg) => {
+                  const done = importedSet.has(seg.index);
+                  const importing = importingSegments.has(seg.index);
+                  return (
+                    <div
+                      key={seg.index}
+                      className={cn(
+                        'flex items-center justify-between p-2 rounded-lg text-xs transition-all',
+                        done
+                          ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-background border border-border/50',
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold">第 {seg.index + 1} 段</span>
+                        <span className="text-muted-foreground">
+                          第 {seg.from}-{seg.to} 条 ({seg.examples.length} 句)
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {done ? (
+                          <span className="text-emerald-500 font-bold text-[10px]">✓ 已导入</span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() => handleImportSegment(seg.index)}
+                            disabled={importing}
+                            className="h-7 rounded-lg text-[10px] font-bold px-3 bg-[#00B894] hover:bg-[#00a882] text-white"
+                          >
+                            {importing ? '导入中...' : '导入此段'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Total imported */}
+              {totalImported > 0 && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">
+                  已累计导入 {totalImported} 条例句
+                </p>
+              )}
+
+              {/* All done */}
+              {allImported && (
+                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 p-3 text-center">
+                  <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                    ✅ 全部导入完成！共 {totalImported} 条
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2">
@@ -1324,15 +1502,26 @@ function ImportDialog({
             onClick={() => onOpenChange(false)}
             className="rounded-xl font-bold"
           >
-            取消
+            {allImported ? '完成' : '取消'}
           </Button>
-          <Button
-            onClick={onImport}
-            disabled={loading}
-            className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
-          >
-            {loading ? '导入中...' : <><BookOpen className="size-4" /> 导入例句</>}
-          </Button>
+          {scanned && !allImported && (
+            <Button
+              onClick={handleImportAll}
+              disabled={importingSegments.size > 0}
+              className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
+            >
+              <BookOpen className="size-4" />
+              逐段导入全部
+            </Button>
+          )}
+          {allImported && (
+            <Button
+              onClick={() => { onOpenChange(false); onImported(); }}
+              className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold"
+            >
+              开始练习
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
