@@ -36,7 +36,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -293,8 +292,7 @@ export default function SpellingPage() {
     sentences,
     addSentence,
     addSentences,
-    importFromWordExamples,
-    aiBatchAdd,
+aiBatchAdd,
   } = useSpellingSentences();
   const {
     getProgress,
@@ -337,6 +335,7 @@ export default function SpellingPage() {
   const [autoRead, setAutoRead] = useState(true);         // 自动朗读
   const [importDirty, setImportDirty] = useState(0);       // import → rebuild trigger
   const [building, setBuilding] = useState(false);          // building sentence database
+  const [activeLevel, setActiveLevel] = useState('all');     // filter by level ('all' or level code)
 
   // AI dialog state
   const [aiTopic, setAiTopic] = useState('');
@@ -347,9 +346,7 @@ export default function SpellingPage() {
   const [aiPreview, setAiPreview] = useState<{ en: string; zh: string }[]>([]);
 
   // Import dialog state
-  const [importLevel, setImportLevel] = useState('cet4');
-
-  /** Build/rebuild session */
+/** Build/rebuild session */
   const rebuildSession = useCallback(() => {
     const allSentences = sentences;
     if (allSentences.length === 0) {
@@ -357,20 +354,21 @@ export default function SpellingPage() {
       setCurrentIndex(0);
       return;
     }
-    const queue = buildSessionQueue(allSentences); // Include ALL sentences
+    const filtered = activeLevel === 'all' ? allSentences : allSentences.filter(s => s.level === activeLevel);
+    const queue = buildSessionQueue(filtered);
     setSessionQueue(queue);
     setCurrentIndex(0);
     setSubmitted(false);
     setResults(null);
     setCompletionShown(false);
-  }, [sentences, buildSessionQueue]);
+  }, [sentences, buildSessionQueue, activeLevel]);
 
   // Initialize session on sentences load
   useEffect(() => {
     if (sentences.length > 0 && sessionQueue.length === 0) {
       rebuildSession();
     }
-  }, [sentences.length, rebuildSession, sessionQueue.length]);
+  }, [sentences.length, rebuildSession, sessionQueue.length, activeLevel]);
 
   // Rebuild session when import completes (importDirty incremented)
   useEffect(() => {
@@ -594,43 +592,54 @@ export default function SpellingPage() {
   }, []);
 
 
-  /** Build sentence database from selected word bank level */
+  /** Build sentence database from ALL word bank levels */
+  const ALL_LEVELS = ['zhongkao','gaokao','cet4','cet6','ielts','toefl','postgraduate','professional','advanced'];
   const handleBuildDatabase = useCallback(async () => {
     setBuilding(true);
     try {
-      await preloadLevels([importLevel]);
-      const words = queryWords({ level: importLevel });
-      const difficulty = getDifficulty(importLevel);
-      const items = [];
-      for (const w of words) {
-        if (w.examples) {
-          for (const ex of w.examples) {
-            if (ex.en && ex.zh) {
-              items.push({
-                en: ex.en.trim(),
-                zh: ex.zh.trim(),
-                source: 'word_example',
-                sourceWord: w.word,
-                difficulty,
-              });
+      let totalItems = 0;
+      let totalAdded = 0;
+      for (const level of ALL_LEVELS) {
+        await preloadLevels([level]);
+        const words = queryWords({ level });
+        const difficulty = getDifficulty(level);
+        const items = [];
+        for (const w of words) {
+          if (w.examples) {
+            for (const ex of w.examples) {
+              if (ex.en && ex.zh) {
+                items.push({
+                  en: ex.en.trim(),
+                  zh: ex.zh.trim(),
+                  source: 'word_example',
+                  sourceWord: w.word,
+                  level,
+                  difficulty,
+                });
+              }
             }
           }
         }
+        if (items.length > 0) {
+          const added = addSentences(items);
+          totalItems += items.length;
+          totalAdded += added;
+        }
+        await new Promise(r => setTimeout(r, 50)); // yield between levels
       }
-      const added = addSentences(items);
-      toast.success(`数据库建立完成：共 ${items.length} 条，新增 ${added} 条`);
+      toast.success(`数据库建立完成：共 ${totalItems} 条，新增 ${totalAdded} 条`);
       setImportDirty((c) => c + 1);
     } catch {
       toast.error('建库失败，请重试');
     }
     setBuilding(false);
-  }, [importLevel, addSentences, getDifficulty]);
+  }, [addSentences, getDifficulty]);
 
   // Progress  // Progress
   const isFav = currentSentence ? isFavorited(currentSentence.en, 'spelling') : false;
   const currentProgress = currentSentence ? getProgress(currentSentence.id) : null;
 
-  // Welcome screen — no sentences yet, select a word bank or use AI
+  // Welcome screen — no sentences yet, build database or use AI
   if (sentences.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-32 px-4">
@@ -638,56 +647,23 @@ export default function SpellingPage() {
           <Sparkles className="size-10 text-[#00B894]" />
         </div>
         <h2 className="text-2xl font-black italic mb-2">句子拼写</h2>
-        <p className="text-muted-foreground mb-6 text-center max-w-md">
-          选择一个词库，自动建立句子数据库开始练习
+        <p className="text-muted-foreground mb-8 text-center max-w-md">
+          首次使用需要建立句子数据库<br />将自动导入全部词库（9 级）的所有例句
         </p>
-
-        <div className="w-full max-w-xs mb-6">
-          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 block text-center">
-            选择词库级别
-          </label>
-          <div className="flex flex-wrap justify-center gap-2">
-            {[
-              ['zhongkao', '中考'],
-              ['gaokao', '高考'],
-              ['cet4', '四级'],
-              ['cet6', '六级'],
-              ['ielts', '雅思'],
-              ['toefl', '托福'],
-              ['postgraduate', '考研'],
-              ['professional', '专业'],
-              ['advanced', '高级'],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setImportLevel(value)}
-                className={cn(
-                  'px-4 py-2 rounded-xl text-sm font-bold border transition-all duration-200',
-                  importLevel === value
-                    ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]'
-                    : 'border-border text-muted-foreground hover:border-muted-foreground/40',
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
 
         <Button
           onClick={handleBuildDatabase}
           disabled={building}
-          className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2 px-8"
+          className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2 px-8 mb-4"
         >
           {building ? (
-            <>建库中...</>
+            <><RefreshCw className="size-4 animate-spin" /> 建库中...</>
           ) : (
-            <><BookOpen className="size-4" /> 开始建库</>
+            <><BookOpen className="size-4" /> 建立句子库</>
           )}
         </Button>
 
-        <p className="text-xs text-muted-foreground/60 mt-4 text-center max-w-md">
+        <p className="text-xs text-muted-foreground/60 text-center max-w-md">
           也可以先通过 AI 添加自定义句子
         </p>
         <Button
@@ -775,7 +751,38 @@ export default function SpellingPage() {
       {/* ── Header Controls ── */}
       <Card className="p-4 rounded-2xl border-border/50 shadow-sm space-y-4">
         {/* Row 1: Mode toggles */}
-        <div className="flex items-center justify-between">
+        {/* Level filter + Mode toggles */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-xl border border-border p-0.5 bg-muted/50">
+              <button
+                onClick={() => setActiveLevel('all')}
+                className={cn(
+                  'px-2.5 py-1.5 rounded-[10px] text-[10px] font-bold transition-all whitespace-nowrap',
+                  activeLevel === 'all'
+                    ? 'bg-[#00B894] text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                全部
+              </button>
+              {['zhongkao','gaokao','cet4','cet6','ielts','toefl','postgraduate','professional','advanced'].map((lvl) => (
+                <button
+                  key={lvl}
+                  onClick={() => setActiveLevel(lvl)}
+                  className={cn(
+                    'px-2.5 py-1.5 rounded-[10px] text-[10px] font-bold transition-all whitespace-nowrap',
+                    activeLevel === lvl
+                      ? 'bg-[#00B894] text-white shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'})[lvl]}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mr-2">
               拼写模式

@@ -23,6 +23,10 @@
 
 
 
+
+## 2026-07-16
+- fix: word bank selector buttons, persist completed sentences, fill mode init + wrong-words fix, index-based prev/next nav (`72ee5a9`)
+
 ## 2026-07-16
 - refactor: simplified SpellingPage — select level builds database, linear practice flow, removed ImportDialog (`b687900`)
 

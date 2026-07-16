@@ -22,6 +22,7 @@ export interface ISpellingSentence {
   zh: string;                    // Chinese translation
   source: SpellingSentenceSource;
   sourceWord?: string;           // originating word (if from word example)
+  level?: string;                // word bank level (e.g. 'cet4')
   difficulty: SpellingDifficulty;
   batchId?: string;              // for tracking AI-generated batches
   createdAt: number;
