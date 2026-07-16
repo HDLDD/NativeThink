@@ -16,6 +16,10 @@
 
 
 
+
+## 2026-07-16
+- feat: remove ___ placeholders, one-click full word bank import, fix sentence count not updating (`de4f924`)
+
 ## 2026-07-16
 - fix: adjust word gap to 0.5em (one 'a' width) (`8ece919`)
 
