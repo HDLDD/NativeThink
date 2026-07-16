@@ -188,7 +188,7 @@ function DictationInput({
                 value={userInputs[i] || ''}
                 onChange={(e) => setUserInput(i, e.target.value)}
                 disabled={submitted}
-                maxLength={clean.length + 2}
+                maxLength={80}
                 tabIndex={0}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-text"
                 onKeyDown={(e) => {
@@ -399,9 +399,9 @@ export default function SpellingPage() {
     }
   }, [importDirty, rebuildSession]);
 
-  // Reset inputs when sentence changes — don't clear submitted results mid-submission
+  // Reset inputs when sentence changes — don't clear if results are already shown
   useEffect(() => {
-    if (currentSentence && !submitted) {
+    if (currentSentence && !results) {
       setSubmitted(false);
       setResults(null);
       const words = getWords(currentSentence.en);
@@ -427,7 +427,7 @@ export default function SpellingPage() {
       }, 500);
       return () => { clearTimeout(timer); tts.cancel(); };
     }
-  }, [currentSentence?.id, mode, submitted]);
+  }, [currentSentence?.id, mode, results]);
 
   /** Check answers */
   const handleSubmit = useCallback(() => {

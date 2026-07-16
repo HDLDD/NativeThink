@@ -36,6 +36,10 @@
 
 
 
+
+## 2026-07-16
+- fix: prevent sentence-change effect from clearing submitted results (`f99d0c5`)
+
 ## 2026-07-16
 - fix: sentence display for fill mode, init effect handles all-completed, remove auto-reset (`c770c7b`)
 
