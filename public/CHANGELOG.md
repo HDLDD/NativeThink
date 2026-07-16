@@ -40,6 +40,10 @@
 
 
 
+
+## 2026-07-17
+- refactor: word bank sentences in global cache (not React state) — root cause fix (`a1a504c`)
+
 ## 2026-07-17
 - fix: sentence-change effect no longer touches submitted/results at all (`7198468`)
 

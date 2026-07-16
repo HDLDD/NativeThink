@@ -331,11 +331,15 @@ export default function SpellingPage() {
   // Session state
   const [sessionQueue, setSessionQueue] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const currentSentence = useMemo(() => {
+  const currentSentenceMemo = useMemo(() => {
     if (sessionQueue.length === 0) return undefined;
     const id = sessionQueue[currentIndex];
     return sentences.find((s) => s.id === id) || getWBSentences().find((s) => s.id === id);
   }, [sessionQueue, currentIndex, sentences]);
+  // Stable ref — handleSubmit always has the sentence even if useMemo flickers
+  const currentSentenceRef = useRef(currentSentenceMemo);
+  currentSentenceRef.current = currentSentenceMemo || currentSentenceRef.current;
+  const currentSentence = currentSentenceRef.current;
 
   // Input state
   const [dictationInputs, setDictationInputs] = useState<string[]>([]);  // per-word inputs for 句子拼写
