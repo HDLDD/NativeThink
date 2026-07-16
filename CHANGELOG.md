@@ -21,6 +21,10 @@
 
 
 
+
+## 2026-07-16
+- fix: buildSessionQueue now includes ALL sentences without maxNew limit, fix variable name (`74c71d0`)
+
 ## 2026-07-16
 - fix: increase session queue to 200 sentences, fix empty symbol display (&nbsp; → actual U+00A0) (`6be0277`)
 

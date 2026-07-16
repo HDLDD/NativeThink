@@ -332,10 +332,10 @@ export default function SpellingPage() {
   // UI state
   const [showFavorites, setShowFavorites] = useState(false);
   const [showAIDialog, setShowAIDialog] = useState(false);
-  const [showImportDialog, setShowImportDialog] = useState(false);
   const [completionShown, setCompletionShown] = useState(false);
   const [autoRead, setAutoRead] = useState(true);         // 自动朗读
   const [importDirty, setImportDirty] = useState(0);       // import → rebuild trigger
+  const [building, setBuilding] = useState(false);          // building sentence database
 
   // AI dialog state
   const [aiTopic, setAiTopic] = useState('');
@@ -593,11 +593,44 @@ export default function SpellingPage() {
     return 'intermediate';
   }, []);
 
-  // Progress
+
+  /** Build sentence database from selected word bank level */
+  const handleBuildDatabase = useCallback(async () => {
+    setBuilding(true);
+    try {
+      await preloadLevels([importLevel]);
+      const words = queryWords({ level: importLevel });
+      const difficulty = getDifficulty(importLevel);
+      const items = [];
+      for (const w of words) {
+        if (w.examples) {
+          for (const ex of w.examples) {
+            if (ex.en && ex.zh) {
+              items.push({
+                en: ex.en.trim(),
+                zh: ex.zh.trim(),
+                source: 'word_example',
+                sourceWord: w.word,
+                difficulty,
+              });
+            }
+          }
+        }
+      }
+      const added = addSentences(items);
+      toast.success(`数据库建立完成：共 ${items.length} 条，新增 ${added} 条`);
+      setImportDirty((c) => c + 1);
+    } catch {
+      toast.error('建库失败，请重试');
+    }
+    setBuilding(false);
+  }, [importLevel, addSentences, getDifficulty]);
+
+  // Progress  // Progress
   const isFav = currentSentence ? isFavorited(currentSentence.en, 'spelling') : false;
   const currentProgress = currentSentence ? getProgress(currentSentence.id) : null;
 
-  // ── Empty State ──
+  // Welcome screen — no sentences yet, select a word bank or use AI
   if (sentences.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-32 px-4">
@@ -605,29 +638,56 @@ export default function SpellingPage() {
           <Sparkles className="size-10 text-[#00B894]" />
         </div>
         <h2 className="text-2xl font-black italic mb-2">句子拼写</h2>
-        <p className="text-muted-foreground mb-8 text-center max-w-md">
-          还没有拼写句子。<br />
-          通过 AI 批量生成，或从单词库导入例句开始练习。
+        <p className="text-muted-foreground mb-6 text-center max-w-md">
+          选择一个词库，自动建立句子数据库开始练习
         </p>
-        <div className="flex gap-3">
-          <Button
-            onClick={() => setShowAIDialog(true)}
-            className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
-          >
-            <Sparkles className="size-4" />
-            AI 批量添加
-          </Button>
-          <Button
-            onClick={() => setShowImportDialog(true)}
-            variant="outline"
-            className="rounded-2xl font-bold gap-2"
-          >
-            <BookOpen className="size-4" />
-            从单词库导入
-          </Button>
+
+        <div className="w-full max-w-xs mb-6">
+          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block text-center">
+            选择词库级别
+          </label>
+          <Select value={importLevel} onValueChange={setImportLevel}>
+            <SelectTrigger className="rounded-xl">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="zhongkao">中考 · 3,223 词</SelectItem>
+              <SelectItem value="gaokao">高考 · 6,008 词</SelectItem>
+              <SelectItem value="cet4">大学四级 · 4,542 词</SelectItem>
+              <SelectItem value="cet6">大学六级 · 7,404 词</SelectItem>
+              <SelectItem value="ielts">雅思 · 6,609 词</SelectItem>
+              <SelectItem value="toefl">托福 · 10,367 词</SelectItem>
+              <SelectItem value="postgraduate">考研 · 9,602 词</SelectItem>
+              <SelectItem value="professional">专业英语 · 8,887 词</SelectItem>
+              <SelectItem value="advanced">高级 · 18,471 词</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Dialogs for empty state */}
+        <Button
+          onClick={handleBuildDatabase}
+          disabled={building}
+          className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2 px-8"
+        >
+          {building ? (
+            <>建库中...</>
+          ) : (
+            <><BookOpen className="size-4" /> 开始建库</>
+          )}
+        </Button>
+
+        <p className="text-xs text-muted-foreground/60 mt-4 text-center max-w-md">
+          也可以先通过 AI 添加自定义句子
+        </p>
+        <Button
+          onClick={() => setShowAIDialog(true)}
+          variant="outline"
+          className="rounded-xl font-bold gap-2 mt-2"
+        >
+          <Sparkles className="size-4" />
+          AI 添加句子
+        </Button>
+
         <AIBatchAddDialog
           open={showAIDialog}
           onOpenChange={setShowAIDialog}
@@ -639,17 +699,8 @@ export default function SpellingPage() {
           onCountChange={setAiCount}
           loading={aiLoading}
           result={aiResult}
-          onGenerate={handleAIGenerate}
+          onGenerate={async () => { await handleAIGenerate(); rebuildSession(); }}
           isConfigured={ai.isConfigured}
-        />
-        <ImportDialog
-          open={showImportDialog}
-          onOpenChange={setShowImportDialog}
-          level={importLevel}
-          onLevelChange={setImportLevel}
-          addSentences={addSentences}
-          getDifficulty={getDifficulty}
-          onImported={() => setImportDirty((c) => c + 1)}
         />
       </div>
     );
@@ -809,15 +860,6 @@ export default function SpellingPage() {
 
           {/* Action buttons */}
           <div className="flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowImportDialog(true)}
-              className="rounded-xl h-8 text-xs font-bold gap-1.5"
-            >
-              <BookOpen className="size-3.5" />
-              <span className="hidden sm:inline">导入例句</span>
-            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -1129,15 +1171,6 @@ export default function SpellingPage() {
       />
 
       {/* Import Dialog */}
-      <ImportDialog
-        open={showImportDialog}
-        onOpenChange={setShowImportDialog}
-        level={importLevel}
-        onLevelChange={setImportLevel}
-        addSentences={addSentences}
-        getDifficulty={getDifficulty}
-        onImported={() => setImportDirty((c) => c + 1)}
-      />
 
       {/* ── Favorites Sidebar (Sheet) ── */}
       <Sheet open={showFavorites} onOpenChange={setShowFavorites}>
@@ -1310,167 +1343,6 @@ function AIBatchAddDialog({
                 <>生成中...</>
               ) : (
                 <><Sparkles className="size-4" /> 生成句子</>
-              )}
-            </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ImportDialog({
-  open, onOpenChange, level, onLevelChange, addSentences, getDifficulty, onImported,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  level: string;
-  onLevelChange: (l: string) => void;
-  addSentences: (items: Omit<ISpellingSentence, 'id' | 'createdAt'>[]) => number;
-  getDifficulty: (level: string) => SpellingDifficulty;
-  onImported: () => void;
-}) {
-  const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
-  const [result, setResult] = useState<{ found: number; added: number } | null>(null);
-  const [error, setError] = useState('');
-
-  // Reset on open
-  useEffect(() => {
-    if (open) { setDone(false); setResult(null); setError(''); }
-  }, [open]);
-
-  const handleImportAll = useCallback(async () => {
-    setLoading(true);
-    setResult(null);
-    setError('');
-    try {
-      await preloadLevels([level]);
-      const words = queryWords({ level });
-      if (!words || words.length === 0) { setError('该词库暂无数据'); setLoading(false); return; }
-
-      const difficulty = getDifficulty(level);
-      const allItems: Omit<ISpellingSentence, 'id' | 'createdAt'>[] = [];
-      let found = 0;
-
-      for (const w of words) {
-        if (w.examples && w.examples.length > 0) {
-          for (const ex of w.examples) {
-            if (ex.en && ex.zh) {
-              found++;
-              allItems.push({
-                en: ex.en.trim(),
-                zh: ex.zh.trim(),
-                source: 'word_example' as const,
-                sourceWord: w.word,
-                difficulty,
-              });
-            }
-          }
-        }
-      }
-
-      const added = addSentences(allItems);
-      setResult({ found, added });
-      setDone(true);
-      // Signal parent to rebuild session queue
-      onImported();
-    } catch {
-      setError('导入失败，请重试');
-    }
-    setLoading(false);
-  }, [level, addSentences, getDifficulty, onImported]);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl sm:max-w-md" aria-describedby="import-dialog-desc">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base font-black">
-            <BookOpen className="size-5 text-[#00B894]" />
-            从单词库导入例句
-          </DialogTitle>
-          <p id="import-dialog-desc" className="text-xs text-muted-foreground">
-            一键导入整个词库的例句到拼写练习库
-          </p>
-        </DialogHeader>
-
-        <div className="py-2 space-y-4">
-          {/* Level selector */}
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">
-              选择词库级别
-            </label>
-            <Select value={level} onValueChange={onLevelChange}>
-              <SelectTrigger className="rounded-xl">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="zhongkao">中考 · 3,223 词</SelectItem>
-                <SelectItem value="gaokao">高考 · 6,008 词</SelectItem>
-                <SelectItem value="cet4">大学四级 · 4,542 词</SelectItem>
-                <SelectItem value="cet6">大学六级 · 7,404 词</SelectItem>
-                <SelectItem value="ielts">雅思 · 6,609 词</SelectItem>
-                <SelectItem value="toefl">托福 · 10,367 词</SelectItem>
-                <SelectItem value="postgraduate">考研 · 9,602 词</SelectItem>
-                <SelectItem value="professional">专业英语 · 8,887 词</SelectItem>
-                <SelectItem value="advanced">高级 · 18,471 词</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Loading */}
-          {loading && (
-            <div className="rounded-xl bg-muted/50 p-4 text-center">
-              <p className="text-sm font-bold text-muted-foreground">正在扫描并导入全部例句...</p>
-              <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-3">
-                <div className="h-full bg-[#00B894] rounded-full animate-pulse" style={{ width: '60%' }} />
-              </div>
-            </div>
-          )}
-
-          {/* Result */}
-          {result && (
-            <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 p-4 text-center space-y-1">
-              <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                ✅ 导入完成
-              </p>
-              <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">
-                扫描到 {result.found} 条例句，新增 {result.added} 条
-              </p>
-              {result.added < result.found && (
-                <p className="text-[10px] text-muted-foreground/60">
-                  {result.found - result.added} 条已存在，跳过
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Error */}
-          {error && (
-            <div className="rounded-xl bg-rose-50 dark:bg-rose-950/30 p-3 text-center">
-              <p className="text-sm font-bold text-rose-600 dark:text-rose-400">❌ {error}</p>
-            </div>
-          )}
-        </div>
-
-        <DialogFooter className="gap-2">
-          <Button
-            variant="outline"
-            onClick={() => { onOpenChange(false); if (done) onImported(); }}
-            className="rounded-xl font-bold"
-          >
-            {done ? '完成' : '取消'}
-          </Button>
-          {!done && (
-            <Button
-              onClick={handleImportAll}
-              disabled={loading}
-              className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
-            >
-              {loading ? (
-                '导入中...'
-              ) : (
-                <><BookOpen className="size-4" /> 导入全部例句</>
               )}
             </Button>
           )}
