@@ -35,6 +35,10 @@
 
 
 
+
+## 2026-07-16
+- fix: sentence display for fill mode, init effect handles all-completed, remove auto-reset (`c770c7b`)
+
 ## 2026-07-16
 - fix: move auto-reset useEffect before early returns (hooks rule), remove duplicate (`3b8c943`)
 

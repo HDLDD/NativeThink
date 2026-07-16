@@ -399,9 +399,9 @@ export default function SpellingPage() {
     }
   }, [importDirty, rebuildSession]);
 
-  // Reset inputs when sentence changes — NEVER clear submitted/results here (causes flash)
+  // Reset inputs when sentence changes — don't clear submitted results mid-submission
   useEffect(() => {
-    if (currentSentence) {
+    if (currentSentence && !submitted) {
       setSubmitted(false);
       setResults(null);
       const words = getWords(currentSentence.en);
@@ -427,7 +427,7 @@ export default function SpellingPage() {
       }, 500);
       return () => { clearTimeout(timer); tts.cancel(); };
     }
-  }, [currentSentence?.id, mode]); // mode changes need to init fillParts/fillInputs; autoRead excluded to avoid unwanted resets
+  }, [currentSentence?.id, mode, submitted]);
 
   /** Check answers */
   const handleSubmit = useCallback(() => {
