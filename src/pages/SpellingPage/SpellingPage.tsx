@@ -21,6 +21,7 @@ import {
   ChevronRight as ChevronRightIcon,
   List,
   Play,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,7 +57,7 @@ import { useSpellingSentences } from '@/lib/use-spelling-sentences';
 import { useSpellingLearning } from '@/lib/use-spelling-learning';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { queryWords, preloadLevels } from '@/data/wordbank';
+import { queryWords, preloadLevels, isLevelReady } from '@/data/wordbank';
 import type { IWordEntry } from '@/data/wordbank/schema';
 import type {
   ISpellingSentence,
@@ -291,7 +292,7 @@ export default function SpellingPage() {
   const {
     sentences,
     addSentences,
-    removeBySource,
+    upsertSentences,
     aiBatchAdd,
   } = useSpellingSentences();
   const {
@@ -336,7 +337,8 @@ export default function SpellingPage() {
   const [completionShown, setCompletionShown] = useState(false);
   const [autoRead, setAutoRead] = useState(true);         // 自动朗读
   const [importDirty, setImportDirty] = useState(0);       // import → rebuild trigger
-  const [building, setBuilding] = useState(false);          // building sentence database
+  const [building, setBuilding] = useState(false);          // building sentence database (full rebuild)
+  const [levelLoading, setLevelLoading] = useState(false);  // loading word bank data for level switch
   const [activeLevel, setActiveLevel] = useState('all');     // filter by level ('all' or level code)
 
   // AI dialog state
@@ -371,13 +373,6 @@ export default function SpellingPage() {
       rebuildSession();
     }
   }, [sentences.length, rebuildSession, sessionQueue.length]);
-
-  // Rebuild session when level filter changes
-  useEffect(() => {
-    if (sentences.length > 0) {
-      rebuildSession();
-    }
-  }, [activeLevel]);
 
   // Rebuild session when import completes (importDirty incremented)
   useEffect(() => {
@@ -600,52 +595,104 @@ export default function SpellingPage() {
     return 'intermediate';
   }, []);
 
+  /** Extract example sentences from word bank data for a level */
+  const extractLevelSentences = useCallback(
+    (level: string): Omit<ISpellingSentence, 'id' | 'createdAt'>[] => {
+      const words = queryWords({ level });
+      const difficulty = getDifficulty(level);
+      const items: Omit<ISpellingSentence, 'id' | 'createdAt'>[] = [];
+      for (const w of words) {
+        if (w.examples) {
+          for (const ex of w.examples) {
+            if (ex.en && ex.zh) {
+              items.push({
+                en: ex.en.trim(),
+                zh: ex.zh.trim(),
+                source: 'word_example',
+                sourceWord: w.word,
+                level,
+                difficulty,
+              });
+            }
+          }
+        }
+      }
+      return items;
+    },
+    [getDifficulty],
+  );
+
+  /** Switch level — lazy-load sentences on demand (like DeepVocabularyPage) */
+  const handleLevelChange = useCallback(
+    async (lvl: string) => {
+      if (lvl === activeLevel) return;
+
+      setActiveLevel(lvl);
+
+      // Check if we already have sentences tagged with this level
+      const hasSentences = lvl === 'all' || sentences.some((s) => s.level === lvl);
+
+      if (lvl !== 'all' && !hasSentences && !isLevelReady(lvl)) {
+        // Word bank data not yet loaded — preload it
+        setLevelLoading(true);
+        try {
+          await preloadLevels([lvl]);
+        } catch {
+          toast.error('加载词库数据失败');
+          setLevelLoading(false);
+          return;
+        }
+        setLevelLoading(false);
+      }
+
+      if (lvl !== 'all' && !hasSentences) {
+        // No sentences yet for this level — extract from word bank
+        setLevelLoading(true);
+        try {
+          if (!isLevelReady(lvl)) {
+            await preloadLevels([lvl]);
+          }
+          const items = extractLevelSentences(lvl);
+          if (items.length > 0) {
+            const count = upsertSentences(items);
+            toast.success(`已加载 ${({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'})[lvl] || lvl} 词库 ${count} 条例句`);
+          } else {
+            toast.info('该词库没有例句');
+          }
+        } catch {
+          toast.error('加载词库失败');
+        }
+        setLevelLoading(false);
+      }
+
+      // Rebuild session with the new level filter (sentences now have level field)
+      rebuildSession();
+    },
+    [activeLevel, sentences, extractLevelSentences, upsertSentences, rebuildSession],
+  );
 
   /** Build sentence database from ALL word bank levels */
   const ALL_LEVELS = ['zhongkao','gaokao','cet4','cet6','ielts','toefl','postgraduate','professional','advanced'];
   const handleBuildDatabase = useCallback(async () => {
     setBuilding(true);
     try {
-      // Step 1: Remove all old word_example sentences so they are re-imported with correct level field
-      removeBySource('word_example');
-
       let totalImported = 0;
       for (const level of ALL_LEVELS) {
         await preloadLevels([level]);
-        const words = queryWords({ level });
-        const difficulty = getDifficulty(level);
-        const items = [];
-        for (const w of words) {
-          if (w.examples) {
-            for (const ex of w.examples) {
-              if (ex.en && ex.zh) {
-                items.push({
-                  en: ex.en.trim(),
-                  zh: ex.zh.trim(),
-                  source: 'word_example',
-                  sourceWord: w.word,
-                  level,
-                  difficulty,
-                });
-              }
-            }
-          }
-        }
+        const items = extractLevelSentences(level);
         if (items.length > 0) {
-          addSentences(items);
-          totalImported += items.length;
+          const count = upsertSentences(items);
+          totalImported += count;
         }
         await new Promise(r => setTimeout(r, 50)); // yield between levels
       }
       toast.success(`数据库建立完成：共导入 ${totalImported} 条例句`);
-      if (activeLevel === 'all') {
-        rebuildSession();
-      }
+      rebuildSession();
     } catch {
       toast.error('建库失败，请重试');
     }
     setBuilding(false);
-  }, [addSentences, getDifficulty, removeBySource, activeLevel, rebuildSession]);
+  }, [extractLevelSentences, upsertSentences, rebuildSession]);
 
   // Progress  // Progress
   const isFav = currentSentence ? isFavorited(currentSentence.en, 'spelling') : false;
@@ -724,7 +771,7 @@ export default function SpellingPage() {
 
         <div className="flex gap-3">
           <Button
-            onClick={() => setActiveLevel('all')}
+            onClick={() => handleLevelChange('all')}
             className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
           >
             <BookOpen className="size-4" />
@@ -851,7 +898,7 @@ export default function SpellingPage() {
           <div className="flex items-center gap-2">
             <div className="flex rounded-xl border border-border p-0.5 bg-muted/50">
               <button
-                onClick={() => setActiveLevel('all')}
+                onClick={() => handleLevelChange('all')}
                 className={cn(
                   'px-2.5 py-1.5 rounded-[10px] text-[10px] font-bold transition-all whitespace-nowrap',
                   activeLevel === 'all'
@@ -864,7 +911,7 @@ export default function SpellingPage() {
               {['zhongkao','gaokao','cet4','cet6','ielts','toefl','postgraduate','professional','advanced'].map((lvl) => (
                 <button
                   key={lvl}
-                  onClick={() => setActiveLevel(lvl)}
+                  onClick={() => handleLevelChange(lvl)}
                   className={cn(
                     'px-2.5 py-1.5 rounded-[10px] text-[10px] font-bold transition-all whitespace-nowrap',
                     activeLevel === lvl
@@ -952,6 +999,14 @@ export default function SpellingPage() {
             {autoRead ? '🔊 自动' : '🔇 静音'}
           </button>
         </div>
+
+        {/* Loading indicator — like DeepVocabularyPage */}
+        {levelLoading && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#00B894]/5 border border-[#00B894]/20">
+            <Loader2 className="size-4 text-[#00B894] animate-spin shrink-0" />
+            <span className="text-xs font-bold text-[#00B894]">正在加载词库...</span>
+          </div>
+        )}
 
         {/* Row 2: Progress + Action buttons */}
         <div className="flex items-center justify-between">

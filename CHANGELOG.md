@@ -26,6 +26,10 @@
 
 
 
+
+## 2026-07-16
+- fix: show '当前词库没有句子' instead of '全部完成' when level has no sentences (`0887b25`)
+
 ## 2026-07-16
 - fix: level switching rebuild, clear old sentences on rebuild, completed sentences excluded, reset progress UI (`d145c1c`)
 

@@ -65,7 +65,7 @@ export function useSpellingSentences() {
     [sentences, persist],
   );
 
-  /** Add multiple sentences at once (batch add) */
+  /** Add multiple sentences at once (batch add, dedup by English text) */
   const addSentences = useCallback(
     (items: Omit<ISpellingSentence, 'id' | 'createdAt'>[]): number => {
       const existingTexts = new Set(sentences.map((s) => s.en.trim().toLowerCase()));
@@ -85,6 +85,35 @@ export function useSpellingSentences() {
         persist([...sentences, ...newItems]);
       }
       return newItems.length; // number actually added
+    },
+    [sentences, persist],
+  );
+
+  /** Upsert sentences: update existing (add level field) or insert new */
+  const upsertSentences = useCallback(
+    (items: Omit<ISpellingSentence, 'id' | 'createdAt'>[]): number => {
+      let changed = 0;
+      const updated = [...sentences];
+      for (const item of items) {
+        const key = item.en.trim().toLowerCase();
+        const existingIdx = updated.findIndex((s) => s.en.trim().toLowerCase() === key);
+        if (existingIdx >= 0) {
+          // Update existing: add level field (preserve other fields)
+          if (updated[existingIdx].level !== item.level) {
+            updated[existingIdx] = { ...updated[existingIdx], level: item.level };
+            changed++;
+          }
+        } else {
+          updated.push({
+            ...item,
+            id: generateId(),
+            createdAt: Date.now(),
+          });
+          changed++;
+        }
+      }
+      if (changed > 0) persist(updated);
+      return changed;
     },
     [sentences, persist],
   );
@@ -213,6 +242,7 @@ export function useSpellingSentences() {
     loaded,
     addSentence,
     addSentences,
+    upsertSentences,
     removeSentence,
     removeBySource,
     clearAll,
