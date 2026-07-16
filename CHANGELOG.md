@@ -37,6 +37,10 @@
 
 
 
+
+## 2026-07-17
+- fix: use results guard instead of submitted guard in sentence-change effect (`03cdc70`)
+
 ## 2026-07-16
 - fix: prevent sentence-change effect from clearing submitted results (`f99d0c5`)
 

@@ -7,7 +7,6 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Volume2,
   Check,
-  ChevronRight,
   Star,
   StarOff,
   SkipForward,
@@ -18,9 +17,8 @@ import {
   PanelRightClose,
   RotateCcw,
   ChevronLeft,
+  ChevronRight,
   ChevronRight as ChevronRightIcon,
-  List,
-  Play,
   Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -30,7 +28,6 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from '@/components/ui/sheet';
 import {
   Dialog,
@@ -59,7 +56,6 @@ import { useSpellingLearning } from '@/lib/use-spelling-learning';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { queryWords, preloadLevels, isLevelReady } from '@/data/wordbank';
-import type { IWordEntry } from '@/data/wordbank/schema';
 import type {
   ISpellingSentence,
   SpellingMode,
@@ -72,14 +68,6 @@ import type {
 /** Get clean word list from sentence (strip punctuation for comparison) */
 function getWords(en: string): string[] {
   return en.split(/\s+/).filter(Boolean).map((w) => w.replace(/[^a-zA-Z'-]/g, ''));
-}
-
-/** Get word detail for dictation hints */
-function getWordDetails(en: string) {
-  return en.split(/\s+/).filter(Boolean).map((w) => ({
-    clean: w.replace(/[^a-zA-Z'-]/g, ''),
-    original: w,
-  }));
 }
 
 /** Select blank indices for fill mode — prefer longer (content) words */
@@ -348,7 +336,6 @@ export default function SpellingPage() {
   const [aiCount, setAiCount] = useState(10);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<{ success: boolean; count: number; error?: string } | null>(null);
-  const [aiPreview, setAiPreview] = useState<{ en: string; zh: string }[]>([]);
 
   // Import dialog state
 /** Build/rebuild session — accepts optional override params to avoid stale-closure issues */
@@ -524,7 +511,7 @@ export default function SpellingPage() {
     }
   }, [mode, fillInputs.length, currentSentence]);
 
-  /** Retry only wrong words (句子拼写: clear wrong word inputs; 单词拼写: clear wrong blanks) */
+  /** Retry only wrong words (clear wrong inputs, keep results visible so user knows which words to fix) */
   const handleRetryWrong = useCallback(() => {
     if (!currentSentence || !results) return;
     if (mode === 'dictation') {
@@ -543,8 +530,8 @@ export default function SpellingPage() {
       }
       setFillInputs(newInputs);
     }
+    // Keep results visible so user sees which words were wrong; just allow re-submit
     setSubmitted(false);
-    setResults(null);
   }, [currentSentence, results, mode, fillInputs, fillParts]);
 
   /** Toggle favorite for current sentence */
@@ -587,7 +574,6 @@ export default function SpellingPage() {
     if (!aiTopic.trim() || !ai.isConfigured) return;
     setAiLoading(true);
     setAiResult(null);
-    setAiPreview([]);
 
     const result = await aiBatchAdd(
       ai.chat,
@@ -1346,7 +1332,7 @@ export default function SpellingPage() {
         open={showAIDialog}
         onOpenChange={(open) => {
           setShowAIDialog(open);
-          if (!open) { setAiResult(null); setAiPreview([]); }
+          if (!open) { setAiResult(null); }
         }}
         topic={aiTopic}
         onTopicChange={setAiTopic}
