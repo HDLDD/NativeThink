@@ -386,12 +386,10 @@ export default function SpellingPage() {
     }
   }, [importDirty, rebuildSession]);
 
-  // Reset inputs when sentence changes — don't clear if results are already shown
+  // Reset inputs when sentence changes — never clear submitted/results (controlled by handlers only)
   useEffect(() => {
-    if (currentSentence && !results) {
-      setSubmitted(false);
-      setResults(null);
-      const words = getWords(currentSentence.en);
+    if (!currentSentence) return;
+    const words = getWords(currentSentence.en);
       if (mode === 'dictation') {
         setDictationInputs(new Array(words.length).fill(''));
         inputRefs.current = new Array(words.length).fill(null);
@@ -413,8 +411,7 @@ export default function SpellingPage() {
         if (mode === 'dictation' && autoRead) tts.speak(currentSentence.en);
       }, 500);
       return () => { clearTimeout(timer); tts.cancel(); };
-    }
-  }, [currentSentence?.id, mode, results]);
+  }, [currentSentence?.id, mode]);
 
   /** Check answers */
   const handleSubmit = useCallback(() => {

@@ -38,6 +38,10 @@
 
 
 
+
+## 2026-07-17
+- fix: handleRetryWrong keeps results visible, remove dead code (`8644d23`)
+
 ## 2026-07-17
 - fix: use results guard instead of submitted guard in sentence-change effect (`03cdc70`)
 
