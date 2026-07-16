@@ -11,6 +11,10 @@
 
 
 
+
+## 2026-07-16
+- fix: segmented batch import, per-word input with ___ placeholder, centered Chinese, conditional auto-read (`2172279`)
+
 ## 2026-07-16
 - feat: segmented batch import from word bank — scan all words, split into segments of 200+, import by segment (`7281c72`)
 

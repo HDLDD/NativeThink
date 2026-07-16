@@ -1342,13 +1342,35 @@ function ImportDialog({
   }, [segments, level, addSentences, getDifficulty]);
 
   const handleImportAll = useCallback(async () => {
+    // Collect ALL remaining items into one batch to avoid stale closure overwrites
+    const allItems: Omit<ISpellingSentence, 'id' | 'createdAt'>[] = [];
+    const difficulty = getDifficulty(level);
     for (let i = 0; i < segments.length; i++) {
       if (!importedSet.has(i)) {
-        await handleImportSegment(i);
+        const seg = segments[i];
+        for (const ex of seg.examples) {
+          allItems.push({
+            en: ex.en,
+            zh: ex.zh,
+            source: 'word_example' as const,
+            sourceWord: ex.word,
+            difficulty,
+          });
+        }
       }
     }
+    if (allItems.length === 0) return;
+    const count = addSentences(allItems);
+    // Mark all segments as imported
+    const newSet = new Set(importedSet);
+    for (let i = 0; i < segments.length; i++) {
+      if (!importedSet.has(i)) newSet.add(i);
+    }
+    setImportedSet(newSet);
+    setTotalImported((prev) => prev + count);
+    toast.success(`全部导入完成：新增 ${count} 条`);
     onImported();
-  }, [segments, importedSet, handleImportSegment, onImported]);
+  }, [segments, importedSet, addSentences, level, getDifficulty, onImported]);
 
   const allImported = scanned && segments.length > 0 && importedSet.size === segments.length;
 
