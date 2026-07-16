@@ -350,22 +350,26 @@ export default function SpellingPage() {
   const [aiPreview, setAiPreview] = useState<{ en: string; zh: string }[]>([]);
 
   // Import dialog state
-/** Build/rebuild session */
-  const rebuildSession = useCallback(() => {
-    const allSentences = sentences;
-    if (allSentences.length === 0) {
-      setSessionQueue([]);
+/** Build/rebuild session — accepts optional override params to avoid stale-closure issues */
+  const rebuildSession = useCallback(
+    (overrides?: { sentences?: ISpellingSentence[]; level?: string }) => {
+      const allSentences = overrides?.sentences ?? sentences;
+      const level = overrides?.level ?? activeLevel;
+      if (allSentences.length === 0) {
+        setSessionQueue([]);
+        setCurrentIndex(0);
+        return;
+      }
+      const filtered = level === 'all' ? allSentences : allSentences.filter((s) => s.level === level);
+      const queue = buildSessionQueue(filtered);
+      setSessionQueue(queue);
       setCurrentIndex(0);
-      return;
-    }
-    const filtered = activeLevel === 'all' ? allSentences : allSentences.filter(s => s.level === activeLevel);
-    const queue = buildSessionQueue(filtered);
-    setSessionQueue(queue);
-    setCurrentIndex(0);
-    setSubmitted(false);
-    setResults(null);
-    setCompletionShown(false);
-  }, [sentences, buildSessionQueue, activeLevel]);
+      setSubmitted(false);
+      setResults(null);
+      setCompletionShown(false);
+    },
+    [sentences, buildSessionQueue, activeLevel],
+  );
 
   // Initialize session on sentences load
   useEffect(() => {
@@ -651,13 +655,34 @@ export default function SpellingPage() {
           toast.error('加载词库失败');
         }
         setLevelLoading(false);
-        // Use importDirty to trigger rebuild in the next render (with fresh sentences)
-        setImportDirty((c) => c + 1);
+
+        // Compute fresh sentences locally (upsert applied) and rebuild with override
+        const existingTexts = new Set(sentences.map((s) => s.en.trim().toLowerCase()));
+        const freshSentences = [...sentences];
+        const newItems = extractLevelSentences(lvl);
+        for (const item of newItems) {
+          const key = item.en.trim().toLowerCase();
+          const idx = freshSentences.findIndex((s) => s.en.trim().toLowerCase() === key);
+          if (idx >= 0) {
+            // Update existing: add level field
+            if (freshSentences[idx].level !== item.level) {
+              freshSentences[idx] = { ...freshSentences[idx], level: item.level };
+            }
+          } else if (!existingTexts.has(key)) {
+            existingTexts.add(key);
+            freshSentences.push({
+              ...item,
+              id: `spell_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+              createdAt: Date.now(),
+            });
+          }
+        }
+        rebuildSession({ sentences: freshSentences, level: lvl });
         return;
       }
 
       // Sentences already exist for this level — rebuild directly
-      rebuildSession();
+      rebuildSession({ level: lvl });
     },
     [activeLevel, sentences, extractLevelSentences, upsertSentences, rebuildSession],
   );
@@ -798,7 +823,7 @@ export default function SpellingPage() {
         </p>
         <div className="flex gap-3">
           <Button
-            onClick={rebuildSession}
+            onClick={() => rebuildSession()}
             className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
           >
             <RefreshCw className="size-4" />
@@ -1279,6 +1304,36 @@ export default function SpellingPage() {
                   })()}
                 </div>
               )}
+
+              {/* Full sentence display */}
+              {currentSentence && (
+                <div className="pt-2 border-t border-border/40">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 mb-1.5">
+                    完整句子
+                  </div>
+                  <p className="text-sm font-mono leading-relaxed text-foreground/90">
+                    {(() => {
+                      const words = getWords(currentSentence.en);
+                      return words.map((word, i) => {
+                        const isCorrect = results.wordResults[i];
+                        return (
+                          <span
+                            key={i}
+                            className={cn(
+                              'inline-block mr-[0.3em] rounded px-0.5',
+                              isCorrect
+                                ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                                : 'text-rose-600 dark:text-rose-400 font-bold',
+                            )}
+                          >
+                            {isCorrect ? word : <><span className="line-through opacity-50">{word}</span> <span className="not-italic">{word}</span></>}
+                          </span>
+                        );
+                      });
+                    })()}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1299,7 +1354,7 @@ export default function SpellingPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={rebuildSession}
+            onClick={() => rebuildSession()}
             className="rounded-xl gap-1 text-muted-foreground"
           >
             <RefreshCw className="size-3.5" /> 重新排队

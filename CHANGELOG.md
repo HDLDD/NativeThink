@@ -28,6 +28,10 @@
 
 
 
+
+## 2026-07-16
+- fix: use importDirty to trigger rebuild after async level load (avoids stale closure) (`034aa04`)
+
 ## 2026-07-16
 - refactor: on-demand level loading like DeepVocabularyPage, upsert instead of rebuild (`3db4299`)
 
