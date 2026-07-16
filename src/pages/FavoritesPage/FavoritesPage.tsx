@@ -29,6 +29,7 @@ const TYPE_LABELS: Record<string, string> = {
   shadowing: '影子跟读',
   article: '文章',
   word: '单词',
+  spelling: '句子拼写',
 };
 
 const TYPE_COLORS: Record<string, { bg: string; badge: string }> = {
@@ -39,9 +40,10 @@ const TYPE_COLORS: Record<string, { bg: string; badge: string }> = {
   shadowing:  { bg: 'bg-rose-50 dark:bg-rose-500/10',      badge: 'bg-rose-100 dark:bg-rose-500/20 text-rose-600' },
   article:    { bg: 'bg-teal-50 dark:bg-teal-500/10',      badge: 'bg-teal-100 dark:bg-teal-500/20 text-teal-600' },
   word:       { bg: 'bg-slate-50 dark:bg-slate-500/10',    badge: 'bg-slate-100 dark:bg-slate-500/20 text-slate-600' },
+  spelling:   { bg: 'bg-purple-50 dark:bg-purple-500/10',   badge: 'bg-purple-100 dark:bg-purple-500/20 text-purple-600' },
 };
 
-const FILTER_TYPES = ['all', 'vocabulary', 'chunk', 'expression', 'think', 'shadowing', 'article'] as const;
+const FILTER_TYPES = ['all', 'vocabulary', 'chunk', 'expression', 'think', 'shadowing', 'article', 'spelling'] as const;
 
 // ============================================================
 // Component
@@ -144,6 +146,7 @@ export default function FavoritesPage() {
               { key: 'expression' as const, label: '表达', icon: '💬' },
               { key: 'article' as const, label: '文章', icon: '📰' },
               { key: 'shadowing' as const, label: '跟读', icon: '🎤' },
+              { key: 'spelling' as const, label: '拼写', icon: '✍️' },
             ]).map(({ key, label, icon }) => (
               <button
                 key={key}

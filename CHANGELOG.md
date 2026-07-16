@@ -6,6 +6,10 @@
 
 
 
+
+## 2026-07-14
+- fix: learning time tracking bugs — midnight reset, stale closure, UTC dates (`87070f2`)
+
 ## 2026-07-14
 - fix: 修复成就徽章系统多个问题 (`70aeaf1`)
 

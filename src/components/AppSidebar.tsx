@@ -10,6 +10,7 @@ import {
   BarChart3,
   Sparkles,
   PenLine,
+  SpellCheck,
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -36,6 +37,7 @@ const ROUTE_PREFETCH: Record<string, () => Promise<unknown>> = {
   '/favorites': () => import('@/pages/FavoritesPage/FavoritesPage'),
   '/writing': () => import('@/pages/WritingPage/WritingPage'),
   '/progress': () => import('@/pages/ProgressPage/ProgressPage'),
+  '/spelling': () => import('@/pages/SpellingPage/SpellingPage'),
 };
 
 const NAV_ITEMS = [
@@ -48,6 +50,7 @@ const NAV_ITEMS = [
   { path: '/vocabulary', label: '词汇深度', icon: BookOpen },
   { path: '/favorites', label: '我的收藏', icon: Heart },
   { path: '/writing', label: 'AI 写作练习', icon: PenLine },
+  { path: '/spelling', label: '句子拼写', icon: SpellCheck },
   { path: '/progress', label: '学习记录', icon: BarChart3 },
 ];
 

@@ -14,6 +14,7 @@ const DeepVocabularyPage = lazy(() => import("@/pages/DeepVocabularyPage/DeepVoc
 const WritingPage = lazy(() => import("@/pages/WritingPage/WritingPage"));
 const ProgressPage = lazy(() => import("@/pages/ProgressPage/ProgressPage"));
 const FavoritesPage = lazy(() => import("@/pages/FavoritesPage/FavoritesPage"));
+const SpellingPage = lazy(() => import("@/pages/SpellingPage/SpellingPage"));
 
 function PageErrorFallback({ page }: { page: string }) {
   return (
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="writing" element={<ErrorBoundary fallback={<PageErrorFallback page="写作练习" />}><WritingPage /></ErrorBoundary>} />
         <Route path="progress" element={<ErrorBoundary fallback={<PageErrorFallback page="学习记录" />}><ProgressPage /></ErrorBoundary>} />
         <Route path="favorites" element={<ErrorBoundary fallback={<PageErrorFallback page="我的收藏" />}><FavoritesPage /></ErrorBoundary>} />
+        <Route path="spelling" element={<ErrorBoundary fallback={<PageErrorFallback page="句子拼写" />}><SpellingPage /></ErrorBoundary>} />
       </Route>
       <Route path="*" element={<Suspense fallback={<div className="flex items-center justify-center py-24"><span className="text-sm text-muted-foreground">加载中...</span></div>}><ErrorBoundary fallback={<PageErrorFallback page="页面未找到" />}><NotFoundPage /></ErrorBoundary></Suspense>} />
       {/* eslint-enable @lark-apaas/no-duplicate-route-component */}
