@@ -8,6 +8,19 @@ import { safeStorage } from './safe-storage';
 import type { ISpellingSentence, ISpellingProgress, ISpellingLearningState, SpellingMode } from '@/types/spelling';
 
 const STORAGE_KEY = '__nativethink_spelling_progress';
+const COMPLETED_KEY = '__nativethink_spelling_completed';
+
+function loadCompletedIds(): string[] {
+  try {
+    const saved = safeStorage.getItem(COMPLETED_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch { /* ignore */ }
+  return [];
+}
+
+function saveCompletedIds(ids: string[]) {
+  safeStorage.setItem(COMPLETED_KEY, JSON.stringify(ids));
+}
 
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -66,6 +79,12 @@ function sm2Update(prev: ISpellingProgress, quality: number): ISpellingProgress 
 
 export function useSpellingLearning() {
   const [state, setState] = useState<ISpellingLearningState>(loadState);
+  const [completedSentenceIds, setCompletedSentenceIds] = useState<string[]>(loadCompletedIds);
+
+  // Persist completed IDs
+  useEffect(() => {
+    saveCompletedIds(completedSentenceIds);
+  }, [completedSentenceIds]);
 
   // Reset daily counters if new day
   useEffect(() => {
@@ -209,7 +228,10 @@ export function useSpellingLearning() {
       for (const s of allSentences) {
         const p = progress[s.id];
         if (!p || p.status === 'new') {
-          newOnes.push(s.id);
+          // Skip completed sentences that have no SM-2 progress yet
+          if (!completedSentenceIds.includes(s.id)) {
+            newOnes.push(s.id);
+          }
         } else if (p.status === 'mastered' && p.nextReview > now) {
           mastered.push(s.id);
         } else if (p.nextReview <= now) {
@@ -228,7 +250,7 @@ export function useSpellingLearning() {
 
       return [...due, ...shuffled, ...mastered];
     },
-    [state.progress],
+    [state.progress, completedSentenceIds],
   );
 
   /** Reset progress for a specific sentence */
@@ -245,6 +267,14 @@ export function useSpellingLearning() {
     setState({ progress: {}, todayPracticed: [], lastActiveDate: todayKey() });
   }, []);
 
+  /** Mark a sentence as completed (so it won't reappear as new after refresh) */
+  const markCompleted = useCallback((sentenceId: string) => {
+    setCompletedSentenceIds((prev) => {
+      if (prev.includes(sentenceId)) return prev;
+      return [...prev, sentenceId];
+    });
+  }, []);
+
   return {
     state,
     getProgress,
@@ -255,5 +285,6 @@ export function useSpellingLearning() {
     buildSessionQueue,
     resetSentenceProgress,
     resetAllProgress,
+    markCompleted,
   };
 }

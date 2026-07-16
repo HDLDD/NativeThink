@@ -22,6 +22,10 @@
 
 
 
+
+## 2026-07-16
+- refactor: simplified SpellingPage — select level builds database, linear practice flow, removed ImportDialog (`b687900`)
+
 ## 2026-07-16
 - fix: buildSessionQueue now includes ALL sentences without maxNew limit, fix variable name (`74c71d0`)
 

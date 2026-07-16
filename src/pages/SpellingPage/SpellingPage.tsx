@@ -302,6 +302,7 @@ export default function SpellingPage() {
     calculateQuality,
     buildSessionQueue,
     stats: learningStats,
+    markCompleted,
   } = useSpellingLearning();
   const tts = useTTS();
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
@@ -406,7 +407,7 @@ export default function SpellingPage() {
       }, 500);
       return () => { clearTimeout(timer); tts.cancel(); };
     }
-  }, [currentSentence?.id]); // Only sentence change — NOT mode/autoRead (those cause unwanted resets)
+  }, [currentSentence?.id, mode]); // mode changes need to init fillParts/fillInputs; autoRead excluded to avoid unwanted resets
 
   /** Check answers */
   const handleSubmit = useCallback(() => {
@@ -458,39 +459,38 @@ export default function SpellingPage() {
     setSubmitted(true);
   }, [currentSentence, mode, dictationInputs, fillInputs, fillParts, calculateQuality, recordAttempt]);
 
-  /** Navigate to next sentence — remove current from queue so it doesn't repeat */
+  /** Navigate to next sentence — mark completed */
   const handleNext = useCallback(() => {
     const currentId = sessionQueue[currentIndex];
+    if (currentId) markCompleted(currentId);
     if (currentIndex < sessionQueue.length - 1) {
-      // Remove current sentence from queue so it won't repeat
-      setSessionQueue((prev) => prev.filter((id) => id !== currentId));
-      // Keep same index (next item slides into place)
+      setCurrentIndex((i) => i + 1);
     } else {
-      // Last item — remove it, queue becomes empty → completion shown
-      setSessionQueue((prev) => prev.filter((id) => id !== currentId));
       setCompletionShown(true);
     }
     setSubmitted(false);
     setResults(null);
-  }, [currentIndex, sessionQueue.length]);
+  }, [currentIndex, sessionQueue.length, markCompleted]);
 
   /** Navigate to previous sentence */
   const handlePrev = useCallback(() => {
-    if (currentIndex > 0) {
-      setCurrentIndex((i) => i - 1);
-      setSubmitted(false);
-      setResults(null);
-    }
-  }, [currentIndex]);
-
-  /** Skip current sentence — remove from queue */
-  const handleSkip = useCallback(() => {
-    const currentId = sessionQueue[currentIndex];
-    setSessionQueue((prev) => prev.filter((id) => id !== currentId));
-    if (sessionQueue.length <= 1) setCompletionShown(true);
+    setCurrentIndex((i) => Math.max(i - 1, 0));
     setSubmitted(false);
     setResults(null);
-  }, [currentIndex, sessionQueue]);
+  }, []);
+
+  /** Skip current sentence — mark completed */
+  const handleSkip = useCallback(() => {
+    const currentId = sessionQueue[currentIndex];
+    if (currentId) markCompleted(currentId);
+    if (currentIndex < sessionQueue.length - 1) {
+      setCurrentIndex((i) => i + 1);
+    } else {
+      setCompletionShown(true);
+    }
+    setSubmitted(false);
+    setResults(null);
+  }, [currentIndex, sessionQueue.length, markCompleted]);
 
   /** Retry current sentence (reset input state) */
   const handleRetry = useCallback(() => {
@@ -643,25 +643,36 @@ export default function SpellingPage() {
         </p>
 
         <div className="w-full max-w-xs mb-6">
-          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block text-center">
+          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 block text-center">
             选择词库级别
           </label>
-          <Select value={importLevel} onValueChange={setImportLevel}>
-            <SelectTrigger className="rounded-xl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="zhongkao">中考 · 3,223 词</SelectItem>
-              <SelectItem value="gaokao">高考 · 6,008 词</SelectItem>
-              <SelectItem value="cet4">大学四级 · 4,542 词</SelectItem>
-              <SelectItem value="cet6">大学六级 · 7,404 词</SelectItem>
-              <SelectItem value="ielts">雅思 · 6,609 词</SelectItem>
-              <SelectItem value="toefl">托福 · 10,367 词</SelectItem>
-              <SelectItem value="postgraduate">考研 · 9,602 词</SelectItem>
-              <SelectItem value="professional">专业英语 · 8,887 词</SelectItem>
-              <SelectItem value="advanced">高级 · 18,471 词</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap justify-center gap-2">
+            {[
+              ['zhongkao', '中考'],
+              ['gaokao', '高考'],
+              ['cet4', '四级'],
+              ['cet6', '六级'],
+              ['ielts', '雅思'],
+              ['toefl', '托福'],
+              ['postgraduate', '考研'],
+              ['professional', '专业'],
+              ['advanced', '高级'],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setImportLevel(value)}
+                className={cn(
+                  'px-4 py-2 rounded-xl text-sm font-bold border transition-all duration-200',
+                  importLevel === value
+                    ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]'
+                    : 'border-border text-muted-foreground hover:border-muted-foreground/40',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <Button
@@ -1096,16 +1107,25 @@ export default function SpellingPage() {
                       }
                     }
                     if (wrongList.length === 0) return null;
-                    const inputs = mode === 'dictation' ? dictationInputs : fillInputs;
                     return (
                       <div>
                         <span className="font-bold">正确答案：</span>
-                        {wrongList.map((w) => (
-                          <span key={w.index} className="inline-block mr-3">
-                            <span className="text-rose-500 line-through">{inputs[w.index] || '___'}</span>
-                            <span className="text-emerald-600 dark:text-emerald-400 font-bold ml-1">→ {w.correct}</span>
-                          </span>
-                        ))}
+                        {wrongList.map((w) => {
+                          // fill mode: inputs indexed by blank number, not word index
+                          const userVal = mode === 'dictation'
+                            ? dictationInputs[w.index]
+                            : (() => {
+                                if (!fillParts) return undefined;
+                                const blankIdx = fillParts.findIndex(p => p.type === 'blank' && p.wordIndex === w.index);
+                                return blankIdx === -1 ? undefined : fillInputs[blankIdx];
+                              })();
+                          return (
+                            <span key={w.index} className="inline-block mr-3">
+                              <span className="text-rose-500 line-through">{userVal || '___'}</span>
+                              <span className="text-emerald-600 dark:text-emerald-400 font-bold ml-1">→ {w.correct}</span>
+                            </span>
+                          );
+                        })}
                       </div>
                     );
                   })()}
@@ -1139,10 +1159,9 @@ export default function SpellingPage() {
           variant="ghost"
           size="sm"
           onClick={handleNext}
-          disabled={currentIndex >= sessionQueue.length - 1}
           className="rounded-xl gap-1"
         >
-          下一句 <ChevronRightIcon className="size-4" />
+          {currentIndex >= sessionQueue.length - 1 ? '完成' : '下一句'} <ChevronRightIcon className="size-4" />
         </Button>
       </div>
 
