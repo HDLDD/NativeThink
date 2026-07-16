@@ -25,6 +25,10 @@
 
 
 
+
+## 2026-07-16
+- fix: level switching rebuild, clear old sentences on rebuild, completed sentences excluded, reset progress UI (`d145c1c`)
+
 ## 2026-07-16
 - feat: import all 9 word banks on build, add level filter UI (`018fecf`)
 

@@ -705,7 +705,46 @@ export default function SpellingPage() {
     );
   }
 
-  // ── Completion State ──
+  // ── Completion / Empty-Level State ──
+  const hasLevelSentences = activeLevel === 'all' || sentences.some((s) => s.level === activeLevel);
+
+  if (sessionQueue.length === 0 && !hasLevelSentences && !completionShown) {
+    // Level with no sentences at all
+    return (
+      <div className="flex flex-col items-center justify-center py-32 px-4">
+        <div className="size-20 rounded-3xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/10 flex items-center justify-center mb-6">
+          <BookOpen className="size-10 text-amber-500" />
+        </div>
+        <h2 className="text-2xl font-black italic mb-2">当前词库没有句子</h2>
+        <p className="text-muted-foreground mb-8 text-center max-w-md">
+          {sentences.length > 0
+            ? '试试切换回全部词库，或重建句子数据库'
+            : '首次使用需要建立句子数据库'}
+        </p>
+
+        <div className="flex gap-3">
+          <Button
+            onClick={() => setActiveLevel('all')}
+            className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
+          >
+            <BookOpen className="size-4" />
+            返回全部词库
+          </Button>
+          <Button
+            onClick={handleBuildDatabase}
+            className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold gap-2"
+          >
+            <RefreshCw className="size-4" />
+            重建句子库
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground/60 mt-4">
+          重建将清除旧例句并用带词库标记的句子替换
+        </p>
+      </div>
+    );
+  }
+
   if (completionShown || sessionQueue.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-32 px-4">
