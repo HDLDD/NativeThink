@@ -50,6 +50,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { safeStorage } from '@/lib/safe-storage';
 import { useTTS } from '@/lib/use-tts';
 import { useFavorites } from '@/lib/use-favorites';
 import { useAI } from '@/hooks/use-ai';
@@ -327,7 +328,6 @@ export default function SpellingPage() {
   const [results, setResults] = useState<{ wordResults: Record<number, boolean>; score: number; total: number } | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Fill mode state
   const [fillParts, setFillParts] = useState<ReturnType<typeof splitForFill> | null>(null);
 
   // UI state
@@ -363,7 +363,14 @@ export default function SpellingPage() {
       const filtered = level === 'all' ? allSentences : allSentences.filter((s) => s.level === level);
       const queue = buildSessionQueue(filtered);
       setSessionQueue(queue);
-      setCurrentIndex(0);
+
+      // Restore resume index if pending, else start at 0
+      if (pendingResumeIndex.current !== null && pendingResumeIndex.current < queue.length) {
+        setCurrentIndex(pendingResumeIndex.current);
+        pendingResumeIndex.current = null;
+      } else {
+        setCurrentIndex(0);
+      }
       setSubmitted(false);
       setResults(null);
       setCompletionShown(false);
@@ -709,6 +716,44 @@ export default function SpellingPage() {
     }
     setBuilding(false);
   }, [extractLevelSentences, upsertSentences, rebuildSession]);
+
+  // ── Position memory (resume last position) ──
+  const RESUME_KEY = '__nativethink_spelling_resume';
+  const resumeTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const pendingResumeIndex = useRef<number | null>(null);
+  const resumeDoneRef = useRef(false);
+  const persistPosition = useCallback((level: string, idx: number) => {
+    if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+    resumeTimerRef.current = setTimeout(() => {
+      try { safeStorage.setItem(RESUME_KEY, JSON.stringify({ activeLevel: level, currentIndex: idx })); } catch { /* ignore */ }
+    }, 200);
+  }, []);
+
+  // Save position when index or level changes
+  const prevIndexRef = useRef(0);
+  const prevLevelRef = useRef('all');
+  useEffect(() => {
+    if (prevIndexRef.current !== currentIndex || prevLevelRef.current !== activeLevel) {
+      prevIndexRef.current = currentIndex;
+      prevLevelRef.current = activeLevel;
+      persistPosition(activeLevel, currentIndex);
+    }
+  }, [currentIndex, activeLevel, persistPosition]);
+
+  // Restore saved position on mount (after sentences are loaded)
+  useEffect(() => {
+    if (sentences.length === 0 || resumeDoneRef.current) return;
+    resumeDoneRef.current = true;
+    try {
+      const raw = safeStorage.getItem(RESUME_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved.activeLevel && saved.activeLevel !== 'all' && saved.activeLevel !== activeLevel) {
+        pendingResumeIndex.current = saved.currentIndex ?? 0;
+        handleLevelChange(saved.activeLevel);
+      }
+    } catch { /* ignore */ }
+  }, [sentences.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Progress  // Progress
   const isFav = currentSentence ? isFavorited(currentSentence.en, 'spelling') : false;

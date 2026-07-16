@@ -29,6 +29,10 @@
 
 
 
+
+## 2026-07-16
+- fix: rebuildSession onClick wrappers (type compat with override params) (`b221704`)
+
 ## 2026-07-16
 - fix: use importDirty to trigger rebuild after async level load (avoids stale closure) (`034aa04`)
 
