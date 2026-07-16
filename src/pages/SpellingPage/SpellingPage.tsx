@@ -745,6 +745,14 @@ export default function SpellingPage() {
     } catch { /* ignore */ }
   }, [sentences.length]);
 
+  // ── Auto-reset: when queue empties without explicit completion, start a new round ──
+  useEffect(() => {
+    if (sentences.length > 0 && sessionQueue.length === 0 && !completionShown && !levelLoading) {
+      resetCompletedAll();
+      setImportDirty((c) => c + 1);
+    }
+  }, [sentences.length, sessionQueue.length, completionShown, levelLoading]);
+
   // Progress  // Progress
   const isFav = currentSentence ? isFavorited(currentSentence.en, 'spelling') : false;
   const currentProgress = currentSentence ? getProgress(currentSentence.id) : null;
@@ -803,130 +811,47 @@ export default function SpellingPage() {
     );
   }
 
-  // ── Completion State (hide during loading to prevent flash) ──
-  if (!levelLoading && (completionShown || sessionQueue.length === 0)) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32 px-4">
-        <div className="size-20 rounded-3xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 flex items-center justify-center mb-6">
-          <Check className="size-10 text-[#00B894]" />
-        </div>
-        <h2 className="text-2xl font-black italic mb-2">全部完成！</h2>
-        <p className="text-muted-foreground mb-2">
-          今日已练习 {learningStats.todayPracticed} 句
-        </p>
-        <p className="text-xs text-muted-foreground/60 mb-8">
-          掌握 {learningStats.mastered} 句 · 学习中 {learningStats.learning} 句 · 待复习 {learningStats.reviewing} 句
-        </p>
-        <div className="flex gap-3">
-          <Button
-            onClick={() => {
-              resetCompletedAll();
-              setImportDirty(c => c + 1);
-            }}
-            className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
-          >
-            <RefreshCw className="size-4" />
-            再来一轮
-          </Button>
-          <Button
-            onClick={() => setShowAIDialog(true)}
-            variant="outline"
-            className="rounded-2xl font-bold gap-2"
-          >
-            <Sparkles className="size-4" />
-            添加新句子
-          </Button>
-          <Button
-            onClick={() => setShowManageDialog(true)}
-            variant="outline"
-            className="rounded-2xl font-bold gap-2"
-          >
-            <BookOpen className="size-4" />
-            学习记录
-          </Button>
-        </div>
-
-        {/* Manage learning records dialog */}
-        <Dialog open={showManageDialog} onOpenChange={setShowManageDialog}>
-          <DialogContent className="rounded-2xl sm:max-w-sm" aria-describedby="manage-dialog-desc">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-base font-black">
-                <BookOpen className="size-5 text-[#00B894]" />
-                管理学习记录
-              </DialogTitle>
-              <p id="manage-dialog-desc" className="text-xs text-muted-foreground">
-                查看学习进度或重置所有记录
-              </p>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-xl bg-muted/50 p-3 text-center">
-                  <p className="text-lg font-black text-[#00B894]">{learningStats.mastered}</p>
-                  <p className="text-[10px] font-bold text-muted-foreground">已掌握</p>
-                </div>
-                <div className="rounded-xl bg-muted/50 p-3 text-center">
-                  <p className="text-lg font-black text-amber-500">{learningStats.learning}</p>
-                  <p className="text-[10px] font-bold text-muted-foreground">学习中</p>
-                </div>
-                <div className="rounded-xl bg-muted/50 p-3 text-center">
-                  <p className="text-lg font-black text-blue-500">{learningStats.reviewing}</p>
-                  <p className="text-[10px] font-bold text-muted-foreground">待复习</p>
-                </div>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground">
-                  今日已练习 <span className="font-bold">{learningStats.todayPracticed}</span> 句
-                </p>
-              </div>
-              <Separator />
-              <div className="text-center">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    resetAllProgress();
-                    resetCompletedAll();
-                    setShowManageDialog(false);
-                    setImportDirty(c => c + 1);
-                    toast.success('学习记录已重置');
-                  }}
-                  className="rounded-xl font-bold gap-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:border-rose-800 dark:hover:bg-rose-950/30"
-                >
-                  <RotateCcw className="size-4" />
-                  重置所有学习记录
-                </Button>
-                <p className="text-[10px] text-muted-foreground/60 mt-2">
-                  清除所有进度和完成记录，句子库不受影响
-                </p>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <AIBatchAddDialog
-          open={showAIDialog}
-          onOpenChange={setShowAIDialog}
-          topic={aiTopic}
-          onTopicChange={setAiTopic}
-          difficulty={aiDifficulty}
-          onDifficultyChange={setAiDifficulty}
-          count={aiCount}
-          onCountChange={setAiCount}
-          loading={aiLoading}
-          result={aiResult}
-          onGenerate={handleAIGenerate}
-          isConfigured={ai.isConfigured}
-        />
-      </div>
-    );
-  }
-
   // ── Main Content ──
   const scorePercent = results ? Math.round((results.score / results.total) * 100) : 0;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      {/* ── Inline completion banner ── */}
+      {completionShown && (
+        <Card className="p-6 rounded-2xl border-[#00B894]/20 shadow-sm bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5">
+          <div className="flex flex-col items-center justify-center text-center">
+            <Check className="size-8 text-[#00B894] mb-2" />
+            <h2 className="text-lg font-black italic mb-1">本轮完成！</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              今日已练习 {learningStats.todayPracticed} 句
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  resetCompletedAll();
+                  setImportDirty(c => c + 1);
+                  setCompletionShown(false);
+                }}
+                className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-1.5"
+              >
+                <RefreshCw className="size-3.5" />
+                再来一轮
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowManageDialog(true)}
+                className="rounded-xl font-bold gap-1.5"
+              >
+                <BookOpen className="size-3.5" />
+                学习记录
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* ── Header Controls ── */}
       <Card className="p-4 rounded-2xl border-border/50 shadow-sm space-y-4">
         {/* Row 1: Mode toggles */}

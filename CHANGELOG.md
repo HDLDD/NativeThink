@@ -33,6 +33,10 @@
 
 
 
+
+## 2026-07-16
+- fix: buildSessionQueue includes all non-mastered, add manage dialog, reset fixes (`eb2a67a`)
+
 ## 2026-07-16
 - fix: remove local updated array (ID mismatch), add race-condition guard, prevent loading flash (`eed7ce9`)
 
