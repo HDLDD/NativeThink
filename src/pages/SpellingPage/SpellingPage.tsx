@@ -70,6 +70,33 @@ function getWords(en: string): string[] {
   return en.split(/\s+/).filter(Boolean).map((w) => w.replace(/[^a-zA-Z'-]/g, ''));
 }
 
+// ── Global word bank sentence cache (not React state — no cascading re-renders) ──
+const _wbCache: Record<string, ISpellingSentence[]> = {};
+let _wbCacheAll: ISpellingSentence[] | null = null;
+
+function _wbId(en: string, sourceWord?: string): string {
+  let hash = 0;
+  for (let i = 0; i < en.length; i++) { hash = ((hash << 5) - hash + en.charCodeAt(i)) | 0; }
+  return `wb_${Math.abs(hash).toString(36)}${sourceWord ? '_' + sourceWord.slice(0, 4) : ''}`;
+}
+
+function cacheWBSentences(level: string, sentences: ISpellingSentence[]) {
+  _wbCache[level] = sentences;
+  _wbCacheAll = null; // invalidate
+}
+
+function getWBSentences(level?: string): ISpellingSentence[] {
+  if (level && level !== 'all') return _wbCache[level] || [];
+  if (_wbCacheAll) return _wbCacheAll;
+  _wbCacheAll = Object.values(_wbCache).flat();
+  return _wbCacheAll;
+}
+
+function getAllSentences(hookSentences: ISpellingSentence[]): ISpellingSentence[] {
+  if (_wbCacheAll) return [...hookSentences, ..._wbCacheAll];
+  return [...hookSentences, ...Object.values(_wbCache).flat()];
+}
+
 /** Select blank indices for fill mode — prefer longer (content) words */
 function selectBlanks(words: string[]): number[] {
   const candidates = words
@@ -281,7 +308,6 @@ export default function SpellingPage() {
   const {
     sentences,
     addSentences,
-    upsertSentences,
     aiBatchAdd,
   } = useSpellingSentences();
   const {
@@ -305,10 +331,11 @@ export default function SpellingPage() {
   // Session state
   const [sessionQueue, setSessionQueue] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const currentSentence = useMemo(
-    () => (sessionQueue.length > 0 ? sentences.find((s) => s.id === sessionQueue[currentIndex]) : undefined),
-    [sessionQueue, currentIndex, sentences],
-  );
+  const currentSentence = useMemo(() => {
+    if (sessionQueue.length === 0) return undefined;
+    const id = sessionQueue[currentIndex];
+    return sentences.find((s) => s.id === id) || getWBSentences().find((s) => s.id === id);
+  }, [sessionQueue, currentIndex, sentences]);
 
   // Input state
   const [dictationInputs, setDictationInputs] = useState<string[]>([]);  // per-word inputs for 句子拼写
@@ -341,8 +368,10 @@ export default function SpellingPage() {
 /** Build/rebuild session — accepts optional override params to avoid stale-closure issues */
   const rebuildSession = useCallback(
     (overrides?: { sentences?: ISpellingSentence[]; level?: string }) => {
-      const allSentences = overrides?.sentences ?? sentences;
+      const hookSentences = overrides?.sentences ?? sentences;
       const level = overrides?.level ?? activeLevel;
+      // Combine hook sentences (AI/user) with global word bank cache
+      const allSentences = getAllSentences(hookSentences);
       if (allSentences.length === 0) {
         setSessionQueue([]);
         setCurrentIndex(0);
@@ -629,20 +658,19 @@ export default function SpellingPage() {
   /** Guard against concurrent level switches */
   const switchingRef = useRef(false);
 
-  /** Switch level — lazy-load once, cache, then instant subsequent switches */
+  /** Switch level — lazy-load once, cache globally, then instant subsequent switches */
   const handleLevelChange = useCallback(
     async (lvl: string) => {
       if (lvl === activeLevel || switchingRef.current) return;
       switchingRef.current = true;
 
-      // Set loading BEFORE activeLevel to prevent intermediate empty-state flash
       setLevelLoading(true);
       setSubmitted(false);
       setResults(null);
       setCompletionShown(false);
 
-      // Already have sentences tagged with this level → instant rebuild
-      if (lvl === 'all' || sentences.some((s) => s.level === lvl)) {
+      // Already have sentences in global cache for this level → instant rebuild
+      if (lvl === 'all' || getWBSentences(lvl).length > 0) {
         setActiveLevel(lvl);
         setLevelLoading(false);
         rebuildSession({ level: lvl });
@@ -650,31 +678,35 @@ export default function SpellingPage() {
         return;
       }
 
-      // First visit: preload → extract → persist via hook (consistent IDs) → rebuild via importDirty
+      // First visit: preload → extract → cache globally → rebuild (no React state cascade)
       try {
         setActiveLevel(lvl);
-        if (!isLevelReady(lvl)) {
-          await preloadLevels([lvl]);
-        }
+        if (!isLevelReady(lvl)) await preloadLevels([lvl]);
+
         const items = extractLevelSentences(lvl);
         if (items.length > 0) {
-          const count = upsertSentences(items);
-          setImportDirty((c) => c + 1);
-          toast.success(`已加载 ${({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'})[lvl] || lvl} 词库 ${count} 条例句`);
+          // Build stable-ID sentences and cache globally (not in React state)
+          const sents: ISpellingSentence[] = items.map((item) => ({
+            ...item,
+            id: _wbId(item.en, item.sourceWord),
+            createdAt: Date.now(),
+          }));
+          cacheWBSentences(lvl, sents);
+          toast.success(`已加载 ${({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'})[lvl] || lvl} 词库 ${sents.length} 条例句`);
         } else {
           toast.info('该词库没有例句');
-          rebuildSession({ level: lvl });
         }
       } catch {
         toast.error('加载词库失败');
       }
       setLevelLoading(false);
+      rebuildSession({ level: lvl });
       switchingRef.current = false;
     },
-    [activeLevel, sentences, extractLevelSentences, upsertSentences, rebuildSession],
+    [activeLevel, sentences, extractLevelSentences, rebuildSession],
   );
 
-  /** Build sentence database from ALL word bank levels */
+  /** Build sentence database from ALL word bank levels (into global cache) */
   const handleBuildDatabase = useCallback(async () => {
     setBuilding(true);
     try {
@@ -683,18 +715,23 @@ export default function SpellingPage() {
         await preloadLevels([level]);
         const items = extractLevelSentences(level);
         if (items.length > 0) {
-          const count = upsertSentences(items);
-          totalImported += count;
+          const sents: ISpellingSentence[] = items.map((item) => ({
+            ...item,
+            id: _wbId(item.en, item.sourceWord),
+            createdAt: Date.now(),
+          }));
+          cacheWBSentences(level, sents);
+          totalImported += sents.length;
         }
-        await new Promise(r => setTimeout(r, 50)); // yield between levels
+        await new Promise(r => setTimeout(r, 50));
       }
       toast.success(`数据库建立完成：共导入 ${totalImported} 条例句`);
-      setImportDirty((c) => c + 1);
+      rebuildSession();
     } catch {
       toast.error('建库失败，请重试');
     }
     setBuilding(false);
-  }, [extractLevelSentences, upsertSentences, rebuildSession]);
+  }, [extractLevelSentences, rebuildSession]);
 
   // ── Position memory (resume last position) ──
   const RESUME_KEY = '__nativethink_spelling_resume';
@@ -965,7 +1002,9 @@ export default function SpellingPage() {
               />
             </div>
             {(() => {
-              const totalInLevel = activeLevel === 'all' ? sentences.length : sentences.filter(s => s.level === activeLevel).length;
+              const wb = getWBSentences(activeLevel);
+              const hookSents = activeLevel === 'all' ? sentences : sentences.filter(s => s.level === activeLevel);
+              const totalInLevel = hookSents.length + wb.length;
               return (
                 <Badge variant="secondary" className="rounded-lg text-[10px] font-bold whitespace-nowrap">
                   共 {totalInLevel} 句

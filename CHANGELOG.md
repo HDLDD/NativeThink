@@ -39,6 +39,10 @@
 
 
 
+
+## 2026-07-17
+- fix: sentence-change effect no longer touches submitted/results at all (`7198468`)
+
 ## 2026-07-17
 - fix: handleRetryWrong keeps results visible, remove dead code (`8644d23`)
 
