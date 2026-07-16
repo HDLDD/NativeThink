@@ -44,6 +44,10 @@
 
 
 
+
+## 2026-07-17
+- fix: favorites dual-write to direct localStorage key (survives prefix changes) (`7ebcf68`)
+
 ## 2026-07-17
 - feat: add voice input via Web Speech API (`3d64289`)
 

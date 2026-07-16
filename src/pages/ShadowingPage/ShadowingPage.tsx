@@ -182,6 +182,10 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
   const [analyzing, setAnalyzing] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
 
+  // Voice recording + recognition state
+  const [recordingVoice, setRecordingVoice] = useState(false);
+  const [userTranscript, setUserTranscript] = useState('');
+
   const allMaterials = [...customMaterials, ...MOCK_SHADOWING_MATERIALS];
 
   const isLoopingRef = useRef(false);
@@ -467,6 +471,92 @@ Keep it concise and practical.`,
       setAnalyzing(false);
     }
   };
+
+  /** Record voice + AI compare with original */
+  const handleRecordAndAnalyze = useCallback(async () => {
+    if (!currentSentence) return;
+    const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) { toast.error('当前浏览器不支持语音识别'); return; }
+
+    if (recordingVoice) return;
+    setRecordingVoice(true);
+    setUserTranscript('');
+    setAiAnalysis('');
+    setShowAnalysis(true);
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    let finalTranscript = '';
+
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      setUserTranscript(finalTranscript + interim);
+    };
+
+    recognition.onerror = () => { setRecordingVoice(false); toast.error('语音识别失败，请重试'); };
+
+    recognition.onend = async () => {
+      setRecordingVoice(false);
+      const spoken = finalTranscript.trim();
+      if (!spoken) { toast.error('未检测到语音输入'); return; }
+
+      setUserTranscript(spoken);
+      setAnalyzing(true);
+
+      try {
+        const result = await aiChat(
+          [
+            {
+              role: 'system',
+              content: `You are an English pronunciation coach. Compare the original sentence with what the user actually said during shadowing.
+
+Respond in this bilingual format (English first, then 中文), keep it concise:
+
+## 🎯 准确度评分
+Overall accuracy: X/10
+
+## 📊 逐词对比
+| Original | You said | Correct? |
+|----------|----------|----------|
+| word | what they said | ✅ or ❌ |
+
+## 🗣 发音建议
+- Specific words that need improvement
+
+## ✅ 做得好的地方
+- What they got right
+
+Be encouraging but accurate. Focus on the most impactful improvements.`,
+            },
+            {
+              role: 'user',
+              content: `Original sentence: "${currentSentence.text}"\n\nUser's shadowing attempt: "${spoken}"`,
+            },
+          ],
+          { temperature: 0.3, maxTokens: 1536 },
+        );
+        setAiAnalysis(result);
+      } catch {
+        toast.error('AI 分析失败，请稍后重试');
+        setShowAnalysis(false);
+      } finally {
+        setAnalyzing(false);
+      }
+    };
+
+    recognition.start();
+  }, [currentSentence, recordingVoice, aiChat]);
 
   const toggleMaterialFavorite = (e: React.MouseEvent, material: typeof MOCK_SHADOWING_MATERIALS[0]) => {
     e.stopPropagation();
@@ -887,31 +977,61 @@ Keep it concise and practical.`,
                       </Button>
                     </div>
 
-                    {/* AI 发音分析 */}
-                    <div className="flex gap-3 pt-4 border-t border-border">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleAnalyzePronunciation}
-                        disabled={analyzing}
-                        className="rounded-2xl gap-2 text-[10px] font-black uppercase tracking-wider border-violet-300 text-violet-500 hover:bg-violet-50 w-full"
-                      >
-                        {analyzing ? (
-                          <><Loader2 className="size-3.5 animate-spin" /> 分析中...</>
-                        ) : (
-                          <><Bot className="size-3.5" /> AI 分析发音难点</>
-                        )}
-                      </Button>
+                    {/* AI 发音分析 + 录音对比 */}
+                    <div className="flex flex-col gap-3 pt-4 border-t border-border w-full">
+                      <div className="flex gap-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleAnalyzePronunciation}
+                          disabled={analyzing}
+                          className="rounded-2xl gap-2 text-[10px] font-black uppercase tracking-wider border-violet-300 text-violet-500 hover:bg-violet-50 flex-1"
+                        >
+                          {analyzing ? (
+                            <><Loader2 className="size-3.5 animate-spin" /> 分析中...</>
+                          ) : (
+                            <><Bot className="size-3.5" /> 发音难点分析</>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleRecordAndAnalyze}
+                          disabled={recordingVoice || analyzing}
+                          className={cn(
+                            'rounded-2xl gap-2 text-[10px] font-black uppercase tracking-wider flex-1',
+                            recordingVoice
+                              ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
+                              : 'bg-[#00B894] hover:bg-[#00a882] text-white',
+                          )}
+                        >
+                          <Mic className="size-3.5" />
+                          {recordingVoice ? '录音中...' : '录音并分析'}
+                        </Button>
+                      </div>
+
+                      {/* Live transcript while recording */}
+                      {recordingVoice && userTranscript && (
+                        <div className="p-3 rounded-2xl bg-[#00B894]/5 border border-[#00B894]/20">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-[#00B894] mb-1">正在听...</p>
+                          <p className="text-sm italic text-foreground/80">{userTranscript}</p>
+                        </div>
+                      )}
                     </div>
 
                     {showAnalysis && aiAnalysis && (
-                      <div className="p-4 rounded-2xl bg-violet-50/50 border border-violet-100 text-sm">
+                      <div className="p-4 rounded-2xl bg-violet-50/50 border border-violet-100 text-sm w-full">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-black uppercase tracking-wider text-violet-500">AI 发音指导</span>
+                          <span className="text-xs font-black uppercase tracking-wider text-violet-500">AI 发音分析</span>
                           <button onClick={() => setShowAnalysis(false)} className="text-muted-foreground hover:text-foreground">
                             <X className="size-4" />
                           </button>
                         </div>
+                        {userTranscript && (
+                          <div className="mb-3 p-2 rounded-xl bg-amber-50 border border-amber-200 text-xs">
+                            <span className="font-bold text-amber-700">你的跟读：</span>
+                            <span className="text-amber-800">{userTranscript}</span>
+                          </div>
+                        )}
                         <div className="prose prose-sm max-w-none dark:prose-invert">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>{aiAnalysis}</ReactMarkdown>
                         </div>
