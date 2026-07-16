@@ -41,6 +41,10 @@
 
 
 
+
+## 2026-07-17
+- fix: stable currentSentence via ref — immune to useMemo flicker (`4465a4c`)
+
 ## 2026-07-17
 - refactor: word bank sentences in global cache (not React state) — root cause fix (`a1a504c`)
 

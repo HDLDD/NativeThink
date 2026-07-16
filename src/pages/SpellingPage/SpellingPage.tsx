@@ -446,10 +446,20 @@ export default function SpellingPage() {
       return () => { clearTimeout(timer); tts.cancel(); };
   }, [currentSentence?.id, mode]);
 
-  /** Check answers */
+  /** Check answers — accepts synonyms for sourceWord */
   const handleSubmit = useCallback(() => {
     if (!currentSentence) return;
 
+    // Look up synonyms for the example's source word (word bank data)
+    let sourceWordSynonyms: string[] = [];
+    if (currentSentence.source === 'word_example' && currentSentence.sourceWord) {
+      const sw = currentSentence.sourceWord.toLowerCase();
+      const entries = queryWords({ search: sw });
+      const entry = entries.find((w) => w.word.toLowerCase() === sw);
+      if (entry?.synonyms) {
+        sourceWordSynonyms = entry.synonyms.map((s) => s.toLowerCase());
+      }
+    }
     const words = getWords(currentSentence.en);
     let correctCount = 0;
     const wordResults: Record<number, boolean> = {};
@@ -461,7 +471,7 @@ export default function SpellingPage() {
       for (let i = 0; i < words.length; i++) {
         const user = (dictationInputs[i] || '').trim().toLowerCase();
         const correct = words[i].toLowerCase();
-        const isCorrect = user === correct;
+        const isCorrect = user === correct || (sourceWordSynonyms.length > 0 && sourceWordSynonyms.includes(user) && correct === currentSentence.sourceWord?.toLowerCase());
         wordResults[i] = isCorrect;
         if (isCorrect) correctCount++;
         else {
@@ -478,7 +488,7 @@ export default function SpellingPage() {
         if (part.type === 'blank') {
           const user = (fillInputs[inputIdx] || '').trim().toLowerCase();
           const correct = part.content.replace(/[^a-zA-Z'-]/g, '').toLowerCase();
-          const isCorrect = user === correct;
+          const isCorrect = user === correct || (sourceWordSynonyms.length > 0 && sourceWordSynonyms.includes(user) && correct === currentSentence.sourceWord?.toLowerCase());
           wordResults[part.wordIndex] = isCorrect;
           if (isCorrect) correctCount++;
           else {
