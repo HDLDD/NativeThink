@@ -20,6 +20,10 @@
 
 
 
+
+## 2026-07-16
+- fix: increase session queue to 200 sentences, fix empty symbol display (&nbsp; → actual U+00A0) (`6be0277`)
+
 ## 2026-07-16
 - feat: add vertical bar and brand-color underline on focus to show active word (`c917832`)
 

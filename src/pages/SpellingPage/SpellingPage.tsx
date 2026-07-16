@@ -356,7 +356,7 @@ export default function SpellingPage() {
       setCurrentIndex(0);
       return;
     }
-    const queue = buildSessionQueue(allSentences, 200); // Include many more sentences
+    const queue = buildSessionQueue(allSentences); // Include ALL sentences
     setSessionQueue(queue);
     setCurrentIndex(0);
     setSubmitted(false);

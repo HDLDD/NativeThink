@@ -197,7 +197,7 @@ export function useSpellingLearning() {
 
   /** Build session queue: due sentences first, then new ones */
   const buildSessionQueue = useCallback(
-    (allSentences: ISpellingSentence[], maxNew: number = 10): string[] => {
+    (allSentences: ISpellingSentence[]): string[] => {
       const now = Date.now();
       const progress = state.progress;
 
@@ -226,7 +226,7 @@ export function useSpellingLearning() {
       due.sort((a, b) => (progress[a]?.nextReview || 0) - (progress[b]?.nextReview || 0));
       const shuffled = [...newOnes].sort(() => Math.random() - 0.5);
 
-      return [...due, ...shuffled.slice(0, maxNew)];
+      return [...due, ...shuffled, ...mastered];
     },
     [state.progress],
   );
