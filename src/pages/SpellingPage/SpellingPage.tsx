@@ -636,67 +636,50 @@ export default function SpellingPage() {
     return items;
   }, [getDifficulty]);
 
+  /** Guard against concurrent level switches */
+  const switchingRef = useRef(false);
+
   /** Switch level — lazy-load once, cache, then instant subsequent switches */
   const handleLevelChange = useCallback(
     async (lvl: string) => {
-      if (lvl === activeLevel) return;
-      setActiveLevel(lvl);
+      if (lvl === activeLevel || switchingRef.current) return;
+      switchingRef.current = true;
+
+      // Set loading BEFORE activeLevel to prevent intermediate empty-state flash
+      setLevelLoading(true);
       setSubmitted(false);
       setResults(null);
       setCompletionShown(false);
 
       // Already have sentences tagged with this level → instant rebuild
       if (lvl === 'all' || sentences.some((s) => s.level === lvl)) {
+        setActiveLevel(lvl);
+        setLevelLoading(false);
         rebuildSession({ level: lvl });
+        switchingRef.current = false;
         return;
       }
 
-      // First visit to this level: preload → extract (cached) → persist → rebuild
-      let updated: ISpellingSentence[] = sentences; // fallback
-      setLevelLoading(true);
+      // First visit: preload → extract → persist via hook (consistent IDs) → rebuild via importDirty
       try {
+        setActiveLevel(lvl);
         if (!isLevelReady(lvl)) {
           await preloadLevels([lvl]);
         }
         const items = extractLevelSentences(lvl);
-
-        // Build Map for O(1) lookup — replaces O(n²) findIndex loops
-        const idxMap = new Map<string, number>();
-        sentences.forEach((s, i) => idxMap.set(s.en.trim().toLowerCase(), i));
-
-        updated = [...sentences];
-        const seenKeys = new Set(idxMap.keys());
-        let changed = 0;
-
-        for (const item of items) {
-          const key = item.en.trim().toLowerCase();
-          const idx = idxMap.get(key);
-          if (idx !== undefined) {
-            if (updated[idx].level !== item.level) {
-              updated[idx] = { ...updated[idx], level: item.level };
-              changed++;
-            }
-          } else if (!seenKeys.has(key)) {
-            seenKeys.add(key);
-            updated.push({
-              ...item,
-              id: `spell_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
-              createdAt: Date.now(),
-            });
-            changed++;
-          }
+        if (items.length > 0) {
+          const count = upsertSentences(items);
+          setImportDirty((c) => c + 1);
+          toast.success(`已加载 ${({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'})[lvl] || lvl} 词库 ${count} 条例句`);
+        } else {
+          toast.info('该词库没有例句');
+          rebuildSession({ level: lvl });
         }
-
-        if (changed > 0) {
-          // Persist asynchronously — UI rebuilds immediately with local copy
-          upsertSentences(items);
-        }
-        toast.success(`已加载 ${({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'})[lvl] || lvl} 词库 ${items.length} 条例句`);
       } catch {
         toast.error('加载词库失败');
       }
       setLevelLoading(false);
-      rebuildSession({ sentences: updated, level: lvl });
+      switchingRef.current = false;
     },
     [activeLevel, sentences, extractLevelSentences, upsertSentences, rebuildSession],
   );
@@ -819,8 +802,8 @@ export default function SpellingPage() {
     );
   }
 
-  // ── Completion State ──
-  if (completionShown || sessionQueue.length === 0) {
+  // ── Completion State (hide during loading to prevent flash) ──
+  if (!levelLoading && (completionShown || sessionQueue.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center py-32 px-4">
         <div className="size-20 rounded-3xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 flex items-center justify-center mb-6">

@@ -31,6 +31,10 @@
 
 
 
+
+## 2026-07-16
+- perf: cache extracted sentences per level, Map O(1) upsert, remove empty-level screen (`52b7508`)
+
 ## 2026-07-16
 - feat: remember last practice position (level + sentence index) (`3670753`)
 
