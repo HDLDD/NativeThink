@@ -142,7 +142,7 @@ function DictationInput({
               className="relative inline-flex flex-col items-center min-w-[28px] cursor-text group"
               onClick={() => inputRefs.current[i]?.focus()}
             >
-              {/* Text above underline */}
+              {/* Text above underline — no ___ placeholders, just empty space or typed word */}
               <span
                 className={cn(
                   'text-sm font-mono leading-tight min-h-[1.3em] text-center transition-colors duration-150',
@@ -150,14 +150,14 @@ function DictationInput({
                     ? isCorrect
                       ? 'text-emerald-600 dark:text-emerald-400 font-bold'
                       : 'text-rose-600 dark:text-rose-400 font-bold'
-                    : hasValue
-                      ? 'text-foreground/90'
-                      : 'text-muted-foreground/30 tracking-[0.2em] select-none',
+                    : 'text-foreground/90',
                 )}
               >
-                {submitted
-                  ? (userInputs[i] || '___')
-                  : (userInputs[i] || '_'.repeat(clean.length))}
+                {submitted && !userInputs[i] ? (
+                  <span className="tracking-[0.2em] text-muted-foreground/40">——</span>
+                ) : (
+                  userInputs[i] || ' '
+                )}
               </span>
 
               {/* Underline — the visual input line */}
@@ -326,6 +326,7 @@ export default function SpellingPage() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [completionShown, setCompletionShown] = useState(false);
   const [autoRead, setAutoRead] = useState(true);         // 自动朗读
+  const [importDirty, setImportDirty] = useState(0);       // import → rebuild trigger
 
   // AI dialog state
   const [aiTopic, setAiTopic] = useState('');
@@ -360,6 +361,13 @@ export default function SpellingPage() {
       rebuildSession();
     }
   }, [sentences.length, rebuildSession, sessionQueue.length]);
+
+  // Rebuild session when import completes (importDirty incremented)
+  useEffect(() => {
+    if (importDirty > 0) {
+      rebuildSession();
+    }
+  }, [importDirty, rebuildSession]);
 
   // Reset inputs when sentence changes
   useEffect(() => {
@@ -616,7 +624,7 @@ export default function SpellingPage() {
           onLevelChange={setImportLevel}
           addSentences={addSentences}
           getDifficulty={getDifficulty}
-          onImported={rebuildSession}
+          onImported={() => setImportDirty((c) => c + 1)}
         />
       </div>
     );
@@ -1103,7 +1111,7 @@ export default function SpellingPage() {
         onLevelChange={setImportLevel}
         addSentences={addSentences}
         getDifficulty={getDifficulty}
-        onImported={rebuildSession}
+        onImported={() => setImportDirty((c) => c + 1)}
       />
 
       {/* ── Favorites Sidebar (Sheet) ── */}
@@ -1297,138 +1305,56 @@ function ImportDialog({
   getDifficulty: (level: string) => SpellingDifficulty;
   onImported: () => void;
 }) {
-  const [scanning, setScanning] = useState(false);
-  const [importingSegments, setImportingSegments] = useState<Set<number>>(new Set());
-  const [segments, setSegments] = useState<
-    Array<{ index: number; from: number; to: number; examples: { en: string; zh: string; word: string }[] }>
-  >([]);
-  const [importedSet, setImportedSet] = useState<Set<number>>(new Set());
-  const [totalFound, setTotalFound] = useState(0);
-  const [totalImported, setTotalImported] = useState(0);
-  const [scanned, setScanned] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+  const [result, setResult] = useState<{ found: number; added: number } | null>(null);
+  const [error, setError] = useState('');
 
-  const SEGMENT_SIZE = 200;
-
-  // Reset when dialog opens/closes or level changes
+  // Reset on open
   useEffect(() => {
-    if (!open) {
-      setScanned(false);
-      setSegments([]);
-      setImportedSet(new Set());
-      setTotalFound(0);
-      setTotalImported(0);
-      setScanning(false);
-      setImportingSegments(new Set());
-    }
+    if (open) { setDone(false); setResult(null); setError(''); }
   }, [open]);
 
-  const handleScan = useCallback(async () => {
-    setScanning(true);
-    setScanned(false);
+  const handleImportAll = useCallback(async () => {
+    setLoading(true);
+    setResult(null);
+    setError('');
     try {
-      // Preload the level
       await preloadLevels([level]);
       const words = queryWords({ level });
-      if (!words || words.length === 0) {
-        toast('该词库暂无数据');
-        setScanning(false);
-        return;
-      }
+      if (!words || words.length === 0) { setError('该词库暂无数据'); setLoading(false); return; }
 
-      // Collect all examples from all words
-      const allExamples: { en: string; zh: string; word: string }[] = [];
+      const difficulty = getDifficulty(level);
+      const allItems: Omit<ISpellingSentence, 'id' | 'createdAt'>[] = [];
+      let found = 0;
+
       for (const w of words) {
         if (w.examples && w.examples.length > 0) {
           for (const ex of w.examples) {
             if (ex.en && ex.zh) {
-              allExamples.push({ en: ex.en.trim(), zh: ex.zh.trim(), word: w.word });
+              found++;
+              allItems.push({
+                en: ex.en.trim(),
+                zh: ex.zh.trim(),
+                source: 'word_example' as const,
+                sourceWord: w.word,
+                difficulty,
+              });
             }
           }
         }
       }
 
-      setTotalFound(allExamples.length);
-
-      // Build segments of SEGMENT_SIZE
-      const segs: Array<{ index: number; from: number; to: number; examples: { en: string; zh: string; word: string }[] }> = [];
-      for (let i = 0; i < allExamples.length; i += SEGMENT_SIZE) {
-        const chunk = allExamples.slice(i, i + SEGMENT_SIZE);
-        segs.push({
-          index: segs.length,
-          from: i + 1,
-          to: Math.min(i + SEGMENT_SIZE, allExamples.length),
-          examples: chunk,
-        });
-      }
-      setSegments(segs);
-      setScanned(true);
-    } catch (e) {
-      toast('扫描词库失败，请重试');
-    }
-    setScanning(false);
-  }, [level]);
-
-  const handleImportSegment = useCallback(async (segIndex: number) => {
-    const seg = segments[segIndex];
-    if (!seg) return;
-
-    setImportingSegments((prev) => new Set(prev).add(segIndex));
-    try {
-      const difficulty = getDifficulty(level);
-      // Batch all examples into a single addSentences call
-      const items: Omit<ISpellingSentence, 'id' | 'createdAt'>[] = seg.examples.map((ex) => ({
-        en: ex.en,
-        zh: ex.zh,
-        source: 'word_example' as const,
-        sourceWord: ex.word,
-        difficulty,
-      }));
-      const count = addSentences(items);
-      setImportedSet((prev) => new Set(prev).add(segIndex));
-      setTotalImported((prev) => prev + count);
-      toast.success(`第 ${segIndex + 1} 段导入完成：新增 ${count} 条`);
+      const added = addSentences(allItems);
+      setResult({ found, added });
+      setDone(true);
+      // Signal parent to rebuild session queue
+      onImported();
     } catch {
-      toast.error(`第 ${segIndex + 1} 段导入失败`);
+      setError('导入失败，请重试');
     }
-    setImportingSegments((prev) => {
-      const next = new Set(prev);
-      next.delete(segIndex);
-      return next;
-    });
-  }, [segments, level, addSentences, getDifficulty]);
-
-  const handleImportAll = useCallback(async () => {
-    // Collect ALL remaining items into one batch to avoid stale closure overwrites
-    const allItems: Omit<ISpellingSentence, 'id' | 'createdAt'>[] = [];
-    const difficulty = getDifficulty(level);
-    for (let i = 0; i < segments.length; i++) {
-      if (!importedSet.has(i)) {
-        const seg = segments[i];
-        for (const ex of seg.examples) {
-          allItems.push({
-            en: ex.en,
-            zh: ex.zh,
-            source: 'word_example' as const,
-            sourceWord: ex.word,
-            difficulty,
-          });
-        }
-      }
-    }
-    if (allItems.length === 0) return;
-    const count = addSentences(allItems);
-    // Mark all segments as imported
-    const newSet = new Set(importedSet);
-    for (let i = 0; i < segments.length; i++) {
-      if (!importedSet.has(i)) newSet.add(i);
-    }
-    setImportedSet(newSet);
-    setTotalImported((prev) => prev + count);
-    toast.success(`全部导入完成：新增 ${count} 条`);
-    onImported();
-  }, [segments, importedSet, addSentences, level, getDifficulty, onImported]);
-
-  const allImported = scanned && segments.length > 0 && importedSet.size === segments.length;
+    setLoading(false);
+  }, [level, addSentences, getDifficulty, onImported]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1439,7 +1365,7 @@ function ImportDialog({
             从单词库导入例句
           </DialogTitle>
           <p id="import-dialog-desc" className="text-xs text-muted-foreground">
-            分段导入词库中所有单词的例句，每段至少 {SEGMENT_SIZE} 条
+            一键导入整个词库的例句到拼写练习库
           </p>
         </DialogHeader>
 
@@ -1449,110 +1375,55 @@ function ImportDialog({
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">
               选择词库级别
             </label>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Select value={level} onValueChange={(v) => { onLevelChange(v); setScanned(false); setSegments([]); }}>
-                  <SelectTrigger className="rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="zhongkao">中考 · 3,223 词</SelectItem>
-                    <SelectItem value="gaokao">高考 · 6,008 词</SelectItem>
-                    <SelectItem value="cet4">大学四级 · 4,542 词</SelectItem>
-                    <SelectItem value="cet6">大学六级 · 7,404 词</SelectItem>
-                    <SelectItem value="ielts">雅思 · 6,609 词</SelectItem>
-                    <SelectItem value="toefl">托福 · 10,367 词</SelectItem>
-                    <SelectItem value="postgraduate">考研 · 9,602 词</SelectItem>
-                    <SelectItem value="professional">专业英语 · 8,887 词</SelectItem>
-                    <SelectItem value="advanced">高级 · 18,471 词</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                onClick={handleScan}
-                disabled={scanning}
-                className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold shrink-0"
-              >
-                {scanning ? '扫描中...' : '扫描词库'}
-              </Button>
-            </div>
+            <Select value={level} onValueChange={onLevelChange}>
+              <SelectTrigger className="rounded-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="zhongkao">中考 · 3,223 词</SelectItem>
+                <SelectItem value="gaokao">高考 · 6,008 词</SelectItem>
+                <SelectItem value="cet4">大学四级 · 4,542 词</SelectItem>
+                <SelectItem value="cet6">大学六级 · 7,404 词</SelectItem>
+                <SelectItem value="ielts">雅思 · 6,609 词</SelectItem>
+                <SelectItem value="toefl">托福 · 10,367 词</SelectItem>
+                <SelectItem value="postgraduate">考研 · 9,602 词</SelectItem>
+                <SelectItem value="professional">专业英语 · 8,887 词</SelectItem>
+                <SelectItem value="advanced">高级 · 18,471 词</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Scan result */}
-          {scanned && (
-            <div className="rounded-xl bg-muted/50 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold">共扫描到 {totalFound} 条例句</span>
-                <span className="text-xs text-muted-foreground">
-                  分为 {segments.length} 段
-                </span>
+          {/* Loading */}
+          {loading && (
+            <div className="rounded-xl bg-muted/50 p-4 text-center">
+              <p className="text-sm font-bold text-muted-foreground">正在扫描并导入全部例句...</p>
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-3">
+                <div className="h-full bg-[#00B894] rounded-full animate-pulse" style={{ width: '60%' }} />
               </div>
+            </div>
+          )}
 
-              {/* Progress bar */}
-              {segments.length > 0 && (
-                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-[#00B894] rounded-full transition-all duration-300"
-                    style={{ width: `${(importedSet.size / segments.length) * 100}%` }}
-                  />
-                </div>
-              )}
-
-              {/* Segment list */}
-              <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
-                {segments.map((seg) => {
-                  const done = importedSet.has(seg.index);
-                  const importing = importingSegments.has(seg.index);
-                  return (
-                    <div
-                      key={seg.index}
-                      className={cn(
-                        'flex items-center justify-between p-2 rounded-lg text-xs transition-all',
-                        done
-                          ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-background border border-border/50',
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold">第 {seg.index + 1} 段</span>
-                        <span className="text-muted-foreground">
-                          第 {seg.from}-{seg.to} 条 ({seg.examples.length} 句)
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {done ? (
-                          <span className="text-emerald-500 font-bold text-[10px]">✓ 已导入</span>
-                        ) : (
-                          <Button
-                            size="sm"
-                            onClick={() => handleImportSegment(seg.index)}
-                            disabled={importing}
-                            className="h-7 rounded-lg text-[10px] font-bold px-3 bg-[#00B894] hover:bg-[#00a882] text-white"
-                          >
-                            {importing ? '导入中...' : '导入此段'}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Total imported */}
-              {totalImported > 0 && (
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">
-                  已累计导入 {totalImported} 条例句
+          {/* Result */}
+          {result && (
+            <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 p-4 text-center space-y-1">
+              <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                ✅ 导入完成
+              </p>
+              <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">
+                扫描到 {result.found} 条例句，新增 {result.added} 条
+              </p>
+              {result.added < result.found && (
+                <p className="text-[10px] text-muted-foreground/60">
+                  {result.found - result.added} 条已存在，跳过
                 </p>
               )}
+            </div>
+          )}
 
-              {/* All done */}
-              {allImported && (
-                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 p-3 text-center">
-                  <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                    ✅ 全部导入完成！共 {totalImported} 条
-                  </p>
-                </div>
-              )}
+          {/* Error */}
+          {error && (
+            <div className="rounded-xl bg-rose-50 dark:bg-rose-950/30 p-3 text-center">
+              <p className="text-sm font-bold text-rose-600 dark:text-rose-400">❌ {error}</p>
             </div>
           )}
         </div>
@@ -1560,27 +1431,22 @@ function ImportDialog({
         <DialogFooter className="gap-2">
           <Button
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={() => { onOpenChange(false); if (done) onImported(); }}
             className="rounded-xl font-bold"
           >
-            {allImported ? '完成' : '取消'}
+            {done ? '完成' : '取消'}
           </Button>
-          {scanned && !allImported && (
+          {!done && (
             <Button
               onClick={handleImportAll}
-              disabled={importingSegments.size > 0}
+              disabled={loading}
               className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
             >
-              <BookOpen className="size-4" />
-              逐段导入全部
-            </Button>
-          )}
-          {allImported && (
-            <Button
-              onClick={() => { onOpenChange(false); onImported(); }}
-              className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold"
-            >
-              开始练习
+              {loading ? (
+                '导入中...'
+              ) : (
+                <><BookOpen className="size-4" /> 导入全部例句</>
+              )}
             </Button>
           )}
         </DialogFooter>

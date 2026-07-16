@@ -15,6 +15,10 @@
 
 
 
+
+## 2026-07-16
+- fix: adjust word gap to 0.5em (one 'a' width) (`8ece919`)
+
 ## 2026-07-16
 - feat: underline is invisible input carrier — click to type, text appears above line (`82aaecd`)
 
