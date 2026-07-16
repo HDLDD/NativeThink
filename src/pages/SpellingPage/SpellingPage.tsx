@@ -626,27 +626,15 @@ export default function SpellingPage() {
   const handleLevelChange = useCallback(
     async (lvl: string) => {
       if (lvl === activeLevel) return;
-
       setActiveLevel(lvl);
+      setSubmitted(false);
+      setResults(null);
 
       // Check if we already have sentences tagged with this level
       const hasSentences = lvl === 'all' || sentences.some((s) => s.level === lvl);
 
-      if (lvl !== 'all' && !hasSentences && !isLevelReady(lvl)) {
-        // Word bank data not yet loaded — preload it
-        setLevelLoading(true);
-        try {
-          await preloadLevels([lvl]);
-        } catch {
-          toast.error('加载词库数据失败');
-          setLevelLoading(false);
-          return;
-        }
-        setLevelLoading(false);
-      }
-
       if (lvl !== 'all' && !hasSentences) {
-        // No sentences yet for this level — extract from word bank
+        // Need to load this level's sentences
         setLevelLoading(true);
         try {
           if (!isLevelReady(lvl)) {
@@ -663,9 +651,12 @@ export default function SpellingPage() {
           toast.error('加载词库失败');
         }
         setLevelLoading(false);
+        // Use importDirty to trigger rebuild in the next render (with fresh sentences)
+        setImportDirty((c) => c + 1);
+        return;
       }
 
-      // Rebuild session with the new level filter (sentences now have level field)
+      // Sentences already exist for this level — rebuild directly
       rebuildSession();
     },
     [activeLevel, sentences, extractLevelSentences, upsertSentences, rebuildSession],
@@ -687,7 +678,7 @@ export default function SpellingPage() {
         await new Promise(r => setTimeout(r, 50)); // yield between levels
       }
       toast.success(`数据库建立完成：共导入 ${totalImported} 条例句`);
-      rebuildSession();
+      setImportDirty((c) => c + 1);
     } catch {
       toast.error('建库失败，请重试');
     }

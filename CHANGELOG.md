@@ -27,6 +27,10 @@
 
 
 
+
+## 2026-07-16
+- refactor: on-demand level loading like DeepVocabularyPage, upsert instead of rebuild (`3db4299`)
+
 ## 2026-07-16
 - fix: show '当前词库没有句子' instead of '全部完成' when level has no sentences (`0887b25`)
 
