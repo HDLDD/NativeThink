@@ -12,6 +12,10 @@
 
 
 
+
+## 2026-07-16
+- fix: handleImportAll batches all segments in single addSentences call to avoid stale closure overwrite (`e2f7e34`)
+
 ## 2026-07-16
 - fix: segmented batch import, per-word input with ___ placeholder, centered Chinese, conditional auto-read (`2172279`)
 

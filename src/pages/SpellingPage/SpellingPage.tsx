@@ -113,7 +113,7 @@ function splitForFill(
 
 // ── Sub-components ──
 
-/** Per-word input fields for 句子拼写 mode — each field shows ___ placeholder, normal spaces between */
+/** 句子拼写: 下划线即输入区 — 无边框盒, 一行排列, 间距一个字母 */
 function DictationInput({
   words,
   userInputs,
@@ -130,41 +130,41 @@ function DictationInput({
   inputRefs: React.MutableRefObject<(HTMLInputElement | null)[]>;
 }) {
   return (
-    <div className="flex flex-wrap gap-x-2 gap-y-3 justify-center items-end">
+    <div className="flex flex-wrap justify-center gap-x-[0.6em] gap-y-3">
       {words.map((clean, i) => {
         const isCorrect = submitted ? correctWords[i] : undefined;
         return (
-          <div key={i} className="flex flex-col items-center gap-1">
-            <input
-              ref={(el) => { inputRefs.current[i] = el; }}
-              value={userInputs[i] || ''}
-              onChange={(e) => setUserInput(i, e.target.value)}
-              disabled={submitted}
-              maxLength={clean.length + 2}
-              placeholder={'_'.repeat(clean.length)}
-              className={cn(
-                'h-10 w-[calc(1ch*' + Math.max(clean.length + 2, 6) + '+ 16px)] min-w-[56px]',
-                'text-center text-sm font-mono rounded-xl border-2 outline-none transition-all duration-200',
-                'bg-background placeholder:text-muted-foreground/30 placeholder:tracking-[0.15em]',
-                'focus:border-[#00B894] focus:ring-2 focus:ring-[#00B894]/20',
-                submitted
-                  ? isCorrect
-                    ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300'
-                    : 'border-rose-400 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300'
-                  : 'border-muted-foreground/20 hover:border-muted-foreground/40',
-              )}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === 'Tab') {
-                  e.preventDefault();
-                  const next = i + 1;
-                  if (next < words.length) inputRefs.current[next]?.focus();
-                }
-                if (e.key === 'Backspace' && !userInputs[i] && i > 0) {
-                  inputRefs.current[i - 1]?.focus();
-                }
-              }}
-            />
-          </div>
+          <input
+            key={i}
+            ref={(el) => { inputRefs.current[i] = el; }}
+            value={userInputs[i] || ''}
+            onChange={(e) => setUserInput(i, e.target.value)}
+            disabled={submitted}
+            maxLength={clean.length + 2}
+            placeholder={'_'.repeat(clean.length)}
+            className={cn(
+              'h-7 w-[calc(1ch*' + Math.max(clean.length, 3) + '+ 4px)] min-w-[28px]',
+              'text-center text-sm font-mono outline-none transition-all duration-200',
+              'bg-transparent border-0 border-b-2 border-dotted border-muted-foreground/30',
+              'placeholder:text-muted-foreground/30 placeholder:tracking-[0.2em] placeholder:select-none',
+              'focus:border-[#00B894] focus:border-solid',
+              submitted
+                ? isCorrect
+                  ? 'border-emerald-400 text-emerald-600 dark:text-emerald-400'
+                  : 'border-rose-400 text-rose-600 dark:text-rose-400'
+                : 'hover:border-muted-foreground/60',
+            )}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                const next = i + 1;
+                if (next < words.length) inputRefs.current[next]?.focus();
+              }
+              if (e.key === 'Backspace' && !userInputs[i] && i > 0) {
+                inputRefs.current[i - 1]?.focus();
+              }
+            }}
+          />
         );
       })}
     </div>
@@ -284,6 +284,7 @@ export default function SpellingPage() {
   const [showAIDialog, setShowAIDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [completionShown, setCompletionShown] = useState(false);
+  const [autoRead, setAutoRead] = useState(true);         // 自动朗读
 
   // AI dialog state
   const [aiTopic, setAiTopic] = useState('');
@@ -338,13 +339,13 @@ export default function SpellingPage() {
         inputRefs.current = new Array(blankCount).fill(null);
       }
 
-      // Auto-play audio only in 句子拼写 mode (dictation)
+      // Auto-play audio (only in 句子拼写 mode + autoRead enabled)
       const timer = setTimeout(() => {
-        if (mode === 'dictation') tts.speak(currentSentence.en);
+        if (mode === 'dictation' && autoRead) tts.speak(currentSentence.en);
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [currentSentence?.id, mode]);
+  }, [currentSentence?.id, mode, autoRead]);
 
   /** Check answers */
   const handleSubmit = useCallback(() => {
@@ -698,6 +699,20 @@ export default function SpellingPage() {
               </button>
             </div>
           </div>
+
+          {/* Auto-read toggle */}
+          <button
+            onClick={() => setAutoRead(!autoRead)}
+            className={cn(
+              'px-3 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-200 border',
+              autoRead
+                ? 'bg-[#00B894]/10 border-[#00B894]/30 text-[#00B894]'
+                : 'border-border text-muted-foreground hover:text-foreground',
+            )}
+            title={autoRead ? '点击关闭自动朗读' : '点击开启自动朗读'}
+          >
+            {autoRead ? '🔊 自动' : '🔇 静音'}
+          </button>
         </div>
 
         {/* Row 2: Progress + Action buttons */}
