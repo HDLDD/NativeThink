@@ -132,7 +132,7 @@ function DictationInput({
   return (
     <>
       {/* One sentence window — no word windows */}
-      <div className="flex flex-wrap justify-center gap-x-[0.6em] gap-y-4">
+      <div className="flex flex-wrap justify-center gap-x-[0.5em] gap-y-4">
         {words.map((clean, i) => {
           const isCorrect = submitted ? correctWords[i] : undefined;
           const hasValue = !!userInputs[i];

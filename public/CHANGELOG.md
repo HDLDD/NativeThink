@@ -14,6 +14,10 @@
 
 
 
+
+## 2026-07-16
+- feat: underline is invisible input carrier — click to type, text appears above line (`82aaecd`)
+
 ## 2026-07-16
 - feat: underline-only input style, auto-read toggle (`00ffb4b`)
 
