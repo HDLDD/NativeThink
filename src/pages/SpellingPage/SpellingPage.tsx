@@ -113,67 +113,82 @@ function splitForFill(
 
 // ── Sub-components ──
 
-/** Word input fields for dictation mode */
+/** Single continuous input for dictation mode */
 function DictationInput({
-  words,
-  userInputs,
-  setUserInput,
+  value,
+  onChange,
+  wordHints,
   submitted,
-  correctWords,
-  inputRefs,
+  words,
+  userWords,
 }: {
-  words: string[];
-  userInputs: string[];
-  setUserInput: (index: number, value: string) => void;
+  value: string;
+  onChange: (value: string) => void;
+  wordHints: string;
   submitted: boolean;
-  correctWords: Record<number, boolean>;
-  inputRefs: React.MutableRefObject<(HTMLInputElement | null)[]>;
+  words: string[];
+  userWords: string[];
 }) {
-  return (
-    <div className="flex flex-wrap gap-2 justify-center">
-      {words.map((clean, i) => {
-        const isCorrect = submitted ? correctWords[i] : undefined;
-        return (
-          <div key={i} className="flex flex-col items-center gap-1.5">
-            {/* Letter count hint */}
-            {!submitted && (
-              <span className="text-[10px] font-mono text-muted-foreground/60 tracking-[0.2em] select-none">
-                {'_'.repeat(clean.length)}
+  if (submitted) {
+    return (
+      <div className="flex flex-wrap gap-x-3 gap-y-2 justify-center text-lg font-mono leading-relaxed px-2">
+        {words.map((correctWord, i) => {
+          const userWord = userWords[i] || '';
+          const isCorrect = userWord.toLowerCase() === correctWord.toLowerCase();
+          return (
+            <span key={i} className="inline-flex items-baseline gap-1.5">
+              <span
+                className={cn(
+                  'px-1.5 py-0.5 rounded-lg text-sm font-bold',
+                  isCorrect
+                    ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400',
+                )}
+              >
+                {userWord || '___'}
               </span>
-            )}
-            <input
-              ref={(el) => { inputRefs.current[i] = el; }}
-              value={userInputs[i] || ''}
-              onChange={(e) => setUserInput(i, e.target.value)}
-              disabled={submitted}
-              maxLength={clean.length + 2}
-              className={cn(
-                'h-10 w-[calc(1ch*' + Math.max(clean.length + 2, 6) + '+ 16px)] min-w-[56px]',
-                'text-center text-sm font-mono rounded-xl border-2 outline-none transition-all duration-200',
-                'bg-background focus:border-[#00B894] focus:ring-2 focus:ring-[#00B894]/20',
-                submitted
-                  ? isCorrect
-                    ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300'
-                    : 'border-rose-400 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300'
-                  : 'border-muted-foreground/20 hover:border-muted-foreground/40',
+              {!isCorrect && (
+                <span className="text-emerald-600 dark:text-emerald-400 text-sm font-bold">
+                  → {correctWord}
+                </span>
               )}
-              placeholder={'_'.repeat(Math.min(clean.length, 6))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === 'Tab') {
-                  e.preventDefault();
-                  const next = i + 1;
-                  if (next < words.length) {
-                    inputRefs.current[next]?.focus();
-                  }
-                }
-                if (e.key === 'Backspace' && !userInputs[i] && i > 0) {
-                  inputRefs.current[i - 1]?.focus();
-                }
-              }}
-            />
-          </div>
-        );
-      })}
+            </span>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="text-xs font-mono text-muted-foreground/50 tracking-[0.3em] select-none">
+        {wordHints}
+      </div>
+      <div className="w-full max-w-2xl mx-auto">
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          autoFocus
+          placeholder="在此输入整句英文…"
+          className={cn(
+            'w-full h-12 px-5 text-center text-lg font-mono',
+            'rounded-2xl border-2 outline-none transition-all duration-200',
+            'bg-background placeholder:text-muted-foreground/30',
+            'focus:border-[#00B894] focus:ring-4 focus:ring-[#00B894]/15',
+            'border-muted-foreground/20 hover:border-muted-foreground/40',
+          )}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              // Submit is triggered by the button — the Enter key is a convenience
+              document.getElementById('spelling-submit-btn')?.click();
+            }
+          }}
+        />
+      </div>
+      <div className="text-[11px] text-muted-foreground/50 font-medium">
+        {words.length} 个单词 · 用空格分隔 · 按 Enter 快速提交
+      </div>
     </div>
   );
 }
@@ -276,7 +291,8 @@ export default function SpellingPage() {
   );
 
   // Input state
-  const [userInputs, setUserInputs] = useState<string[]>([]);
+  const [dictationInput, setDictationInput] = useState('');       // single input for dictation mode
+  const [fillInputs, setFillInputs] = useState<string[]>([]);      // per-blank inputs for fill mode
   const [submitted, setSubmitted] = useState(false);
   const [results, setResults] = useState<{ wordResults: Record<number, boolean>; score: number; total: number } | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -332,15 +348,15 @@ export default function SpellingPage() {
     if (currentSentence) {
       const words = getWords(currentSentence.en);
       if (mode === 'dictation') {
-        setUserInputs(new Array(words.length).fill(''));
-        inputRefs.current = new Array(words.length).fill(null);
+        setDictationInput('');
+        inputRefs.current = [];
       } else {
         // Fill mode: compute blanks
         const blanks = selectBlanks(words);
         const parts = splitForFill(currentSentence.en, blanks);
         setFillParts(parts);
         const blankCount = parts.filter((p) => p.type === 'blank').length;
-        setUserInputs(new Array(blankCount).fill(''));
+        setFillInputs(new Array(blankCount).fill(''));
         inputRefs.current = new Array(blankCount).fill(null);
       }
 
@@ -364,15 +380,15 @@ export default function SpellingPage() {
 
     if (mode === 'dictation') {
       totalWords = words.length;
+      const userWords = dictationInput.trim().split(/\s+/).filter(Boolean);
       for (let i = 0; i < words.length; i++) {
-        const user = (userInputs[i] || '').trim().toLowerCase();
+        const user = (userWords[i] || '').trim().toLowerCase();
         const correct = words[i].toLowerCase();
         const isCorrect = user === correct;
         wordResults[i] = isCorrect;
         if (isCorrect) correctCount++;
         else {
-          const cleanWord = words[i].toLowerCase();
-          wrongWords[cleanWord] = (wrongWords[cleanWord] || 0) + 1;
+          wrongWords[correct] = (wrongWords[correct] || 0) + 1;
         }
       }
     } else {
@@ -383,7 +399,7 @@ export default function SpellingPage() {
       let inputIdx = 0;
       for (const part of fillParts) {
         if (part.type === 'blank') {
-          const user = (userInputs[inputIdx] || '').trim().toLowerCase();
+          const user = (fillInputs[inputIdx] || '').trim().toLowerCase();
           const correct = part.content.replace(/[^a-zA-Z'-]/g, '').toLowerCase();
           const isCorrect = user === correct;
           wordResults[part.wordIndex] = isCorrect;
@@ -401,7 +417,7 @@ export default function SpellingPage() {
 
     setResults({ wordResults, score: correctCount, total: totalWords });
     setSubmitted(true);
-  }, [currentSentence, mode, userInputs, fillParts, calculateQuality, recordAttempt]);
+  }, [currentSentence, mode, dictationInput, fillInputs, fillParts, calculateQuality, recordAttempt]);
 
   /** Navigate to next sentence */
   const handleNext = useCallback(() => {
@@ -428,29 +444,31 @@ export default function SpellingPage() {
   const handleRetry = useCallback(() => {
     setSubmitted(false);
     setResults(null);
-    const words = currentSentence ? getWords(currentSentence.en) : [];
     if (mode === 'dictation') {
-      setUserInputs(new Array(words.length).fill(''));
+      setDictationInput('');
     } else {
-      setUserInputs(new Array(userInputs.length).fill(''));
+      setFillInputs(new Array(fillInputs.length).fill(''));
     }
-  }, [currentSentence, mode, userInputs.length]);
+  }, [mode, fillInputs.length]);
 
-  /** Retry only wrong words in dictation mode */
+  /** Retry only wrong words (dictation: clear entire input; fill: clear wrong blanks) */
   const handleRetryWrong = useCallback(() => {
     if (!currentSentence || !results) return;
-    const words = getWords(currentSentence.en);
-    const newInputs = [...userInputs];
-    // Clear only wrong words
-    for (let i = 0; i < words.length; i++) {
-      if (!results.wordResults[i]) {
-        newInputs[i] = '';
+    if (mode === 'dictation') {
+      setDictationInput('');
+    } else {
+      const newInputs = [...fillInputs];
+      for (const [wordIdxStr, isCorrect] of Object.entries(results.wordResults)) {
+        if (!isCorrect && fillParts) {
+          const blankIndex = fillParts.findIndex((p) => p.type === 'blank' && p.wordIndex === Number(wordIdxStr));
+          if (blankIndex !== -1) newInputs[blankIndex] = '';
+        }
       }
+      setFillInputs(newInputs);
     }
-    setUserInputs(newInputs);
     setSubmitted(false);
     setResults(null);
-  }, [currentSentence, results, userInputs]);
+  }, [currentSentence, results, mode, fillInputs, fillParts]);
 
   /** Toggle favorite for current sentence */
   const handleToggleFavorite = useCallback(() => {
@@ -791,32 +809,28 @@ export default function SpellingPage() {
         <div className="px-6 py-6 space-y-6">
           {mode === 'dictation' ? (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-3 justify-center">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   听写输入
                 </span>
                 <span className="text-[11px] text-muted-foreground/60">
-                  ({currentSentence ? getWords(currentSentence.en).length : 0} 个单词 · 按 Tab 切换)
+                  ({currentSentence ? getWords(currentSentence.en).length : 0} 个单词)
                 </span>
               </div>
               {currentSentence && (
                 <DictationInput
-                  words={getWords(currentSentence.en)}
-                  userInputs={userInputs}
-                  setUserInput={(i, v) => setUserInputs((prev) => {
-                    const next = [...prev];
-                    next[i] = v;
-                    return next;
-                  })}
+                  value={dictationInput}
+                  onChange={setDictationInput}
+                  wordHints={getWords(currentSentence.en).map((w) => '_'.repeat(w.length)).join(' ')}
                   submitted={submitted}
-                  correctWords={results?.wordResults || {}}
-                  inputRefs={inputRefs}
+                  words={getWords(currentSentence.en)}
+                  userWords={dictationInput.trim().split(/\s+/).filter(Boolean)}
                 />
               )}
             </div>
           ) : (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-3 justify-center">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   填空
                 </span>
@@ -827,8 +841,8 @@ export default function SpellingPage() {
               {currentSentence && fillParts && (
                 <FillDisplay
                   parts={fillParts}
-                  userInputs={userInputs}
-                  setUserInput={(i, v) => setUserInputs((prev) => {
+                  userInputs={fillInputs}
+                  setUserInput={(i, v) => setFillInputs((prev) => {
                     const next = [...prev];
                     next[i] = v;
                     return next;
@@ -857,6 +871,7 @@ export default function SpellingPage() {
 
             {!submitted ? (
               <Button
+                id="spelling-submit-btn"
                 onClick={handleSubmit}
                 className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
               >
@@ -974,17 +989,32 @@ export default function SpellingPage() {
                         wrongList.push({ index: Number(wordIdxStr), correct: words[Number(wordIdxStr)] });
                       }
                     }
-                    return wrongList.length > 0 ? (
+                    if (wrongList.length === 0) return null;
+                    if (mode === 'dictation') {
+                      const userWords = dictationInput.trim().split(/\s+/).filter(Boolean);
+                      return (
+                        <div>
+                          <span className="font-bold">正确答案：</span>
+                          {wrongList.map((w) => (
+                            <span key={w.index} className="inline-block mr-3">
+                              <span className="text-rose-500 line-through">{userWords[w.index] || '___'}</span>
+                              <span className="text-emerald-600 dark:text-emerald-400 font-bold ml-1">→ {w.correct}</span>
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return (
                       <div>
                         <span className="font-bold">正确答案：</span>
                         {wrongList.map((w) => (
                           <span key={w.index} className="inline-block mr-3">
-                            <span className="text-rose-500 line-through">{userInputs[w.index] || '___'}</span>
+                            <span className="text-rose-500 line-through">{fillInputs[w.index] || '___'}</span>
                             <span className="text-emerald-600 dark:text-emerald-400 font-bold ml-1">→ {w.correct}</span>
                           </span>
                         ))}
                       </div>
-                    ) : null;
+                    );
                   })()}
                 </div>
               )}

@@ -8,6 +8,10 @@
 
 
 
+
+## 2026-07-16
+- fix: add _redirects for SPA client-side routing, fix Dialog aria-describedby warning (`bd46d45`)
+
 ## 2026-07-16
 - feat: add sentence spelling feature with dictation & fill modes, AI batch add, SM-2 memory, favorites (`08c8750`)
 
