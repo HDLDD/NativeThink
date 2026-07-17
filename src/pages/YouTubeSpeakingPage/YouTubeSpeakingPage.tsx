@@ -23,6 +23,7 @@ import {
   ChevronRight,
   X,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +46,7 @@ import {
   getVideosByLevel,
   getVideoById,
   addCustomVideo,
+  removeVideo,
   type VideoEntry,
   type VideoSegment,
   type VideoKeyword,
@@ -98,47 +100,57 @@ function VideoCard({
   video,
   active,
   onClick,
+  onDelete,
 }: {
   video: VideoEntry;
   active: boolean;
   onClick: () => void;
+  onDelete?: (e: React.MouseEvent) => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'shrink-0 w-48 rounded-2xl overflow-hidden border-2 transition-all duration-200 text-left',
-        active
-          ? 'border-[#00B894] shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30'
-          : 'border-border/50 hover:border-[#00B894]/50',
-      )}
-    >
-      {/* Thumbnail placeholder */}
-      <div className="aspect-video bg-gradient-to-br from-muted to-muted-foreground/10 flex items-center justify-center relative">
-        <Play className="size-8 text-muted-foreground/30" />
-        <span className="absolute bottom-1 right-1 text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">
-          {fmtTime(video.duration)}
-        </span>
-      </div>
-      {/* Info */}
-      <div className="p-2.5 space-y-1">
-        <p className="text-xs font-bold text-foreground leading-tight line-clamp-2">
-          {video.titleZh || video.title}
-        </p>
-        <p className="text-[10px] text-muted-foreground truncate">{video.channel}</p>
-        <Badge
-          variant="secondary"
-          className={cn(
-            'text-[9px] font-bold px-1.5 py-0 rounded',
-            video.level === 'beginner' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-            video.level === 'intermediate' && 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-            video.level === 'advanced' && 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
-          )}
+    <div className={cn(
+      'shrink-0 w-48 rounded-2xl overflow-hidden border-2 transition-all duration-200 relative group',
+      active
+        ? 'border-[#00B894] shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30'
+        : 'border-border/50 hover:border-[#00B894]/50',
+    )}>
+      <button onClick={onClick} className="w-full text-left">
+        {/* Thumbnail placeholder */}
+        <div className="aspect-video bg-gradient-to-br from-muted to-muted-foreground/10 flex items-center justify-center relative">
+          <Play className="size-8 text-muted-foreground/30" />
+          <span className="absolute bottom-1 right-1 text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">
+            {fmtTime(video.duration)}
+          </span>
+        </div>
+        {/* Info */}
+        <div className="p-2.5 space-y-1">
+          <p className="text-xs font-bold text-foreground leading-tight line-clamp-2">
+            {video.titleZh || video.title}
+          </p>
+          <p className="text-[10px] text-muted-foreground truncate">{video.channel}</p>
+          <Badge
+            variant="secondary"
+            className={cn(
+              'text-[9px] font-bold px-1.5 py-0 rounded',
+              video.level === 'beginner' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+              video.level === 'intermediate' && 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+              video.level === 'advanced' && 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
+            )}
+          >
+            {video.level === 'beginner' ? '初级' : video.level === 'intermediate' ? '中级' : '高级'}
+          </Badge>
+        </div>
+      </button>
+      {/* Delete button — visible on hover */}
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          className="absolute top-1.5 right-1.5 size-6 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500"
         >
-          {video.level === 'beginner' ? '初级' : video.level === 'intermediate' ? '中级' : '高级'}
-        </Badge>
-      </div>
-    </button>
+          <X className="size-3" />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -297,6 +309,20 @@ export default function YouTubeSpeakingPage() {
     segmentRefs.current = new Array(video.segments.length).fill(null);
   }, []);
 
+  // ── Delete video ──
+  const handleDeleteVideo = useCallback((e: React.MouseEvent, video: VideoEntry) => {
+    e.stopPropagation();
+    if (!confirm(`确定删除「${video.titleZh || video.title}」？`)) return;
+    removeVideo(video.id);
+    setVideos(getVideosByLevel(levelFilter));
+    if (activeVideo?.id === video.id) {
+      setActiveVideo(null);
+      setCurrentTime(0);
+      currentTimeRef.current = 0;
+    }
+    toast.success('已删除');
+  }, [levelFilter, activeVideo]);
+
   // ── Add custom video ──
   const handleAddCustom = useCallback(() => {
     if (!customBvid.trim()) { toast.error('请输入 BVID'); return; }
@@ -400,6 +426,7 @@ export default function YouTubeSpeakingPage() {
                 video={video}
                 active={activeVideo?.id === video.id}
                 onClick={() => handleSelectVideo(video)}
+                onDelete={(e) => handleDeleteVideo(e, video)}
               />
             ))}
           </div>

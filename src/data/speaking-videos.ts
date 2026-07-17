@@ -216,3 +216,8 @@ export function getVideoById(id: string): VideoEntry | undefined {
 export function addCustomVideo(video: VideoEntry): void {
   _library.push(video);
 }
+
+export function removeVideo(id: string): void {
+  const idx = _library.findIndex((v) => v.id === id);
+  if (idx !== -1) _library.splice(idx, 1);
+}
