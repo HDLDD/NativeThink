@@ -1,6 +1,10 @@
 # NativeThink 开发日志
 
 
+
+## 2026-07-17
+- feat: speaking page - support delete video (`7334816`)
+
 ## 2026-07-17
 - speaking page (`4f2c1fb`)
 

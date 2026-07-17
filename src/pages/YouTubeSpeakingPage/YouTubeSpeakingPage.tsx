@@ -325,14 +325,22 @@ export default function YouTubeSpeakingPage() {
 
   // ── Add custom video ──
   const handleAddCustom = useCallback(() => {
-    if (!customBvid.trim()) { toast.error('请输入 BVID'); return; }
+    if (!customBvid.trim()) { toast.error('请输入 BVID 或 B站视频链接'); return; }
     if (!customTitle.trim()) { toast.error('请输入视频标题'); return; }
 
-    // Validate BVID format (BV + 10 chars)
-    const bvid = customBvid.trim().toUpperCase();
-    if (!/^BV[A-Za-z0-9]{10,}$/.test(bvid)) {
-      toast.error('BVID 格式不正确（如 BV1xx411c7mD）');
-      return;
+    // Extract BVID from URL or plain text
+    let bvid = customBvid.trim();
+    // Try to match BV... in URL (supports full URLs like https://www.bilibili.com/video/BV1xx411c7mD?p=1)
+    const bvMatch = bvid.match(/BV[A-Za-z0-9]{10,}/);
+    if (bvMatch) {
+      bvid = bvMatch[0].toUpperCase();
+    } else {
+      bvid = bvid.toUpperCase();
+      // Fallback: check if it looks like a raw BVID
+      if (!/^BV[A-Za-z0-9]{10,}$/.test(bvid)) {
+        toast.error('无法识别 BVID，请粘贴 B站视频链接或 BVID');
+        return;
+      }
     }
 
     // Don't duplicate
@@ -613,11 +621,11 @@ export default function YouTubeSpeakingPage() {
               <Input
                 value={customBvid}
                 onChange={(e) => setCustomBvid(e.target.value)}
-                placeholder="例如: BV1xx411c7mD"
+                placeholder="B站链接 或 BVID（如 BV1xx411c7mD）"
                 className="mt-1 rounded-xl text-sm"
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                在 B站视频页 URL 中查找: bilibili.com/video/<b>BV1xx411c7mD</b>
+                支持粘贴完整链接: bilibili.com/video/<b>BV1xx411c7mD</b>
               </p>
             </div>
             <div>
