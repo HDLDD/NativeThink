@@ -506,7 +506,10 @@ export default function SpellingPage() {
 
     setResults({ wordResults, score: correctCount, total: totalWords });
     setSubmitted(true);
-  }, [currentSentence, mode, dictationInputs, fillInputs, fillParts, calculateQuality, recordAttempt]);
+
+    // Re-read the sentence aloud after submit
+    tts.speak(currentSentence.en);
+  }, [currentSentence, mode, dictationInputs, fillInputs, fillParts, calculateQuality, recordAttempt, tts]);
 
   /** Navigate to next sentence — mark completed */
   const handleNext = useCallback(() => {

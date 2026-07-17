@@ -1,51 +1,10 @@
 # NativeThink 开发日志
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+## 2026-07-17
+- feat: 提交句子拼写答案后自动重读句子
+- feat: 新增英语口语视频学习页 (/speaking) — B站嵌入播放 + 同步字幕 + 重点词查词翻译
+- feat: 视频库按难度筛选，支持自定义添加 B站视频
+- fix: 再听一遍 stays on current sentence, improve pronunciation analysis prompt (`67e21d6`)
 
 ## 2026-07-17
 - fix: shadowing togglePlay pause not working — ref-based isSpeaking avoids stale closure (`c5d48bb`)
@@ -170,6 +129,10 @@
 ## 2026-07-16
 - feat: add sentence spelling feature with dictation & fill modes, AI batch add, SM-2 memory, favorites (`08c8750`)
 
+---
+
+*(以下为之前版本的日志，略缩显示)*
+
 ## 2026-07-14
 - fix: learning time tracking bugs — midnight reset, stale closure, UTC dates (`87070f2`)
 
@@ -178,20 +141,10 @@
 
 ## 2026-07-13
 - fix: 修复词汇复习模式在无学习单词时随机切换问题 (`67cc0ae`)
-
-## 2026-07-13
 - perf: vocabulary page renders UI immediately, skeleton fallback for page transitions (`7fde02f`)
-
-## 2026-07-13
 - fix: re-read localStorage after cloud sync completes (`dc3dc98`)
-
-## 2026-07-13
 - docs: 整理 CHANGELOG — 合并重复日期，分类记录更新和修复 (`4d7a6dc`)
-
-## 2026-07-13
 - feat: add password hint text on register form (`272e88d`)
-
-## 2026-07-13
 
 ### LCP 性能优化 🚀
 - **Google Fonts 非阻塞加载**: `@import`（渲染阻塞）→ `<link rel="stylesheet" media="print" onload>` + `preconnect` 提示，字重从 13 个减至 6 个

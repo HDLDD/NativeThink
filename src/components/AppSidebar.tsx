@@ -11,6 +11,7 @@ import {
   Sparkles,
   PenLine,
   SpellCheck,
+  Video,
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -38,6 +39,7 @@ const ROUTE_PREFETCH: Record<string, () => Promise<unknown>> = {
   '/writing': () => import('@/pages/WritingPage/WritingPage'),
   '/progress': () => import('@/pages/ProgressPage/ProgressPage'),
   '/spelling': () => import('@/pages/SpellingPage/SpellingPage'),
+  '/speaking': () => import('@/pages/YouTubeSpeakingPage/YouTubeSpeakingPage'),
 };
 
 const NAV_ITEMS = [
@@ -51,6 +53,7 @@ const NAV_ITEMS = [
   { path: '/favorites', label: '我的收藏', icon: Heart },
   { path: '/writing', label: 'AI 写作练习', icon: PenLine },
   { path: '/spelling', label: '句子拼写', icon: SpellCheck },
+  { path: '/speaking', label: '口语视频', icon: Video },
   { path: '/progress', label: '学习记录', icon: BarChart3 },
 ];
 
