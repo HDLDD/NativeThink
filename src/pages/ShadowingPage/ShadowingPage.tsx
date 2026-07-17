@@ -210,9 +210,12 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
 
   const currentSentence = allSentences[currentSentenceIdx];
 
+  const skipAdvanceRef = useRef(false);
+
   // Shared TTS hook with auto-advance on sentence end
   const tts = useTTS({
     onEnd: () => {
+      if (skipAdvanceRef.current) { skipAdvanceRef.current = false; return; }
       if (!isLoopingRef.current) {
         const idx = currentIdxRef.current;
         if (idx < allSentences.length - 1) {
@@ -224,6 +227,7 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
 
   const isSpeakingRef = useRef(false);
   isSpeakingRef.current = tts.isSpeaking;
+
   const togglePlay = useCallback(() => {
     if (isSpeakingRef.current) {
       tts.cancel();
@@ -238,6 +242,7 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
 
   const playCurrentSentence = useCallback(() => {
     if (currentSentence) {
+      skipAdvanceRef.current = true;
       tts.speak(currentSentence.text, {
         lang: selectedCorpus?.accent === 'UK' ? 'en-GB' : 'en-US',
         rate: playbackRate,
@@ -521,25 +526,31 @@ Keep it concise and practical.`,
           [
             {
               role: 'system',
-              content: `You are an English pronunciation coach. Compare the original sentence with what the user actually said during shadowing.
+              content: `You are an expert English pronunciation coach. Compare the original sentence with the user's shadowing attempt and give detailed pronunciation feedback.
 
-Respond in this bilingual format (English first, then 中文), keep it concise:
+Respond in this bilingual format (English first, then 中文):
 
-## 🎯 准确度评分
+## 🎯 准确度
 Overall accuracy: X/10
 
 ## 📊 逐词对比
 | Original | You said | Correct? |
 |----------|----------|----------|
-| word | what they said | ✅ or ❌ |
+| word | spoken | ✅/❌ |
 
-## 🗣 发音建议
-- Specific words that need improvement
+## 🗣 发音分析
+For each mispronounced or different word, explain the pronunciation issue:
+- **word**: what the user likely said wrong and how to fix it (specific mouth/tongue position tips)
+- Focus on: vowel length, consonant voicing, word stress, and linking
+
+## 📝 语调和节奏
+- Intonation patterns the user got right or wrong
+- Sentence stress (which words should be emphasized)
 
 ## ✅ 做得好的地方
-- What they got right
+- What the user got right, to encourage them
 
-Be encouraging but accurate. Focus on the most impactful improvements.`,
+Be encouraging but precise. Focus on the most impactful improvements for a Chinese learner.`,
             },
             {
               role: 'user',

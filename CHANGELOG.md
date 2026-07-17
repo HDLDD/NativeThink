@@ -46,6 +46,10 @@
 
 
 
+
+## 2026-07-17
+- fix: shadowing togglePlay pause not working — ref-based isSpeaking avoids stale closure (`c5d48bb`)
+
 ## 2026-07-17
 - fix: shadowing center play/pause button now correctly stops playback — ref-based isSpeaking avoids stale closure (`ac0397f`..HEAD)
 
