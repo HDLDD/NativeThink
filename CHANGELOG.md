@@ -4,6 +4,10 @@
 
 
 
+
+## 2026-07-18
+- feat: speaking collection feature - auto-fetch B站 info, level group, add TED 100 talks (`28b900f`)
+
 ## 2026-07-18
 - feat: replace placeholder videos with real B站英语播客合集 (`885c75f`)
 

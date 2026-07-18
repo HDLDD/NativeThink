@@ -24,6 +24,7 @@ import {
   X,
   ExternalLink,
   Trash2,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,8 +38,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { safeStorage } from '@/lib/safe-storage';
 import { useTTS } from '@/lib/use-tts';
 import { useFavorites } from '@/lib/use-favorites';
+import { useAI } from '@/hooks/use-ai';
 import { queryWords } from '@/data/wordbank';
 import { toast } from 'sonner';
 import {
@@ -194,6 +197,15 @@ export default function YouTubeSpeakingPage() {
   const [fetchingInfo, setFetchingInfo] = useState(false);
   const [fetchedInfo, setFetchedInfo] = useState<{ title: string; episodes: number; channel: string } | null>(null);
 
+  // Subtitle state
+  const [fetchedSegments, setFetchedSegments] = useState<VideoSegment[] | null>(null);
+  const [subtitleLoading, setSubtitleLoading] = useState(false);
+  const [subtitleSource, setSubtitleSource] = useState<'bilibili' | 'ai' | 'manual' | null>(null);
+  const [showAddSubtitle, setShowAddSubtitle] = useState(false);
+  const [pastedTranscript, setPastedTranscript] = useState('');
+  const [aiProcessing, setAiProcessing] = useState(false);
+  const ai = useAI();
+
   // ── Filter videos by level ──
   useEffect(() => {
     setVideos(getVideosByLevel(levelFilter));
@@ -242,14 +254,58 @@ export default function YouTubeSpeakingPage() {
     return () => clearInterval(interval);
   }, [playerPlaying, activeVideo]);
 
+  // ── Subtitle cache key ──
+  const subtitleCacheKey = activeVideo ? `__speaking_subtitle_${activeVideo.bvid}` : null;
+
+  // ── Auto-fetch subtitles when video changes ──
+  useEffect(() => {
+    if (!activeVideo) { setFetchedSegments(null); setSubtitleSource(null); return; }
+
+    // Check localStorage cache first
+    if (subtitleCacheKey) {
+      try {
+        const cached = safeStorage.getItem(subtitleCacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setFetchedSegments(parsed.segments || null);
+          setSubtitleSource(parsed.source || null);
+          return;
+        }
+      } catch { /* ignore */ }
+    }
+
+    // Fetch from API
+    setSubtitleLoading(true);
+    fetch(`/api/bilibili-subtitle?bvid=${activeVideo.bvid}&page=1`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.segments && data.segments.length > 0) {
+          setFetchedSegments(data.segments);
+          setSubtitleSource('bilibili');
+          // Cache
+          if (subtitleCacheKey) {
+            try { safeStorage.setItem(subtitleCacheKey, JSON.stringify({ segments: data.segments, source: 'bilibili' })); } catch { /* */ }
+          }
+        } else {
+          setFetchedSegments(null);
+          setSubtitleSource(null);
+        }
+      })
+      .catch(() => { setFetchedSegments(null); setSubtitleSource(null); })
+      .finally(() => setSubtitleLoading(false));
+  }, [activeVideo?.id]);
+
+  // ── Segments to display (prefer live segments > fetched > built-in) ──
+  const displaySegments = activeVideo?.segments && activeVideo.segments.length > 0
+    ? activeVideo.segments
+    : (fetchedSegments || []);
+
   // ── Compute current segment index ──
-  const currentSegmentIdx = useRef(-1);
   const currentSegmentIndex = (() => {
-    if (!activeVideo) return -1;
-    const idx = activeVideo.segments.findIndex(
+    if (!activeVideo || displaySegments.length === 0) return -1;
+    return displaySegments.findIndex(
       (seg) => currentTime >= seg.start && currentTime < seg.end,
     );
-    return idx;
   })();
 
   // ─- Auto-scroll transcript to current segment ──
@@ -310,7 +366,10 @@ export default function YouTubeSpeakingPage() {
     currentTimeRef.current = 0;
     setPlayerReady(false);
     setPlayerPlaying(false);
-    segmentRefs.current = new Array(video.segments.length).fill(null);
+    setFetchedSegments(null);
+    setSubtitleSource(null);
+    setSearchQuery('');
+    segmentRefs.current = [];
   }, []);
 
   // ── Delete video ──
@@ -401,15 +460,80 @@ export default function YouTubeSpeakingPage() {
     toast.success('已添加视频！请在下方添加字幕段');
   }, [customBvid, customTitle, customTitleZh, customLevel, levelFilter, handleSelectVideo]);
 
+  // ── AI process pasted transcript ──
+  const handleProcessTranscript = useCallback(async () => {
+    if (!pastedTranscript.trim() || !activeVideo || !ai.isConfigured) {
+      if (!ai.isConfigured) toast.error('请先配置 AI API Key');
+      return;
+    }
+    setAiProcessing(true);
+    try {
+      const prompt = `You are a bilingual subtitle generator. Take the following English transcript text and split it into natural segments (by sentence or short phrase group). For each segment, provide the Chinese translation and highlight 1-3 key vocabulary words with their Chinese meanings.
+
+Return ONLY a valid JSON array, no markdown, no extra text:
+[
+  {
+    "start": <segment_number_0_indexed>,
+    "end": <segment_number_plus_3_seconds>,
+    "en": "English text",
+    "zh": "Chinese translation",
+    "keywords": [{"word": "key_word", "meaning": "中文释义"}]
+  }
+]
+
+Transcript text:
+${pastedTranscript.slice(0, 8000)}`;
+
+      const result = await ai.chat([
+        { role: 'system', content: 'You are a bilingual transcript processor. Return valid JSON only.' },
+        { role: 'user', content: prompt },
+      ], { temperature: 0.3, maxTokens: 4096 });
+
+      // Try to extract JSON from response
+      const jsonMatch = result.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) { toast.error('AI 返回格式错误，请重试'); return; }
+      const segments = JSON.parse(jsonMatch[0]);
+
+      if (!Array.isArray(segments) || segments.length === 0) {
+        toast.error('AI 未能生成字幕段'); return;
+      }
+
+      const validSegments: VideoSegment[] = segments.map((s: any, i: number) => ({
+        start: typeof s.start === 'number' ? s.start : i * 3,
+        end: typeof s.end === 'number' ? s.end : (i + 1) * 3,
+        en: (s.en || '').trim(),
+        zh: (s.zh || '').trim(),
+        keywords: (s.keywords || []).filter((k: any) => k.word).map((k: any) => ({ word: k.word, meaning: k.meaning || '' })),
+      })).filter((s) => s.en);
+
+      setFetchedSegments(validSegments);
+      setSubtitleSource('ai');
+      segmentRefs.current = new Array(validSegments.length).fill(null);
+
+      // Cache
+      if (subtitleCacheKey) {
+        try { safeStorage.setItem(subtitleCacheKey, JSON.stringify({ segments: validSegments, source: 'ai' })); } catch { /* */ }
+      }
+
+      toast.success(`已生成 ${validSegments.length} 条字幕`);
+      setShowAddSubtitle(false);
+      setPastedTranscript('');
+    } catch {
+      toast.error('处理失败，请重试');
+    } finally {
+      setAiProcessing(false);
+    }
+  }, [pastedTranscript, activeVideo, ai, subtitleCacheKey]);
+
   // ── Filter segments by search ──
   const filteredSegments = activeVideo
     ? searchQuery.trim()
-      ? activeVideo.segments.filter(
+      ? displaySegments.filter(
           (s) =>
             s.en.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.zh.includes(searchQuery),
+            s.zh.toLowerCase().includes(searchQuery.toLowerCase()),
         )
-      : activeVideo.segments
+      : displaySegments
     : [];
 
   // ── Render ──
@@ -547,20 +671,55 @@ export default function YouTubeSpeakingPage() {
             {/* Segments list */}
             <ScrollArea className="flex-1 rounded-2xl border border-border/50 bg-muted/20">
               <div className="p-3 space-y-1">
-                {filteredSegments.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-8">
-                    {activeVideo.segments.length === 0
-                      ? '该视频暂无字幕段，请在数据文件中添加'
-                      : '未找到匹配的字幕'}
-                  </p>
+                {/* Subtitle source badge and add button */}
+                {displaySegments.length > 0 && subtitleSource && (
+                  <div className="flex items-center justify-between px-1 pb-1">
+                    <span className="text-[10px] text-muted-foreground">
+                      字幕来源: {subtitleSource === 'bilibili' ? 'B站' : subtitleSource === 'ai' ? 'AI生成' : '手动'}
+                    </span>
+                    <button
+                      onClick={() => setShowAddSubtitle(true)}
+                      className="text-[10px] font-bold text-[#00B894] hover:underline"
+                    >
+                      重新生成
+                    </button>
+                  </div>
                 )}
+
+                {/* Empty / No subtitles state */}
+                {displaySegments.length === 0 && !subtitleLoading && (
+                  <div className="text-center py-6 space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      {subtitleSource === null
+                        ? 'B站未提供字幕'
+                        : searchQuery.trim() ? '未找到匹配的字幕' : '暂无字幕'}
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={() => setShowAddSubtitle(true)}
+                      variant="outline"
+                      className="rounded-xl text-xs font-bold gap-1"
+                    >
+                      <Plus className="size-3.5" />添加字幕
+                    </Button>
+                  </div>
+                )}
+
+                {/* Subtitle loading */}
+                {subtitleLoading && (
+                  <div className="flex items-center justify-center py-8 gap-2">
+                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">正在获取字幕…</span>
+                  </div>
+                )}
+
+                {/* Segment list */}
                 {filteredSegments.map((seg, i) => {
                   const isActive = currentSegmentIndex === i;
-                  const globalIdx = activeVideo.segments.indexOf(seg);
                   return (
                     <div
                       key={i}
-                      ref={(el) => { if (globalIdx >= 0) segmentRefs.current[globalIdx] = el; }}
+                      ref={(el) => { if (i < segmentRefs.current.length) segmentRefs.current[i] = el; }}
                       onClick={() => seekTo(seg.start)}
                       className={cn(
                         'group rounded-xl p-3 cursor-pointer transition-all duration-200',
@@ -582,9 +741,11 @@ export default function YouTubeSpeakingPage() {
                             {highlightKeywords(seg.en, seg.keywords, handleKeywordClick, isActive)}
                           </p>
                           {/* Chinese translation */}
-                          <p className="text-xs text-muted-foreground/70 mt-0.5 leading-relaxed">
-                            {seg.zh}
-                          </p>
+                          {seg.zh && (
+                            <p className="text-xs text-muted-foreground/70 mt-0.5 leading-relaxed">
+                              {seg.zh}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -753,6 +914,44 @@ export default function YouTubeSpeakingPage() {
               添加
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add Subtitle / AI Generate Dialog ── */}
+      <Dialog open={showAddSubtitle} onOpenChange={setShowAddSubtitle}>
+        <DialogContent className="max-w-lg rounded-[28px]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-black">添加字幕</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">粘贴英文原文</label>
+              <textarea
+                value={pastedTranscript}
+                onChange={(e) => setPastedTranscript(e.target.value)}
+                placeholder="从 YouTube 或其他来源复制视频的英文转录文本，粘贴到这里..."
+                rows={8}
+                className="w-full mt-1 rounded-xl border border-border/50 bg-muted/50 p-3 text-sm outline-none focus:border-[#00B894] focus:ring-2 focus:ring-[#00B894]/20 transition-all resize-y"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                AI 会自动分段、翻译中文、标注重点词汇
+              </p>
+            </div>
+            <Button
+              onClick={handleProcessTranscript}
+              disabled={aiProcessing || !pastedTranscript.trim() || !ai.isConfigured}
+              className="w-full rounded-xl text-xs font-bold bg-[#00B894] hover:bg-[#00a882] gap-2"
+            >
+              {aiProcessing ? (
+                <><Loader2 className="size-4 animate-spin" />AI 处理中…</>
+              ) : (
+                <><Sparkles className="size-4" />AI 自动生成字幕</>
+              )}
+            </Button>
+            {!ai.isConfigured && (
+              <p className="text-xs text-rose-500 text-center">请先在 AI 对话页面配置 API Key</p>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
