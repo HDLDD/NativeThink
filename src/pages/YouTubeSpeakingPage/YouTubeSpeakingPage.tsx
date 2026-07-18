@@ -119,7 +119,7 @@ function VideoCard({
         <div className="aspect-video bg-gradient-to-br from-muted to-muted-foreground/10 flex items-center justify-center relative">
           <Play className="size-8 text-muted-foreground/30" />
           <span className="absolute bottom-1 right-1 text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">
-            {fmtTime(video.duration)}
+            {video.episodes ? `${video.episodes}集` : fmtTime(video.duration)}
           </span>
         </div>
         {/* Info */}

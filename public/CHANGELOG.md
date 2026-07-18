@@ -2,6 +2,10 @@
 
 
 
+
+## 2026-07-17
+- fix: speaking page - support full B站 URL when adding video (`d9b6978`)
+
 ## 2026-07-17
 - feat: speaking page - support delete video (`7334816`)
 
