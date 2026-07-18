@@ -72,6 +72,18 @@ const _library: VideoEntry[] = [
     episodes: 30,
     segments: [],
   },
+  {
+    id: 'ted_talks_100',
+    bvid: 'BV1UbyZB9ERb',
+    title: '100 TED Talks Collection',
+    titleZh: '必看100场TED演讲合集',
+    channel: 'YouTube英语课堂',
+    level: 'intermediate',
+    duration: 72471,
+    thumbnail: '',
+    episodes: 100,
+    segments: [],
+  },
 ];
 
 // ── Public API ──

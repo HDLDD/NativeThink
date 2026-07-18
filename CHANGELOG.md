@@ -3,6 +3,10 @@
 
 
 
+
+## 2026-07-18
+- feat: replace placeholder videos with real B站英语播客合集 (`885c75f`)
+
 ## 2026-07-17
 - fix: speaking page - support full B站 URL when adding video (`d9b6978`)
 

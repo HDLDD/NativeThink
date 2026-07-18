@@ -190,6 +190,10 @@ export default function YouTubeSpeakingPage() {
 
   const segmentRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  // Auto-fetch state
+  const [fetchingInfo, setFetchingInfo] = useState(false);
+  const [fetchedInfo, setFetchedInfo] = useState<{ title: string; episodes: number; channel: string } | null>(null);
+
   // ── Filter videos by level ──
   useEffect(() => {
     setVideos(getVideosByLevel(levelFilter));
@@ -323,6 +327,31 @@ export default function YouTubeSpeakingPage() {
     toast.success('已删除');
   }, [levelFilter, activeVideo]);
 
+  // ── Auto-fetch video info from Bilibili ──
+  const handleFetchInfo = useCallback(async () => {
+    const input = customBvid.trim();
+    if (!input) { toast.error('请先输入 BVID 或 B站链接'); return; }
+    const match = input.match(/BV[A-Za-z0-9]{10,}/);
+    if (!match) { toast.error('无法识别 BVID'); return; }
+    const bvid = match[0].toUpperCase();
+    setFetchingInfo(true);
+    setFetchedInfo(null);
+    try {
+      const res = await fetch(`/api/bilibili-info?bvid=${bvid}`);
+      if (!res.ok) { toast.error('获取信息失败'); return; }
+      const data = await res.json();
+      if (data.error) { toast.error(data.error); return; }
+      setFetchedInfo({ title: data.title, episodes: data.episodes, channel: data.channel });
+      setCustomTitle(data.title || '');
+      setCustomTitleZh('');
+      toast.success(`已获取：${data.title}（${data.episodes}集）`);
+    } catch {
+      toast.error('网络错误，请重试');
+    } finally {
+      setFetchingInfo(false);
+    }
+  }, [customBvid]);
+
   // ── Add custom video ──
   const handleAddCustom = useCallback(() => {
     if (!customBvid.trim()) { toast.error('请输入 BVID 或 B站视频链接'); return; }
@@ -421,11 +450,36 @@ export default function YouTubeSpeakingPage() {
           </Button>
         </div>
 
-        {/* Video cards horizontal scroll */}
+        {/* Video cards — grouped by level when showing "全部" */}
         {videos.length === 0 ? (
           <div className="py-8 text-center text-sm text-muted-foreground">
             该级别暂无视频，点击"添加视频"自定义
           </div>
+        ) : levelFilter === 'all' ? (
+          (['beginner', 'intermediate', 'advanced'] as const).map((lvl) => {
+            const levelVideos = videos.filter((v) => v.level === lvl);
+            if (levelVideos.length === 0) return null;
+            const levelLabel = lvl === 'beginner' ? '初级' : lvl === 'intermediate' ? '中级' : '高级';
+            const levelColor = lvl === 'beginner' ? 'text-emerald-600' : lvl === 'intermediate' ? 'text-amber-600' : 'text-rose-600';
+            return (
+              <div key={lvl}>
+                <h3 className={cn('text-xs font-black uppercase tracking-wider mb-2', levelColor)}>
+                  {levelLabel} · {levelVideos.length} 个合集
+                </h3>
+                <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-none">
+                  {levelVideos.map((video) => (
+                    <VideoCard
+                      key={video.id}
+                      video={video}
+                      active={activeVideo?.id === video.id}
+                      onClick={() => handleSelectVideo(video)}
+                      onDelete={(e) => handleDeleteVideo(e, video)}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })
         ) : (
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
             {videos.map((video) => (
@@ -610,30 +664,55 @@ export default function YouTubeSpeakingPage() {
       </Dialog>
 
       {/* ── Add Custom Video Dialog ── */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+      <Dialog open={showAddDialog} onOpenChange={(open) => { if (!open) { setFetchedInfo(null); setFetchingInfo(false); } setShowAddDialog(open); }}>
         <DialogContent className="max-w-sm rounded-[28px]">
           <DialogHeader>
-            <DialogTitle className="text-base font-black">添加自定义视频</DialogTitle>
+            <DialogTitle className="text-base font-black">添加合集视频</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            {/* BVID input + auto-fetch button */}
             <div>
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Bilibili BVID</label>
-              <Input
-                value={customBvid}
-                onChange={(e) => setCustomBvid(e.target.value)}
-                placeholder="B站链接 或 BVID（如 BV1xx411c7mD）"
-                className="mt-1 rounded-xl text-sm"
-              />
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">B站链接 / BVID</label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  value={customBvid}
+                  onChange={(e) => { setCustomBvid(e.target.value); setFetchedInfo(null); }}
+                  placeholder="粘贴 B站链接 或 BVID"
+                  className="flex-1 rounded-xl text-sm"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleFetchInfo}
+                  disabled={fetchingInfo}
+                  variant="outline"
+                  className="shrink-0 rounded-xl text-xs font-bold"
+                >
+                  {fetchingInfo ? <Loader2 className="size-3.5 animate-spin" /> : '获取信息'}
+                </Button>
+              </div>
               <p className="text-[10px] text-muted-foreground mt-1">
-                支持粘贴完整链接: bilibili.com/video/<b>BV1xx411c7mD</b>
+                粘贴完整链接自动提取 BVID，点击"获取信息"自动填写
               </p>
             </div>
+
+            {/* Fetched info display */}
+            {fetchedInfo && (
+              <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 p-3 space-y-1">
+                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300 truncate">{fetchedInfo.title}</p>
+                <div className="flex gap-3 text-[10px] text-emerald-600 dark:text-emerald-400">
+                  <span>{fetchedInfo.episodes} 集</span>
+                  <span>{fetchedInfo.channel}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Title - auto-filled from fetch */}
             <div>
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">英文标题</label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">标题</label>
               <Input
                 value={customTitle}
                 onChange={(e) => setCustomTitle(e.target.value)}
-                placeholder="视频英文标题"
+                placeholder="视频标题（自动获取后自动填充）"
                 className="mt-1 rounded-xl text-sm"
               />
             </div>
@@ -642,7 +721,7 @@ export default function YouTubeSpeakingPage() {
               <Input
                 value={customTitleZh}
                 onChange={(e) => setCustomTitleZh(e.target.value)}
-                placeholder="视频中文标题"
+                placeholder="中文标题"
                 className="mt-1 rounded-xl text-sm"
               />
             </div>
