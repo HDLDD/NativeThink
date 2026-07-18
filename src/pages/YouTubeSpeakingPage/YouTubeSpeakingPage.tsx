@@ -86,8 +86,8 @@ async function lookupWord(word: string): Promise<{ word: string; phonetic: strin
 }
 
 // ── Bilibili iframe URL builder ──
-function bilibiliUrl(bvid: string, t = 0): string {
-  return `https://player.bilibili.com/player.html?bvid=${bvid}&page=1&autoplay=0&t=${Math.floor(t)}`;
+function bilibiliUrl(bvid: string, page = 1, t = 0): string {
+  return `https://player.bilibili.com/player.html?bvid=${bvid}&page=${page}&autoplay=0&t=${Math.floor(t)}`;
 }
 
 /** Format seconds → MM:SS */
@@ -175,6 +175,10 @@ export default function YouTubeSpeakingPage() {
   const [playerPlaying, setPlayerPlaying] = useState(false);
   const currentTimeRef = useRef(0);
 
+  // Episode navigation
+  const [currentPage, setCurrentPage] = useState(1);
+  const [episodeList, setEpisodeList] = useState<{ page: number; part: string; duration: number }[]>([]);
+
   // Transcript
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -254,10 +258,10 @@ export default function YouTubeSpeakingPage() {
     return () => clearInterval(interval);
   }, [playerPlaying, activeVideo]);
 
-  // ── Subtitle cache key ──
-  const subtitleCacheKey = activeVideo ? `__speaking_subtitle_${activeVideo.bvid}` : null;
+  // ── Subtitle cache key (includes page for multi-episode videos) ──
+  const subtitleCacheKey = activeVideo ? `__speaking_subtitle_${activeVideo.bvid}_p${currentPage}` : null;
 
-  // ── Auto-fetch subtitles when video changes ──
+  // ── Auto-fetch subtitles when video or page changes ──
   useEffect(() => {
     if (!activeVideo) { setFetchedSegments(null); setSubtitleSource(null); return; }
 
@@ -276,13 +280,23 @@ export default function YouTubeSpeakingPage() {
 
     // Fetch from API
     setSubtitleLoading(true);
-    fetch(`/api/bilibili-subtitle?bvid=${activeVideo.bvid}&page=1`)
+    fetch(`/api/bilibili-subtitle?bvid=${activeVideo.bvid}&page=${currentPage}`)
       .then((r) => r.json())
       .then((data) => {
+        // Set episode list (for collections)
+        if (data.episodeList && data.episodeList.length > 1) {
+          setEpisodeList(data.episodeList);
+        } else if (activeVideo.episodes && activeVideo.episodes > 1 && episodeList.length === 0) {
+          const eps = [];
+          for (let i = 1; i <= activeVideo.episodes; i++) {
+            eps.push({ page: i, part: `Episode ${i}`, duration: 0 });
+          }
+          setEpisodeList(eps);
+        }
+        // Set segments
         if (data.segments && data.segments.length > 0) {
           setFetchedSegments(data.segments);
           setSubtitleSource('bilibili');
-          // Cache
           if (subtitleCacheKey) {
             try { safeStorage.setItem(subtitleCacheKey, JSON.stringify({ segments: data.segments, source: 'bilibili' })); } catch { /* */ }
           }
@@ -291,9 +305,20 @@ export default function YouTubeSpeakingPage() {
           setSubtitleSource(null);
         }
       })
-      .catch(() => { setFetchedSegments(null); setSubtitleSource(null); })
+      .catch(() => {
+        setFetchedSegments(null);
+        setSubtitleSource(null);
+        // Fallback episode names
+        if (activeVideo.episodes && activeVideo.episodes > 1 && episodeList.length === 0) {
+          const eps = [];
+          for (let i = 1; i <= activeVideo.episodes; i++) {
+            eps.push({ page: i, part: `Episode ${i}`, duration: 0 });
+          }
+          setEpisodeList(eps);
+        }
+      })
       .finally(() => setSubtitleLoading(false));
-  }, [activeVideo?.id]);
+  }, [activeVideo?.id, currentPage]);
 
   // ── Segments to display (prefer live segments > fetched > built-in) ──
   const displaySegments = activeVideo?.segments && activeVideo.segments.length > 0
@@ -362,15 +387,32 @@ export default function YouTubeSpeakingPage() {
   // ── Select video ──
   const handleSelectVideo = useCallback((video: VideoEntry) => {
     setActiveVideo(video);
+    setCurrentPage(1);
     setCurrentTime(0);
     currentTimeRef.current = 0;
     setPlayerReady(false);
     setPlayerPlaying(false);
     setFetchedSegments(null);
     setSubtitleSource(null);
+    setEpisodeList([]);
     setSearchQuery('');
     segmentRefs.current = [];
+    setShowAddSubtitle(false);
   }, []);
+
+  // ── Switch episode within collection ──
+  const handleSwitchEpisode = useCallback((page: number) => {
+    if (!activeVideo || page === currentPage) return;
+    setCurrentPage(page);
+    setCurrentTime(0);
+    currentTimeRef.current = 0;
+    setFetchedSegments(null);
+    setSubtitleSource(null);
+    setSearchQuery('');
+    segmentRefs.current = [];
+  }, [activeVideo, currentPage]);
+
+  // ── Segments to display (prefer live segments > fetched > built-in) ──
 
   // ── Delete video ──
   const handleDeleteVideo = useCallback((e: React.MouseEvent, video: VideoEntry) => {
@@ -638,7 +680,7 @@ ${pastedTranscript.slice(0, 8000)}`;
             <div className="aspect-video bg-black rounded-2xl overflow-hidden">
               <iframe
                 ref={iframeRef}
-                src={bilibiliUrl(activeVideo.bvid, Math.max(0, Math.floor(currentTime - 2)))}
+                src={bilibiliUrl(activeVideo.bvid, currentPage, Math.max(0, Math.floor(currentTime - 2)))}
                 className="w-full h-full"
                 allow="autoplay; encrypted-media"
                 allowFullScreen
@@ -664,6 +706,28 @@ ${pastedTranscript.slice(0, 8000)}`;
                 {activeVideo.level === 'beginner' ? '初级' : activeVideo.level === 'intermediate' ? '中级' : '高级'}
               </Badge>
             </div>
+
+            {/* Episode navigation — for multi-episode collections */}
+            {episodeList.length > 1 && (
+              <div className="mt-3 px-1">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                  {episodeList.map((ep) => (
+                    <button
+                      key={ep.page}
+                      onClick={() => handleSwitchEpisode(ep.page)}
+                      className={cn(
+                        'shrink-0 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap',
+                        currentPage === ep.page
+                          ? 'bg-[#00B894] text-white shadow-sm'
+                          : 'bg-muted text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {ep.part}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Transcript column */}

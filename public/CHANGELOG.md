@@ -6,6 +6,10 @@
 
 
 
+
+## 2026-07-18
+- fix: subtitle timing estimate + simplified B站 API (`a48380a`)
+
 ## 2026-07-18
 - feat: auto subtitle - B站 API + AI fallback, cache, transcript paste (`a9c723b`)
 

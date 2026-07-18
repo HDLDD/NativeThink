@@ -95,6 +95,12 @@ export async function onRequest(context) {
 
     const result = await getSubtitle(bvid, targetPage.cid);
 
+    const episodeList = pages.map((p) => ({
+      page: p.page,
+      part: p.part || `Episode ${p.page}`,
+      duration: p.duration || 0,
+    }));
+
     return new Response(JSON.stringify({
       bvid, page,
       cid: targetPage.cid,
@@ -103,6 +109,7 @@ export async function onRequest(context) {
       source: result.source,
       error: result.error || null,
       totalEpisodes: pages.length,
+      episodeList,
     }), {
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
