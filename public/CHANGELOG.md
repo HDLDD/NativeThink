@@ -9,6 +9,10 @@
 
 
 
+
+## 2026-07-18
+- feat: voice recognition subtitle - Web Speech API STT (`33ec0c6`)
+
 ## 2026-07-18
 - fix: episode nav with arrows + wheel, resilient subtitle API, dialog a11y (`cfd7e48`)
 

@@ -212,8 +212,10 @@ export default function YouTubeSpeakingPage() {
 
   // Speech-to-text state
   const [sttActive, setSttActive] = useState(false);
-  const [sttTranscript, setSttTranscript] = useState('');
   const sttRef = useRef<any>(null);
+  const sttBufferRef = useRef('');
+  const sttSegmentCountRef = useRef(0);
+  const sttProcessingRef = useRef(false);
 
   // ── Filter videos by level ──
   useEffect(() => {
@@ -583,14 +585,80 @@ ${pastedTranscript.slice(0, 8000)}`;
     }
   }, [pastedTranscript, activeVideo, ai, subtitleCacheKey]);
 
-  // ── Speech-to-text via Web Speech API ──
+  // ── Speech-to-text via Web Speech API (real-time AI translation) ──
+
+  /** Translate a single sentence via AI and add to segments */
+  const translateAndAddSegment = useCallback(async (text: string) => {
+    if (!text.trim() || !ai.isConfigured) return;
+    sttProcessingRef.current = true;
+    try {
+      const prompt = `Translate the following English sentence to Chinese. Return ONLY valid JSON:
+{"en": "...", "zh": "..."}
+
+Sentence: ${text.trim()}`;
+      const result = await ai.chat([
+        { role: 'system', content: 'Translate English to Chinese. Return valid JSON only.' },
+        { role: 'user', content: prompt },
+      ], { temperature: 0.2, maxTokens: 512 });
+
+      const jsonMatch = result.match(/\{[^}]+\}/);
+      if (!jsonMatch) return;
+      const data = JSON.parse(jsonMatch[0]);
+      const en = (data.en || text).trim();
+      const zh = (data.zh || '').trim();
+
+      // Extract keywords (words > 4 chars)
+      const words = en.split(/\s+/).filter(Boolean);
+      const keywords = [];
+      const seen = new Set();
+      for (const w of words) {
+        const clean = w.replace(/[^a-zA-Z]/g, '').toLowerCase();
+        if (clean.length > 4 && !seen.has(clean) && keywords.length < 4) {
+          seen.add(clean);
+          keywords.push({ word: clean, meaning: '' });
+        }
+      }
+
+      const idx = sttSegmentCountRef.current;
+      sttSegmentCountRef.current = idx + 1;
+      const newSegment: VideoSegment = {
+        start: idx * 3,
+        end: (idx + 1) * 3,
+        en,
+        zh,
+        keywords,
+      };
+
+      setFetchedSegments((prev) => {
+        const updated = [...(prev || []), newSegment];
+        // Cache incrementally
+        if (subtitleCacheKey) {
+          try { safeStorage.setItem(subtitleCacheKey, JSON.stringify({ segments: updated, source: 'stt' })); } catch { /* */ }
+        }
+        return updated;
+      });
+
+      // Scroll to bottom
+      setTimeout(() => {
+        const el = segmentRefs.current[segmentRefs.current.length - 1];
+        el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    } catch { /* skip failed sentence */ }
+    finally { sttProcessingRef.current = false; }
+  }, [ai, subtitleCacheKey]);
+
   const handleSTTStart = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) { toast.error('当前浏览器不支持语音识别'); return; }
     if (!activeVideo) { toast.error('请先选择视频'); return; }
 
+    setSubtitleSource('stt');
+    sttBufferRef.current = '';
+    sttSegmentCountRef.current = 0;
+    sttProcessingRef.current = false;
+    setFetchedSegments([]);
+    segmentRefs.current = [];
     setSttActive(true);
-    setSttTranscript('');
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
@@ -598,51 +666,64 @@ ${pastedTranscript.slice(0, 8000)}`;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
-    let finalText = '';
-
     recognition.onresult = (event: any) => {
-      let interim = '';
+      // Find the latest final result
+      let newFinal = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          finalText += transcript + ' ';
-        } else {
-          interim = transcript;
+          newFinal = event.results[i][0].transcript.trim();
         }
       }
-      setSttTranscript(finalText + (interim ? ` (${interim})` : ''));
+      if (!newFinal) return;
+
+      // Check if it ends a sentence and has enough words
+      if (/[.!?]$/.test(newFinal) && newFinal.split(/\s+/).length >= 3) {
+        // Only process if not already processing (prevents queue buildup)
+        if (!sttProcessingRef.current) {
+          translateAndAddSegment(newFinal);
+        } else {
+          // Buffer the sentence for later processing
+          sttBufferRef.current += ' ' + newFinal;
+        }
+      } else {
+        sttBufferRef.current += ' ' + newFinal;
+      }
     };
 
     recognition.onerror = (event: any) => {
       if (event.error !== 'no-speech' && event.error !== 'aborted') {
         toast.error(`语音识别错误: ${event.error}`);
       }
-      setSttActive(false);
+      if (sttActive) setSttActive(false);
     };
 
-    recognition.onend = () => { setSttActive(false); };
+    recognition.onend = () => {
+      // Process any remaining buffered text
+      if (sttBufferRef.current.trim()) {
+        translateAndAddSegment(sttBufferRef.current.trim());
+        sttBufferRef.current = '';
+      }
+      if (sttActive) setSttActive(false);
+    };
 
     sttRef.current = recognition;
     recognition.start();
-    toast.success('语音识别已开始，请播放视频');
-  }, [activeVideo]);
+    toast.success('语音识别已开始，自动翻译中…');
+  }, [activeVideo, translateAndAddSegment]);
 
   const handleSTTStop = useCallback(() => {
     if (sttRef.current) {
       try { sttRef.current.stop(); } catch { /* */ }
       sttRef.current = null;
     }
+    // Flush buffer
+    if (sttBufferRef.current.trim()) {
+      translateAndAddSegment(sttBufferRef.current.trim());
+      sttBufferRef.current = '';
+    }
     setSttActive(false);
-  }, []);
-
-  const handleSTTClear = useCallback(() => { setSttTranscript(''); }, []);
-
-  const handleSTTUseAsSubtitle = useCallback(() => {
-    if (!sttTranscript.trim()) { toast.error('没有转录文本'); return; }
-    setPastedTranscript(sttTranscript.replace(/\s*\([^)]*\)\s*/g, '').trim());
-    setShowAddSubtitle(true);
-    handleSTTStop();
-  }, [sttTranscript, handleSTTStop]);
+    toast.success('语音识别已停止');
+  }, [translateAndAddSegment]);
 
   // ── Filter segments by search ──
   const filteredSegments = activeVideo
@@ -852,18 +933,31 @@ ${pastedTranscript.slice(0, 8000)}`;
             {/* Segments list */}
             <ScrollArea className="flex-1 rounded-2xl border border-border/50 bg-muted/20">
               <div className="p-3 space-y-1">
-                {/* Subtitle source badge and add button */}
+                {/* Subtitle source badge and controls */}
                 {displaySegments.length > 0 && subtitleSource && (
                   <div className="flex items-center justify-between px-1 pb-1">
-                    <span className="text-[10px] text-muted-foreground">
-                      字幕来源: {subtitleSource === 'bilibili' ? 'B站' : subtitleSource === 'ai' ? 'AI生成' : '手动'}
-                    </span>
-                    <button
-                      onClick={() => setShowAddSubtitle(true)}
-                      className="text-[10px] font-bold text-[#00B894] hover:underline"
-                    >
-                      重新生成
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground">
+                        字幕来源: {subtitleSource === 'bilibili' ? 'B站' : subtitleSource === 'ai' ? 'AI生成' : subtitleSource === 'stt' ? '语音识别' : '手动'}
+                      </span>
+                      {sttActive && (
+                        <span className="flex items-center gap-1">
+                          <span className="size-2 rounded-full bg-[#00B894] animate-pulse" />
+                          <span className="text-[10px] text-[#00B894] font-bold">识别中</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {sttActive ? (
+                        <button onClick={handleSTTStop} className="text-[10px] font-bold text-rose-500 hover:underline">
+                          停止
+                        </button>
+                      ) : (
+                        <button onClick={() => setShowAddSubtitle(true)} className="text-[10px] font-bold text-[#00B894] hover:underline">
+                          重新生成
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -871,24 +965,24 @@ ${pastedTranscript.slice(0, 8000)}`;
                 {displaySegments.length === 0 && !subtitleLoading && (
                   <div className="text-center py-6 space-y-3">
                     <p className="text-xs text-muted-foreground">
-                      {subtitleSource === null
-                        ? 'B站未提供字幕'
-                        : searchQuery.trim() ? '未找到匹配的字幕' : '暂无字幕'}
+                      {subtitleSource === 'stt' && sttActive
+                        ? '等待语音识别…'
+                        : subtitleSource === null
+                          ? 'B站未提供字幕'
+                          : searchQuery.trim() ? '未找到匹配的字幕' : '暂无字幕'}
                     </p>
 
-                    {/* Speech-to-text: real-time recognition */}
-                    {!sttActive && !sttTranscript && (
+                    {!sttActive ? (
                       <div className="flex flex-col gap-2 items-center">
                         <Button
                           size="sm"
                           onClick={handleSTTStart}
-                          variant="default"
                           className="rounded-xl text-xs font-bold gap-1.5 bg-[#00B894] hover:bg-[#00a882]"
                         >
                           <Volume2 className="size-3.5" />语音识别生成字幕
                         </Button>
                         <span className="text-[10px] text-muted-foreground">
-                          播放视频后点击此按钮，浏览器会自动识别英文语音
+                          播放视频后点此，浏览器会自动识别英文并翻译
                         </span>
                         <Button
                           size="sm"
@@ -899,17 +993,14 @@ ${pastedTranscript.slice(0, 8000)}`;
                           <Plus className="size-3.5" />粘贴文本
                         </Button>
                       </div>
-                    )}
-
-                    {/* STT in progress */}
-                    {sttActive && (
+                    ) : (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 justify-center">
                           <span className="relative flex size-3">
                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#00B894] opacity-75" />
                             <span className="relative inline-flex size-3 rounded-full bg-[#00B894]" />
                           </span>
-                          <span className="text-xs font-bold text-[#00B894]">语音识别中…</span>
+                          <span className="text-xs font-bold text-[#00B894]">识别翻译中…</span>
                         </div>
                         <Button
                           size="sm"
@@ -917,42 +1008,8 @@ ${pastedTranscript.slice(0, 8000)}`;
                           variant="outline"
                           className="rounded-xl text-xs font-bold gap-1"
                         >
-                          <X className="size-3.5" />停止识别
+                          <X className="size-3.5" />停止
                         </Button>
-                      </div>
-                    )}
-
-                    {/* STT result: show transcript + action buttons */}
-                    {!sttActive && sttTranscript && (
-                      <div className="space-y-2 px-2">
-                        <p className="text-xs text-left leading-relaxed max-h-32 overflow-y-auto bg-muted/50 rounded-xl p-3 border border-border/50">
-                          {sttTranscript}
-                        </p>
-                        <div className="flex gap-2 justify-center">
-                          <Button
-                            size="sm"
-                            onClick={handleSTTClear}
-                            variant="outline"
-                            className="rounded-xl text-xs font-bold gap-1"
-                          >
-                            <X className="size-3.5" />清除
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={handleSTTStart}
-                            variant="outline"
-                            className="rounded-xl text-xs font-bold gap-1"
-                          >
-                            <Volume2 className="size-3.5" />继续识别
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={handleSTTUseAsSubtitle}
-                            className="rounded-xl text-xs font-bold gap-1 bg-[#00B894] hover:bg-[#00a882]"
-                          >
-                            <Sparkles className="size-3.5" />AI 转为字幕
-                          </Button>
-                        </div>
                       </div>
                     )}
                   </div>
