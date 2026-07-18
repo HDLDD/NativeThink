@@ -350,8 +350,9 @@ export default function YouTubeSpeakingPage() {
     }
   }, [currentSegmentIndex]);
 
-  // ── Seek in player ──
+  // ── Seek in player (postMessage + iframe reload fallback) ──
   const seekTo = useCallback((time: number) => {
+    if (!activeVideo) return;
     // Try postMessage first
     try {
       iframeRef.current?.contentWindow?.postMessage(
@@ -359,10 +360,14 @@ export default function YouTubeSpeakingPage() {
         BILIBILI_ORIGIN,
       );
     } catch { /* fallback below */ }
-    // Also update local time immediately
+    // Also reload iframe with t= parameter as reliable seek
+    const newSrc = bilibiliUrl(activeVideo.bvid, currentPage, time);
+    if (iframeRef.current && iframeRef.current.src !== newSrc) {
+      iframeRef.current.src = newSrc;
+    }
     currentTimeRef.current = time;
     setCurrentTime(time);
-  }, []);
+  }, [activeVideo, currentPage]);
 
   // ── Word click handler ──
   const handleKeywordClick = useCallback(async (word: string) => {
@@ -946,6 +951,15 @@ ${pastedTranscript.slice(0, 8000)}`;
                         <button onClick={handleSTTStop} className="text-[10px] font-bold text-rose-500 hover:underline">
                           停止
                         </button>
+                      ) : subtitleSource === 'stt' ? (
+                        <>
+                          <button onClick={handleSTTStart} className="text-[10px] font-bold text-[#00B894] hover:underline">
+                            继续识别
+                          </button>
+                          <button onClick={() => setShowAddSubtitle(true)} className="text-[10px] font-bold text-muted-foreground hover:underline">
+                            重新生成
+                          </button>
+                        </>
                       ) : (
                         <button onClick={() => setShowAddSubtitle(true)} className="text-[10px] font-bold text-[#00B894] hover:underline">
                           重新生成

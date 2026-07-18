@@ -11,6 +11,10 @@
 
 
 
+
+## 2026-07-18
+- fix: auto STT - recognize sentence immediately, auto-restart (`87fc203`)
+
 ## 2026-07-18
 - fix: real-time STT - translate each sentence on the fly (`441dbf0`)
 
