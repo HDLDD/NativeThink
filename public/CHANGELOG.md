@@ -12,6 +12,10 @@
 
 
 
+
+## 2026-07-18
+- fix: seek via iframe reload + STT restart after stop (`4a010ab`)
+
 ## 2026-07-18
 - fix: auto STT - recognize sentence immediately, auto-restart (`87fc203`)
 

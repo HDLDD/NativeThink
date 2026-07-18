@@ -410,7 +410,25 @@ export default function YouTubeSpeakingPage() {
     setSearchQuery('');
     segmentRefs.current = [];
     setShowAddSubtitle(false);
+    // Flag for auto-start (ref-based, used in effect below)
+    autoStartSttRef.current = true;
   }, []);
+
+  const autoStartSttRef = useRef(false);
+  const sttStartRef = useRef<() => void>(() => {});
+
+  // Auto-start STT: fires after subtitle API returns empty
+  useEffect(() => {
+    if (!activeVideo || subtitleLoading || !autoStartSttRef.current) return;
+    autoStartSttRef.current = false;
+    if (displaySegments.length > 0 || subtitleSource === 'bilibili' || subtitleSource === 'ai') return;
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition || sttActive) return;
+
+    const timer = setTimeout(() => sttStartRef.current(), 800);
+    return () => clearTimeout(timer);
+  }, [activeVideo?.id, subtitleLoading, subtitleSource, displaySegments.length]);
 
   // ── Switch episode within collection ──
   const handleSwitchEpisode = useCallback((page: number) => {
@@ -710,6 +728,9 @@ ${pastedTranscript.slice(0, 8000)}`;
     recognition.start();
     toast.success('语音识别已开始，自动翻译中…');
   }, [activeVideo, addSegment]);
+
+  // Keep ref in sync with latest handleSTTStart for auto-start effect
+  useEffect(() => { sttStartRef.current = handleSTTStart; });
 
   const handleSTTStop = useCallback(() => {
     if (sttRef.current) {
