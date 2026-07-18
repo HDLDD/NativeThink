@@ -5,6 +5,10 @@
 
 
 
+
+## 2026-07-18
+- feat: auto subtitle - B站 API + AI fallback, cache, transcript paste (`a9c723b`)
+
 ## 2026-07-18
 - feat: speaking collection feature - auto-fetch B站 info, level group, add TED 100 talks (`28b900f`)
 

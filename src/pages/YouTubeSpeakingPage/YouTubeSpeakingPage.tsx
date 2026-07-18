@@ -473,8 +473,6 @@ export default function YouTubeSpeakingPage() {
 Return ONLY a valid JSON array, no markdown, no extra text:
 [
   {
-    "start": <segment_number_0_indexed>,
-    "end": <segment_number_plus_3_seconds>,
     "en": "English text",
     "zh": "Chinese translation",
     "keywords": [{"word": "key_word", "meaning": "中文释义"}]
@@ -498,13 +496,26 @@ ${pastedTranscript.slice(0, 8000)}`;
         toast.error('AI 未能生成字幕段'); return;
       }
 
-      const validSegments: VideoSegment[] = segments.map((s: any, i: number) => ({
-        start: typeof s.start === 'number' ? s.start : i * 3,
-        end: typeof s.end === 'number' ? s.end : (i + 1) * 3,
-        en: (s.en || '').trim(),
-        zh: (s.zh || '').trim(),
-        keywords: (s.keywords || []).filter((k: any) => k.word).map((k: any) => ({ word: k.word, meaning: k.meaning || '' })),
-      })).filter((s) => s.en);
+      // Calculate timestamps based on word count (avg speaking rate ~2.5 words/sec)
+      const WORDS_PER_SEC = 2.7;
+      let cursor = 0;
+      const validSegments: VideoSegment[] = segments.map((s: any) => {
+        const en = (s.en || '').trim();
+        const wordCount = en.split(/\s+/).filter(Boolean).length;
+        const duration = Math.max(2, wordCount / WORDS_PER_SEC);
+        const start = cursor;
+        const end = cursor + duration;
+        cursor += duration;
+        return {
+          start,
+          end,
+          en,
+          zh: (s.zh || '').trim(),
+          keywords: (s.keywords || []).filter((k: any) => k.word).map((k: any) => ({ word: k.word, meaning: k.meaning || '' })),
+        };
+      }).filter((s) => s.en);
+
+      if (validSegments.length === 0) { toast.error('字幕段为空'); return; }
 
       setFetchedSegments(validSegments);
       setSubtitleSource('ai');
