@@ -8,6 +8,10 @@
 
 
 
+
+## 2026-07-18
+- fix: episode nav with arrows + wheel, resilient subtitle API, dialog a11y (`cfd7e48`)
+
 ## 2026-07-18
 - fix: episode switching - page nav + per-page subtitles (`bb229d9`)
 

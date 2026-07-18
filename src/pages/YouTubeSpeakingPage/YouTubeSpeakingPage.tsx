@@ -204,11 +204,16 @@ export default function YouTubeSpeakingPage() {
   // Subtitle state
   const [fetchedSegments, setFetchedSegments] = useState<VideoSegment[] | null>(null);
   const [subtitleLoading, setSubtitleLoading] = useState(false);
-  const [subtitleSource, setSubtitleSource] = useState<'bilibili' | 'ai' | 'manual' | null>(null);
+  const [subtitleSource, setSubtitleSource] = useState<'bilibili' | 'ai' | 'stt' | null>(null);
   const [showAddSubtitle, setShowAddSubtitle] = useState(false);
   const [pastedTranscript, setPastedTranscript] = useState('');
   const [aiProcessing, setAiProcessing] = useState(false);
   const ai = useAI();
+
+  // Speech-to-text state
+  const [sttActive, setSttActive] = useState(false);
+  const [sttTranscript, setSttTranscript] = useState('');
+  const sttRef = useRef<any>(null);
 
   // ── Filter videos by level ──
   useEffect(() => {
@@ -578,6 +583,67 @@ ${pastedTranscript.slice(0, 8000)}`;
     }
   }, [pastedTranscript, activeVideo, ai, subtitleCacheKey]);
 
+  // ── Speech-to-text via Web Speech API ──
+  const handleSTTStart = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) { toast.error('当前浏览器不支持语音识别'); return; }
+    if (!activeVideo) { toast.error('请先选择视频'); return; }
+
+    setSttActive(true);
+    setSttTranscript('');
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    let finalText = '';
+
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalText += transcript + ' ';
+        } else {
+          interim = transcript;
+        }
+      }
+      setSttTranscript(finalText + (interim ? ` (${interim})` : ''));
+    };
+
+    recognition.onerror = (event: any) => {
+      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        toast.error(`语音识别错误: ${event.error}`);
+      }
+      setSttActive(false);
+    };
+
+    recognition.onend = () => { setSttActive(false); };
+
+    sttRef.current = recognition;
+    recognition.start();
+    toast.success('语音识别已开始，请播放视频');
+  }, [activeVideo]);
+
+  const handleSTTStop = useCallback(() => {
+    if (sttRef.current) {
+      try { sttRef.current.stop(); } catch { /* */ }
+      sttRef.current = null;
+    }
+    setSttActive(false);
+  }, []);
+
+  const handleSTTClear = useCallback(() => { setSttTranscript(''); }, []);
+
+  const handleSTTUseAsSubtitle = useCallback(() => {
+    if (!sttTranscript.trim()) { toast.error('没有转录文本'); return; }
+    setPastedTranscript(sttTranscript.replace(/\s*\([^)]*\)\s*/g, '').trim());
+    setShowAddSubtitle(true);
+    handleSTTStop();
+  }, [sttTranscript, handleSTTStop]);
+
   // ── Filter segments by search ──
   const filteredSegments = activeVideo
     ? searchQuery.trim()
@@ -809,14 +875,86 @@ ${pastedTranscript.slice(0, 8000)}`;
                         ? 'B站未提供字幕'
                         : searchQuery.trim() ? '未找到匹配的字幕' : '暂无字幕'}
                     </p>
-                    <Button
-                      size="sm"
-                      onClick={() => setShowAddSubtitle(true)}
-                      variant="outline"
-                      className="rounded-xl text-xs font-bold gap-1"
-                    >
-                      <Plus className="size-3.5" />添加字幕
-                    </Button>
+
+                    {/* Speech-to-text: real-time recognition */}
+                    {!sttActive && !sttTranscript && (
+                      <div className="flex flex-col gap-2 items-center">
+                        <Button
+                          size="sm"
+                          onClick={handleSTTStart}
+                          variant="default"
+                          className="rounded-xl text-xs font-bold gap-1.5 bg-[#00B894] hover:bg-[#00a882]"
+                        >
+                          <Volume2 className="size-3.5" />语音识别生成字幕
+                        </Button>
+                        <span className="text-[10px] text-muted-foreground">
+                          播放视频后点击此按钮，浏览器会自动识别英文语音
+                        </span>
+                        <Button
+                          size="sm"
+                          onClick={() => setShowAddSubtitle(true)}
+                          variant="outline"
+                          className="rounded-xl text-xs font-bold gap-1"
+                        >
+                          <Plus className="size-3.5" />粘贴文本
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* STT in progress */}
+                    {sttActive && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 justify-center">
+                          <span className="relative flex size-3">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#00B894] opacity-75" />
+                            <span className="relative inline-flex size-3 rounded-full bg-[#00B894]" />
+                          </span>
+                          <span className="text-xs font-bold text-[#00B894]">语音识别中…</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={handleSTTStop}
+                          variant="outline"
+                          className="rounded-xl text-xs font-bold gap-1"
+                        >
+                          <X className="size-3.5" />停止识别
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* STT result: show transcript + action buttons */}
+                    {!sttActive && sttTranscript && (
+                      <div className="space-y-2 px-2">
+                        <p className="text-xs text-left leading-relaxed max-h-32 overflow-y-auto bg-muted/50 rounded-xl p-3 border border-border/50">
+                          {sttTranscript}
+                        </p>
+                        <div className="flex gap-2 justify-center">
+                          <Button
+                            size="sm"
+                            onClick={handleSTTClear}
+                            variant="outline"
+                            className="rounded-xl text-xs font-bold gap-1"
+                          >
+                            <X className="size-3.5" />清除
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleSTTStart}
+                            variant="outline"
+                            className="rounded-xl text-xs font-bold gap-1"
+                          >
+                            <Volume2 className="size-3.5" />继续识别
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleSTTUseAsSubtitle}
+                            className="rounded-xl text-xs font-bold gap-1 bg-[#00B894] hover:bg-[#00a882]"
+                          >
+                            <Sparkles className="size-3.5" />AI 转为字幕
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
