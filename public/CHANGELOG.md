@@ -7,6 +7,10 @@
 
 
 
+
+## 2026-07-18
+- fix: episode switching - page nav + per-page subtitles (`bb229d9`)
+
 ## 2026-07-18
 - fix: subtitle timing estimate + simplified B站 API (`a48380a`)
 

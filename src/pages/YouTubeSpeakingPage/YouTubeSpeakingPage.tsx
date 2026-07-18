@@ -710,22 +710,62 @@ ${pastedTranscript.slice(0, 8000)}`;
             {/* Episode navigation — for multi-episode collections */}
             {episodeList.length > 1 && (
               <div className="mt-3 px-1">
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                  {episodeList.map((ep) => (
-                    <button
-                      key={ep.page}
-                      onClick={() => handleSwitchEpisode(ep.page)}
-                      className={cn(
-                        'shrink-0 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap',
-                        currentPage === ep.page
-                          ? 'bg-[#00B894] text-white shadow-sm'
-                          : 'bg-muted text-muted-foreground hover:text-foreground',
-                      )}
-                    >
-                      {ep.part}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-1">
+                  {/* Prev button */}
+                  <button
+                    onClick={() => handleSwitchEpisode(Math.max(1, currentPage - 1))}
+                    disabled={currentPage <= 1}
+                    className={cn(
+                      'shrink-0 size-7 rounded-lg flex items-center justify-center transition-all text-xs font-bold',
+                      currentPage <= 1
+                        ? 'text-muted-foreground/30 cursor-not-allowed'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                    )}
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+
+                  {/* Episode chips — scrollable + wheel support */}
+                  <div
+                    className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1"
+                    onWheel={(e) => {
+                      e.currentTarget.scrollLeft += e.deltaY > 0 ? 60 : -60;
+                    }}
+                  >
+                    {episodeList.map((ep) => (
+                      <button
+                        key={ep.page}
+                        onClick={() => handleSwitchEpisode(ep.page)}
+                        className={cn(
+                          'shrink-0 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap',
+                          currentPage === ep.page
+                            ? 'bg-[#00B894] text-white shadow-sm'
+                            : 'bg-muted text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {ep.part.length > 18 ? ep.part.slice(0, 16) + '…' : ep.part}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Next button */}
+                  <button
+                    onClick={() => handleSwitchEpisode(Math.min(episodeList.length, currentPage + 1))}
+                    disabled={currentPage >= episodeList.length}
+                    className={cn(
+                      'shrink-0 size-7 rounded-lg flex items-center justify-center transition-all text-xs font-bold',
+                      currentPage >= episodeList.length
+                        ? 'text-muted-foreground/30 cursor-not-allowed'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                    )}
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
                 </div>
+                {/* Page indicator */}
+                <p className="text-[10px] text-muted-foreground text-center mt-1">
+                  第 {currentPage} 集 / 共 {episodeList.length} 集
+                </p>
               </div>
             )}
           </div>
@@ -844,7 +884,7 @@ ${pastedTranscript.slice(0, 8000)}`;
 
       {/* ── Word Lookup Dialog (same pattern as ArticlePage) ── */}
       <Dialog open={lookupOpen} onOpenChange={setLookupOpen}>
-        <DialogContent className="max-w-sm rounded-[28px] p-0 overflow-hidden">
+        <DialogContent aria-describedby={undefined} className="max-w-sm rounded-[28px] p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6 pb-2">
             <DialogTitle className="text-xl font-black text-foreground flex items-center gap-2">
               <Hash className="size-5 text-[#00B894]" />
@@ -901,7 +941,7 @@ ${pastedTranscript.slice(0, 8000)}`;
 
       {/* ── Add Custom Video Dialog ── */}
       <Dialog open={showAddDialog} onOpenChange={(open) => { if (!open) { setFetchedInfo(null); setFetchingInfo(false); } setShowAddDialog(open); }}>
-        <DialogContent className="max-w-sm rounded-[28px]">
+        <DialogContent aria-describedby={undefined} className="max-w-sm rounded-[28px]">
           <DialogHeader>
             <DialogTitle className="text-base font-black">添加合集视频</DialogTitle>
           </DialogHeader>
@@ -994,7 +1034,7 @@ ${pastedTranscript.slice(0, 8000)}`;
 
       {/* ── Add Subtitle / AI Generate Dialog ── */}
       <Dialog open={showAddSubtitle} onOpenChange={setShowAddSubtitle}>
-        <DialogContent className="max-w-lg rounded-[28px]">
+        <DialogContent aria-describedby={undefined} className="max-w-lg rounded-[28px]">
           <DialogHeader>
             <DialogTitle className="text-base font-black">添加字幕</DialogTitle>
           </DialogHeader>
