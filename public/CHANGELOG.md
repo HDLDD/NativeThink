@@ -13,6 +13,10 @@
 
 
 
+
+## 2026-07-18
+- fix: auto-STT on video select - no manual click needed (`ef1ac2c`)
+
 ## 2026-07-18
 - fix: seek via iframe reload + STT restart after stop (`4a010ab`)
 

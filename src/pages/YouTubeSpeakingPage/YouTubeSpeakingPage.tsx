@@ -396,7 +396,11 @@ export default function YouTubeSpeakingPage() {
     }
   }, [lookupWord_State, favWord, favorites, addFavorite, removeFavorite, lookupData]);
 
-  // ── Select video ──
+  // Ref-based addSegment to avoid stale closure in inline STT
+  const addSegmentRef = useRef(addSegment);
+  addSegmentRef.current = addSegment;
+
+  // ── Select video → start STT immediately (within click gesture) ──
   const handleSelectVideo = useCallback((video: VideoEntry) => {
     setActiveVideo(video);
     setCurrentPage(1);
@@ -410,25 +414,55 @@ export default function YouTubeSpeakingPage() {
     setSearchQuery('');
     segmentRefs.current = [];
     setShowAddSubtitle(false);
-    // Flag for auto-start (ref-based, used in effect below)
-    autoStartSttRef.current = true;
-  }, []);
 
-  const autoStartSttRef = useRef(false);
-  const sttStartRef = useRef<() => void>(() => {});
-
-  // Auto-start STT: fires after subtitle API returns empty
-  useEffect(() => {
-    if (!activeVideo || subtitleLoading || !autoStartSttRef.current) return;
-    autoStartSttRef.current = false;
-    if (displaySegments.length > 0 || subtitleSource === 'bilibili' || subtitleSource === 'ai') return;
-
+    // Start STT immediately (within user click gesture so browser allows mic)
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition || sttActive) return;
+    if (!SpeechRecognition) return;
 
-    const timer = setTimeout(() => sttStartRef.current(), 800);
-    return () => clearTimeout(timer);
-  }, [activeVideo?.id, subtitleLoading, subtitleSource, displaySegments.length]);
+    const segFn = (text: string) => addSegmentRef.current(text);
+
+    setSubtitleSource('stt');
+    sttBufferRef.current = '';
+    sttSegmentCountRef.current = 0;
+    sttProcessingRef.current = false;
+    setFetchedSegments([]);
+    setSttActive(true);
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: any) => {
+      let newFinal = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          newFinal = event.results[i][0].transcript.trim();
+        }
+      }
+      if (!newFinal || newFinal.split(/\s+/).length < 2) return;
+      if (!sttProcessingRef.current) {
+        segFn(newFinal);
+      } else {
+        sttBufferRef.current += ' ' + newFinal;
+      }
+    };
+
+    recognition.onerror = () => {};
+    recognition.onend = () => {
+      if (sttBufferRef.current.trim()) {
+        segFn(sttBufferRef.current.trim());
+        sttBufferRef.current = '';
+      }
+      if (sttActive) {
+        try { recognition.start(); } catch { setSttActive(false); }
+      }
+    };
+
+    sttRef.current = recognition;
+    recognition.start();
+  }, []);
 
   // ── Switch episode within collection ──
   const handleSwitchEpisode = useCallback((page: number) => {
@@ -729,8 +763,6 @@ ${pastedTranscript.slice(0, 8000)}`;
     toast.success('语音识别已开始，自动翻译中…');
   }, [activeVideo, addSegment]);
 
-  // Keep ref in sync with latest handleSTTStart for auto-start effect
-  useEffect(() => { sttStartRef.current = handleSTTStart; });
 
   const handleSTTStop = useCallback(() => {
     if (sttRef.current) {
