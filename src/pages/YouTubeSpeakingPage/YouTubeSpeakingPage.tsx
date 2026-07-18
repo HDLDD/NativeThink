@@ -588,63 +588,63 @@ ${pastedTranscript.slice(0, 8000)}`;
   // ── Speech-to-text via Web Speech API (real-time AI translation) ──
 
   /** Translate a single sentence via AI and add to segments */
-  const translateAndAddSegment = useCallback(async (text: string) => {
-    if (!text.trim() || !ai.isConfigured) return;
+  const addSegment = useCallback(async (text: string, translatedZh?: string) => {
+    if (!text.trim()) return;
     sttProcessingRef.current = true;
-    try {
-      const prompt = `Translate the following English sentence to Chinese. Return ONLY valid JSON:
-{"en": "...", "zh": "..."}
 
-Sentence: ${text.trim()}`;
-      const result = await ai.chat([
-        { role: 'system', content: 'Translate English to Chinese. Return valid JSON only.' },
-        { role: 'user', content: prompt },
-      ], { temperature: 0.2, maxTokens: 512 });
+    let en = text.trim();
+    let zh = translatedZh || '';
 
-      const jsonMatch = result.match(/\{[^}]+\}/);
-      if (!jsonMatch) return;
-      const data = JSON.parse(jsonMatch[0]);
-      const en = (data.en || text).trim();
-      const zh = (data.zh || '').trim();
+    // If no translation yet, try AI
+    if (!zh && ai.isConfigured) {
+      try {
+        const result = await ai.chat([
+          { role: 'system', content: 'Translate the following English sentence to Chinese. Return ONLY valid JSON like {"zh":"..."}' },
+          { role: 'user', content: `{"en":"${en.replace(/"/g, '\\"')}"}` },
+        ], { temperature: 0.2, maxTokens: 256 });
+        const m = result.match(/"zh"\s*:\s*"([^"]+)"/);
+        if (m) zh = m[1];
+      } catch { /* show English only */ }
+    }
 
-      // Extract keywords (words > 4 chars)
-      const words = en.split(/\s+/).filter(Boolean);
-      const keywords = [];
-      const seen = new Set();
-      for (const w of words) {
-        const clean = w.replace(/[^a-zA-Z]/g, '').toLowerCase();
-        if (clean.length > 4 && !seen.has(clean) && keywords.length < 4) {
-          seen.add(clean);
-          keywords.push({ word: clean, meaning: '' });
-        }
+    // Extract keywords
+    const words = en.split(/\s+/).filter(Boolean);
+    const keywords = [];
+    const seen = new Set();
+    for (const w of words) {
+      const clean = w.replace(/[^a-zA-Z]/g, '').toLowerCase();
+      if (clean.length > 4 && !seen.has(clean) && keywords.length < 4) {
+        seen.add(clean);
+        keywords.push({ word: clean, meaning: '' });
       }
+    }
 
-      const idx = sttSegmentCountRef.current;
-      sttSegmentCountRef.current = idx + 1;
-      const newSegment: VideoSegment = {
-        start: idx * 3,
-        end: (idx + 1) * 3,
-        en,
-        zh,
-        keywords,
-      };
+    const idx = sttSegmentCountRef.current;
+    sttSegmentCountRef.current = idx + 1;
+    const newSegment: VideoSegment = {
+      start: idx * 3,
+      end: (idx + 1) * 3,
+      en,
+      zh,
+      keywords,
+    };
 
-      setFetchedSegments((prev) => {
-        const updated = [...(prev || []), newSegment];
-        // Cache incrementally
-        if (subtitleCacheKey) {
-          try { safeStorage.setItem(subtitleCacheKey, JSON.stringify({ segments: updated, source: 'stt' })); } catch { /* */ }
-        }
-        return updated;
-      });
+    setFetchedSegments((prev) => {
+      const updated = [...(prev || []), newSegment];
+      if (subtitleCacheKey) {
+        try { safeStorage.setItem(subtitleCacheKey, JSON.stringify({ segments: updated, source: 'stt' })); } catch { /* */ }
+      }
+      return updated;
+    });
 
-      // Scroll to bottom
-      setTimeout(() => {
-        const el = segmentRefs.current[segmentRefs.current.length - 1];
-        el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 50);
-    } catch { /* skip failed sentence */ }
-    finally { sttProcessingRef.current = false; }
+    // Scroll into view
+    setTimeout(() => {
+      const refs = segmentRefs.current;
+      const el = refs[refs.length - 1];
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+
+    sttProcessingRef.current = false;
   }, [ai, subtitleCacheKey]);
 
   const handleSTTStart = useCallback(() => {
@@ -667,24 +667,17 @@ Sentence: ${text.trim()}`;
     recognition.maxAlternatives = 1;
 
     recognition.onresult = (event: any) => {
-      // Find the latest final result
       let newFinal = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
           newFinal = event.results[i][0].transcript.trim();
         }
       }
-      if (!newFinal) return;
+      if (!newFinal || newFinal.split(/\s+/).length < 2) return;
 
-      // Check if it ends a sentence and has enough words
-      if (/[.!?]$/.test(newFinal) && newFinal.split(/\s+/).length >= 3) {
-        // Only process if not already processing (prevents queue buildup)
-        if (!sttProcessingRef.current) {
-          translateAndAddSegment(newFinal);
-        } else {
-          // Buffer the sentence for later processing
-          sttBufferRef.current += ' ' + newFinal;
-        }
+      // Always process every final result immediately if not busy
+      if (!sttProcessingRef.current) {
+        addSegment(newFinal);
       } else {
         sttBufferRef.current += ' ' + newFinal;
       }
@@ -694,36 +687,37 @@ Sentence: ${text.trim()}`;
       if (event.error !== 'no-speech' && event.error !== 'aborted') {
         toast.error(`语音识别错误: ${event.error}`);
       }
-      if (sttActive) setSttActive(false);
     };
 
     recognition.onend = () => {
-      // Process any remaining buffered text
+      // Process buffered text
       if (sttBufferRef.current.trim()) {
-        translateAndAddSegment(sttBufferRef.current.trim());
+        addSegment(sttBufferRef.current.trim());
         sttBufferRef.current = '';
       }
-      if (sttActive) setSttActive(false);
+      // Auto-restart if still active
+      if (sttActive) {
+        try { recognition.start(); } catch { setSttActive(false); }
+      }
     };
 
     sttRef.current = recognition;
     recognition.start();
     toast.success('语音识别已开始，自动翻译中…');
-  }, [activeVideo, translateAndAddSegment]);
+  }, [activeVideo, addSegment]);
 
   const handleSTTStop = useCallback(() => {
     if (sttRef.current) {
       try { sttRef.current.stop(); } catch { /* */ }
       sttRef.current = null;
     }
-    // Flush buffer
     if (sttBufferRef.current.trim()) {
-      translateAndAddSegment(sttBufferRef.current.trim());
+      addSegment(sttBufferRef.current.trim());
       sttBufferRef.current = '';
     }
     setSttActive(false);
     toast.success('语音识别已停止');
-  }, [translateAndAddSegment]);
+  }, [addSegment]);
 
   // ── Filter segments by search ──
   const filteredSegments = activeVideo

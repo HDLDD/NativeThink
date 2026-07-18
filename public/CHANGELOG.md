@@ -10,6 +10,10 @@
 
 
 
+
+## 2026-07-18
+- fix: real-time STT - translate each sentence on the fly (`441dbf0`)
+
 ## 2026-07-18
 - feat: voice recognition subtitle - Web Speech API STT (`33ec0c6`)
 
