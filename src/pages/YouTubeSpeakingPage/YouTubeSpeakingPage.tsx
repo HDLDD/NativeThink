@@ -210,6 +210,9 @@ export default function YouTubeSpeakingPage() {
   const [aiProcessing, setAiProcessing] = useState(false);
   const ai = useAI();
 
+  // Whisper transcription state
+  const [transcribing, setTranscribing] = useState(false);
+
   // Ref for addSegment (defined later) — avoid stale closure in inline STT
   const addSegmentRef = useRef<(text: string, zh?: string) => Promise<void>>(async () => {});
 
@@ -790,6 +793,44 @@ ${pastedTranscript.slice(0, 8000)}`;
     toast.success('语音识别已停止');
   }, [addSegment]);
 
+  // ── Whisper AI transcription via browser-cached API key ──
+  const handleWhisperTranscribe = useCallback(async () => {
+    if (!activeVideo) return;
+    let apiKey = '';
+    let provider = 'groq';
+    try {
+      apiKey = localStorage.getItem('ai_key_groq') || '';
+      if (!apiKey) { provider = 'siliconflow'; apiKey = localStorage.getItem('ai_key_siliconflow') || ''; }
+    } catch { /* */ }
+    if (!apiKey) { toast.error('未找到 Groq 或 SiliconFlow API Key，请先在 AI 对话页配置'); return; }
+
+    setTranscribing(true);
+    setSubtitleLoading(true);
+    try {
+      const res = await fetch('/api/ai/transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey, provider, bvid: activeVideo.bvid, page: currentPage }),
+      });
+      const data = await res.json();
+      if (data.error) { toast.error('转写失败: ' + data.error); return; }
+      if (!data.segments || data.segments.length === 0) { toast.error('未识别到内容'); return; }
+
+      setFetchedSegments(data.segments);
+      setSubtitleSource('ai');
+      segmentRefs.current = new Array(data.segments.length).fill(null);
+      if (subtitleCacheKey) {
+        try { safeStorage.setItem(subtitleCacheKey, JSON.stringify({ segments: data.segments, source: 'ai' })); } catch { /* */ }
+      }
+      toast.success(`转写完成，共 ${data.segments.length} 条字幕`);
+    } catch (err) {
+      toast.error('转写请求失败');
+    } finally {
+      setTranscribing(false);
+      setSubtitleLoading(false);
+    }
+  }, [activeVideo, currentPage, subtitleCacheKey]);
+
   // ── Filter segments by search ──
   const filteredSegments = activeVideo
     ? searchQuery.trim()
@@ -1058,14 +1099,26 @@ ${pastedTranscript.slice(0, 8000)}`;
                         <span className="text-[10px] text-muted-foreground">
                           播放视频后点此，浏览器会自动识别英文并翻译
                         </span>
-                        <Button
-                          size="sm"
-                          onClick={() => setShowAddSubtitle(true)}
-                          variant="outline"
-                          className="rounded-xl text-xs font-bold gap-1"
-                        >
-                          <Plus className="size-3.5" />粘贴文本
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={handleWhisperTranscribe}
+                            disabled={transcribing || subtitleLoading}
+                            variant="outline"
+                            className="rounded-xl text-xs font-bold gap-1"
+                          >
+                            {transcribing ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                            {transcribing ? '转写中…' : 'AI 转写'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => setShowAddSubtitle(true)}
+                            variant="outline"
+                            className="rounded-xl text-xs font-bold gap-1"
+                          >
+                            <Plus className="size-3.5" />粘贴文本
+                          </Button>
+                        </div>
                       </div>
                     ) : (
                       <div className="space-y-2">

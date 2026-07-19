@@ -16,6 +16,10 @@
 
 
 
+
+## 2026-07-19
+- fix: prevent STT segments from being cleared by subtitle API race (`e1b9ede`)
+
 ## 2026-07-19
 - fix: stale closure in STT onend (`e33887b`)
 
