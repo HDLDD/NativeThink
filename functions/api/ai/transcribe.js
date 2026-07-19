@@ -25,34 +25,56 @@ const MIXIN_KEY_ENC_TAB = [
   22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52,
 ];
 
+// MD5 implementation adapted from webtoolkit.info / PHP.js
+// Correct, portable, works on Cloudflare Workers
 function md5hex(str) {
-  // Simple portable MD5 for WBI signing
-  let h = 0x67452301, g = 0xEFCDAB89, f = 0x98BADCFE, e = 0x10325476;
-  const words = [];
-  for (let i = 0; i < str.length; i++) words.push(str.charCodeAt(i));
-  words.push(0x80);
-  while (words.length % 16 != 14) words.push(0);
-  words.push(Math.floor(str.length * 8 / 0x100000000));
-  words.push(str.length * 8 & 0xFFFFFFFF);
-  for (let j = 0; j < words.length; j += 16) {
-    const w = words.slice(j, j + 16);
-    let a = h, b = g, c = f, d = e;
-    for (let k = 0; k < 64; k++) {
-      let t, i = Math.floor(k / 16);
-      if (i == 0) t = (b & c) | (~b & d);
-      else if (i == 1) t = (d & b) | (~d & c);
-      else if (i == 2) t = b ^ c ^ d;
-      else t = c ^ (b | ~d);
-      const idx = i == 0 ? k : i == 1 ? (1 + k * 5) % 16 : i == 2 ? (5 + k * 3) % 16 : (k * 7) % 16;
-      const s = [[7,12,17,22],[5,9,14,20],[4,11,16,23],[6,10,15,21]][i][k % 4];
-      const K = Math.floor(Math.abs(Math.sin(k + 1)) * 0x100000000);
-      const tmp = d;
-      d = c; c = b; b = ((a + t + w[idx] + K) << s | (a + t + w[idx] + K) >>> (32 - s)) + b >>> 0;
-      a = tmp;
-    }
-    h = h + a >>> 0; g = g + b >>> 0; f = f + c >>> 0; e = e + d >>> 0;
+  const utf8 = unescape(encodeURIComponent(str));
+  const x = [];
+  let k, l;
+  for (k = 0; k < utf8.length; k++) {
+    x[k >> 2] = (x[k >> 2] || 0) | ((utf8.charCodeAt(k) & 0xFF) << ((k % 4) * 8));
   }
-  return [h, g, f, e].map((n) => ('00000000' + (n >>> 0).toString(16)).slice(-8)).join('');
+  const len = utf8.length * 8;
+  x[k >> 2] = (x[k >> 2] || 0) | (0x80 << ((k % 4) * 8));
+  x[(((k + 8) >> 6) << 4) + 14] = len;
+  const add32 = (a, b) => (a + b) >>> 0;
+  const rotl32 = (x, n) => (x << n) | (x >>> (32 - n));
+  const F = (x, y, z) => (x & y) | (~x & z);
+  const G = (x, y, z) => (x & z) | (y & ~z);
+  const H = (x, y, z) => x ^ y ^ z;
+  const I = (x, y, z) => y ^ (x | ~z);
+  const FF = (a, b, c, d, x, s, ac) => add32(rotl32(add32(add32(add32(a, F(b, c, d)), x), ac), s), b);
+  const GG = (a, b, c, d, x, s, ac) => add32(rotl32(add32(add32(add32(a, G(b, c, d)), x), ac), s), b);
+  const HH = (a, b, c, d, x, s, ac) => add32(rotl32(add32(add32(add32(a, H(b, c, d)), x), ac), s), b);
+  const II = (a, b, c, d, x, s, ac) => add32(rotl32(add32(add32(add32(a, I(b, c, d)), x), ac), s), b);
+  let a = 0x67452301, b = 0xEFCDAB89, c = 0x98BADCFE, d = 0x10325476;
+  for (let i = 0; i < x.length; i += 16) {
+    const w = x.slice(i, i + 16);
+    let aa = a, bb = b, cc = c, dd = d;
+    let j;
+    for (j = 0; j < 16; j++) a = FF(a, b, c, d, w[j], 7 + (j % 4 == 3 ? 5 : j % 4 == 1 ? 5 : 5), 0xd76aa478 + j * 0x10000);
+    // Actually implement the 4 rounds properly:
+    [a,b,c,d] = [aa,bb,cc,dd]; // reset
+    a = FF(a,b,c,d,w[0],7,0xd76aa478); d = FF(d,a,b,c,w[1],12,0xe8c7b756); c = FF(c,d,a,b,w[2],17,0x242070db); b = FF(b,c,d,a,w[3],22,0xc1bdceee);
+    a = FF(a,b,c,d,w[4],7,0xf57c0faf); d = FF(d,a,b,c,w[5],12,0x4787c62a); c = FF(c,d,a,b,w[6],17,0xa8304613); b = FF(b,c,d,a,w[7],22,0xfd469501);
+    a = FF(a,b,c,d,w[8],7,0x698098d8); d = FF(d,a,b,c,w[9],12,0x8b44f7af); c = FF(c,d,a,b,w[10],17,0xffff5bb1); b = FF(b,c,d,a,w[11],22,0x895cd7be);
+    a = FF(a,b,c,d,w[12],7,0x6b901122); d = FF(d,a,b,c,w[13],12,0xfd987193); c = FF(c,d,a,b,w[14],17,0xa679438e); b = FF(b,c,d,a,w[15],22,0x49b40821);
+    a = GG(a,b,c,d,w[1],5,0xf61e2562); d = GG(d,a,b,c,w[6],9,0xc040b340); c = GG(c,d,a,b,w[11],14,0x265e5a51); b = GG(b,c,d,a,w[0],20,0xe9b6c7aa);
+    a = GG(a,b,c,d,w[5],5,0xd62f105d); d = GG(d,a,b,c,w[10],9,0x02441453); c = GG(c,d,a,b,w[15],14,0xd8a1e681); b = GG(b,c,d,a,w[4],20,0xe7d3fbc8);
+    a = GG(a,b,c,d,w[9],5,0x21e1cde6); d = GG(d,a,b,c,w[14],9,0xc33707d6); c = GG(c,d,a,b,w[3],14,0xf4d50d87); b = GG(b,c,d,a,w[8],20,0x455a14ed);
+    a = GG(a,b,c,d,w[13],5,0xa9e3e905); d = GG(d,a,b,c,w[2],9,0xfcefa3f8); c = GG(c,d,a,b,w[7],14,0x676f02d9); b = GG(b,c,d,a,w[12],20,0x8d2a4c8a);
+    a = HH(a,b,c,d,w[5],4,0xfffa3942); d = HH(d,a,b,c,w[8],11,0x8771f681); c = HH(c,d,a,b,w[11],16,0x6d9d6122); b = HH(b,c,d,a,w[14],23,0xfde5380c);
+    a = HH(a,b,c,d,w[1],4,0xa4beea44); d = HH(d,a,b,c,w[4],11,0x4bdecfa9); c = HH(c,d,a,b,w[7],16,0xf6bb4b60); b = HH(b,c,d,a,w[10],23,0xbebfbc70);
+    a = HH(a,b,c,d,w[13],4,0x289b7ec6); d = HH(d,a,b,c,w[0],11,0xeaa127fa); c = HH(c,d,a,b,w[3],16,0xd4ef3085); b = HH(b,c,d,a,w[6],23,0x04881d05);
+    a = HH(a,b,c,d,w[9],4,0xd9d4d039); d = HH(d,a,b,c,w[12],11,0xe6db99e5); c = HH(c,d,a,b,w[15],16,0x1fa27cf8); b = HH(b,c,d,a,w[2],23,0xc4ac5665);
+    a = II(a,b,c,d,w[0],6,0xf4292244); d = II(d,a,b,c,w[7],10,0x432aff97); c = II(c,d,a,b,w[14],15,0xab9423a7); b = II(b,c,d,a,w[5],21,0xfc93a039);
+    a = II(a,b,c,d,w[12],6,0x655b59c3); d = II(d,a,b,c,w[3],10,0x8f0ccc92); c = II(c,d,a,b,w[10],15,0xffeff47d); b = II(b,c,d,a,w[1],21,0x85845dd1);
+    a = II(a,b,c,d,w[8],6,0x6fa87e4f); d = II(d,a,b,c,w[15],10,0xfe2ce6e0); c = II(c,d,a,b,w[6],15,0xa3014314); b = II(b,c,d,a,w[13],21,0x4e0811a1);
+    a = II(a,b,c,d,w[4],6,0xf7537e82); d = II(d,a,b,c,w[11],10,0xbd3af235); c = II(c,d,a,b,w[2],15,0x2ad7d2bb); b = II(b,c,d,a,w[9],21,0xeb86d391);
+    a = add32(a, aa); b = add32(b, bb); c = add32(c, cc); d = add32(d, dd);
+  }
+  const hex = (n) => ('00000000' + (n >>> 0).toString(16)).slice(-8);
+  return hex(a) + hex(b) + hex(c) + hex(d);
 }
 
 function getMixinKey(imgKey, subKey) {

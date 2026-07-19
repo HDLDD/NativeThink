@@ -17,6 +17,10 @@
 
 
 
+
+## 2026-07-19
+- feat: Whisper transcription via provider API (`2f1a136`)
+
 ## 2026-07-19
 - fix: prevent STT segments from being cleared by subtitle API race (`e1b9ede`)
 
