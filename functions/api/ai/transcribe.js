@@ -25,56 +25,56 @@ const MIXIN_KEY_ENC_TAB = [
   22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52,
 ];
 
-// MD5 implementation adapted from webtoolkit.info / PHP.js
-// Correct, portable, works on Cloudflare Workers
+// MD5 — webtoolkit.info / blueimp JavaScript-MD5 derived
+// Tested: matches Python hashlib.md5. Works on Cloudflare Workers.
 function md5hex(str) {
+  function md5cycle(x, k) {
+    let a = x[0], b = x[1], c = x[2], d = x[3];
+    a = ff(a, b, c, d, k[0], 7, -680876936); d = ff(d, a, b, c, k[1], 12, -389564586); c = ff(c, d, a, b, k[2], 17, 606105819); b = ff(b, c, d, a, k[3], 22, -1044525330);
+    a = ff(a, b, c, d, k[4], 7, -176418897); d = ff(d, a, b, c, k[5], 12, 1200080426); c = ff(c, d, a, b, k[6], 17, -1473231341); b = ff(b, c, d, a, k[7], 22, -45705983);
+    a = ff(a, b, c, d, k[8], 7, 1770035416); d = ff(d, a, b, c, k[9], 12, -1958414417); c = ff(c, d, a, b, k[10], 17, -42063); b = ff(b, c, d, a, k[11], 22, -1990404162);
+    a = ff(a, b, c, d, k[12], 7, 1804603682); d = ff(d, a, b, c, k[13], 12, -40341101); c = ff(c, d, a, b, k[14], 17, -1502002290); b = ff(b, c, d, a, k[15], 22, 1236535329);
+    a = gg(a, b, c, d, k[1], 5, -165796510); d = gg(d, a, b, c, k[6], 9, -1069501632); c = gg(c, d, a, b, k[11], 14, 643717713); b = gg(b, c, d, a, k[0], 20, -373897302);
+    a = gg(a, b, c, d, k[5], 5, -701558691); d = gg(d, a, b, c, k[10], 9, 38016083); c = gg(c, d, a, b, k[15], 14, -660478335); b = gg(b, c, d, a, k[4], 20, -405537848);
+    a = gg(a, b, c, d, k[9], 5, 568446438); d = gg(d, a, b, c, k[14], 9, -1019803690); c = gg(c, d, a, b, k[3], 14, -187363961); b = gg(b, c, d, a, k[8], 20, 1163531501);
+    a = gg(a, b, c, d, k[13], 5, -1444681467); d = gg(d, a, b, c, k[2], 9, -51403784); c = gg(c, d, a, b, k[7], 14, 1735328473); b = gg(b, c, d, a, k[12], 20, -1926607734);
+    a = hh(a, b, c, d, k[5], 4, -378558); d = hh(d, a, b, c, k[8], 11, -2022574463); c = hh(c, d, a, b, k[11], 16, 1839030562); b = hh(b, c, d, a, k[14], 23, -35309556);
+    a = hh(a, b, c, d, k[1], 4, -1530992060); d = hh(d, a, b, c, k[4], 11, 1272893353); c = hh(c, d, a, b, k[7], 16, -155497632); b = hh(b, c, d, a, k[10], 23, -1094730640);
+    a = hh(a, b, c, d, k[13], 4, 681279174); d = hh(d, a, b, c, k[0], 11, -358537222); c = hh(c, d, a, b, k[3], 16, -722521979); b = hh(b, c, d, a, k[6], 23, 76029189);
+    a = hh(a, b, c, d, k[9], 4, -640364487); d = hh(d, a, b, c, k[12], 11, -421815835); c = hh(c, d, a, b, k[15], 16, 530742520); b = hh(b, c, d, a, k[2], 23, -995338651);
+    a = ii(a, b, c, d, k[0], 6, -198630844); d = ii(d, a, b, c, k[7], 10, 1126891415); c = ii(c, d, a, b, k[14], 15, -1416354905); b = ii(b, c, d, a, k[5], 21, -57434055);
+    a = ii(a, b, c, d, k[12], 6, 1700485571); d = ii(d, a, b, c, k[3], 10, -1894986606); c = ii(c, d, a, b, k[10], 15, -1051523); b = ii(b, c, d, a, k[1], 21, -2054922799);
+    a = ii(a, b, c, d, k[8], 6, 1873313359); d = ii(d, a, b, c, k[15], 10, -30611744); c = ii(c, d, a, b, k[6], 15, -1560198380); b = ii(b, c, d, a, k[13], 21, 1309151649);
+    a = ii(a, b, c, d, k[4], 6, -145523070); d = ii(d, a, b, c, k[11], 10, -1120210379); c = ii(c, d, a, b, k[2], 15, 718787259); b = ii(b, c, d, a, k[9], 21, -343485551);
+    x[0] = add32(a, x[0]); x[1] = add32(b, x[1]); x[2] = add32(c, x[2]); x[3] = add32(d, x[3]);
+  }
+  function cmn(q, a, b, x, s, t) { return add32(rotl32(add32(add32(a, q), add32(x, t)), s), b); }
+  function ff(a, b, c, d, x, s, t) { return cmn((b & c) | ((~b) & d), a, b, x, s, t); }
+  function gg(a, b, c, d, x, s, t) { return cmn((b & d) | (c & (~d)), a, b, x, s, t); }
+  function hh(a, b, c, d, x, s, t) { return cmn(b ^ c ^ d, a, b, x, s, t); }
+  function ii(a, b, c, d, x, s, t) { return cmn(c ^ (b | (~d)), a, b, x, s, t); }
+  function rotl32(n, s) { return (n << s) | (n >>> (32 - s)); }
+  function add32(a, b) { return (a + b) & 0xFFFFFFFF; }
   const utf8 = unescape(encodeURIComponent(str));
-  const x = [];
-  let k, l;
-  for (k = 0; k < utf8.length; k++) {
-    x[k >> 2] = (x[k >> 2] || 0) | ((utf8.charCodeAt(k) & 0xFF) << ((k % 4) * 8));
+  const n = utf8.length;
+  let bytes = [], i;
+  for (i = 0; i < n; i++) bytes[i] = utf8.charCodeAt(i);
+  // Pad
+  const paddedLen = ((n + 8) >>> 6) + 1;
+  const blocks = new Array(paddedLen * 16).fill(0);
+  for (i = 0; i < n; i++) blocks[i >> 2] |= bytes[i] << ((i % 4) * 8);
+  blocks[n >> 2] |= 0x80 << ((n % 4) * 8);
+  blocks[paddedLen * 16 - 2] = n * 8;
+  const h = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476];
+  for (i = 0; i < blocks.length; i += 16) {
+    const w = blocks.slice(i, i + 16);
+    md5cycle(h, w);
   }
-  const len = utf8.length * 8;
-  x[k >> 2] = (x[k >> 2] || 0) | (0x80 << ((k % 4) * 8));
-  x[(((k + 8) >> 6) << 4) + 14] = len;
-  const add32 = (a, b) => (a + b) >>> 0;
-  const rotl32 = (x, n) => (x << n) | (x >>> (32 - n));
-  const F = (x, y, z) => (x & y) | (~x & z);
-  const G = (x, y, z) => (x & z) | (y & ~z);
-  const H = (x, y, z) => x ^ y ^ z;
-  const I = (x, y, z) => y ^ (x | ~z);
-  const FF = (a, b, c, d, x, s, ac) => add32(rotl32(add32(add32(add32(a, F(b, c, d)), x), ac), s), b);
-  const GG = (a, b, c, d, x, s, ac) => add32(rotl32(add32(add32(add32(a, G(b, c, d)), x), ac), s), b);
-  const HH = (a, b, c, d, x, s, ac) => add32(rotl32(add32(add32(add32(a, H(b, c, d)), x), ac), s), b);
-  const II = (a, b, c, d, x, s, ac) => add32(rotl32(add32(add32(add32(a, I(b, c, d)), x), ac), s), b);
-  let a = 0x67452301, b = 0xEFCDAB89, c = 0x98BADCFE, d = 0x10325476;
-  for (let i = 0; i < x.length; i += 16) {
-    const w = x.slice(i, i + 16);
-    let aa = a, bb = b, cc = c, dd = d;
-    let j;
-    for (j = 0; j < 16; j++) a = FF(a, b, c, d, w[j], 7 + (j % 4 == 3 ? 5 : j % 4 == 1 ? 5 : 5), 0xd76aa478 + j * 0x10000);
-    // Actually implement the 4 rounds properly:
-    [a,b,c,d] = [aa,bb,cc,dd]; // reset
-    a = FF(a,b,c,d,w[0],7,0xd76aa478); d = FF(d,a,b,c,w[1],12,0xe8c7b756); c = FF(c,d,a,b,w[2],17,0x242070db); b = FF(b,c,d,a,w[3],22,0xc1bdceee);
-    a = FF(a,b,c,d,w[4],7,0xf57c0faf); d = FF(d,a,b,c,w[5],12,0x4787c62a); c = FF(c,d,a,b,w[6],17,0xa8304613); b = FF(b,c,d,a,w[7],22,0xfd469501);
-    a = FF(a,b,c,d,w[8],7,0x698098d8); d = FF(d,a,b,c,w[9],12,0x8b44f7af); c = FF(c,d,a,b,w[10],17,0xffff5bb1); b = FF(b,c,d,a,w[11],22,0x895cd7be);
-    a = FF(a,b,c,d,w[12],7,0x6b901122); d = FF(d,a,b,c,w[13],12,0xfd987193); c = FF(c,d,a,b,w[14],17,0xa679438e); b = FF(b,c,d,a,w[15],22,0x49b40821);
-    a = GG(a,b,c,d,w[1],5,0xf61e2562); d = GG(d,a,b,c,w[6],9,0xc040b340); c = GG(c,d,a,b,w[11],14,0x265e5a51); b = GG(b,c,d,a,w[0],20,0xe9b6c7aa);
-    a = GG(a,b,c,d,w[5],5,0xd62f105d); d = GG(d,a,b,c,w[10],9,0x02441453); c = GG(c,d,a,b,w[15],14,0xd8a1e681); b = GG(b,c,d,a,w[4],20,0xe7d3fbc8);
-    a = GG(a,b,c,d,w[9],5,0x21e1cde6); d = GG(d,a,b,c,w[14],9,0xc33707d6); c = GG(c,d,a,b,w[3],14,0xf4d50d87); b = GG(b,c,d,a,w[8],20,0x455a14ed);
-    a = GG(a,b,c,d,w[13],5,0xa9e3e905); d = GG(d,a,b,c,w[2],9,0xfcefa3f8); c = GG(c,d,a,b,w[7],14,0x676f02d9); b = GG(b,c,d,a,w[12],20,0x8d2a4c8a);
-    a = HH(a,b,c,d,w[5],4,0xfffa3942); d = HH(d,a,b,c,w[8],11,0x8771f681); c = HH(c,d,a,b,w[11],16,0x6d9d6122); b = HH(b,c,d,a,w[14],23,0xfde5380c);
-    a = HH(a,b,c,d,w[1],4,0xa4beea44); d = HH(d,a,b,c,w[4],11,0x4bdecfa9); c = HH(c,d,a,b,w[7],16,0xf6bb4b60); b = HH(b,c,d,a,w[10],23,0xbebfbc70);
-    a = HH(a,b,c,d,w[13],4,0x289b7ec6); d = HH(d,a,b,c,w[0],11,0xeaa127fa); c = HH(c,d,a,b,w[3],16,0xd4ef3085); b = HH(b,c,d,a,w[6],23,0x04881d05);
-    a = HH(a,b,c,d,w[9],4,0xd9d4d039); d = HH(d,a,b,c,w[12],11,0xe6db99e5); c = HH(c,d,a,b,w[15],16,0x1fa27cf8); b = HH(b,c,d,a,w[2],23,0xc4ac5665);
-    a = II(a,b,c,d,w[0],6,0xf4292244); d = II(d,a,b,c,w[7],10,0x432aff97); c = II(c,d,a,b,w[14],15,0xab9423a7); b = II(b,c,d,a,w[5],21,0xfc93a039);
-    a = II(a,b,c,d,w[12],6,0x655b59c3); d = II(d,a,b,c,w[3],10,0x8f0ccc92); c = II(c,d,a,b,w[10],15,0xffeff47d); b = II(b,c,d,a,w[1],21,0x85845dd1);
-    a = II(a,b,c,d,w[8],6,0x6fa87e4f); d = II(d,a,b,c,w[15],10,0xfe2ce6e0); c = II(c,d,a,b,w[6],15,0xa3014314); b = II(b,c,d,a,w[13],21,0x4e0811a1);
-    a = II(a,b,c,d,w[4],6,0xf7537e82); d = II(d,a,b,c,w[11],10,0xbd3af235); c = II(c,d,a,b,w[2],15,0x2ad7d2bb); b = II(b,c,d,a,w[9],21,0xeb86d391);
-    a = add32(a, aa); b = add32(b, bb); c = add32(c, cc); d = add32(d, dd);
-  }
-  const hex = (n) => ('00000000' + (n >>> 0).toString(16)).slice(-8);
-  return hex(a) + hex(b) + hex(c) + hex(d);
+  const hex = (n) => {
+    for (var r = '', i = 0; i < 4; i++) r += '0123456789abcdef'[(n >> (i * 8 + 4)) & 0xF] + '0123456789abcdef'[(n >> (i * 8)) & 0xF];
+    return r;
+  };
+  return hex(h[0]) + hex(h[1]) + hex(h[2]) + hex(h[3]);
 }
 
 function getMixinKey(imgKey, subKey) {
