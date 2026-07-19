@@ -14,6 +14,10 @@
 
 
 
+
+## 2026-07-18
+- fix: STT starts on video select click (`0546dc8`)
+
 ## 2026-07-18
 - fix: auto-STT on video select - no manual click needed (`ef1ac2c`)
 

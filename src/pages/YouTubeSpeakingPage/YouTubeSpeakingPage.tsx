@@ -210,8 +210,12 @@ export default function YouTubeSpeakingPage() {
   const [aiProcessing, setAiProcessing] = useState(false);
   const ai = useAI();
 
+  // Ref for addSegment (defined later) — avoid stale closure in inline STT
+  const addSegmentRef = useRef<(text: string, zh?: string) => Promise<void>>(async () => {});
+
   // Speech-to-text state
   const [sttActive, setSttActive] = useState(false);
+  const sttActiveRef = useRef(false);
   const sttRef = useRef<any>(null);
   const sttBufferRef = useRef('');
   const sttSegmentCountRef = useRef(0);
@@ -264,6 +268,9 @@ export default function YouTubeSpeakingPage() {
     }, 250);
     return () => clearInterval(interval);
   }, [playerPlaying, activeVideo]);
+
+  // Sync sttActiveRef with sttActive (for use in async callbacks)
+  useEffect(() => { sttActiveRef.current = sttActive; }, [sttActive]);
 
   // ── Subtitle cache key (includes page for multi-episode videos) ──
   const subtitleCacheKey = activeVideo ? `__speaking_subtitle_${activeVideo.bvid}_p${currentPage}` : null;
@@ -396,10 +403,6 @@ export default function YouTubeSpeakingPage() {
     }
   }, [lookupWord_State, favWord, favorites, addFavorite, removeFavorite, lookupData]);
 
-  // Ref-based addSegment to avoid stale closure in inline STT
-  const addSegmentRef = useRef(addSegment);
-  addSegmentRef.current = addSegment;
-
   // ── Select video → start STT immediately (within click gesture) ──
   const handleSelectVideo = useCallback((video: VideoEntry) => {
     setActiveVideo(video);
@@ -455,12 +458,14 @@ export default function YouTubeSpeakingPage() {
         segFn(sttBufferRef.current.trim());
         sttBufferRef.current = '';
       }
-      if (sttActive) {
+      // Use ref to avoid stale closure
+      if (sttActiveRef.current) {
         try { recognition.start(); } catch { setSttActive(false); }
       }
     };
 
     sttRef.current = recognition;
+    sttActiveRef.current = true;
     recognition.start();
   }, []);
 
@@ -703,6 +708,7 @@ ${pastedTranscript.slice(0, 8000)}`;
 
     sttProcessingRef.current = false;
   }, [ai, subtitleCacheKey]);
+  addSegmentRef.current = addSegment;
 
   const handleSTTStart = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -765,6 +771,7 @@ ${pastedTranscript.slice(0, 8000)}`;
 
 
   const handleSTTStop = useCallback(() => {
+    sttActiveRef.current = false;
     if (sttRef.current) {
       try { sttRef.current.stop(); } catch { /* */ }
       sttRef.current = null;
