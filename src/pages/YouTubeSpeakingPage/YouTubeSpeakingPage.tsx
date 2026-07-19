@@ -801,8 +801,9 @@ ${pastedTranscript.slice(0, 8000)}`;
     try {
       apiKey = localStorage.getItem('ai_key_groq') || '';
       if (!apiKey) { provider = 'siliconflow'; apiKey = localStorage.getItem('ai_key_siliconflow') || ''; }
+      if (!apiKey) { provider = 'glm'; apiKey = localStorage.getItem('ai_key_glm') || ''; }
     } catch { /* */ }
-    if (!apiKey) { toast.error('未找到 Groq 或 SiliconFlow API Key，请先在 AI 对话页配置'); return; }
+    if (!apiKey) { toast.error('请先在 AI 对话页配置 Groq / SiliconFlow / GLM 的 API Key'); return; }
 
     setTranscribing(true);
     setSubtitleLoading(true);

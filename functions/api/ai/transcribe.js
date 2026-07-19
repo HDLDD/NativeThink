@@ -111,12 +111,13 @@ async function signWbi(params) {
 const WHISPER_ENDPOINTS = {
   groq: 'https://api.groq.com/openai/v1/audio/transcriptions',
   siliconflow: 'https://api.siliconflow.cn/v1/audio/transcriptions',
-  // Qwen/DashScope uses their own ASR SDK, not OpenAI-compatible
+  glm: 'https://open.bigmodel.cn/api/paas/v4/audio/transcriptions',
 };
 
 const WHISPER_MODELS = {
   groq: 'whisper-large-v3-turbo',
   siliconflow: 'FunAudioLLM/SenseVoiceSmall',
+  glm: 'GLM-ASR-2512',
 };
 
 export async function onRequest(context) {
