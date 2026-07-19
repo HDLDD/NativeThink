@@ -340,8 +340,29 @@ export default function YouTubeSpeakingPage() {
           setEpisodeList(eps);
         }
       })
-      .finally(() => setSubtitleLoading(false));
+      .finally(() => {
+        setSubtitleLoading(false);
+        // Auto-trigger transcription if no subtitles at all
+        if (subtitleCacheKey && !sttActiveRef.current) {
+          try {
+            const cached = safeStorage.getItem(subtitleCacheKey);
+            if (!cached && !activeVideo?.segments?.length) {
+              autoTranscribeRef.current = true;
+            }
+          } catch { autoTranscribeRef.current = true; }
+        }
+      });
   }, [activeVideo?.id, currentPage]);
+
+  // Auto-transcribe effect: runs after subtitle fetch completes with empty result
+  const autoTranscribeRef = useRef(false);
+  useEffect(() => {
+    if (!autoTranscribeRef.current || !activeVideo || transcribing || sttActive) return;
+    autoTranscribeRef.current = false;
+    // Small delay to let UI settle
+    const timer = setTimeout(() => doTranscribe(), 500);
+    return () => clearTimeout(timer);
+  }, [activeVideo?.id, fetchedSegments]);
 
   // ── Segments to display (prefer live segments > fetched > built-in) ──
   const displaySegments = activeVideo?.segments && activeVideo.segments.length > 0
@@ -427,7 +448,11 @@ export default function YouTubeSpeakingPage() {
     segmentRefs.current = [];
     setShowAddSubtitle(false);
 
-    // Start STT immediately (within user click gesture so browser allows mic)
+    // Check if user has Whisper API key → skip STT (Whisper auto-transcribes)
+    const hasApiKey = !!(localStorage.getItem('ai_key_groq') || localStorage.getItem('ai_key_siliconflow') || localStorage.getItem('ai_key_glm'));
+    if (hasApiKey) return; // Whisper will auto-run from the subtitle fetch effect
+
+    // Fallback: STT via browser mic
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) return;
 
@@ -793,9 +818,9 @@ ${pastedTranscript.slice(0, 8000)}`;
     toast.success('语音识别已停止');
   }, [addSegment]);
 
-  // ── Whisper AI transcription via browser-cached API key ──
-  const handleWhisperTranscribe = useCallback(async () => {
-    if (!activeVideo) return;
+  // ── Whisper AI transcription ──
+  const doTranscribe = useCallback(async () => {
+    if (!activeVideo || transcribing) return;
     let apiKey = '';
     let provider = 'groq';
     try {
@@ -803,7 +828,7 @@ ${pastedTranscript.slice(0, 8000)}`;
       if (!apiKey) { provider = 'siliconflow'; apiKey = localStorage.getItem('ai_key_siliconflow') || ''; }
       if (!apiKey) { provider = 'glm'; apiKey = localStorage.getItem('ai_key_glm') || ''; }
     } catch { /* */ }
-    if (!apiKey) { toast.error('请先在 AI 对话页配置 Groq / SiliconFlow / GLM 的 API Key'); return; }
+    if (!apiKey) return false;
 
     setTranscribing(true);
     setSubtitleLoading(true);
@@ -814,8 +839,7 @@ ${pastedTranscript.slice(0, 8000)}`;
         body: JSON.stringify({ apiKey, provider, bvid: activeVideo.bvid, page: currentPage }),
       });
       const data = await res.json();
-      if (data.error) { toast.error('转写失败: ' + data.error); return; }
-      if (!data.segments || data.segments.length === 0) { toast.error('未识别到内容'); return; }
+      if (data.error || !data.segments || data.segments.length === 0) return false;
 
       setFetchedSegments(data.segments);
       setSubtitleSource('ai');
@@ -823,14 +847,19 @@ ${pastedTranscript.slice(0, 8000)}`;
       if (subtitleCacheKey) {
         try { safeStorage.setItem(subtitleCacheKey, JSON.stringify({ segments: data.segments, source: 'ai' })); } catch { /* */ }
       }
-      toast.success(`转写完成，共 ${data.segments.length} 条字幕`);
-    } catch (err) {
-      toast.error('转写请求失败');
-    } finally {
-      setTranscribing(false);
-      setSubtitleLoading(false);
+      return true;
+    } catch { return false; }
+    finally { setTranscribing(false); setSubtitleLoading(false); }
+  }, [activeVideo, currentPage, subtitleCacheKey, transcribing]);
+
+  // Manual trigger (for the button)
+  const handleWhisperTranscribe = useCallback(async () => {
+    const ok = await doTranscribe();
+    if (ok) toast.success('转写完成');
+    else if (!localStorage.getItem('ai_key_groq') && !localStorage.getItem('ai_key_siliconflow') && !localStorage.getItem('ai_key_glm')) {
+      toast.error('请先在 AI 对话页配置 API Key (Groq/SiliconFlow/GLM)');
     }
-  }, [activeVideo, currentPage, subtitleCacheKey]);
+  }, [doTranscribe]);
 
   // ── Filter segments by search ──
   const filteredSegments = activeVideo
