@@ -292,6 +292,9 @@ export default function YouTubeSpeakingPage() {
       } catch { /* ignore */ }
     }
 
+    // Don't fetch Bilibili subtitles if STT is already running (has segments coming in)
+    if (sttActiveRef.current) { return; }
+
     // Fetch from API
     setSubtitleLoading(true);
     fetch(`/api/bilibili-subtitle?bvid=${activeVideo.bvid}&page=${currentPage}`)
@@ -307,22 +310,25 @@ export default function YouTubeSpeakingPage() {
           }
           setEpisodeList(eps);
         }
-        // Set segments
-        if (data.segments && data.segments.length > 0) {
-          setFetchedSegments(data.segments);
-          setSubtitleSource('bilibili');
-          if (subtitleCacheKey) {
-            try { safeStorage.setItem(subtitleCacheKey, JSON.stringify({ segments: data.segments, source: 'bilibili' })); } catch { /* */ }
+        // Set segments (only if STT hasn't taken over)
+        if (!sttActiveRef.current) {
+          if (data.segments && data.segments.length > 0) {
+            setFetchedSegments(data.segments);
+            setSubtitleSource('bilibili');
+            if (subtitleCacheKey) {
+              try { safeStorage.setItem(subtitleCacheKey, JSON.stringify({ segments: data.segments, source: 'bilibili' })); } catch { /* */ }
+            }
+          } else {
+            setFetchedSegments(null);
+            setSubtitleSource(null);
           }
-        } else {
-          setFetchedSegments(null);
-          setSubtitleSource(null);
         }
       })
       .catch(() => {
-        setFetchedSegments(null);
-        setSubtitleSource(null);
-        // Fallback episode names
+        if (!sttActiveRef.current) {
+          setFetchedSegments(null);
+          setSubtitleSource(null);
+        }
         if (activeVideo.episodes && activeVideo.episodes > 1 && episodeList.length === 0) {
           const eps = [];
           for (let i = 1; i <= activeVideo.episodes; i++) {

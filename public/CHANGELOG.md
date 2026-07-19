@@ -15,6 +15,10 @@
 
 
 
+
+## 2026-07-19
+- fix: stale closure in STT onend (`e33887b`)
+
 ## 2026-07-18
 - fix: STT starts on video select click (`0546dc8`)
 
