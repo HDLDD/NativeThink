@@ -21,6 +21,10 @@
 
 
 
+
+## 2026-07-19
+- feat: auto Whisper transcription when B站 has no subtitles (`99a27d8`)
+
 ## 2026-07-19
 - feat: add GLM ASR support (`80030c0`)
 
