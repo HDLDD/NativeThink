@@ -818,7 +818,7 @@ ${pastedTranscript.slice(0, 8000)}`;
     toast.success('语音识别已停止');
   }, [addSegment]);
 
-  // ── Whisper AI transcription ──
+  // ── Whisper AI transcription + auto-translate ──
   const doTranscribe = useCallback(async () => {
     if (!activeVideo || transcribing) return;
     let apiKey = '';
@@ -841,16 +841,32 @@ ${pastedTranscript.slice(0, 8000)}`;
       const data = await res.json();
       if (data.error || !data.segments || data.segments.length === 0) return false;
 
-      setFetchedSegments(data.segments);
+      // Translate segments to Chinese via AI chat
+      const segs = data.segments;
+      if (ai.isConfigured && segs.length > 0) {
+        try {
+          const texts = segs.map((s, i) => `${i}:${s.en}`).join('\n');
+          const result = await ai.chat([
+            { role: 'system', content: 'Translate each English sentence to Chinese. Return ONLY a JSON array of strings in order, no markdown.' },
+            { role: 'user', content: texts },
+          ], { temperature: 0.2, maxTokens: 4096 });
+          const parsed = JSON.parse(result.match(/\[[\s\S]*?\]/)?.[0] || '[]');
+          if (Array.isArray(parsed) && parsed.length === segs.length) {
+            parsed.forEach((zh, i) => { if (segs[i]) segs[i].zh = zh || ''; });
+          }
+        } catch { /* translation failed, show English only */ }
+      }
+
+      setFetchedSegments(segs);
       setSubtitleSource('ai');
-      segmentRefs.current = new Array(data.segments.length).fill(null);
+      segmentRefs.current = new Array(segs.length).fill(null);
       if (subtitleCacheKey) {
-        try { safeStorage.setItem(subtitleCacheKey, JSON.stringify({ segments: data.segments, source: 'ai' })); } catch { /* */ }
+        try { safeStorage.setItem(subtitleCacheKey, JSON.stringify({ segments: segs, source: 'ai' })); } catch { /* */ }
       }
       return true;
     } catch { return false; }
     finally { setTranscribing(false); setSubtitleLoading(false); }
-  }, [activeVideo, currentPage, subtitleCacheKey, transcribing]);
+  }, [activeVideo, currentPage, subtitleCacheKey, transcribing, ai]);
 
   // Manual trigger (for the button)
   const handleWhisperTranscribe = useCallback(async () => {

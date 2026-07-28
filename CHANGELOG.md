@@ -22,6 +22,10 @@
 
 
 
+
+## 2026-07-29
+- chore: update changelog (`6b17b3a`)
+
 ## 2026-07-19
 - feat: auto Whisper transcription when B站 has no subtitles (`99a27d8`)
 
