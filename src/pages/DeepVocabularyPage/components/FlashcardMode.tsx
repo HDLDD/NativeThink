@@ -47,6 +47,9 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
         dueWords.push(w);
       }
     }
+    // 复习减负：到期堆积过多时本轮只取前 30 个，避免心理压力
+    const MAX_DUE = 30;
+    const cappedDue = dueWords.slice(0, MAX_DUE);
     const otherWords: IWordEntry[] = [];
     for (const key of Object.keys(state.progress)) {
       if (!seen.has(key)) {
@@ -60,10 +63,16 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       return []; // Return empty queue - show "no words to review" message
     }
     // Otherwise, fill with new words to reach 20 cards
-    const fillCount = Math.max(0, 20 - dueWords.length - otherWords.length);
+    const fillCount = Math.max(0, 20 - cappedDue.length - otherWords.length);
     const newWords = fillCount > 0 ? getNewWords(fillCount).filter((w) => !seen.has(w.word.toLowerCase())) : [];
-    return [...dueWords, ...otherWords, ...newWords];
+    return [...cappedDue, ...otherWords, ...newWords];
   }, [dueForReview, state.progress, getNewWords]);
+
+  // 到期堆积提示（只在本轮挂载时提示一次）
+  const dueOverCap = dueForReview.length > 30;
+  useEffect(() => {
+    if (dueOverCap) toast.info(`到期复习 ${dueForReview.length} 个 — 本轮先复习 30 个，别有压力`, { duration: 4000 });
+  }, []);
 
   const ttsRef = useRef(tts);
   ttsRef.current = tts;
@@ -124,6 +133,26 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setDir(1); setFlipped(false); setRated(false);
     setTimeout(() => setIdx((p) => (p + 1) % queue.length), 150);
   };
+
+  // ── 全键盘操作：空格翻面/默认好评，1-5 评分，→ 下一个 ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || !cw) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!isFlipped) flip();
+        else if (rated) advance();
+        else markWithQuality(4);
+      } else if (isFlipped && !rated && ['1', '2', '3', '4', '5'].includes(e.key)) {
+        markWithQuality([0, 2, 3, 4, 5][parseInt(e.key, 10) - 1]);
+      } else if (e.key === 'ArrowRight' && rated) {
+        advance();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [cw, isFlipped, rated, flip, advance, markWithQuality]);
 
   if (!cw) {
     return (
@@ -260,12 +289,14 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             { q: 3, label: '基本记得', color: 'bg-amber-500 hover:bg-amber-600' },
             { q: 4, label: '比较熟悉', color: 'bg-emerald-500 hover:bg-emerald-600' },
             { q: 5, label: '完全掌握', color: 'bg-[#6C5CE7] hover:bg-[#5A4BD1]' },
-          ].map(({ q, label, color }) => (
+          ].map(({ q, label, color }, i) => (
             <button key={q} onClick={() => markWithQuality(q)}
-              className={cn('px-3 py-2 rounded-2xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg transition-all hover:scale-105', color)}>
+              className={cn('relative px-3 py-2 rounded-2xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg transition-all hover:scale-105', color)}>
               {label}
+              <span className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-black/25 text-[8px] font-black flex items-center justify-center">{i + 1}</span>
             </button>
           ))}
+          <span className="w-full text-center text-[9px] text-muted-foreground font-bold mt-1">键盘：空格 翻面 / 1-5 评分 / → 下一个</span>
         </div>
       )}
       {rated && (

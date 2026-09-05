@@ -394,10 +394,23 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   }, [activePages, onClose]);
 
   // Word click — lookup Chinese + English definitions
+  // ── 最近查词记录（跨会话，最多 18 条） ──
+  const [recentLookups, setRecentLookups] = useState<string[]>(() => {
+    try { return JSON.parse(safeStorage.getItem('__reader_lookup_recent') || '[]'); } catch { return []; }
+  });
+  const pushRecentLookup = useCallback((w: string) => {
+    setRecentLookups((prev) => {
+      const next = [w, ...prev.filter((x) => x !== w)].slice(0, 18);
+      try { safeStorage.setItem('__reader_lookup_recent', JSON.stringify(next)); } catch { /* quota */ }
+      return next;
+    });
+  }, []);
+
   const handleWordClick = useCallback(async (e: React.MouseEvent, word: string) => {
     e.stopPropagation();
     const cleaned = word.replace(/[^a-zA-Z'-]/g, '').toLowerCase();
     if (!cleaned || cleaned.length < 2) return;
+    pushRecentLookup(cleaned);
     setLookupWordState(cleaned);
     setLookupOpen(true);
     setLookupLoading(true);
@@ -405,7 +418,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     const data = await lookupWord(cleaned);
     setLookupData(data);
     setLookupLoading(false);
-  }, []);
+  }, [pushRecentLookup]);
 
   // Favorite word
   const favWord = isFavorited(lookupWord_State, 'word');
@@ -911,6 +924,23 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 {favWord ? '已收藏' : '收藏'}
               </Button>
             </div>
+            {/* 最近查询 — 查过的词随时回看 */}
+            {recentLookups.length > 1 && (
+              <div className="pt-1">
+                <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground mb-1.5">最近查询</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {recentLookups.filter((w) => w !== lookupWord_State).slice(0, 8).map((w) => (
+                    <button
+                      key={w}
+                      onClick={(e) => handleWordClick(e, w)}
+                      className="px-2.5 py-1 rounded-full bg-muted text-[11px] font-bold text-muted-foreground hover:bg-[#00B894]/10 hover:text-[#00B894] transition-colors"
+                    >
+                      {w}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

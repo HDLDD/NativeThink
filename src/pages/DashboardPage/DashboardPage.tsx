@@ -256,6 +256,16 @@ export default function DashboardPage() {
     } catch { /* ignore */ }
   }, []);
 
+  // ── 每日目标达成庆祝（跨过目标线的瞬间触发一次） ──
+  const goalHitRef = useRef(false);
+  useEffect(() => {
+    if (goalHitRef.current) return;
+    if (stats.dailyGoalMinutes > 0 && stats.todayMinutes >= stats.dailyGoalMinutes) {
+      goalHitRef.current = true;
+      toast.success('🎉 今日学习目标达成！保持这个节奏', { duration: 4500 });
+    }
+  }, [stats.todayMinutes, stats.dailyGoalMinutes]);
+
   if (!loaded) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground">加载中...</div>
