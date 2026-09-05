@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
-import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb } from 'lucide-react';
+import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -823,6 +823,10 @@ export default function DeepVocabularyPage() {
     }
   };
 
+  // ── 沉浸式模式：进入某模式后隐藏其它模式入口，<- 返回模式选择 ──
+  const [immersed, setImmersed] = useState(false);
+  const enterMode = (key: string) => { handleTabChange(key); setImmersed(true); };
+
   // Word list pagination with configurable page size
   const [wordPage, setWordPage] = useState(0);
   const totalWordPages = Math.max(1, Math.ceil(filteredWords.length / browsePageSize));
@@ -836,12 +840,35 @@ export default function DeepVocabularyPage() {
   return (
     <LazyFramerProvider>
     <div className="space-y-6">
+      {immersed ? (
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setImmersed(false)}
+              className="rounded-xl size-9 text-muted-foreground hover:text-[#00B894]"
+              title="返回模式选择"
+            >
+              <ArrowLeft className="size-5" />
+            </Button>
+            <h1 className="text-xl font-black italic text-foreground tracking-tight">
+              {MODES.find((m) => m.key === tab)?.label || '学习'}
+            </h1>
+          </div>
+          <button
+            onClick={handleOpenWizard}
+            className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 border-2 border-[#00B894]/30 hover:border-[#00B894] transition-all duration-200 active:scale-[0.98]"
+          >
+            <span className="text-base">{BOOKS.find((b) => b.key === (selectedLevel === 'all' ? 'cet4' : selectedLevel))?.icon || '📖'}</span>
+            <span className="text-[10px] font-black text-[#00B894]">{LEVELS.find((l) => l.key === selectedLevel)?.label || '全部'}</span>
+          </button>
+        </div>
+      ) : (
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-black italic text-foreground tracking-tight">词汇深度</h1>
-          <p className="text-muted-foreground text-xs font-medium">
-            {MODES.find((m) => m.key === tab)?.label || '学习'}
-          </p>
+          <p className="text-muted-foreground text-xs font-medium">选择一个模式开始</p>
         </div>
         <button
           onClick={handleOpenWizard}
@@ -859,6 +886,25 @@ export default function DeepVocabularyPage() {
           <Settings className="size-3 text-[#00B894] opacity-50 group-hover:opacity-100 transition-opacity" />
         </button>
       </div>
+      )}
+
+      {/* ── 模式选择主页 ── */}
+      {!immersed && (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 stagger">
+        {MODES.map((m) => (
+          <button
+            key={m.key}
+            onClick={() => enterMode(m.key)}
+            className="group p-5 rounded-[24px] border-2 border-border text-left transition-all duration-200 hover:border-[#00B894]/40 hover:shadow-md hover:-translate-y-0.5"
+          >
+            <span className="text-2xl block mb-2">{m.icon}</span>
+            <span className="block text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors">{m.label}</span>
+            <span className="block text-[11px] text-muted-foreground mt-0.5">{m.desc}</span>
+          </button>
+        ))}
+      </div>
+      )}
+
 
       {showWizard && (
         <VocabSetupWizard
@@ -868,14 +914,14 @@ export default function DeepVocabularyPage() {
         />
       )}
 
-      {!showWizard && !dataReady && (
+      {!showWizard && !dataReady && immersed && (
         <div className="flex items-center gap-2 px-4 py-2 mb-2 rounded-xl bg-[#00B894]/5 border border-[#00B894]/20">
           <Loader2 className="size-4 text-[#00B894] animate-spin shrink-0" />
           <span className="text-xs font-bold text-[#00B894]">词库加载中，部分功能暂不可用…</span>
         </div>
       )}
 
-      {!showWizard && (
+      {!showWizard && immersed && (
       <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
         {/* Sticky header: browse level scroller + filter chips + tab buttons */}
         <div className="sticky top-20 z-30 bg-background/95 backdrop-blur-md pb-3 -mx-1 px-1">
@@ -941,13 +987,13 @@ export default function DeepVocabularyPage() {
             </div>
             </>
           )}
-          <TabsList className="bg-muted p-1.5 rounded-3xl h-auto">
+          {false && (<TabsList className="bg-muted p-1.5 rounded-3xl h-auto">
           <TabsTrigger value="daily" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-emerald-500 data-[state=active]:shadow-sm"><Brain className="size-4 mr-2" />学习</TabsTrigger>
           <TabsTrigger value="flashcard" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#6C5CE7] data-[state=active]:shadow-sm"><RotateCw className="size-4 mr-2" />复习</TabsTrigger>
           <TabsTrigger value="browse" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-sky-500 data-[state=active]:shadow-sm"><BookOpen className="size-4 mr-2" />词库浏览</TabsTrigger>
           <TabsTrigger value="collocations" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-amber-500 data-[state=active]:shadow-sm"><Link2 className="size-4 mr-2" />搭配学习</TabsTrigger>
           <TabsTrigger value="vocabtest" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-rose-500 data-[state=active]:shadow-sm"><Target className="size-4 mr-2" />测词汇量</TabsTrigger>
-        </TabsList>
+        </TabsList>)}
         </div>{/* end sticky header */}
 
         <TabsContent value="daily" className="mt-0">

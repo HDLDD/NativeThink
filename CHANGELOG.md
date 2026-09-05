@@ -33,6 +33,10 @@
 
 
 
+
+## 2026-09-06
+- feat(vocab): focused study mode — overview hidden while studying, back button to return (`169c2cc`)
+
 ## 2026-09-06
 - feat: learning loop trio + guaranteed TTS fallback (`a9ebb2a`)
 
@@ -554,3 +558,10 @@
 
 ### 初始功能
 - 手机版适配基础布局、AI 双语输出、Cloudflare Pages 部署支持
+
+## 2026-09-06 (2) — 词汇页沉浸式：进入模式后隐藏其它入口
+
+- feat: **词汇深度页沉浸式重构** — 打开页面先看到 5 张模式卡片（每日学习/复习/词库浏览/搭配学习/测词汇量）；点击进入后**其它模式入口全部隐藏**，顶栏变为「<- 返回 + 当前模式名 + 词书切换」，一心一意只做当前模式
+- `<-` 返回即回到模式选择主页，换模式随手可及但绝不干扰当前学习
+- 词书加载提示只在模式内显示，主页保持干净
+
