@@ -15,6 +15,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn, cleanText } from '@/lib/utils';
 import { StreamingText } from '@/components/StreamingText';
+import { WordImage } from '@/components/WordImage';
 import type { IChunk } from '@/data/chunks';
 
 interface DailySentenceCardProps {
@@ -107,6 +108,7 @@ function DailySentenceCardInner({
           </div>
         </div>
 
+        <WordImage word={dailyChunk.content} className="h-28 sm:h-36 mb-5" />
         <div className="bg-muted/30 rounded-[28px] p-6 mb-5">
           <div className="flex items-center gap-2 mb-3">
             <p className="text-2xl font-black text-foreground leading-relaxed">

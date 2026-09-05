@@ -28,6 +28,10 @@
 
 
 
+
+## 2026-09-05
+- feat(words): real photo illustrations for vocabulary detail + flashcards (`3cf1780`)
+
 ## 2026-09-05
 - feat(vocabulary): derived word-family chips, AI deep analysis, vocab-size test (`1dd32f1`)
 
@@ -39,6 +43,13 @@
 
 ## 2026-09-05
 - feat: desktop app release — local API server, pro reader redesign, UX overhaul (`8c9d11d`)
+
+## 2026-08-28 (16) — 插图扩展：每日一句 + 学习模式
+
+### 新增插图位置
+- feat: **每日一句卡片配图** — 仪表盘每日一句顶部展示与表达匹配的真实照片（成语/短语直查效果良好，如 "in the nick of time" 返回 8 张）
+- feat: **学习模式每日新词配图** — 每日学习闪卡正面新增单词插图，看图联想 → 翻面验证，双通道记忆
+- 词汇详情 + 闪卡复习 + 每日学习 + 每日一句四大位置全部覆盖；同一组件复用（30天缓存/点击换图/失败降级）
 
 ## 2026-08-28 (15) — 单词插图
 
