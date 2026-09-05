@@ -35,6 +35,10 @@
 
 
 
+
+## 2026-09-06
+- feat(vocab): vertical home layout — hero card for daily learning with live stats, due-count badge on review row (`6ea1e75`)
+
 ## 2026-09-06
 - feat(vocab): immersive mode entry — mode cards home, hide all other entries inside a mode, back button (`a9f7926`)
 

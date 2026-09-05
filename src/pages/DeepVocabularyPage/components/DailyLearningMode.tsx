@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
-import { Brain, Target, CheckCircle2, RotateCw, Sparkles, Volume2, BookOpen, ArrowRight, ArrowLeft, XCircle, Edit3, Shuffle, Headphones, Link2, PenLine, ChevronDown } from 'lucide-react';
+import { Target, CheckCircle2, RotateCw, Sparkles, Volume2, BookOpen, ArrowRight, ArrowLeft, XCircle, Edit3, Shuffle, Headphones, Link2, PenLine, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -456,21 +456,9 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
 
   return (
     <div className="space-y-4">
-      {/* Learning header + level selector（仅概览显示） */}
+      {/* Level switch toast */}
       {!inSession && (
-      <div className="flex items-center justify-between gap-2 flex-wrap relative">
-        <div className="flex items-center gap-2">
-          <div
-            className="size-8 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: `${levelColor.accent}15`, color: levelColor.accent }}
-          >
-            <Brain className="size-4" />
-          </div>
-          <div>
-            <h2 className="text-sm font-black italic text-foreground">学习模式</h2>
-          </div>
-        </div>
-        {/* Level switch toast — CSS animation (no framer-motion needed) */}
+      <div className="relative">
         {levelToast && (
           <div
             className="absolute -top-8 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-black text-white shadow-lg whitespace-nowrap"
@@ -1236,48 +1224,31 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
         </AnimatePresence>
         </div>
       ) : (
-        <Card className={cn('rounded-[40px] border-border shadow-sm overflow-hidden')}>
-          {/* Colored top strip based on level */}
-          <div className="h-2" style={{ backgroundColor: levelColor.accent }} />
-          <CardContent className="p-16 text-center" style={{
-            background: `linear-gradient(135deg, ${levelColor.accent}08 0%, ${modeColor.accent}08 100%)`
-          }}>
-            <div
-              className="size-20 rounded-3xl mx-auto mb-4 flex items-center justify-center shadow-lg"
-              style={{
-                background: `linear-gradient(135deg, ${modeColor.accent}20, ${levelColor.accent}20)`,
-                color: modeColor.accent
-              }}
-            >
-              <BookOpen className="size-9" />
+        <div
+          className="relative overflow-hidden rounded-[32px] text-white shadow-xl"
+          style={{ background: `linear-gradient(120deg, ${modeColor.accent} 0%, ${levelColor.accent} 100%)` }}
+        >
+          {/* 装饰光斑 */}
+          <div className="absolute -right-12 -top-14 size-56 rounded-full bg-white/10 pointer-events-none" />
+          <div className="absolute -left-8 bottom-[-60px] size-40 rounded-full bg-white/10 pointer-events-none" />
+
+          <div className="relative p-8 sm:p-10">
+            {/* 徽章行 */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className="px-3 py-1 rounded-full bg-white/20 text-[10px] font-black">{currentLevelLabel}</span>
+              <span className="px-3 py-1 rounded-full bg-white/20 text-[10px] font-black">{currentModeLabel}</span>
             </div>
-            {/* Level + mode indicator with colors */}
-            <div className="flex items-center justify-center gap-2 mb-3">
-              <Badge
-                className="rounded-full px-3 py-1 text-[10px] font-black text-white border-0"
-                style={{ backgroundColor: levelColor.accent }}
-              >
-                {currentLevelLabel}
-              </Badge>
-              <span className="text-[10px] text-muted-foreground font-bold">·</span>
-              <Badge
-                className="rounded-full px-3 py-1 text-[10px] font-black text-white border-0"
-                style={{ backgroundColor: modeColor.accent }}
-              >
-                {currentModeLabel}
-              </Badge>
-            </div>
+
             {dueForReview.length > 0 || todayRemaining > 0 ? (
               <>
-                <h3 className="text-xl font-black text-foreground mb-2">准备好了吗？</h3>
-                <p className="text-sm text-muted-foreground font-medium mb-6">
-                  {dueForReview.length > 0 && `${dueForReview.length} 个单词待复习 · `}
-                  今日还可新学 {todayRemaining} 个单词
+                <h3 className="text-3xl font-black italic mb-2">准备好了吗？</h3>
+                <p className="text-sm text-white/85 font-medium mb-7">
+                  {dueForReview.length > 0 && `${dueForReview.length} 个单词待复习 · `}今日还可新学 <span className="font-black text-white">{todayRemaining}</span> 个单词
                 </p>
                 <Button
                   onClick={startSession}
-                  className="text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg"
-                  style={{ background: `linear-gradient(135deg, ${modeColor.accent}, ${levelColor.accent})` }}
+                  className="bg-white px-9 py-5 rounded-2xl text-xs font-black uppercase tracking-wider shadow-xl hover:scale-[1.02] transition-transform"
+                  style={{ color: modeColor.accent }}
                 >
                   <BookOpen className="size-4 mr-2" />
                   开始学习
@@ -1285,22 +1256,40 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               </>
             ) : (
               <>
-                <h3 className="text-xl font-black text-foreground mb-2">今日任务完成 🎉</h3>
-                <p className="text-sm text-muted-foreground font-medium mb-6">
-                  已学习 {learnedToday} 个新单词 · 复习了 {reviewedToday} 个
+                <h3 className="text-3xl font-black italic mb-2">今日任务完成 🎉</h3>
+                <p className="text-sm text-white/85 font-medium mb-7">
+                  已学习 <span className="font-black text-white">{learnedToday}</span> 个新单词 · 复习了 <span className="font-black text-white">{reviewedToday}</span> 个
                 </p>
-                <div className="flex justify-center gap-3">
-                  <Button onClick={startSession} variant="outline" className="rounded-2xl text-[10px] font-black uppercase tracking-wider">
+                <div className="flex gap-3">
+                  <Button onClick={startSession} className="bg-white px-7 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-xl" style={{ color: modeColor.accent }}>
                     继续加练
                   </Button>
-                  <Button onClick={resetProgress} variant="ghost" className="rounded-2xl text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                  <Button onClick={resetProgress} variant="ghost" className="rounded-2xl text-[10px] font-black uppercase tracking-wider text-white/80 hover:text-white hover:bg-white/10">
                     <RotateCw className="size-3.5 mr-1" />重置进度
                   </Button>
                 </div>
               </>
             )}
-          </CardContent>
-        </Card>
+
+            {/* 本书进度 · 合入 Hero 底部 */}
+            {bookProgress && !simple && (
+              <div className="mt-8 pt-5 border-t border-white/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-white/70">本书进度</span>
+                  <span className="text-[10px] font-black tabular-nums text-white/90">
+                    {bookProgress.learned}/{bookProgress.total} · {Math.round((bookProgress.learned / bookProgress.total) * 100)}%
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-white/25 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-white transition-all duration-500"
+                    style={{ width: `${(bookProgress.learned / bookProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
