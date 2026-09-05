@@ -120,8 +120,9 @@ function tryMigrate(key: string): void {
 }
 
 // Cloud sync handler — registered by useCloudSync when user is authenticated.
-// After every setItem, this fires with (key, value) to dual-write to Vercel KV.
-type CloudSyncHandler = (key: string, value: string) => void;
+// After every setItem this fires with (key, value) to dual-write to the cloud;
+// after removeItem it fires with (key, null) so deletions propagate too.
+type CloudSyncHandler = (key: string, value: string | null) => void;
 let _cloudSyncHandler: CloudSyncHandler | null = null;
 
 export function setCloudSyncHandler(handler: CloudSyncHandler | null): void {
@@ -158,6 +159,11 @@ export const safeStorage = {
       try {
         localStorage.removeItem(oldPrefixKey(key));
       } catch { /* ignore */ }
+      // Notify cloud sync so deletions propagate (prevents "resurrected" data
+      // when syncDown later pulls the stale cloud copy back)
+      if (_cloudSyncHandler) {
+        try { _cloudSyncHandler(key, null); } catch { /* ignore */ }
+      }
     } catch {
       // ignore
     }

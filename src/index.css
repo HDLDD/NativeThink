@@ -26,3 +26,165 @@ body {
   80%  { opacity: 1; transform: translate(-50%, 0)    scale(1); }
   100% { opacity: 0; transform: translate(-50%, -10px) scale(0.9); }
 }
+/* ── Page transition: subtle fade + rise on every route change ── */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: page-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Staggered card entrance — apply to card grids via .stagger */
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stagger > * {
+  animation: card-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 35ms; }
+.stagger > *:nth-child(3) { animation-delay: 70ms; }
+.stagger > *:nth-child(4) { animation-delay: 105ms; }
+.stagger > *:nth-child(5) { animation-delay: 140ms; }
+.stagger > *:nth-child(6) { animation-delay: 175ms; }
+.stagger > *:nth-child(7) { animation-delay: 210ms; }
+.stagger > *:nth-child(8) { animation-delay: 245ms; }
+.stagger > *:nth-child(n+9) { animation-delay: 280ms; }
+
+/* Accessible motion: honor the OS reduce-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .stagger > * {
+    animation: none !important;
+  }
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Consistent keyboard focus ring across all interactive elements */
+:focus-visible {
+  outline: 2px solid #00B894;
+  outline-offset: 2px;
+}
+
+/* Slim, quiet scrollbars inside main content areas */
+main ::-webkit-scrollbar { width: 8px; height: 8px; }
+main ::-webkit-scrollbar-thumb { background: hsl(180 15% 78%); border-radius: 8px; }
+main ::-webkit-scrollbar-thumb:hover { background: hsl(180 15% 68%); }
+main ::-webkit-scrollbar-track { background: transparent; }
+.dark main ::-webkit-scrollbar-thumb { background: hsl(180 12% 30%); }
+
+/* ── Ripple ring for EmptyState illustration ── */
+@keyframes ripple-pulse {
+  0%   { transform: scale(0.55); opacity: 0.55; }
+  70%  { opacity: 0.12; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+.ripple-ring {
+  position: absolute;
+  border-radius: 9999px;
+  border: 1.5px solid hsl(182 70% 40% / 0.45);
+  animation: ripple-pulse 2.4s ease-out infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ripple-ring { animation: none; opacity: 0.25; }
+}
+
+/* ── Article reader page-turn animation (directional) ── */
+@keyframes page-turn-next {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes page-turn-prev {
+  from { opacity: 0; transform: translateX(-40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.page-turn-next { animation: page-turn-next 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.page-turn-prev { animation: page-turn-prev 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .page-turn-next, .page-turn-prev { animation: none; }
+}
+
+/* ── Streaming text reveal (AI-style typewriter fade) ── */
+@keyframes stream-in {
+  from { opacity: 0; filter: blur(2px); }
+  to   { opacity: 1; filter: blur(0); }
+}
+.stream-in { animation: stream-in 220ms ease-out both; }
+.stream-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: currentColor;
+  opacity: 0.45;
+  animation: caret-blink 0.7s steps(2, start) infinite;
+}
+@keyframes caret-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .stream-in { animation: none; }
+  .stream-caret { animation: none; opacity: 0; }
+}
+
+/* ── 阅读器主题（微信读书式：浅色/纸张/夜间） ── */
+.reader-paper {
+  --background: #F6F1E6;
+  --card: #FBF7EE;
+  --foreground: #3B3327;
+  --muted-foreground: #857A64;
+  --border: #E5DCC8;
+  --muted: #EFE8D8;
+  --accent: #EFE8D8;
+}
+.reader-night {
+  --background: #16181B;
+  --card: #1D2024;
+  --foreground: #D6D3CC;
+  --muted-foreground: #8B8B85;
+  --border: #2C2F34;
+  --muted: #23262B;
+  --accent: #23262B;
+}
+.reader-paper ::selection { background: #D9C9A3; color: #3B3327; }
+.reader-night ::selection { background: #2E4A44; color: #D6D3CC; }
+
+/* ── 阅读进度滑杆 ── */
+.reader-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  background: hsl(180 15% 82%);
+  outline: none;
+  cursor: pointer;
+}
+.reader-night .reader-slider { background: #2C2F34; }
+.reader-paper .reader-slider { background: #E0D6C0; }
+.reader-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #00B894;
+  border: 2.5px solid white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  cursor: grab;
+}
+.reader-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #00B894;
+  border: 2.5px solid white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  cursor: grab;
+}

@@ -35,7 +35,7 @@ function ModuleProgressCardInner({ moduleProgress, onViewDetails }: ModuleProgre
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-8 py-4">
+        <div className="stagger grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-8 py-4">
           {MODULES.map((m) => (
             <RingProgress
               key={m.key}

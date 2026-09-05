@@ -9,9 +9,10 @@
 const BILIBILI_API = 'https://api.bilibili.com/x/web-interface/view';
 
 export async function onRequest(context) {
-  const { request } = context;
+  const { request, env } = context;
   const url = new URL(request.url);
   const bvid = url.searchParams.get('bvid');
+  const cookieHeader = env?.BILIBILI_COOKIE || '';
 
   if (!bvid || !/^BV[A-Za-z0-9]{10,}$/.test(bvid.toUpperCase())) {
     return new Response(JSON.stringify({ error: '无效的 BVID' }), {
@@ -22,7 +23,10 @@ export async function onRequest(context) {
 
   try {
     const res = await fetch(`${BILIBILI_API}?bvid=${bvid}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        Cookie: cookieHeader,
+      },
     });
     const data = await res.json();
 

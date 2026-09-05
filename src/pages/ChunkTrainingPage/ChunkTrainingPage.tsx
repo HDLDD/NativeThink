@@ -53,6 +53,7 @@ import { usePhraseLearning } from '@/lib/use-phrase-learning';
 import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
 import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { cn, cleanText, extractJson } from '@/lib/utils';
+import { EmptyState } from '@/components/EmptyState';
 import { toast } from 'sonner';
 import { useTTS } from '@/lib/use-tts';
 import { capabilityClient } from '@lark-apaas/client-toolkit-lite';
@@ -1528,13 +1529,16 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   {librarySource === 'aigenerated' && customChunks.length === 0 ? (
                     <>
                       <Bot className="size-10 mx-auto mb-3 opacity-30" />
-                      <p className="text-sm font-medium mb-1">还没有 AI 生成的语块</p>
+                      <p className="text-sm font-medium mb-1">还没有 AI 生成的语块 — 用上面的生成器创建一批吧</p>
                       <p className="text-xs">点击上方"AI 生成语块"按钮创建专属语块</p>
                     </>
                   ) : (
                     <>
                       <Search className="size-10 mx-auto mb-3 opacity-30" />
-                      <p className="text-sm font-medium">没有找到匹配的语块</p>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">没有找到匹配的语块</p>
+                        <p className="text-xs text-muted-foreground">试试更短的关键词，或切换分类</p>
+                      </div>
                     </>
                   )}
                 </div>

@@ -3,7 +3,7 @@
  * Provides streaming chat, non-streaming chat, and provider status.
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
   streamChat,
@@ -13,7 +13,11 @@ import {
   type ChatMessage,
   type StreamCallOptions,
 } from '@/services/ai-service';
-import { getConfiguredProviders, type AIProvider } from '@/services/ai-config';
+import {
+  getConfiguredProviders,
+  AI_CONFIG_CHANGED_EVENT,
+  type AIProvider,
+} from '@/services/ai-config';
 
 export interface UseAIReturn {
   /** Whether at least one AI provider has an API key configured */
@@ -36,11 +40,23 @@ export interface UseAIReturn {
 }
 
 export function useAI(): UseAIReturn {
-  const configuredRef = useRef(getConfiguredProviders());
+  const [configuredProviders, setConfiguredProviders] = useState<AIProvider[]>(() =>
+    getConfiguredProviders(),
+  );
 
-  // Refresh configured providers on each call
-  const isConfigured = configuredRef.current.length > 0;
-  const configuredProviders = configuredRef.current;
+  // Re-evaluate when keys change (settings dialog) or window regains focus,
+  // so pages mounted before configuration enable their AI buttons without a reload.
+  useEffect(() => {
+    const refresh = () => setConfiguredProviders(getConfiguredProviders());
+    window.addEventListener(AI_CONFIG_CHANGED_EVENT, refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.removeEventListener(AI_CONFIG_CHANGED_EVENT, refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
+
+  const isConfigured = configuredProviders.length > 0;
 
   const handleStreamChat = useCallback(
     async function* (messages: ChatMessage[], options?: StreamCallOptions) {

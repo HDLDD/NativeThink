@@ -55,6 +55,16 @@ function isIOS(): boolean {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
+/**
+ * Detect Electron (desktop build). Chromium inside Electron often has no
+ * SAPI voices wired up — SpeechSynthesis may "speak" silently without ever
+ * firing onstart, so network engines (Edge-TTS) are more reliable there.
+ */
+function isElectron(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Electron/.test(navigator.userAgent);
+}
+
 function uid(): string {
   return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
@@ -67,9 +77,23 @@ function rateToEdge(rate: number): string {
   return pct >= 0 ? `+${pct}%` : `${pct}%`;
 }
 
+/** Map a selected system voice to the closest Edge-TTS neural voice */
+function edgeVoiceFor(selectedURI: string | null | undefined): string {
+  if (!selectedURI) return 'en-US-AriaNeural';
+  const n = selectedURI.toLowerCase();
+  if (n.includes('zira')) return 'en-US-ZiraNeural';
+  if (n.includes('david')) return 'en-US-DavidNeural';
+  if (n.includes('jenny')) return 'en-US-JennyNeural';
+  if (n.includes('guy')) return 'en-US-GuyNeural';
+  if (n.includes('emma')) return 'en-US-EmmaNeural';
+  if (n.includes('aria')) return 'en-US-AriaNeural';
+  if (n.includes('ana')) return 'en-US-AnaNeural';
+  return 'en-US-AriaNeural';
+}
+
 // ── Tier 2: Edge-TTS via WebSocket → Blob ──
 
-function edgeTTSBlob(text: string, rate: number): Promise<Blob> {
+function edgeTTSBlob(text: string, rate: number, voiceName = 'en-US-AriaNeural'): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(EDGE_WSS);
     ws.binaryType = 'arraybuffer';
@@ -93,7 +117,7 @@ function edgeTTSBlob(text: string, rate: number): Promise<Blob> {
         .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
       ws.send(
         `X-RequestId:${uid()}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${new Date().toISOString()}Z\r\nPath:ssml\r\n\r\n` +
-        `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-US'><voice name='en-US-AriaNeural'><prosody rate='${rateToEdge(rate)}' pitch='+0Hz'>${safe}</prosody></voice></speak>`,
+        `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-US'><voice name='${voiceName}'><prosody rate='${rateToEdge(rate)}' pitch='+0Hz'>${safe}</prosody></voice></speak>`,
       );
     };
 
@@ -122,10 +146,16 @@ function googleTTSUrl(text: string): string {
   return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=${encodeURIComponent(text)}`;
 }
 
-// ── Tier 2b: Cloudflare Function (Edge-TTS proxy) ──
+// ── Tier 2b: Local server TTS (Edge neural voices + Windows SAPI) ──
 
-function cfTtsUrl(text: string, rate: number): string {
-  return `/api/tts?text=${encodeURIComponent(text)}&rate=${rate.toFixed(2)}`;
+function cfTtsUrl(text: string, rate: number, voice?: string | null): string {
+  const v = voice ? `&voice=${encodeURIComponent(voice)}` : '';
+  return `/api/tts?text=${encodeURIComponent(text)}&rate=${rate.toFixed(2)}${v}`;
+}
+
+/** True when the selected voice is served by the local desktop server */
+function isServerVoice(voiceURI: string | null | undefined): boolean {
+  return !!voiceURI && voiceURI.startsWith('srv:');
 }
 
 // ── Chunk long texts ──
@@ -184,13 +214,29 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   // ── Load voices ──
   useEffect(() => {
     if (!ttsSupported) return;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const load = () => {
       const en = window.speechSynthesis.getVoices().filter((v) => v.lang.startsWith('en-'));
-      if (en.length > 0) setVoices(en);
+      if (en.length > 0) {
+        setVoices(en);
+      } else if (tries++ < 6) {
+        // Chrome/Electron populate voices asynchronously — voiceschanged may
+        // never fire in Electron, so poll a few times before giving up
+        timer = setTimeout(load, 400);
+      } else {
+        // No English voices at all — expose every voice so the settings
+        // dialog still offers a choice (non-en voices can read English text)
+        const all = window.speechSynthesis.getVoices();
+        if (all.length > 0) setVoices(all);
+      }
     };
     load();
     window.speechSynthesis.addEventListener('voiceschanged', load);
-    return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.speechSynthesis.removeEventListener('voiceschanged', load);
+    };
   }, [ttsSupported]);
 
   // ── Prime SpeechSynthesis + Audio on first tap (mobile requirement) ──
@@ -229,6 +275,8 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
   const playChunkWithFallback = useCallback(
     (chunks: string[], idx: number, rate: number, engineIdx: number) => {
+      // Desktop build: /api/tts is served by the local Windows SAPI engine
+      // (offline, cached) — fastest first; edge/google as fallbacks
       const engines: Array<'cf' | 'edge' | 'google'> = ['cf', 'edge', 'google'];
       const engine = engines[engineIdx];
       if (!engine || abortedRef.current || idx >= chunks.length) {
@@ -249,17 +297,22 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         }
       };
 
-      const playUrl = (url: string) => {
+      const playUrl = (url: string, opts?: { applyRate?: boolean }) => {
         if (abortedRef.current) { onDone(); return; }
         stopAudio();
         const a = new Audio(url);
         audioRef.current = a;
         a.preload = 'auto';
         a.volume = settings.volume;
+        // cf/google engines have no server-side rate control — compensate via
+        // playbackRate (preserves pitch). Edge engine already encodes rate in SSML.
+        if (opts?.applyRate) a.playbackRate = Math.min(2, Math.max(0.5, rate));
         a.onplay = () => { if (!abortedRef.current) { setIsSpeaking(true); setIsPaused(false); } };
         a.onended = () => { if (audioRef.current === a) audioRef.current = null; onDone(); };
         a.onerror = () => { if (audioRef.current === a) audioRef.current = null; onFail(); };
         safetyRef.current = setTimeout(() => {
+          // Don't kill a chunk the user deliberately paused
+          if (a.paused) return;
           if (audioRef.current === a) { a.pause(); a.src = ''; audioRef.current = null; onFail(); }
         }, 25000);
         // After first-touch prime(), mobile browsers allow play() — but if it
@@ -268,17 +321,24 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       };
 
       if (engine === 'cf') {
-        playUrl(cfTtsUrl(chunks[idx], rate));
+        // Prefetch the NEXT chunk while this one plays — the local server
+        // synthesizes into cache, so the next segment starts instantly.
+        // Playback request goes first, prefetch second → FIFO order holds.
+        const next = chunks[idx + 1];
+        if (next) {
+          fetch(cfTtsUrl(next, rate, settings.selectedVoiceURI), { priority: 'low' }).catch(() => {});
+        }
+        playUrl(cfTtsUrl(chunks[idx], rate, settings.selectedVoiceURI), { applyRate: !isServerVoice(settings.selectedVoiceURI) });
       } else if (engine === 'edge') {
-        edgeTTSBlob(chunks[idx], rate)
+        edgeTTSBlob(chunks[idx], rate, edgeVoiceFor(settings.selectedVoiceURI))
           .then((blob) => playUrl(URL.createObjectURL(blob)))
           .catch(onFail);
       } else {
         // google
-        playUrl(googleTTSUrl(chunks[idx]));
+        playUrl(googleTTSUrl(chunks[idx]), { applyRate: true });
       }
     },
-    [settings.volume],
+    [settings.volume, settings.selectedVoiceURI],
   );
 
   // ── SpeechSynthesis engine (Tier 1) ──
@@ -404,13 +464,13 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   const prewarm = useCallback((text: string) => {
     const cleaned = cleanText(text);
     if (!cleaned) return;
-    // Only prewarm CF engine (fastest) — fetch URL into browser cache
+    // Only prewarm the local server engine (fastest) — fills the synth cache
     try {
-      const url = cfTtsUrl(cleaned, settings.rate);
+      const url = cfTtsUrl(cleaned, settings.rate, settings.selectedVoiceURI);
       // Use fetch with low priority so it doesn't compete with current playback
       fetch(url, { priority: 'low' }).catch(() => {});
     } catch { /* */ }
-  }, [settings.rate]);
+  }, [settings.rate, settings.selectedVoiceURI]);
 
   const speak = useCallback(
     (text: string, opts?: SpeakOptions) => {
@@ -431,8 +491,19 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
       const chunks = chunkText(cleaned);
 
-      if (isIOS()) {
-        // iOS: SpeechSynthesis broken — skip straight to network engines
+      // A server-provided voice (Edge neural / Windows SAPI) can only be
+      // synthesized by the local server — skip SpeechSynthesis entirely
+      if (isIOS() || isElectron() || isServerVoice(settings.selectedVoiceURI)) {
+        // iOS: SpeechSynthesis broken. Electron: voices often missing/silent.
+        // Server voice: synthesized by /api/tts. All → network engines.
+        // Pipeline warm-up: stagger-prefetch upcoming chunks in parallel —
+        // the server synthesizes each independently, so by the time chunk 0
+        // finishes playing, later chunks are already cached (no gaps)
+        chunks.slice(1, 9).forEach((c, i) => {
+          setTimeout(() => {
+            fetch(cfTtsUrl(c, rate, settings.selectedVoiceURI), { priority: 'low' }).catch(() => {});
+          }, 60 * (i + 1));
+        });
         playChunkWithFallback(chunks, 0, rate, 0);
         return;
       }
@@ -464,12 +535,13 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   const pause = useCallback(() => {
     if (audioRef.current && !audioRef.current.paused) {
       audioRef.current.pause();
+      clearSafety(); // paused chunk must not be killed by the 25s safety timer
       setIsPaused(true);
     } else if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
       window.speechSynthesis.pause();
       setIsPaused(true);
     }
-  }, []);
+  }, [clearSafety]);
 
   const resume = useCallback(() => {
     if (audioRef.current && audioRef.current.paused) {

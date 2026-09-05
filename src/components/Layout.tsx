@@ -1,11 +1,12 @@
-import { Suspense, Component, type ReactNode } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Suspense, useEffect, Component, type ReactNode } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/AppSidebar';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import Header from '@/components/Header';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { safeStorage } from '@/lib/safe-storage';
 
 function PageFallback() {
   return (
@@ -61,6 +62,21 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 }
 
 export function Layout() {
+  const location = useLocation();
+
+  // Route change UX: reset scroll to top, retrigger the page-enter animation,
+  // and remember the last visited module (for "继续上次学习" on the dashboard)
+  useEffect(() => {
+    const main = document.querySelector('main.flex-1');
+    if (main) main.scrollTop = 0;
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    if (location.pathname !== '/') {
+      try {
+        safeStorage.setItem('__nativethink_last_visit', JSON.stringify({ path: location.pathname, ts: Date.now() }));
+      } catch { /* ignore */ }
+    }
+  }, [location.pathname]);
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -68,9 +84,12 @@ export function Layout() {
         <Header />
         <main className="flex-1 w-full overflow-y-auto px-4 sm:px-6 lg:px-10 py-4 sm:py-6 lg:py-8 pb-20 lg:pb-8">
           <div className="max-w-[1600px] mx-auto">
+            {/* keyed by pathname → remounts on navigation → page-enter animation */}
             <ErrorBoundary>
               <Suspense fallback={<PageFallback />}>
-                <Outlet />
+                <div key={location.pathname} className="page-enter">
+                  <Outlet />
+                </div>
               </Suspense>
             </ErrorBoundary>
           </div>

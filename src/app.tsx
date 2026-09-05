@@ -15,7 +15,6 @@ const WritingPage = lazy(() => import("@/pages/WritingPage/WritingPage"));
 const ProgressPage = lazy(() => import("@/pages/ProgressPage/ProgressPage"));
 const FavoritesPage = lazy(() => import("@/pages/FavoritesPage/FavoritesPage"));
 const SpellingPage = lazy(() => import("@/pages/SpellingPage/SpellingPage"));
-const YouTubeSpeakingPage = lazy(() => import("@/pages/YouTubeSpeakingPage/YouTubeSpeakingPage"));
 
 function PageErrorFallback({ page }: { page: string }) {
   return (
@@ -53,9 +52,8 @@ export default function App() {
         <Route path="progress" element={<ErrorBoundary fallback={<PageErrorFallback page="学习记录" />}><ProgressPage /></ErrorBoundary>} />
         <Route path="favorites" element={<ErrorBoundary fallback={<PageErrorFallback page="我的收藏" />}><FavoritesPage /></ErrorBoundary>} />
         <Route path="spelling" element={<ErrorBoundary fallback={<PageErrorFallback page="句子拼写" />}><SpellingPage /></ErrorBoundary>} />
-        <Route path="speaking" element={<ErrorBoundary fallback={<PageErrorFallback page="口语视频学习" />}><YouTubeSpeakingPage /></ErrorBoundary>} />
       </Route>
-      <Route path="*" element={<Suspense fallback={<div className="flex items-center justify-center py-24"><span className="text-sm text-muted-foreground">加载中...</span></div>}><ErrorBoundary fallback={<PageErrorFallback page="页面未找到" />}><NotFoundPage /></ErrorBoundary></Suspense>} />
+      <Route path="*" element={<Suspense fallback={<div className="animate-pulse space-y-6 py-4"><div className="h-7 w-40 rounded-xl bg-muted" /><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({ length: 6 }).map((_, i) => (<div key={i} className="rounded-2xl border border-border/50 bg-card p-4 space-y-3"><div className="h-4 w-3/4 rounded-lg bg-muted" /><div className="h-3 w-1/2 rounded-lg bg-muted/60" /><div className="h-3 w-full rounded-lg bg-muted/40" /></div>))}</div></div>}><ErrorBoundary fallback={<PageErrorFallback page="页面未找到" />}><NotFoundPage /></ErrorBoundary></Suspense>} />
       {/* eslint-enable @lark-apaas/no-duplicate-route-component */}
     </Routes>
   );

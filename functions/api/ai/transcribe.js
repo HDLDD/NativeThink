@@ -83,7 +83,7 @@ function getMixinKey(imgKey, subKey) {
   return mixin;
 }
 
-async function signWbi(params) {
+export async function signWbi(params) {
   const navRes = await fetch('https://api.bilibili.com/x/web-interface/nav', {
     headers: { 'User-Agent': BILIBILI_UA, 'Referer': 'https://www.bilibili.com/' },
   });
@@ -121,10 +121,12 @@ const WHISPER_MODELS = {
 };
 
 export async function onRequest(context) {
-  const { request } = context;
+  const { request, env } = context;
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
   }
+  // Optional B站 login state — higher-quality audio streams with SESSDATA
+  const bilibiliCookie = env?.BILIBILI_COOKIE || '';
 
   let body;
   try { body = await request.json(); } catch {
@@ -157,7 +159,7 @@ export async function onRequest(context) {
 
     if (!audioUrl && bvid) {
       const viewRes = await fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`, {
-        headers: { 'User-Agent': BILIBILI_UA, 'Referer': 'https://www.bilibili.com/' },
+        headers: { 'User-Agent': BILIBILI_UA, 'Referer': 'https://www.bilibili.com/', Cookie: bilibiliCookie },
       });
       const viewData = await viewRes.json();
       if (viewData.code !== 0) throw new Error('B站 API 错误');
@@ -173,7 +175,7 @@ export async function onRequest(context) {
       const signed = await signWbi({ bvid, cid: String(targetPage.cid), fnval: 16, fnver: 0, fourk: 1 });
       const playUrl = `https://api.bilibili.com/x/player/wbi/playurl?${new URLSearchParams(signed).toString()}`;
       const playRes = await fetch(playUrl, {
-        headers: { 'User-Agent': BILIBILI_UA, 'Referer': 'https://www.bilibili.com/' },
+        headers: { 'User-Agent': BILIBILI_UA, 'Referer': 'https://www.bilibili.com/', Cookie: bilibiliCookie },
       });
       const playData = await playRes.json();
       const audioList = playData?.data?.dash?.audio || [];
@@ -190,7 +192,7 @@ export async function onRequest(context) {
 
     // Step 2: Download audio
     const audioRes = await fetch(audioUrl, {
-      headers: { 'User-Agent': BILIBILI_UA, 'Referer': 'https://www.bilibili.com/' },
+      headers: { 'User-Agent': BILIBILI_UA, 'Referer': 'https://www.bilibili.com/', Cookie: bilibiliCookie },
     });
     if (!audioRes.ok) throw new Error('下载音频失败');
 

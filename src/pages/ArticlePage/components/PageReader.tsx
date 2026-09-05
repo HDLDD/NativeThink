@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   X, ChevronLeft, ChevronRight, BookOpen, Heart, Globe,
-  Sparkles, Hash, Wand2, Loader2, Volume2, MoreHorizontal, ChevronDown, ChevronUp,
+  Sparkles, Hash, Wand2, Loader2, Volume2, ChevronDown, ChevronUp, ListTree, Repeat, Copy, Type,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,9 +9,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
 import { useAI } from '@/hooks/use-ai';
 import { useTTS } from '@/lib/use-tts';
@@ -71,7 +68,33 @@ interface Props {
 export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const { isConfigured, chat: aiChat } = useAI();
   const { addFavorite, isFavorited, favorites, removeFavorite } = useFavorites();
-  const tts = useTTS();
+
+  // ── 连读（auto-read) refs — declared before useTTS so the onEnd closure
+  // can read the latest page state without stale-closure pitfalls ──
+  const autoReadRef = useRef(false);
+  const currentPageRef = useRef(0);
+  const activePagesRef = useRef(0);
+  const turnRef = useRef<(target: number, dir: 'next' | 'prev') => void>(() => {});
+  const speakPageRef = useRef<() => void>(() => {});
+  const [autoReadPages, setAutoReadPages] = useState(false);
+
+  const tts = useTTS({
+    // When 连读 is on, advance to the next page and keep reading after each page
+    onEnd: () => {
+      if (!autoReadRef.current) return;
+      setTimeout(() => {
+        if (!autoReadRef.current) return;
+        if (currentPageRef.current < activePagesRef.current - 1) {
+          turnRef.current(currentPageRef.current + 1, 'next');
+          setTimeout(() => speakPageRef.current(), 380);
+        } else {
+          autoReadRef.current = false;
+          setAutoReadPages(false);
+          toast.success('整篇连读完成');
+        }
+      }, 420);
+    },
+  });
 
   // Cleanup on unmount: stop TTS + release heavy references for GC
   useEffect(() => { return () => { try { tts.cancel(); } catch { /* */ } }; }, []);
@@ -92,7 +115,28 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     return saved.page > 0 ? saved.page : startPage;
   });
   const [transMode, setTransMode] = useState<TransMode>('bilingual');
-  const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('lg');
+  const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg' | 'xl'>(() => {
+    try {
+      const prefs = JSON.parse(safeStorage.getItem('__nativethink_reader_prefs') || '{}');
+      if (['sm', 'base', 'lg', 'xl'].includes(prefs.fontSize)) return prefs.fontSize;
+    } catch { /* ignore */ }
+    return 'lg';
+  });
+  // ── 沉浸式阅读：点击内容区切换工具栏；设置面板；阅读主题 ──
+  const [chromeVisible, setChromeVisible] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [readerTheme, setReaderTheme] = useState<'light' | 'paper' | 'night'>(() => {
+    try {
+      const prefs = JSON.parse(safeStorage.getItem('__nativethink_reader_prefs') || '{}');
+      if (['light', 'paper', 'night'].includes(prefs.theme)) return prefs.theme;
+    } catch { /* ignore */ }
+    return 'light';
+  });
+  const toggleChrome = useCallback(() => setChromeVisible((v) => !v), []);
+  // Persist reader preferences
+  useEffect(() => {
+    try { safeStorage.setItem('__nativethink_reader_prefs', JSON.stringify({ fontSize, theme: readerTheme })); } catch { /* quota */ }
+  }, [fontSize, readerTheme]);
   const [lookupOpen, setLookupOpen] = useState(false);
   const [lookupWord_State, setLookupWordState] = useState('');
   const [lookupData, setLookupData] = useState<{ word: string; phonetic: string; meaning: string; zhMeaning: string } | null>(null);
@@ -117,6 +161,20 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     typeof window !== 'undefined' ? window.innerWidth < 640 : false,
   );
   const [toolbarExpanded, setToolbarExpanded] = useState(false);
+
+  // Chapter TOC — built from ##CHAPTER## markers; recomputed after AI level conversion
+  const [tocOpen, setTocOpen] = useState(false);
+  const chapters = useMemo(() => {
+    const list: { title: string; page: number }[] = [];
+    displayContent.pages.forEach((pg) => {
+      pg.paragraphs.forEach((p) => {
+        if (p.en.startsWith('##CHAPTER##')) {
+          list.push({ title: p.en.replace('##CHAPTER##', '').trim(), page: pg.pageNumber - 1 });
+        }
+      });
+    });
+    return list;
+  }, [displayContent]);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)');
@@ -182,9 +240,49 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   // Save progress
   useEffect(() => { saveProgress(activeContent.id, currentPage); }, [activeContent.id, currentPage]);
 
-  // Page navigation
-  const goPrev = () => setPageIdx((p) => Math.max(0, p - 1));
-  const goNext = () => setPageIdx((p) => Math.min(activePages - 1, p + 1));
+  // Page navigation — with directional slide animation.
+  // turnTo sets the anim class BEFORE the page renders so the remounted
+  // content (key={currentPage}) plays page-turn-next / page-turn-prev.
+  const [pageAnim, setPageAnim] = useState<'next' | 'prev' | null>(null);
+  const pageAnimTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const turnTo = useCallback((target: number, dir: 'next' | 'prev') => {
+    setPageIdx(target);
+    setPageAnim(dir);
+    if (pageAnimTimer.current) clearTimeout(pageAnimTimer.current);
+    pageAnimTimer.current = setTimeout(() => setPageAnim(null), 260);
+  }, []);
+  const goPrev = () => { if (currentPage > 0) turnTo(currentPage - 1, 'prev'); };
+  const goNext = () => { if (currentPage < activePages - 1) turnTo(currentPage + 1, 'next'); };
+
+  // Sync refs for the 连读 onEnd closure
+  currentPageRef.current = currentPage;
+  activePagesRef.current = activePages;
+  turnRef.current = turnTo;
+
+  /** 朗读当前页（连读模式的核心步骤，也被工具栏按钮调用） */
+  const speakCurrentPage = useCallback(() => {
+    const data = validPages[currentPageRef.current];
+    if (!data) return;
+    const text = data.paragraphs
+      .filter((p) => !p.en.startsWith('##CHAPTER##'))
+      .map((p) => cleanText(p.en))
+      .join(' ');
+    if (text) safeSpeak(text, { rate: 0.85 });
+  }, [validPages, safeSpeak]);
+  speakPageRef.current = speakCurrentPage;
+
+  /** 切换连读：开启即从当前页开始朗读，结束/关闭自动停止 */
+  const toggleAutoRead = useCallback(() => {
+    const next = !autoReadRef.current;
+    autoReadRef.current = next;
+    setAutoReadPages(next);
+    if (next) {
+      toast.success('连读已开启 — 读完本页自动继续下一页');
+      speakCurrentPage();
+    } else {
+      tts.cancel();
+    }
+  }, [speakCurrentPage, tts]);
 
   // Touch swipe handlers (must be after goPrev/goNext and currentPage/activePages are defined)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -463,292 +561,41 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col">
-      {/* ── Header ── */}
-      <div className="shrink-0 border-b border-border px-4 py-3 flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onClose} className="rounded-xl shrink-0">
-          <X className="size-5" />
-        </Button>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-black text-foreground truncate">{activeContent.zhTitle || activeContent.title}</h2>
-          <p className="text-[10px] font-medium text-muted-foreground truncate">
-            {activeContent.author && `${activeContent.author} · `}{activeContent.source} · {activeContent.difficulty}
-          </p>
-        </div>
-      </div>
-
-      {/* ── Toolbar ── */}
-      {isMobile ? (
-        /* ── Mobile Toolbar ── */
-        <div className="shrink-0 border-b border-border/50">
-          {/* Primary row: always visible */}
-          <div className="px-3 py-1.5 flex items-center gap-1">
-            {/* View mode */}
-            <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
-              {([
-                { key: 'en', label: '原文' },
-                { key: 'bilingual', label: '对照' },
-                { key: 'zh', label: '译文' },
-              ] as { key: TransMode; label: string }[]).map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setTransMode(key)}
-                  className={cn(
-                    'px-1.5 py-0.5 rounded text-[10px] font-bold transition-all',
-                    transMode === key ? 'bg-white dark:bg-card text-[#00B894] shadow-sm' : 'text-muted-foreground',
-                  )}
-                >{label}</button>
-              ))}
-            </div>
-            {/* Font size */}
-            <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
-              {([
-                { key: 'sm' as const, icon: 'A' },
-                { key: 'base' as const, icon: 'A' },
-                { key: 'lg' as const, icon: 'A' },
-              ]).map(({ key, icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setFontSize(key)}
-                  className={cn(
-                    'w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold transition-all',
-                    fontSize === key ? 'bg-white dark:bg-card text-[#00B894] shadow-sm' : 'text-muted-foreground',
-                  )}
-                  style={{ fontSize: key === 'sm' ? '9px' : key === 'base' ? '10px' : '12px' }}
-                >{icon}</button>
-              ))}
-            </div>
-            <div className="flex-1" />
-            {/* Speak page - icon only */}
-            <Button
-              variant="ghost" size="sm"
-              onClick={() => {
-                if (!currentPageData) return;
-                const text = currentPageData.paragraphs
-                  .filter(p => !p.en.startsWith('##CHAPTER##'))
-                  .map(p => cleanText(p.en)).join(' ');
-                if (text) safeSpeak(text, { rate: 0.85 });
-              }}
-              className="rounded-lg size-7 p-0 text-muted-foreground"
-              title="朗读本页"
-            >
-              <Volume2 className="size-3.5" />
-            </Button>
-            {/* Favorite - icon only */}
-            <Button
-              variant="ghost" size="sm"
-              onClick={favArticle}
-              className={cn('rounded-lg size-7 p-0', articleFaved ? 'text-rose-500' : 'text-muted-foreground')}
-              title={articleFaved ? '取消收藏' : '收藏'}
-            >
-              <Heart className={cn('size-3.5', articleFaved && 'fill-current')} />
-            </Button>
-            {/* Overflow menu for low-frequency actions */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="rounded-lg size-7 p-0 text-muted-foreground">
-                  <MoreHorizontal className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[160px]">
-                {/* Level conversion items */}
-                {LEVELS.map(({ key, label, color }) => (
-                  <DropdownMenuItem
-                    key={key}
-                    onClick={() => convertArticleLevel(key)}
-                    disabled={convertLoading || !isConfigured}
-                    className="gap-2 text-xs font-bold"
-                  >
-                    <span className="size-2 rounded-full" style={{ backgroundColor: color }} />
-                    {convertLoading && convertLevel === key && <Loader2 className="size-3 animate-spin" />}
-                    {label}等级
-                  </DropdownMenuItem>
-                ))}
-                {LEVELS.length > 0 && <div className="h-px bg-border my-1" />}
-                {/* AI translate current page */}
-                {needsTranslation && isConfigured && (
-                  <DropdownMenuItem
-                    onClick={translateCurrentPage}
-                    disabled={transLoading}
-                    className="gap-2 text-xs font-bold"
-                  >
-                    {transLoading ? <Loader2 className="size-3 animate-spin" /> : <Globe className="size-3" />}
-                    AI翻译本页
-                  </DropdownMenuItem>
-                )}
-                {/* Translate all */}
-                {isConfigured && (
-                  <DropdownMenuItem
-                    onClick={translateAllPages}
-                    disabled={transAllLoading}
-                    className="gap-2 text-xs font-bold"
-                  >
-                    {transAllLoading ? <Loader2 className="size-3 animate-spin" /> : <Wand2 className="size-3" />}
-                    翻译全部
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {/* Expand / Collapse toggle */}
-            <Button
-              variant="ghost" size="sm"
-              onClick={() => setToolbarExpanded((v) => !v)}
-              className="rounded-lg size-7 p-0 text-muted-foreground"
-              title={toolbarExpanded ? '收起工具栏' : '展开工具栏'}
-            >
-              {toolbarExpanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-            </Button>
-          </div>
-          {/* Expanded row: level conversion + extra actions */}
-          {toolbarExpanded && (
-            <div className="px-3 pb-1.5 flex items-center gap-1 flex-wrap">
-              {/* Level conversion inline */}
-              <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
-                {LEVELS.map(({ key, label, color }) => (
-                  <button
-                    key={key}
-                    onClick={() => convertArticleLevel(key)}
-                    disabled={convertLoading || !isConfigured}
-                    className={cn('px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider transition-all',
-                      convertLevel === key ? 'text-white shadow-sm' : 'text-muted-foreground')}
-                    style={convertLevel === key ? { backgroundColor: color } : undefined}
-                    title={`转换为${label}等级`}
-                  >
-                    {convertLoading && convertLevel === key ? <Loader2 className="size-2.5 animate-spin inline mr-0.5" /> : null}
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex-1" />
-              {needsTranslation && isConfigured && (
-                <Button
-                  variant="ghost" size="sm"
-                  onClick={translateCurrentPage}
-                  disabled={transLoading}
-                  className="rounded-lg text-[10px] font-bold gap-1 h-6 px-2 text-amber-600"
-                >
-                  {transLoading ? <Loader2 className="size-3 animate-spin" /> : <Globe className="size-3" />}
-                  AI翻译
-                </Button>
-              )}
-              {isConfigured && (
-                <Button
-                  variant="ghost" size="sm"
-                  onClick={translateAllPages}
-                  disabled={transAllLoading}
-                  className="rounded-lg text-[10px] font-bold gap-1 h-6 px-2"
-                >
-                  {transAllLoading ? <Loader2 className="size-3 animate-spin" /> : <Wand2 className="size-3" />}
-                  翻译全部
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* ── Desktop Toolbar (unchanged layout) ── */
-        <div className="shrink-0 px-4 py-2 flex items-center gap-1.5 border-b border-border/50 flex-wrap">
-          {/* View mode: 原文 / 对照 / 译文 */}
-          <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
-            {([
-              { key: 'en', label: '原文' },
-              { key: 'bilingual', label: '对照' },
-              { key: 'zh', label: '译文' },
-            ] as { key: TransMode; label: string }[]).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setTransMode(key)}
-                className={cn(
-                  'px-2.5 py-1 rounded-md text-[10px] font-bold transition-all',
-                  transMode === key ? 'bg-white dark:bg-card text-[#00B894] shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >{label}</button>
-            ))}
-          </div>
-          {/* Font size */}
-          <div className="w-px h-4 bg-border mx-0.5" />
-          <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
-            {([
-              { key: 'sm' as const, label: '小' },
-              { key: 'base' as const, label: '中' },
-              { key: 'lg' as const, label: '大' },
-            ]).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setFontSize(key)}
-                className={cn(
-                  'px-2 py-1 rounded-md text-[10px] font-bold transition-all',
-                  fontSize === key ? 'bg-white dark:bg-card text-[#00B894] shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >{label}</button>
-            ))}
-          </div>
-          {/* Level conversion */}
-          <div className="w-px h-4 bg-border mx-0.5" />
-          <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
-            {LEVELS.map(({ key, label, color }) => (
-              <button
-                key={key}
-                onClick={() => convertArticleLevel(key)}
-                disabled={convertLoading || !isConfigured}
-                className={cn('px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all',
-                  convertLevel === key ? 'text-white shadow-sm' : 'text-muted-foreground hover:text-foreground')}
-                style={convertLevel === key ? { backgroundColor: color } : undefined}
-                title={`转换为${label}等级`}
-              >
-                {convertLoading && convertLevel === key ? <Loader2 className="size-2.5 animate-spin inline mr-0.5" /> : null}
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="flex-1" />
-          {/* AI Translation */}
-          {needsTranslation && isConfigured && (
-            <Button
-              variant="ghost" size="sm"
-              onClick={translateCurrentPage}
-              disabled={transLoading}
-              className="rounded-xl text-[10px] font-bold gap-1 text-amber-600 hover:text-amber-700"
-            >
-              {transLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Globe className="size-3.5" />}
-              AI翻译
-            </Button>
-          )}
-          {isConfigured && (
-            <Button
-              variant="ghost" size="sm"
-              onClick={translateAllPages}
-              disabled={transAllLoading}
-              className="rounded-xl text-[10px] font-bold gap-1"
-            >
-              {transAllLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
-              翻译全部
-            </Button>
-          )}
-          {/* Speak page */}
-          <Button
-            variant="ghost" size="sm"
-            onClick={() => {
-              if (!currentPageData) return;
-              const text = currentPageData.paragraphs
-                .filter(p => !p.en.startsWith('##CHAPTER##'))
-                .map(p => cleanText(p.en)).join(' ');
-              if (text) safeSpeak(text, { rate: 0.85 });
-            }}
-            className="rounded-xl text-[10px] font-bold gap-1"
-          >
-            <Volume2 className="size-3.5" />朗读本页
-          </Button>
-          {/* Favorite */}
-          <Button
-            variant="ghost" size="sm"
-            onClick={favArticle}
-            className={cn('rounded-xl text-[10px] font-bold gap-1', articleFaved && 'text-rose-500')}
-          >
-            <Heart className={cn('size-3.5', articleFaved && 'fill-current')} />{articleFaved ? '已收藏' : '收藏'}
-          </Button>
+    <div className={cn('fixed inset-0 z-50 bg-background flex flex-col', readerTheme === 'paper' && 'reader-paper', readerTheme === 'night' && 'reader-night')}>
+      {/* ── 阅读进度条（当前页/总页） ── */}
+      {activePages > 0 && (
+        <div className="shrink-0 h-0.5 bg-muted/60">
+          <div
+            className="h-full bg-[#00B894] transition-all duration-300 ease-out"
+            style={{ width: `${((currentPage + 1) / activePages) * 100}%` }}
+          />
         </div>
       )}
+      {/* ── Header（沉浸式 — 点击内容区可隐藏/呼出） ── */}
+      <header className={cn(
+        'shrink-0 overflow-hidden transition-all duration-200 border-b border-border/60 bg-background/95 backdrop-blur-sm z-10',
+        chromeVisible ? 'max-h-24 opacity-100' : 'max-h-0 opacity-0 border-b-0',
+      )}>
+        <div className="px-3 sm:px-4 py-2.5 flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={onClose} className="rounded-xl size-9 shrink-0" title="退出阅读">
+            <X className="size-5" />
+          </Button>
+          <div className="flex-1 min-w-0 text-center px-1">
+            <h2 className="text-sm font-black text-foreground truncate">{activeContent.zhTitle || activeContent.title}</h2>
+            <p className="text-[10px] font-medium text-muted-foreground truncate">
+              {activeContent.author ? activeContent.author + ' · ' : ''}{activeContent.source}
+            </p>
+          </div>
+          {chapters.length > 0 && (
+            <Button variant="ghost" size="icon" onClick={() => setTocOpen(true)} className="rounded-xl size-9 shrink-0" title="目录">
+              <ListTree className="size-4.5" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} className="rounded-xl size-9 shrink-0" title="阅读设置">
+            <Type className="size-4.5" />
+          </Button>
+        </div>
+      </header>
 
       {/* ── Content (current page only) with touch swipe ── */}
       <div
@@ -758,6 +605,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           isAnimating && "transition-transform duration-200 ease-out"
         )}
         style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
+        onClick={toggleChrome}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -780,19 +628,28 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 size-6 text-[#00B894]" style={{ opacity: Math.min((-swipeOffset - 20) / 80, 0.6) }} />
           </div>
         )}
-        {/* Page content with swipe translate */}
+        {/* Page content with swipe translate; keyed by page → directional turn animation */}
         <div
-          className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5"
+          key={currentPage}
+          className={cn(
+            'max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5',
+            pageAnim === 'next' && 'page-turn-next',
+            pageAnim === 'prev' && 'page-turn-prev',
+          )}
         >
           {currentPageData?.paragraphs.map((para, i) => {
             const displayEn = para.en.startsWith('##CHAPTER##') ? para.en.replace('##CHAPTER##', '') : para.en;
             const isChapter = para.en.startsWith('##CHAPTER##');
-            const fontSizeClass = fontSize === 'sm' ? 'text-base leading-7' : fontSize === 'base' ? 'text-lg leading-8' : 'text-xl leading-9';
+            const fontSizeClass = fontSize === 'sm' ? 'text-base leading-7' : fontSize === 'base' ? 'text-lg leading-8' : fontSize === 'lg' ? 'text-xl leading-9' : 'text-2xl leading-10';
 
             return (
-              <div key={i} className={isChapter ? 'text-center py-2' : ''}>
+              <div key={i} className={isChapter ? 'text-center pt-10 pb-3' : ''}>
                 {isChapter ? (
-                  <h3 className="text-sm font-black text-[#00B894]">{displayEn}</h3>
+                  <div className="flex items-center justify-center gap-3">
+                    <span className="h-px w-8 sm:w-12 bg-[#00B894]/30" />
+                    <h3 className="text-base sm:text-lg font-black text-[#00B894] tracking-wide">{displayEn}</h3>
+                    <span className="h-px w-8 sm:w-12 bg-[#00B894]/30" />
+                  </div>
                 ) : (
                   <>
                     {/* English — clickable words + paragraph speak */}
@@ -818,7 +675,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                           })}
                         </p>
                         <button
-                          onClick={() => safeSpeak(cleanText(displayEn), { rate: 0.85 })}
+                          onClick={(e) => { e.stopPropagation(); safeSpeak(cleanText(displayEn), { rate: 0.85 }); }}
                           className="shrink-0 text-muted-foreground/25 hover:text-[#00B894] transition-colors mt-0.5 opacity-0 group-hover/para:opacity-100"
                           title="朗读段落"
                         >
@@ -850,59 +707,156 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         </div>
       </div>
 
-      {/* ── Pagination Footer ── */}
-      {/* Mobile: full-width two-button layout with large touch targets + safe-area padding */}
-      {/* Desktop (sm+): centered row with input box, original compact layout */}
-      <div
-        className="shrink-0 border-t border-border sm:px-4 sm:py-3 sm:flex sm:items-center sm:justify-center sm:gap-3"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 12px)' }}
-      >
-        {/* ── Mobile layout ── */}
-        <div className="flex sm:hidden items-stretch gap-0 w-full">
-          <button
-            onClick={goPrev}
-            disabled={currentPage === 0}
-            className="flex-1 flex items-center justify-center gap-1.5 min-h-[48px] px-4 py-3 text-sm font-bold text-foreground border-r border-border disabled:opacity-40 disabled:cursor-not-allowed active:bg-muted transition-colors"
-          >
-            <ChevronLeft className="size-5" />
-            上一页
-          </button>
-          <span className="flex items-center justify-center px-4 text-sm font-bold text-muted-foreground tabular-nums whitespace-nowrap select-none">
-            {currentPage + 1} / {activePages}
-          </span>
-          <button
-            onClick={goNext}
-            disabled={currentPage >= activePages - 1}
-            className="flex-1 flex items-center justify-center gap-1.5 min-h-[48px] px-4 py-3 text-sm font-bold text-foreground border-l border-border disabled:opacity-40 disabled:cursor-not-allowed active:bg-muted transition-colors"
-          >
-            下一页
-            <ChevronRight className="size-5" />
-          </button>
-        </div>
-
-        {/* ── Desktop layout (unchanged) ── */}
-        <div className="hidden sm:flex items-center justify-center gap-3 w-full">
-          <Button variant="outline" size="sm" onClick={goPrev} disabled={currentPage === 0} className="rounded-xl text-[10px] font-bold gap-1">
-            <ChevronLeft className="size-4" />上一页
+      {/* ── 底栏：上一页 / 进度滑杆 / 下一页（沉浸式） ── */}
+      <footer className={cn(
+        'shrink-0 overflow-hidden transition-all duration-200 border-t border-border/60 bg-background/95 backdrop-blur-sm z-10',
+        chromeVisible ? 'max-h-24 opacity-100' : 'max-h-0 opacity-0 border-t-0',
+      )}>
+        <div className="px-3 sm:px-5 py-2 flex items-center gap-2 sm:gap-3">
+          <Button variant="ghost" size="sm" onClick={goPrev} disabled={currentPage === 0} className="rounded-xl size-8 p-0 shrink-0">
+            <ChevronLeft className="size-4" />
           </Button>
-          <span className="text-xs font-bold text-muted-foreground tabular-nums">{currentPage + 1} / {activePages}</span>
-          <Input
-            type="number" min={1} max={activePages}
-            className="w-14 h-8 text-center text-xs font-bold rounded-xl"
-            placeholder={`${currentPage + 1}`}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const n = parseInt((e.target as HTMLInputElement).value);
-                if (n >= 1 && n <= activePages) setPageIdx(n - 1);
-                (e.target as HTMLInputElement).value = '';
-              }
+          <input
+            type="range"
+            min={1}
+            max={Math.max(activePages, 1)}
+            value={currentPage + 1}
+            onChange={(e) => {
+              const n = parseInt(e.target.value, 10) - 1;
+              if (n !== currentPage) turnTo(n, n > currentPage ? 'next' : 'prev');
             }}
+            className="reader-slider flex-1 min-w-0"
+            aria-label="阅读进度"
           />
-          <Button variant="outline" size="sm" onClick={goNext} disabled={currentPage >= activePages - 1} className="rounded-xl text-[10px] font-bold gap-1">
-            下一页<ChevronRight className="size-4" />
+          <span className="text-[11px] font-bold text-muted-foreground tabular-nums shrink-0">{currentPage + 1}<span className="opacity-60">/{activePages}</span></span>
+          <Button variant="ghost" size="sm" onClick={goNext} disabled={currentPage >= activePages - 1} className="rounded-xl size-8 p-0 shrink-0">
+            <ChevronRight className="size-4" />
           </Button>
         </div>
-      </div>
+      </footer>
+
+      {/* ── 阅读设置面板 ── */}
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="max-w-sm rounded-[28px] p-0 overflow-hidden">
+          <DialogHeader className="px-5 pt-5 pb-2">
+            <DialogTitle className="text-base font-black text-foreground">阅读设置</DialogTitle>
+          </DialogHeader>
+          <div className="px-5 pb-6 space-y-5">
+            {/* 显示模式 */}
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">显示模式</p>
+              <div className="flex items-center gap-0.5 bg-muted rounded-xl p-1">
+                {([{ key: 'en', label: '原文' }, { key: 'bilingual', label: '对照' }, { key: 'zh', label: '译文' }] as { key: TransMode; label: string }[]).map(({ key, label }) => (
+                  <button key={key} onClick={() => setTransMode(key)}
+                    className={cn('flex-1 py-1.5 rounded-lg text-xs font-bold transition-all',
+                      transMode === key ? 'bg-background text-[#00B894] shadow-sm' : 'text-muted-foreground')}>{label}</button>
+                ))}
+              </div>
+            </div>
+            {/* 字号 */}
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">字号</p>
+              <div className="flex items-center gap-2">
+                {(['sm', 'base', 'lg', 'xl'] as const).map((key, i) => (
+                  <button key={key} onClick={() => setFontSize(key)}
+                    className={cn('flex-1 h-9 rounded-xl font-black transition-all border',
+                      fontSize === key ? 'border-[#00B894] text-[#00B894] bg-[#00B894]/5' : 'border-border text-muted-foreground')}
+                    style={{ fontSize: 12 + i * 3 }}>A</button>
+                ))}
+              </div>
+            </div>
+            {/* 阅读主题 */}
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">阅读主题</p>
+              <div className="grid grid-cols-3 gap-2">
+                {([{ key: 'light', label: '浅色', bg: '#FFFFFF', fg: '#374151' }, { key: 'paper', label: '纸张', bg: '#F6F1E6', fg: '#5B4F3A' }, { key: 'night', label: '夜间', bg: '#16181B', fg: '#D6D3CC' }] as const).map(({ key, label, bg, fg }) => (
+                  <button key={key} onClick={() => setReaderTheme(key)}
+                    className={cn('rounded-xl border-2 p-2 flex flex-col items-center gap-1.5 transition-all',
+                      readerTheme === key ? 'border-[#00B894]' : 'border-border hover:border-muted-foreground/30')}>
+                    <span className="w-full h-7 rounded-lg border border-black/5 flex items-center justify-center" style={{ background: bg }}>
+                      <span className="text-[9px] font-bold" style={{ color: fg }}>Aa</span>
+                    </span>
+                    <span className={cn('text-[10px] font-bold', readerTheme === key ? 'text-[#00B894]' : 'text-muted-foreground')}>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* 朗读 */}
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">朗读</p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={speakCurrentPage} className="flex-1 rounded-xl text-xs font-bold gap-1">
+                  <Volume2 className="size-3.5" />朗读本页
+                </Button>
+                <Button variant="outline" size="sm" onClick={toggleAutoRead}
+                  className={cn('flex-1 rounded-xl text-xs font-bold gap-1', autoReadPages && 'bg-[#00B894] hover:bg-[#00a882] text-white border-transparent')}>
+                  <Repeat className={cn('size-3.5', autoReadPages && 'animate-pulse')} />{autoReadPages ? '连读中…' : '连读全篇'}
+                </Button>
+              </div>
+            </div>
+            {/* AI 工具 */}
+            {isConfigured && (
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">AI 工具</p>
+                <div className="flex gap-2">
+                  {needsTranslation && (
+                    <Button variant="outline" size="sm" onClick={translateCurrentPage} disabled={transLoading} className="flex-1 rounded-xl text-xs font-bold gap-1">
+                      {transLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Globe className="size-3.5" />}翻译本页
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={translateAllPages} disabled={transAllLoading} className="flex-1 rounded-xl text-xs font-bold gap-1">
+                    {transAllLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}翻译全部
+                  </Button>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  {LEVELS.map(({ key, label, color }) => (
+                    <button key={key} onClick={() => convertArticleLevel(key)} disabled={convertLoading || !isConfigured}
+                      className={cn('flex-1 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border',
+                        convertLevel === key ? 'text-white border-transparent' : 'border-border text-muted-foreground')}
+                      style={convertLevel === key ? { backgroundColor: color } : undefined}>
+                      {convertLoading && convertLevel === key ? <Loader2 className="size-2.5 animate-spin inline" /> : null}{label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* 收藏 */}
+            <Button variant="outline" size="sm" onClick={favArticle}
+              className={cn('w-full rounded-xl text-xs font-bold gap-1', articleFaved ? 'border-rose-300 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10' : '')}>
+              <Heart className={cn('size-3.5', articleFaved && 'fill-current')} />{articleFaved ? '已收藏本篇' : '收藏本篇'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Chapter TOC Dialog ── */}
+      <Dialog open={tocOpen} onOpenChange={setTocOpen}>
+        <DialogContent className="max-w-md rounded-[28px] p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-2">
+            <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
+              <ListTree className="size-5 text-[#00B894]" />
+              目录 · {chapters.length} 章
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] px-3 pb-4">
+            <div className="space-y-0.5">
+              {chapters.map((ch, i) => (
+                <button
+                  key={i}
+                  onClick={() => { turnTo(ch.page, ch.page > currentPage ? 'next' : 'prev'); setTocOpen(false); }}
+                  className={cn(
+                    'w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-muted',
+                    ch.page === currentPage ? 'text-[#00B894] bg-muted/60' : 'text-foreground/80',
+                  )}
+                >
+                  <span className="text-[10px] text-muted-foreground mr-2 tabular-nums">P{ch.page + 1}</span>
+                  {ch.title}
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Word Lookup Dialog — Chinese + English definitions ── */}
       <Dialog open={lookupOpen} onOpenChange={setLookupOpen}>

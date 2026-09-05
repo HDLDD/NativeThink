@@ -114,12 +114,21 @@ export function getAPIKey(provider: AIProvider): string | null {
   }
 }
 
+/** Event dispatched whenever AI config changes — hooks listen to refresh UI state */
+export const AI_CONFIG_CHANGED_EVENT = 'nativethink-ai-config-changed';
+
+function notifyConfigChanged(): void {
+  try { window.dispatchEvent(new Event(AI_CONFIG_CHANGED_EVENT)); } catch { /* ignore */ }
+}
+
 export function setAPIKey(provider: AIProvider, key: string): void {
   localStorage.setItem(`ai_key_${provider}`, key);
+  notifyConfigChanged();
 }
 
 export function clearAPIKey(provider: AIProvider): void {
   localStorage.removeItem(`ai_key_${provider}`);
+  notifyConfigChanged();
 }
 
 /**

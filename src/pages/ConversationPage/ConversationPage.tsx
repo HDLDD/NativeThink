@@ -14,12 +14,14 @@ import {
   X,
   Plus,
   Trash2,
+  Copy,
   Plane,
   ShoppingBag,
   Stethoscope,
   GraduationCap,
   Languages,
   Volume2,
+  History,
   type LucideIcon,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -39,6 +41,7 @@ import { cn } from '@/lib/utils';
 import { useCustomScenarios, ICON_OPTIONS, COLOR_OPTIONS, type IconName } from '@/lib/use-custom-scenarios';
 import { useTTS } from '@/lib/use-tts';
 import { usePageMemory } from '@/lib/use-page-memory';
+import { safeStorage } from '@/lib/safe-storage';
 
 interface IMessage {
   role: 'user' | 'ai';
@@ -54,6 +57,30 @@ interface IScenario {
   icon: typeof Coffee;
   color: string;
   bg: string;
+}
+
+/** Persisted conversation record (per scenario — resume where you left off) */
+interface ISavedConversation {
+  scenarioId: string;
+  scenarioName: string;
+  scenarioDescription: string;
+  scenarioRole: string;
+  scenarioIcon: string; // IconName key into ICON_MAP
+  scenarioColor: string;
+  scenarioBg: string;
+  messages: IMessage[];
+  analysis?: string;
+  updatedAt: number;
+}
+
+const CONV_HISTORY_KEY = '__nativethink_conversation_history';
+
+function loadConvHistory(): ISavedConversation[] {
+  try {
+    const raw = safeStorage.getItem(CONV_HISTORY_KEY);
+    const list = raw ? (JSON.parse(raw) as ISavedConversation[]) : [];
+    return Array.isArray(list) ? list : [];
+  } catch { return []; }
 }
 
 const SCENARIOS: IScenario[] = [
@@ -119,6 +146,7 @@ export default function ConversationPage() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [autoRead, setAutoRead] = usePageMemory('conv-auto-read', false);
+  const [convHistory, setConvHistory] = useState<ISavedConversation[]>(loadConvHistory);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
   useEffect(() => { return () => { mountedRef.current = false; abortRef.current?.abort(); }; }, []);
@@ -400,6 +428,71 @@ export default function ConversationPage() {
     setTranslatingIdx(null);
   };
 
+  // ── Conversation persistence: auto-save the active conversation (debounced) ──
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!selectedScenario || messages.length === 0) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    // 800ms debounce — streaming updates messages on every chunk
+    saveTimerRef.current = setTimeout(() => {
+      const iconName = (Object.keys(ICON_MAP) as IconName[]).find(
+        (k) => ICON_MAP[k] === selectedScenario.icon,
+      ) ?? 'MessageCircle';
+      const record: ISavedConversation = {
+        scenarioId: selectedScenario.id,
+        scenarioName: selectedScenario.name,
+        scenarioDescription: selectedScenario.description,
+        scenarioRole: selectedScenario.role,
+        scenarioIcon: iconName,
+        scenarioColor: selectedScenario.color,
+        scenarioBg: selectedScenario.bg,
+        messages: messages.slice(-100),
+        analysis: analysis || undefined,
+        updatedAt: Date.now(),
+      };
+      setConvHistory((prev) => {
+        const next = [record, ...prev.filter((c) => c.scenarioId !== record.scenarioId)].slice(0, 20);
+        try { safeStorage.setItem(CONV_HISTORY_KEY, JSON.stringify(next)); } catch { /* quota */ }
+        return next;
+      });
+    }, 800);
+  }, [messages, analysis, selectedScenario]);
+
+  const findScenarioById = (id: string): IScenario | undefined => {
+    const builtin = SCENARIOS.find((s) => s.id === id);
+    if (builtin) return builtin;
+    const custom = customScenarios.find((s) => s.id === id);
+    if (custom) return { ...custom, icon: ICON_MAP[custom.icon] ?? MessageCircle };
+    return undefined;
+  };
+
+  const resumeConversation = (record: ISavedConversation) => {
+    const scenario: IScenario = findScenarioById(record.scenarioId) ?? {
+      id: record.scenarioId,
+      name: record.scenarioName,
+      description: record.scenarioDescription,
+      role: record.scenarioRole,
+      icon: ICON_MAP[record.scenarioIcon as IconName] ?? MessageCircle,
+      color: record.scenarioColor,
+      bg: record.scenarioBg,
+    };
+    setSelectedScenario(scenario);
+    setMessages(record.messages);
+    setAnalysis(record.analysis ?? '');
+    setShowAnalysis(false);
+    setTranslationTexts({});
+    setVisibleTranslations({});
+    setTranslatingIdx(null);
+  };
+
+  const deleteSavedConversation = (scenarioId: string) => {
+    setConvHistory((prev) => {
+      const next = prev.filter((c) => c.scenarioId !== scenarioId);
+      try { safeStorage.setItem(CONV_HISTORY_KEY, JSON.stringify(next)); } catch { /* quota */ }
+      return next;
+    });
+  };
+
   if (!selectedScenario) {
     return (
       <div className="space-y-8">
@@ -417,7 +510,57 @@ export default function ConversationPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* 继续上次对话 */}
+        {convHistory.length > 0 && (
+          <Card className="rounded-[32px] border-border p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <History className="size-4 text-[#00B894]" />
+              <h2 className="text-sm font-black uppercase tracking-wider text-foreground">继续上次对话</h2>
+            </div>
+            <div className="space-y-2">
+              {convHistory.map((c) => {
+                const CIcon = ICON_MAP[c.scenarioIcon as IconName] ?? MessageCircle;
+                return (
+                  <div
+                    key={c.scenarioId}
+                    className="flex items-center gap-3 rounded-2xl border border-border p-3 hover:border-[#00B894]/40 transition-colors"
+                  >
+                    <div
+                      className="size-9 rounded-xl flex items-center justify-center text-white shrink-0"
+                      style={{ backgroundColor: c.scenarioColor }}
+                    >
+                      <CIcon className="size-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-foreground truncate">{c.scenarioName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {c.messages.filter((m) => m.role === 'user').length} 轮对话 ·{' '}
+                        {new Date(c.updatedAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => deleteSavedConversation(c.scenarioId)}
+                      className="rounded-xl text-muted-foreground hover:text-red-400 shrink-0"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => resumeConversation(c)}
+                      className="rounded-xl bg-[#00B894] hover:bg-[#00A080] text-white shrink-0"
+                    >
+                      继续
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
+
+        <div className="stagger grid grid-cols-1 md:grid-cols-2 gap-4">
           {[...SCENARIOS.map((s) => ({ ...s, isCustom: false } as IScenario & { isCustom: boolean })),
             ...customScenarios.map((s) => ({
               id: s.id,
@@ -754,9 +897,23 @@ export default function ConversationPage() {
                       <span className="size-1.5 bg-current rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                     </span>
                   )}
-                  {/* TTS + Translation buttons */}
+                  {/* TTS + Copy + Translation buttons */}
                   {msg.content && (
                     <div className="absolute -top-2 -right-2 flex items-center gap-1 opacity-0 group-hover/msg:opacity-100 transition-all">
+                      {msg.role === 'ai' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            try {
+                              navigator.clipboard?.writeText(msg.content).then(() => toast.success('已复制'));
+                            } catch { /* clipboard unavailable */ }
+                          }}
+                          title="复制回复"
+                          className="size-6 rounded-full flex items-center justify-center shadow-sm bg-background text-muted-foreground hover:text-[#00B894] hover:bg-emerald-50 dark:hover:bg-emerald-500/15"
+                        >
+                          <Copy className="size-3" />
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

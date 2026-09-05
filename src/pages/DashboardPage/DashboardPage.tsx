@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  History as HistoryIcon,
   Flame,
   Target,
   Brain,
@@ -230,6 +231,31 @@ export default function DashboardPage() {
     setHistoryYear(now.getFullYear());
   }, []);
 
+  // ── 继续上次学习（hook 必须在条件 return 之前） ──
+  const [lastVisit, setLastVisit] = useState<{ path: string; label: string } | null>(null);
+  useEffect(() => {
+    try {
+      const raw = safeStorage.getItem('__nativethink_last_visit');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const labels: Record<string, string> = {
+        '/think': '母语思维训练',
+        '/chunks': '语块训练',
+        '/conversation': 'AI 对话练习',
+        '/shadowing': '影子跟读',
+        '/articles': '文章阅读',
+        '/vocabulary': '词汇深度',
+        '/favorites': '我的收藏',
+        '/writing': 'AI 写作练习',
+        '/spelling': '句子拼写',
+        '/progress': '学习记录',
+      };
+      if (parsed?.path && labels[parsed.path] && Date.now() - (parsed.ts || 0) < 14 * 24 * 3600 * 1000) {
+        setLastVisit({ path: parsed.path, label: labels[parsed.path] });
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   if (!loaded) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground">加载中...</div>
@@ -240,6 +266,23 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-10">
+      {/* 继续上次学习 */}
+      {lastVisit && (
+        <button
+          onClick={() => navigate(lastVisit.path)}
+          className="w-full flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3 text-left hover:border-[#00B894]/40 hover:shadow-md transition-all group"
+        >
+          <span className="size-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] flex items-center justify-center shrink-0">
+            <HistoryIcon className="size-4" />
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-[10px] font-black uppercase tracking-wider text-muted-foreground">继续上次学习</span>
+            <span className="block text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors truncate">{lastVisit.label}</span>
+          </span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-[#00B894] opacity-0 group-hover:opacity-100 transition-opacity shrink-0">进入 →</span>
+        </button>
+      )}
+
       {/* Hero + KPI 区域 */}
       <div className="grid grid-cols-12 gap-8">
         <HeroCard onStartLearning={() => setShowLearnDialog(true)} />

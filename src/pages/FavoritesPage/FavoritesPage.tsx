@@ -7,6 +7,7 @@ import {
   Sparkles,
   BookOpen,
   ExternalLink,
+  Copy,
   type LucideIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -15,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { useFavorites } from '@/lib/use-favorites';
 import { useTTS } from '@/lib/use-tts';
 import { cn, cleanText } from '@/lib/utils';
+import { EmptyState } from '@/components/EmptyState';
 import { toast } from 'sonner';
 import FavoriteReviewMode from '@/pages/ProgressPage/components/FavoriteReviewMode';
 
@@ -98,22 +100,16 @@ export default function FavoritesPage() {
   if (favorites.length === 0) {
     return (
       <div className="max-w-2xl mx-auto pt-8">
-        <div className="text-center py-20 space-y-6">
-          <div className="size-20 rounded-full bg-muted flex items-center justify-center mx-auto">
-            <Heart className="size-10 text-muted-foreground/40" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black italic text-foreground mb-2">收藏本</h2>
-            <p className="text-sm text-muted-foreground font-medium max-w-md mx-auto">
-              还没有收藏内容。在词汇学习、搭配学习、文章阅读等页面，点击 <Heart className="size-3.5 inline text-rose-500 fill-current mx-0.5" /> 图标即可收藏你喜欢的表达！
-            </p>
-          </div>
-          <div className="flex items-center justify-center gap-3 text-[10px] font-bold text-muted-foreground/60">
-            <span>💡 单词可收藏</span>
-            <span>📝 例句可收藏</span>
-            <span>🔗 搭配可收藏</span>
-            <span>🎤 演讲可收藏</span>
-          </div>
+        <EmptyState
+          icon={Heart}
+          title="收藏本是空的"
+          description={<>在词汇学习、搭配学习、文章阅读等页面，点击 <Heart className="size-3.5 inline text-rose-500 fill-current mx-0.5" /> 图标即可收藏你喜欢的表达</>}
+        />
+        <div className="flex items-center justify-center gap-3 pb-12 text-[10px] font-bold text-muted-foreground/60">
+          <span>💡 单词可收藏</span>
+          <span>📝 例句可收藏</span>
+          <span>🔗 搭配可收藏</span>
+          <span>🎤 演讲可收藏</span>
         </div>
       </div>
     );
@@ -178,9 +174,7 @@ export default function FavoritesPage() {
 
       {/* Empty filtered state */}
       {filteredFavorites.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <p className="text-sm font-medium">该分类暂无收藏内容</p>
-        </div>
+        <EmptyState icon={Heart} size="sm" title="该分类暂无收藏内容" className="py-12" />
       ) : (
         <>
           {/* Type count chips */}
@@ -231,7 +225,7 @@ export default function FavoritesPage() {
                       </Button>
                     </div>
 
-                    {/* Content + TTS */}
+                    {/* Content + TTS + Copy */}
                     <div className="flex items-center gap-2 mb-2">
                       <h4 className="text-lg font-black text-foreground group-hover:text-rose-500 transition-colors">
                         {item.content}
@@ -243,6 +237,18 @@ export default function FavoritesPage() {
                         className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <Volume2 className="size-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          const text = item.example ? `${item.content}\n${item.example}` : item.content;
+                          try { navigator.clipboard?.writeText(text).then(() => toast.success('已复制')); } catch { /* ignore */ }
+                        }}
+                        title="复制"
+                        className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Copy className="size-3.5" />
                       </Button>
                     </div>
 

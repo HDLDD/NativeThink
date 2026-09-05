@@ -19,7 +19,7 @@ function QuickStartGridInner({ onNavigate }: QuickStartGridProps) {
           <h3 className="text-xl font-black italic text-foreground">快速开始</h3>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="stagger grid grid-cols-2 gap-4">
         {QUICK_ENTRIES.map((entry) => {
           const Icon = entry.icon;
           return (

@@ -16,13 +16,14 @@ import { useWordLearning } from '@/lib/use-word-learning';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn, cleanText, extractJson } from '@/lib/utils';
+import { EmptyState } from '@/components/EmptyState';
 import { toast } from 'sonner';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import { buildPages } from '@/data/reading';
 import type { SpeechMeta } from '@/data/speeches';
 // ── Types ──
 type Level = 'beginner' | 'intermediate' | 'advanced';
-type MainTab = 'books' | 'publications' | 'ai' | 'speeches';
+type MainTab = 'books' | 'publications' | 'ai' | 'speeches' | 'wikipedia';
 
 const LEVELS: { key: Level; label: string; color: string; desc: string }[] = [
   { key: 'beginner', label: '初级', color: '#00B894', desc: '简单句式，常用词汇' },
@@ -46,6 +47,7 @@ const MAINTABS: { key: MainTab; label: string; icon: typeof BookOpen }[] = [
   { key: 'publications', label: '刊物', icon: Newspaper },
   { key: 'ai', label: 'AI 生成', icon: Sparkles },
   { key: 'speeches', label: '演讲', icon: Mic },
+  { key: 'wikipedia', label: '维基百科', icon: Globe },
 ];
 
 // ── Curated Publications ──
@@ -199,6 +201,83 @@ export default function ArticlePage() {
     import('@/data/books').then((m) => setBooks(m.ALL_BOOKS)).catch(() => setBooks([]));
   }, [mainTab, booksLoaded]);
 
+  // ── Wikipedia (proxied via /api/wikipedia to bypass CORS/GFW) ──
+  // Declared before the auto-open effect below, which references loadWikiPage.
+  const WIKI_CACHE_PREFIX = '__wiki_cache_';
+  const [wikiQuery, setWikiQuery] = useState('');
+  const [wikiResults, setWikiResults] = useState<{ title: string; wordCount: number }[]>([]);
+  const [wikiSearching, setWikiSearching] = useState(false);
+  const [wikiLoadingTitle, setWikiLoadingTitle] = useState<string | null>(null);
+  const [wikiSearched, setWikiSearched] = useState(false);
+
+  const wikiCacheKey = (title: string) => `${WIKI_CACHE_PREFIX}${encodeURIComponent(title).toLowerCase()}`;
+
+  const loadWikiPage = useCallback(async (title: string): Promise<IReadingContent> => {
+    // 1. Cache (7-day TTL)
+    try {
+      const cached = safeStorage.getItem(wikiCacheKey(title));
+      if (cached) {
+        const { at, content } = JSON.parse(cached);
+        if (at && content?.pages?.length && Date.now() - at < 7 * 24 * 3600 * 1000) return content;
+      }
+    } catch { /* corrupted cache — refetch */ }
+    // 2. Fetch via backend proxy
+    const res = await fetch(`/api/wikipedia?action=page&title=${encodeURIComponent(title)}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const paras: IParagraph[] = (data.paragraphs || []).map((p: string) => ({
+      en: p.replace(/^\[SECTION\]\s*/, '').trim(),
+      zh: '',
+    })).filter((p: IParagraph) => p.en);
+    if (!paras.length) throw new Error('内容为空');
+    const content: IReadingContent = {
+      id: `wiki_${encodeURIComponent(title).toLowerCase()}`,
+      type: 'wikipedia',
+      title,
+      zhTitle: title,
+      author: 'Wikipedia',
+      source: 'Wikipedia',
+      topic: 'wikipedia',
+      difficulty: 'intermediate',
+      pages: buildPages(paras),
+      totalWords: paras.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
+    };
+    try { safeStorage.setItem(wikiCacheKey(title), JSON.stringify({ at: Date.now(), content })); } catch { /* quota */ }
+    return content;
+  }, []);
+
+  const openWikiPage = async (title: string) => {
+    if (wikiLoadingTitle) return;
+    setWikiLoadingTitle(title);
+    try {
+      const content = await loadWikiPage(title);
+      openReader(content);
+      saveToHistory(content.zhTitle, '', 'wikipedia', { wikiId: content.id });
+    } catch (err: any) {
+      toast.error(err?.message || '维基百科加载失败，请重试');
+    } finally {
+      setWikiLoadingTitle(null);
+    }
+  };
+
+  const searchWiki = async (q?: string) => {
+    const query = (q ?? wikiQuery).trim();
+    if (!query || wikiSearching) return;
+    setWikiSearching(true);
+    setWikiSearched(true);
+    try {
+      const res = await fetch(`/api/wikipedia?action=search&q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setWikiResults(data.results || []);
+      if (!data.results?.length) toast.info('没有找到相关条目，换个关键词试试');
+    } catch (err: any) {
+      toast.error(err?.message || '搜索失败，请重试');
+    } finally {
+      setWikiSearching(false);
+    }
+  };
+
   // ── Auto-open from favorites jump (/?open=<id>&source=<type>) ──
   useEffect(() => {
     try {
@@ -206,7 +285,7 @@ export default function ArticlePage() {
       const source = searchParams.get('source');
       if (!articleId) return;
       // Determine which tab the article belongs to
-      const validTabs = ['books', 'publications', 'ai', 'speeches'] as const;
+      const validTabs = ['books', 'publications', 'ai', 'speeches', 'wikipedia'] as const;
       let tab: MainTab = (validTabs as readonly string[]).includes(source || '') ? (source as MainTab) : 'ai';
       if (tab === 'publication' as any) tab = 'publications';
       setMainTab(tab);
@@ -230,6 +309,12 @@ export default function ArticlePage() {
             const existing = buildSpeechFn(articleId);
             if (existing?.pages?.length) { openReader(existing); return true; }
           }
+          if (tab === 'wikipedia') {
+            // ids look like wiki_earth — reload via cache/API (async)
+            const title = decodeURIComponent(articleId.replace(/^wiki_/, ''));
+            loadWikiPage(title).then((c) => { if (c?.pages?.length) openReader(c); }).catch(() => {});
+            return true;
+          }
         } catch { /* skip malformed content */ }
         return false;
       };
@@ -238,7 +323,7 @@ export default function ArticlePage() {
         return () => clearTimeout(timer);
       }
     } catch { /* URL params parse error — ignore */ }
-  }, [searchParams, books, speechMeta, buildSpeechFn, aiArticles]);
+  }, [searchParams, books, speechMeta, buildSpeechFn, aiArticles, loadWikiPage]);
 
   // ── AI article generation (shared by free-form + topic grid) ──
   const generateAiArticle = useCallback(async (topic: string) => {
@@ -263,7 +348,7 @@ export default function ArticlePage() {
         totalWords: safeParagraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
       };
       saveAiArticle(content);
-      saveToHistory(parsed.title || topic, content.totalWords.toString(), 'ai');
+      saveToHistory(parsed.title || topic, content.totalWords.toString(), 'ai', { aiId: content.id });
       setAiTopicInput('');
       toast.success('文章已生成！');
     } catch { toast.error('生成失败，请重试'); }
@@ -317,7 +402,7 @@ export default function ArticlePage() {
 
   // ── History ──
   const HISTORY_KEY = '__nativethink_article_history';
-  interface HistoryEntry { id: string; title: string; source: string; createdAt: string; meta?: { speechId?: string; bookId?: string; pubId?: string; }; }
+  interface HistoryEntry { id: string; title: string; source: string; createdAt: string; meta?: { speechId?: string; bookId?: string; pubId?: string; aiId?: string; wikiId?: string; }; }
   const [history, setHistory] = useState<HistoryEntry[]>(() => {
     try { const s = safeStorage.getItem(HISTORY_KEY); return s ? JSON.parse(s) : []; } catch { return []; }
   });
@@ -333,7 +418,7 @@ export default function ArticlePage() {
 
   const handleHistoryClick = (entry: HistoryEntry) => {
     if (!entry.meta) return;
-    const { speechId, bookId } = entry.meta;
+    const { speechId, bookId, pubId, aiId, wikiId } = entry.meta;
     if (speechId) {
       setMainTab('speeches');
       // Delay to ensure speechMeta is loaded
@@ -342,6 +427,19 @@ export default function ArticlePage() {
       // Books can only be reopened from the books tab
       const book = books?.find((b) => b.id === bookId);
       if (book) { openReader(book); }
+    } else if (pubId) {
+      const pub = PUBLICATIONS.find((p) => p.id === pubId);
+      if (pub?.pages?.length) { openReader(pub); }
+      else toast.error('刊物内容未找到');
+    } else if (aiId) {
+      const ai = aiArticles.find((a) => a.id === aiId);
+      if (ai?.pages?.length) { openReader(ai); }
+      else toast.error('AI 文章内容未找到');
+    } else if (wikiId) {
+      // wiki ids look like wiki_earth — reverse to the title and reload via API/cache
+      const title = decodeURIComponent(wikiId.replace(/^wiki_/, ''));
+      setMainTab('wikipedia');
+      openWikiPage(title);
     }
   };
 
@@ -485,7 +583,7 @@ export default function ArticlePage() {
           <CardHeader className="pb-2"><CardTitle className="text-sm font-black">阅读历史</CardTitle></CardHeader>
           <CardContent>
             {history.length === 0 ? (
-              <p className="text-xs text-muted-foreground">暂无记录</p>
+              <p className="text-xs text-muted-foreground">暂无阅读记录 — 打开任意内容后这里会留下足迹</p>
             ) : (
               <div className="space-y-2 max-h-[200px] overflow-y-auto">
                 {history.slice(0, 20).map((h) => {
@@ -541,7 +639,7 @@ export default function ArticlePage() {
             <span className="text-sm font-black">{books ? `${books.length} 本公版书籍` : '加载中...'} · 点击阅读</span>
           </div>
           {!books ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="rounded-[24px] border-border border bg-muted/30 animate-pulse p-5">
                   <div className="flex items-start gap-3">
@@ -559,7 +657,7 @@ export default function ArticlePage() {
               ))}
             </div>
           ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {books.map((book) => {
               const progress = getBookProgress(book.id);
               const totalPages = book.pages.length;
@@ -615,12 +713,12 @@ export default function ArticlePage() {
             <Newspaper className="size-5 text-[#00B894]" />
             <span className="text-sm font-black">{PUBLICATIONS.length} 篇刊物文章</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="stagger grid grid-cols-1 sm:grid-cols-2 gap-4">
             {PUBLICATIONS.map((pub) => (
               <Card
                 key={pub.id}
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => { openReader(pub); saveToHistory(pub.zhTitle, '', 'publications'); }}
+                onClick={() => { openReader(pub); saveToHistory(pub.zhTitle, '', 'publications', { pubId: pub.id }); }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
@@ -765,7 +863,7 @@ export default function ArticlePage() {
             <span className="text-sm font-black">{speechMeta ? `${speechMeta.length} 篇演讲` : '加载中...'} · 点击阅读</span>
           </div>
           {!speechMeta ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="rounded-[24px] border-border border bg-muted/30 animate-pulse overflow-hidden">
                   <div className="h-32 bg-muted" />
@@ -779,7 +877,7 @@ export default function ArticlePage() {
               ))}
             </div>
           ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {speechMeta.map((speech) => (
               <Card
                 key={speech.id}
@@ -807,6 +905,92 @@ export default function ArticlePage() {
               </Card>
             ))}
           </div>
+          )}
+        </div>
+      )}
+
+      {/* ── WIKIPEDIA TAB ── */}
+      {mainTab === 'wikipedia' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Globe className="size-5 text-[#00B894]" />
+            <span className="text-sm font-black">Wikipedia 英文百科 · 搜索并阅读条目</span>
+          </div>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => { e.preventDefault(); searchWiki(); }}
+          >
+            <Input
+              value={wikiQuery}
+              onChange={(e) => setWikiQuery(e.target.value)}
+              placeholder="搜索英文条目，如 earth, quantum computing, Renaissance..."
+              className="flex-1 rounded-2xl"
+            />
+            <Button
+              type="submit"
+              disabled={wikiSearching || !wikiQuery.trim()}
+              className="rounded-2xl bg-[#00B894] hover:bg-[#00A080] text-white font-bold gap-1.5"
+            >
+              {wikiSearching ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+              搜索
+            </Button>
+          </form>
+
+          {wikiResults.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {wikiResults.map((r) => (
+                <Card
+                  key={r.title}
+                  className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
+                  onClick={() => openWikiPage(r.title)}
+                >
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="size-10 rounded-2xl bg-gradient-to-br from-slate-100 to-gray-200 dark:from-slate-500/10 dark:to-gray-500/20 flex items-center justify-center shrink-0">
+                      {wikiLoadingTitle === r.title ? (
+                        <Loader2 className="size-4 animate-spin text-[#00B894]" />
+                      ) : (
+                        <span className="text-lg">🌐</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors truncate">
+                        {r.title}
+                      </h3>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{r.wordCount.toLocaleString()} 词 · 点击阅读</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {wikiSearched && !wikiSearching && wikiResults.length === 0 && (
+            <EmptyState
+              icon={Globe}
+              size="sm"
+              title="没有找到相关条目"
+              description="换个关键词，或检查拼写后重试"
+              className="py-10"
+            />
+          )}
+          {!wikiSearched && (
+            <div className="text-center py-12 space-y-3">
+              <div className="size-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto">
+                <Globe className="size-8 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">输入关键词搜索 Wikipedia 英文条目</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {['Earth', 'Albert Einstein', 'Great Wall of China', 'Artificial intelligence', 'Mount Everest'].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => { setWikiQuery(s); searchWiki(s); }}
+                    className="px-3 py-1.5 rounded-full bg-muted hover:bg-[#00B894]/10 hover:text-[#00B894] text-xs font-bold text-muted-foreground transition-colors"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}

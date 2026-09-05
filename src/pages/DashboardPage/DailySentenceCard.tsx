@@ -8,10 +8,13 @@ import {
   Volume2,
   Languages,
   Heart,
+  Copy,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn, cleanText } from '@/lib/utils';
+import { StreamingText } from '@/components/StreamingText';
 import type { IChunk } from '@/data/chunks';
 
 interface DailySentenceCardProps {
@@ -109,14 +112,28 @@ function DailySentenceCardInner({
             <p className="text-2xl font-black text-foreground leading-relaxed">
               {dailyChunk.content}
             </p>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onTTS(dailyChunk.content)}
-              className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894] shrink-0"
-            >
-              <Volume2 className="size-4.5" />
-            </Button>
+            <div className="flex items-center gap-1 shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onTTS(dailyChunk.content)}
+                className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]"
+              >
+                <Volume2 className="size-4.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="复制本句"
+                onClick={() => {
+                  const text = `${dailyChunk.content}（${dailyChunk.meaning}）\n${cleanText(dailyChunk.example)}${exampleZh ? `\n${exampleZh}` : ''}`;
+                  try { navigator.clipboard?.writeText(text).then(() => toast.success('已复制到剪贴板')); } catch { /* ignore */ }
+                }}
+                className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]"
+              >
+                <Copy className="size-4" />
+              </Button>
+            </div>
           </div>
           <p className="text-sm font-medium text-muted-foreground">{dailyChunk.meaning}</p>
         </div>
@@ -158,9 +175,10 @@ function DailySentenceCardInner({
             </Button>
           </div>
           {exampleZh && (
-            <p className="text-xs text-muted-foreground font-medium pl-1 border-l-2 border-violet-300">
-              {exampleZh}
-            </p>
+            <StreamingText
+              text={exampleZh}
+              className="block text-xs text-muted-foreground font-medium pl-1 border-l-2 border-violet-300"
+            />
           )}
         </div>
 

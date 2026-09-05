@@ -6,7 +6,5 @@ scripts/.apikey
 .DS_Store
 Thumbs.db
 .v3-cache/
-
-*.bak
-*expand-progress.json
-.claude/
+release/
+.local-data/

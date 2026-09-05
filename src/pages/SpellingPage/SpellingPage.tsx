@@ -23,6 +23,7 @@ import {
   Mic,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/EmptyState';
 import { Input } from '@/components/ui/input';
 import {
   Sheet,
@@ -843,17 +844,16 @@ export default function SpellingPage() {
   const isFav = currentSentence ? isFavorited(currentSentence.en, 'spelling') : false;
   const currentProgress = currentSentence ? getProgress(currentSentence.id) : null;
 
-  // Welcome screen — no sentences yet, build database or use AI
-  if (sentences.length === 0) {
+  // Welcome screen — no sentences yet (hook state AND global word bank cache), build database or use AI
+  if (sentences.length === 0 && getWBSentences().length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 px-4">
-        <div className="size-20 rounded-3xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 flex items-center justify-center mb-6">
-          <Sparkles className="size-10 text-[#00B894]" />
-        </div>
-        <h2 className="text-2xl font-black italic mb-2">句子拼写</h2>
-        <p className="text-muted-foreground mb-8 text-center max-w-md">
-          首次使用需要建立句子数据库<br />将自动导入全部词库（9 级）的所有例句
-        </p>
+      <div className="flex flex-col items-center justify-center py-24 px-4">
+        <EmptyState
+          icon={Sparkles}
+          title="句子拼写"
+          description={<>首次使用需要建立句子数据库<br />将自动导入全部词库（9 级）的所有例句</>}
+          className="mb-2"
+        />
 
         <Button
           onClick={handleBuildDatabase}

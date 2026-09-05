@@ -22,19 +22,70 @@ import {
 import { useTTSSettings, getEnglishVoices } from '@/lib/tts-settings';
 import { cleanText } from '@/lib/utils';
 
+/** Unified voice option: browser SpeechSynthesis voice OR local-server voice */
+interface VoiceOption {
+  uri: string;
+  name: string;
+  lang: string;
+  source: 'system' | 'server';
+}
+
+/** Merge voice lists by uri, keeping first occurrence; English first */
+function mergeVoices(prev: VoiceOption[], next: VoiceOption[]): VoiceOption[] {
+  const seen = new Set<string>();
+  const out: VoiceOption[] = [];
+  for (const v of [...next, ...prev]) {
+    if (seen.has(v.uri)) continue;
+    seen.add(v.uri);
+    out.push(v);
+  }
+  const rank = (v: VoiceOption) =>
+    (v.source === 'server' ? 0 : 1) * 10 +
+    (v.lang.startsWith('en') ? 0 : v.lang.startsWith('zh') ? 1 : 2);
+  return out.sort((a, b) => rank(a) - rank(b));
+}
+
 export default function TTSSettings() {
   const { settings, updateSettings } = useTTSSettings();
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [open, setOpen] = useState(false);
 
-  // Load voices on mount + listen for changes
+  const fromSystemVoices = (list: SpeechSynthesisVoice[]): VoiceOption[] =>
+    list.map((v) => ({ uri: v.voiceURI, name: v.name, lang: v.lang, source: 'system' as const }));
+
+  // Load voices on mount + listen for changes.
+  // Electron/Chrome populate voices asynchronously and voiceschanged may never
+  // fire — poll a few times, then fall back to ALL voices if no English ones.
   useEffect(() => {
-    const load = () => setVoices(getEnglishVoices());
+    const loadAll = () => {
+      try {
+        const all = window.speechSynthesis?.getVoices?.() || [];
+        if (all.length > 0) setVoices((prev) => mergeVoices(prev, fromSystemVoices(all)));
+      } catch { /* ignore */ }
+    };
+    const load = () => {
+      const en = getEnglishVoices();
+      if (en.length > 0) setVoices((prev) => mergeVoices(prev, fromSystemVoices(en)));
+    };
+    // Desktop build only: enumerate the local server's voices (Edge neural + SAPI)
+    fetch('/api/tts-voices').then((r) => r.ok ? r.json() : null).then((data) => {
+      const serverVoices: VoiceOption[] = (data?.voices || []).map((v: { id: string; name: string; lang: string }) => ({
+        uri: v.id, name: v.name, lang: v.lang, source: 'server' as const,
+      }));
+      if (serverVoices.length > 0) setVoices((prev) => mergeVoices(prev, serverVoices));
+    }).catch(() => { /* web version — no local server */ });
     load();
+    const p1 = setTimeout(load, 400);
+    const p2 = setTimeout(load, 1200);
+    const p3 = setTimeout(() => { load(); if (getEnglishVoices().length === 0) loadAll(); }, 2400);
     if ('speechSynthesis' in window) {
       window.speechSynthesis.addEventListener('voiceschanged', load);
-      return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
+      return () => {
+        [p1, p2, p3].forEach(clearTimeout);
+        window.speechSynthesis.removeEventListener('voiceschanged', load);
+      };
     }
+    return () => [p1, p2, p3].forEach(clearTimeout);
   }, []);
 
   // Reload voices when popover opens (mobile WebViews often need a user-gesture
@@ -43,7 +94,7 @@ export default function TTSSettings() {
     if (open && voices.length === 0) {
       const tryLoad = () => {
         const available = getEnglishVoices();
-        if (available.length > 0) setVoices(available);
+        if (available.length > 0) setVoices((prev) => mergeVoices(prev, fromSystemVoices(available)));
       };
       tryLoad();
       // Retry after a short delay for slow-loading mobile browsers
@@ -54,6 +105,13 @@ export default function TTSSettings() {
   }, [open, voices.length]);
 
   const testVoice = useCallback(() => {
+    const selected = voices.find((v) => v.uri === settings.selectedVoiceURI);
+    // Server-sourced voice → play synthesized audio from the local server
+    if (selected?.source === 'server' || settings.selectedVoiceURI?.startsWith('srv:')) {
+      const a = new Audio(`/api/tts?text=${encodeURIComponent('Hello, this is a quick voice test.')}&rate=${settings.rate}&voice=${encodeURIComponent(settings.selectedVoiceURI || '')}`);
+      a.play().catch(() => { /* autoplay blocked */ });
+      return;
+    }
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(cleanText('Hello, this is a quick voice test.'));
@@ -61,13 +119,16 @@ export default function TTSSettings() {
     u.rate = settings.rate;
 
     // Apply selected voice
-    if (settings.selectedVoiceURI) {
-      const voice = voices.find((v) => v.voiceURI === settings.selectedVoiceURI);
+    if (selected && selected.source === 'system') {
+      const voice = window.speechSynthesis.getVoices().find((v) => v.voiceURI === selected.uri);
       if (voice) u.voice = voice;
     } else {
       // Auto-select best voice for test
-      const best = voices[0]; // voices are pre-sorted by quality
-      if (best) u.voice = best;
+      const best = voices.find((v) => v.source === 'system');
+      if (best) {
+        const voice = window.speechSynthesis.getVoices().find((v) => v.voiceURI === best.uri);
+        if (voice) u.voice = voice;
+      }
     }
 
     window.speechSynthesis.speak(u);
@@ -118,13 +179,28 @@ export default function TTSSettings() {
                 </SelectItem>
                 {voices.length === 0 && (
                   <div className="px-2 py-3 text-[10px] text-muted-foreground text-center leading-relaxed">
-                    暂无可用声音
+                    未检测到可用声音
                     <br />
-                    <span className="opacity-60">打开弹窗后自动刷新...</span>
+                    <span className="opacity-60">将自动使用在线语音引擎朗读（需联网）</span>
                   </div>
                 )}
-                {voices.map((v) => (
-                  <SelectItem key={v.voiceURI} value={v.voiceURI} className="text-xs font-medium">
+                {voices.filter((v) => v.source === 'server').length > 0 && (
+                  <div className="px-2 pt-2 pb-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground">
+                    在线神经语音
+                  </div>
+                )}
+                {voices.filter((v) => v.source === 'server').map((v) => (
+                  <SelectItem key={v.uri} value={v.uri} className="text-xs font-medium">
+                    {v.name} ({v.lang})
+                  </SelectItem>
+                ))}
+                {voices.filter((v) => v.source === 'system').length > 0 && (
+                  <div className="px-2 pt-2 pb-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground">
+                    系统语音
+                  </div>
+                )}
+                {voices.filter((v) => v.source === 'system').map((v) => (
+                  <SelectItem key={v.uri} value={v.uri} className="text-xs font-medium">
                     {v.name} ({v.lang})
                   </SelectItem>
                 ))}

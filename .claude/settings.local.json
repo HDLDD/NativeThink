@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(node -e \"const fs = require\\('fs'\\); let c = fs.readFileSync\\('src/data/chunks.ts', 'utf8'\\); const m = c.match\\(/\\\\\\\\\\\\\\\\'/g\\); console.log\\('Found', m ? m.length : 0, 'backslash-apostrophe'\\); const lines = c.split\\('\\\\n'\\); lines.forEach\\(\\(l, i\\) => { if \\(l.includes\\(\\\\\"\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'\\\\\"\\)\\) console.log\\('L' + \\(i+1\\) + ':', l.substring\\(0, 150\\)\\); }\\);\")",
+      "Bash(node -e \"const fs = require\\('fs'\\); const c = fs.readFileSync\\('src/data/chunks.ts', 'utf8'\\); const match = c.match\\(/example:'[^']*\\\\\\\\\\\\\\\\'[^']*'/\\); if \\(match\\) { const m = match[0]; for\\(let i = 0; i < Math.min\\(m.length, 60\\); i++\\) console.log\\(i, m[i], m.charCodeAt\\(i\\).toString\\(16\\)\\); }\")"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "webresearch"
+  ]
+}

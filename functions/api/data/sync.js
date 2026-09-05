@@ -27,11 +27,15 @@ export async function onRequest(context) {
         return Response.json({ error: 'Invalid JSON' }, { status: 400 });
       }
       const upserts = body.upserts || {};
+      const deletes = Array.isArray(body.deletes) ? body.deletes : [];
       const keys = Object.keys(upserts);
       for (const key of keys) {
         await env.KV.put(userDataKey(session.userId, key), upserts[key]);
       }
-      return Response.json({ ok: true, synced: keys.length });
+      for (const key of deletes) {
+        await env.KV.delete(userDataKey(session.userId, key));
+      }
+      return Response.json({ ok: true, synced: keys.length, deleted: deletes.length });
     }
 
     // Download (GET): pull all cloud data

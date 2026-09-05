@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { safeStorage } from './safe-storage';
 
 const FAVORITES_KEY = '__nativethink_favorites';
-const FAVORITES_BACKUP_KEY = '__nativethink_favorites_v2';
+/** Legacy unprefixed backup key — read once for migration, then removed */
+const FAVORITES_LEGACY_KEY = '__nativethink_favorites_v2';
 
 export interface IFavoriteItem {
   id: string;
@@ -14,25 +15,26 @@ export interface IFavoriteItem {
   createdAt: number;
 }
 
+/** One-time migration: move legacy unprefixed favorites into user-scoped safeStorage */
+function migrateLegacyFavorites(): void {
+  try {
+    const legacy = localStorage.getItem(FAVORITES_LEGACY_KEY);
+    if (!legacy) return;
+    if (!safeStorage.getItem(FAVORITES_KEY)) {
+      safeStorage.setItem(FAVORITES_KEY, legacy);
+    }
+    localStorage.removeItem(FAVORITES_LEGACY_KEY);
+  } catch { /* ignore */ }
+}
+
 export function useFavorites() {
   const [favorites, setFavorites] = useState<IFavoriteItem[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const loadFromStorage = useCallback(() => {
     try {
-      // Try direct key first (survives safeStorage prefix changes)
-      const direct = localStorage.getItem(FAVORITES_BACKUP_KEY);
-      if (direct) {
-        setFavorites(JSON.parse(direct));
-        return;
-      }
-      // Fallback to safeStorage (prefixed, user-scoped)
       const saved = safeStorage.getItem(FAVORITES_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setFavorites(parsed);
-        try { localStorage.setItem(FAVORITES_BACKUP_KEY, JSON.stringify(parsed)); } catch { /* ignore */ }
-      }
+      if (saved) setFavorites(JSON.parse(saved));
     } catch {
       // storage unavailable — use defaults
     }
@@ -40,6 +42,7 @@ export function useFavorites() {
 
   // Load on mount
   useEffect(() => {
+    migrateLegacyFavorites();
     loadFromStorage();
     setLoaded(true);
   }, [loadFromStorage]);
@@ -51,11 +54,19 @@ export function useFavorites() {
     return () => window.removeEventListener('nativethink-sync-down', onSyncDown);
   }, [loadFromStorage]);
 
+  // Re-load when another tab/component updates favorites
+  useEffect(() => {
+    const onFavoritesChanged = () => loadFromStorage();
+    window.addEventListener('nativethink-favorites-changed', onFavoritesChanged);
+    return () => window.removeEventListener('nativethink-favorites-changed', onFavoritesChanged);
+  }, [loadFromStorage]);
+
   const persist = useCallback((items: IFavoriteItem[]) => {
     setFavorites(items);
     try {
       safeStorage.setItem(FAVORITES_KEY, JSON.stringify(items));
-      localStorage.setItem(FAVORITES_BACKUP_KEY, JSON.stringify(items));
+      // Notify other mounted favorites consumers (e.g. CollocationsTab / page heart icons)
+      window.dispatchEvent(new Event('nativethink-favorites-changed'));
     } catch {
       // ignore
     }

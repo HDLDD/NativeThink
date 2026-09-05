@@ -364,8 +364,59 @@ export default function WritingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [timer, setTimer] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
-  const [history, setHistory] = useState<{ prompt: string; essay: string; feedback: string; date: number }[]>([]);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [history, setHistory] = useState<{ prompt: string; essay: string; feedback: string; date: number }[]>(() => {
+    try {
+      const saved = safeStorage.getItem('__nativethink_writing_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [selectedHistoryIdx, setSelectedHistoryIdx] = useState<number | null>(null);
+
+  // ── 草稿自动保存：刷新/意外退出不丢作文 ──
+  const DRAFT_KEY = '__nativethink_writing_draft';
+  // 恢复：仅当尚未开始写作时
+  useEffect(() => {
+    try {
+      const raw = safeStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (draft?.prompt?.title && draft.essay?.trim()) {
+          setSelectedPrompt(draft.prompt);
+          setEssay(draft.essay);
+          setDraftRestored(true);
+          toast.info('已恢复上次未完成的草稿');
+        }
+      }
+    } catch { /* ignore */ }
+
+  }, []);
+  // 防抖保存（800ms）
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        if (essay.trim() && selectedPrompt) {
+          safeStorage.setItem(DRAFT_KEY, JSON.stringify({ prompt: selectedPrompt, essay, savedAt: Date.now() }));
+        } else if (!essay.trim()) {
+          safeStorage.removeItem(DRAFT_KEY);
+        }
+      } catch { /* quota */ }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [essay, selectedPrompt]);
+  const discardDraft = () => {
+    try { safeStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    setDraftRestored(false);
+    setEssay('');
+    setSelectedPrompt(null);
+  };
+
+  // Persist practice history (cap at 50 entries to stay within localStorage quota)
+  useEffect(() => {
+    try {
+      safeStorage.setItem('__nativethink_writing_history', JSON.stringify(history.slice(-50)));
+    } catch { /* quota */ }
+  }, [history]);
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -503,6 +554,9 @@ Suggest 2-3 more advanced or natural alternatives to words used in the essay.`,
         ...prev,
         { prompt: selectedPrompt.title, essay: text, feedback: full, date: Date.now() },
       ]);
+      // 已提交 → 草稿完成，清除自动保存
+      try { safeStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+      setDraftRestored(false);
     } catch (err) {
       toast.error('AI 服务暂不可用，请稍后重试');
       setFeedback('> ⚠️ AI 写作反馈服务暂不可用。以下是一些自检建议：\n\n1. 检查你的文章是否有明显的拼写或语法错误\n2. 确认你是否使用了提示中建议的要点\n3. 尝试大声朗读你的文章来检测不自然的表达');

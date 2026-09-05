@@ -149,7 +149,8 @@ async function wbiSign(params) {
 export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
-  const bvid = (url.searchParams.get('bvid') || '').trim().toUpperCase();
+  // NOTE: Bilibili API bvid lookup is case-sensitive — never toUpperCase()
+  const bvid = (url.searchParams.get('bvid') || '').trim();
   const page = parseInt(url.searchParams.get('page') || '1', 10) || 1;
 
   if (!/^BV[A-Za-z0-9]{10,}$/.test(bvid)) {

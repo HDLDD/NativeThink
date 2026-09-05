@@ -1,4 +1,4 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState, useMemo, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart3,
@@ -18,6 +18,7 @@ import {
   Mic,
   Volume2,
   RotateCw,
+  Download,
   AlertTriangle,
   CheckCircle2,
   ExternalLink,
@@ -41,6 +42,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTTS } from '@/lib/use-tts';
 import { usePageMemory } from '@/lib/use-page-memory';
+import { EmptyState } from '@/components/EmptyState';
 import { safeStorage } from '@/lib/safe-storage';
 import { WORD_COUNTS } from '@/data/wordbank/meta';
 import { cn, cleanText } from '@/lib/utils';
@@ -97,6 +99,7 @@ export default function ProgressPage() {
   const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [filterType, setFilterType] = usePageMemory('progress-filter', 'all');
+  const [tab, setTab] = usePageMemory('progress-tab', 'calendar');
   const [favReviewMode, setFavReviewMode] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [resetConfirm, setResetConfirm] = useState<string | null>(null);
@@ -225,6 +228,32 @@ export default function ProgressPage() {
     return buildCalendarDays(calendar, currentMonth.getFullYear(), currentMonth.getMonth());
   }, [currentMonth, calendar]);
 
+  // ── 导出学习数据（JSON 备份，可自行保存/迁移） ──
+  const exportLearningData = useCallback(() => {
+    try {
+      const prefix = safeStorage.getPrefixedKey('');
+      const out: Record<string, string> = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key?.startsWith(prefix)) continue;
+        out[key.slice(prefix.length)] = localStorage.getItem(key) || '';
+      }
+      const blob = new Blob(
+        [JSON.stringify({ app: 'NativeThink', exportedAt: new Date().toISOString(), data: out }, null, 2)],
+        { type: 'application/json' },
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nativethink-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`已导出 ${Object.keys(out).length} 项学习数据`);
+    } catch {
+      toast.error('导出失败，请重试');
+    }
+  }, []);
+
   const filteredFavorites = useMemo(() => {
     if (filterType === 'all') return favorites;
     return favorites.filter((f) => f.type === filterType);
@@ -283,15 +312,26 @@ export default function ProgressPage() {
           <p className="text-muted-foreground mt-2 text-sm font-medium">
             追踪你的学习进度，回顾收藏的地道表达
           </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowResetDialog(true)}
-            className="mt-4 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
-          >
-            <RotateCw className="size-3.5 mr-1.5" />
-            管理学习记录
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowResetDialog(true)}
+              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+            >
+              <RotateCw className="size-3.5 mr-1.5" />
+              管理学习记录
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportLearningData}
+              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+            >
+              <Download className="size-3.5 mr-1.5" />
+              导出学习数据
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -574,7 +614,7 @@ export default function ProgressPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue="calendar" className="w-full">
+      <Tabs defaultValue="calendar" value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="bg-muted p-1.5 rounded-3xl h-auto">
           <TabsTrigger
             value="calendar"
@@ -870,15 +910,12 @@ export default function ProgressPage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-16">
-                  <div className="size-20 rounded-3xl bg-muted mx-auto mb-4 flex items-center justify-center text-muted-foreground">
-                    <Heart className="size-9" />
-                  </div>
-                  <h3 className="text-xl font-black text-foreground mb-2">还没有收藏</h3>
-                  <p className="text-sm text-muted-foreground font-medium">
-                    在学习过程中点击心形图标收藏你喜欢的表达
-                  </p>
-                </div>
+                <EmptyState
+                  icon={Heart}
+                  title="还没有收藏"
+                  description="在学习过程中点击心形图标收藏你喜欢的表达"
+                  className="py-14"
+                />
               )}
             </CardContent>
           </Card>

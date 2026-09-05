@@ -12,20 +12,31 @@ export function useCloudSync() {
   const [syncing, setSyncing] = useState(false);
   const lastSyncRef = useRef<number | null>(null);
 
-  // Debounced dual-write: accumulate pending upserts, flush in batch
+  // Debounced dual-write: accumulate pending upserts + deletes, flush in batch
   const pendingRef = useRef<Record<string, string>>({});
+  const pendingDeletesRef = useRef<Set<string>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flushPending = useCallback(async () => {
     const upserts = { ...pendingRef.current };
+    const deletes = [...pendingDeletesRef.current];
     pendingRef.current = {};
-    if (Object.keys(upserts).length === 0) return;
+    pendingDeletesRef.current = new Set();
+    if (Object.keys(upserts).length === 0 && deletes.length === 0) return;
     try {
       await apiFetch('/api/data/sync', {
         method: 'POST',
-        body: JSON.stringify({ upserts }),
+        body: JSON.stringify({ upserts, deletes }),
       });
-    } catch { /* offline — will retry on next syncUp */ }
+    } catch {
+      // Offline — merge back so the next flush retries (newer pending writes win)
+      pendingRef.current = { ...upserts, ...pendingRef.current };
+      const merged = new Set(pendingDeletesRef.current);
+      deletes.forEach((k) => merged.add(k));
+      // A delete followed by a re-set of the same key: keep it as an upsert only
+      merged.forEach((k) => { if (k in pendingRef.current) merged.delete(k); });
+      pendingDeletesRef.current = merged;
+    }
   }, []);
 
   // Push all localStorage data (safeStorage-scoped) to cloud
@@ -75,11 +86,18 @@ export function useCloudSync() {
     finally { setSyncing(false); }
   }, [isAuthenticated]);
 
-  // Register dual-write handler: debounced batch writes to KV
+  // Register dual-write handler: debounced batch writes to KV.
+  // value === null means deletion.
   const registerCloudWrite = useCallback(() => {
     if (!isAuthenticated) return;
-    setCloudSyncHandler((key: string, value: string) => {
-      pendingRef.current[key] = value;
+    setCloudSyncHandler((key: string, value: string | null) => {
+      if (value === null) {
+        delete pendingRef.current[key];
+        pendingDeletesRef.current.add(key);
+      } else {
+        pendingDeletesRef.current.delete(key);
+        pendingRef.current[key] = value;
+      }
       // Debounce: flush after 3s of inactivity
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(flushPending, 3000);

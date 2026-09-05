@@ -39,10 +39,13 @@ function extractKeywords(text) {
 }
 
 export async function onRequest(context) {
-  const { request } = context;
+  const { request, env } = context;
   const url = new URL(request.url);
-  const bvid = (url.searchParams.get('bvid') || '').trim().toUpperCase();
+  // NOTE: Bilibili API bvid lookup is case-sensitive — never toUpperCase()
+  const bvid = (url.searchParams.get('bvid') || '').trim();
   const page = parseInt(url.searchParams.get('page') || '1', 10) || 1;
+  // Optional B站 login state (SESSDATA) — unlocks B站 AI-generated subtitles
+  const cookieHeader = env?.BILIBILI_COOKIE || '';
 
   // Validate BVID
   if (!/^BV[A-Za-z0-9]{10,}$/.test(bvid)) {
@@ -53,7 +56,10 @@ export async function onRequest(context) {
   }
 
   // Step 1: Get view info (page list, titles, CIDs)
-  const viewData = await safeFetchJson(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`, { Referer: 'https://www.bilibili.com' });
+  const viewData = await safeFetchJson(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`, {
+    Referer: 'https://www.bilibili.com',
+    Cookie: cookieHeader,
+  });
   const pages = viewData?.data?.pages || [];
   const targetPage = pages[page - 1] || pages[0] || null;
 
@@ -71,38 +77,59 @@ export async function onRequest(context) {
   let source = 'none';
 
   if (targetPage && targetPage.cid) {
-    const subData = await safeFetchJson(
-      `https://api.bilibili.com/x/player/v2?bvid=${bvid}&cid=${targetPage.cid}`,
-      { Referer: 'https://www.bilibili.com' },
-    );
-    const subtitles = subData?.data?.subtitle?.subtitles || [];
+    // B站 AI 字幕是异步生成的：首次请求经常返回空/部分字幕。
+    // 轮询重试直到有完整英文字幕（最多 ~6s），避免前端拿到空结果。
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const subData = await safeFetchJson(
+        `https://api.bilibili.com/x/player/v2?bvid=${bvid}&cid=${targetPage.cid}`,
+        { Referer: 'https://www.bilibili.com', Cookie: cookieHeader },
+      );
+      const subtitles = subData?.data?.subtitle?.subtitles || [];
 
-    if (subtitles.length > 0) {
-      try {
-        const best = subtitles.find((s) => s.lan === 'en') || subtitles[0];
-        const subUrl = (best.subtitle_url || '').startsWith('//')
-          ? `https:${best.subtitle_url}`
-          : best.subtitle_url;
+      if (subtitles.length > 0) {
+        try {
+          // Prefer a REAL English track. B站 AI subtitles use lan like
+          // "ai-en" (English) or "ai-zh" (Chinese) — matching "en" picks
+          // ai-en; a plain Chinese video often only has ai-zh, which we
+          // must NOT put into the en field.
+          const hasEnglishTrack = subtitles.some((s) => /en/.test(s.lan || ''));
+          const best = hasEnglishTrack
+            ? subtitles.find((s) => /en/.test(s.lan || ''))
+            : null;
+          const subUrl = best ? ((best.subtitle_url || '').startsWith('//') ? `https:${best.subtitle_url}` : best.subtitle_url) : null;
 
-        if (subUrl) {
-          const subJson = await safeFetchJson(subUrl, { Referer: 'https://www.bilibili.com' });
-          const body = subJson?.body || [];
-          segments = body
-            .filter((item) => item.content && item.from != null && item.to != null)
-            .map((item) => {
-              const parts = item.content.split('<#>');
-              return {
-                start: item.from,
-                end: item.to,
-                en: (parts[0] || '').trim(),
-                zh: (parts[1] || '').trim(),
-                keywords: extractKeywords(parts[0] || ''),
-              };
-            })
-            .filter((s) => s.en.length > 0);
-          source = 'bilibili';
-        }
-      } catch { /* subtitle fetch failed silently */ }
+          if (subUrl) {
+            const subJson = await safeFetchJson(subUrl, { Referer: 'https://api.bilibili.com', Cookie: cookieHeader });
+            const body = subJson?.body || [];
+            segments = body
+              .filter((item) => item.content && item.from != null && item.to != null)
+              .map((item) => {
+                const parts = item.content.split('<#>');
+                return {
+                  start: item.from,
+                  end: item.to,
+                  en: (parts[0] || '').trim(),
+                  zh: (parts[1] || '').trim(),
+                  keywords: extractKeywords(parts[0] || ''),
+                };
+              })
+              .filter((s) => s.en.length > 0);
+            // Only accept when the track is English OR there are no Chinese-only
+            // tracks available (best is null). A Chinese AI track must not be
+            // shown as "English" subtitles.
+            if (!hasEnglishTrack) segments = [];
+            // Only accept when we have a useful amount of English text
+            if (segments.length > 20) {
+              source = 'bilibili';
+              break;
+            }
+            // Partial/empty → AI subtitle still generating, retry
+            segments = [];
+          }
+        } catch { /* subtitle fetch failed silently — retry */ }
+      }
+      // Wait between attempts (B站 AI 字幕生成通常需要 1-3 秒)
+      if (attempt < 4) await new Promise((r) => setTimeout(r, 1200));
     }
   }
 
