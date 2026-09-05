@@ -26,6 +26,7 @@ export interface IWordProgress {
   repetitions: number;     // successful review count
   nextReview: number;      // Date.now() at next review time
   lastReview: number;      // timestamp
+  wrongCount?: number;     // 连续答错累计（quality<=2 时 +1，答对清零）— 错词重练用
 }
 
 export interface ILearningState {
@@ -198,15 +199,20 @@ export function useWordLearning(level: string) {
 
   const recordReview = (word: IWordEntry, quality: number) => {
     const key = wordKey(word);
+    // 错词统计：quality<=2 记一次错，答对清零（错词重练用）
+    const applyWrong = (base: IWordProgress | undefined, updated: IWordProgress) => ({
+      ...updated,
+      wrongCount: quality <= 2 ? ((base as any)?.wrongCount || 0) + 1 : 0,
+    });
     // For 'all' mode: persist to the word's source level so per-level data stays accurate
     if (isAllLevels) {
       const sourceLevel = word.level && SUB_LEVELS.includes(word.level) ? word.level : 'cet4';
       const sourceState = loadState(sourceLevel);
       const existing = sourceState.progress[key];
-      const updated = sm2Update(
+      const updated = applyWrong(existing, sm2Update(
         existing || { wordKey: key, status: 'new', easeFactor: 2.5, interval: 0, repetitions: 0, nextReview: 0, lastReview: 0 },
         quality,
-      );
+      ));
       sourceState.progress[key] = updated;
       if (!sourceState.todayReviewed.includes(key)) sourceState.todayReviewed = [...sourceState.todayReviewed, key];
       if (!existing && !sourceState.todayLearned.includes(key)) sourceState.todayLearned = [...sourceState.todayLearned, key];
@@ -215,10 +221,10 @@ export function useWordLearning(level: string) {
     // Update in-memory state (works for both 'all' and specific levels)
     setState((prev) => {
       const existing = prev.progress[key];
-      const updated = sm2Update(
+      const updated = applyWrong(existing, sm2Update(
         existing || { wordKey: key, status: 'new', easeFactor: 2.5, interval: 0, repetitions: 0, nextReview: 0, lastReview: 0 },
         quality,
-      );
+      ));
       return {
         ...prev,
         progress: { ...prev.progress, [key]: updated },

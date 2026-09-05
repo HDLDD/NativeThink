@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   X, ChevronLeft, ChevronRight, BookOpen, Heart, Globe,
-  Sparkles, Hash, Wand2, Loader2, Volume2, ChevronDown, ChevronUp, ListTree, Repeat, Copy, Type,
+  Sparkles, Hash, Wand2, Loader2, Volume2, ChevronDown, ChevronUp, ListTree, Repeat, Copy, Type, Brain,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,7 +18,8 @@ import { cn, cleanText, extractJson } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { IReadingContent, TransMode, IParagraph } from '@/data/reading';
 import { buildPages } from '@/data/reading';
-import { queryWords, preloadLevels, getEssentialLevels, isAllReady } from '@/data/wordbank';
+import { queryWords, preloadLevels, getEssentialLevels, isAllReady, findWord } from '@/data/wordbank';
+import { useWordLearning } from '@/lib/use-word-learning';
 
 const LEVELS = [
   { key: 'beginner' as const, label: '初级', color: '#00B894' },
@@ -68,6 +69,14 @@ interface Props {
 export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const { isConfigured, chat: aiChat } = useAI();
   const { addFavorite, isFavorited, favorites, removeFavorite } = useFavorites();
+  // 查词 → 一键加入学习队列（'all' 模式自动落到词的源词书，复习队列立即可见）
+  const { recordReview: recordWordLearn } = useWordLearning('all');
+  const addToLearning = useCallback((word: string) => {
+    const entry = findWord(word);
+    if (!entry) { toast.info(`词库未收录 "${word}"，无法加入学习`); return; }
+    recordWordLearn(entry, 0); // quality 0 = 完全忘了 → 立即进入复习队列
+    toast.success(`已加入学习队列 — 复习闪卡中将出现 "${word}"`);
+  }, [recordWordLearn]);
 
   // ── 连读（auto-read) refs — declared before useTTS so the onEnd closure
   // can read the latest page state without stale-closure pitfalls ──
@@ -922,6 +931,14 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
               >
                 <Heart className={cn('size-3.5', favWord && 'fill-current')} />
                 {favWord ? '已收藏' : '收藏'}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => addToLearning(lookupWord_State)}
+                variant="outline"
+                className="rounded-xl text-xs font-bold gap-1 flex-1"
+              >
+                <Brain className="size-3.5" />加入学习
               </Button>
             </div>
             {/* 最近查询 — 查过的词随时回看 */}

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
-import { RotateCw, Volume2, Sparkles } from 'lucide-react';
+import { RotateCw, Volume2, Sparkles, XCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,8 +37,27 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     ? Object.values(allCounts).reduce((a, b) => a + b, 0)
     : (allCounts[currentLevel] || 0);
 
+  // ── 错词重练队列 ──
+  const [wrongDrill, setWrongDrill] = useState(false);
+  const wrongEntries = useMemo(() => {
+    const out: IWordEntry[] = [];
+    for (const [key, p] of Object.entries(state.progress)) {
+      if ((p.wrongCount || 0) > 0) {
+        const w = findWord(key);
+        if (w) out.push(w);
+      }
+    }
+    // 随机排序，避免每次重练顺序相同
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }, [state.progress]);
+
   const queue = useMemo(() => {
     const seen = new Set<string>();
+    if (wrongDrill) return wrongEntries;
     const dueWords: IWordEntry[] = [];
     for (const p of dueForReview) {
       const w = findWord(p.wordKey);
@@ -66,7 +85,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     const fillCount = Math.max(0, 20 - cappedDue.length - otherWords.length);
     const newWords = fillCount > 0 ? getNewWords(fillCount).filter((w) => !seen.has(w.word.toLowerCase())) : [];
     return [...cappedDue, ...otherWords, ...newWords];
-  }, [dueForReview, state.progress, getNewWords]);
+  }, [wrongDrill, wrongEntries, dueForReview, state.progress, getNewWords]);
 
   // 到期堆积提示（只在本轮挂载时提示一次）
   const dueOverCap = dueForReview.length > 30;
@@ -189,14 +208,28 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="size-9 rounded-xl bg-[#6C5CE7]/10 flex items-center justify-center text-[#6C5CE7]">
-            <RotateCw className="size-4.5" />
+          <div className={cn('size-9 rounded-xl flex items-center justify-center', wrongDrill ? 'bg-rose-500/10 text-rose-500' : 'bg-[#6C5CE7]/10 text-[#6C5CE7]')}>
+            {wrongDrill ? <XCircle className="size-4.5" /> : <RotateCw className="size-4.5" />}
           </div>
           <div>
-            <h2 className="text-sm font-black italic text-foreground">复习检测</h2>
-            <p className="text-[9px] font-bold text-muted-foreground">SM-2 间隔记忆 · 巩固已学单词</p>
+            <h2 className="text-sm font-black italic text-foreground">{wrongDrill ? '错词重练' : '复习检测'}</h2>
+            <p className="text-[9px] font-bold text-muted-foreground">{wrongDrill ? `专攻 ${wrongEntries.length} 个答错过的单词` : 'SM-2 间隔记忆 · 巩固已学单词'}</p>
           </div>
         </div>
+        {/* 错词重练入口 */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => { setWrongDrill((v) => !v); setIdx(0); setFlipped(false); setRated(false); }}
+          disabled={wrongEntries.length === 0 && !wrongDrill}
+          className={cn(
+            'rounded-xl text-[10px] font-black uppercase tracking-wider gap-1.5',
+            wrongDrill ? 'border-rose-300 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10' : 'border-border hover:border-rose-300 hover:text-rose-500',
+          )}
+        >
+          <XCircle className="size-3.5" />
+          {wrongDrill ? '退出重练' : `错词重练 (${wrongEntries.length})`}
+        </Button>
       </div>
 
       {/* SM-2 Stats */}

@@ -12,6 +12,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import { useTTSSettings } from './tts-settings';
 import { cleanText } from './utils';
 
@@ -53,6 +54,15 @@ function isIOS(): boolean {
   if (typeof navigator === 'undefined') return false;
   return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+/** 全部引擎失败时的用户提示 — 5 秒内只提示一次，避免刷屏 */
+let _lastTtsFailNotice = 0;
+function notifyTtsFailure(): void {
+  const now = Date.now();
+  if (now - _lastTtsFailNotice < 5000) return;
+  _lastTtsFailNotice = now;
+  try { toast.error('朗读暂时不可用，请点击重试'); } catch { /* ignore */ }
 }
 
 /**
@@ -293,7 +303,24 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         if (engineIdx + 1 < engines.length) {
           playChunkWithFallback(chunks, idx, rate, engineIdx + 1);
         } else {
-          onDone(); // all engines exhausted, skip this chunk
+          // 所有在线引擎失败 — 最后兜底：系统 SpeechSynthesis 直读
+          // （桌面端部分环境可用；浏览器端通常可用）。仍失败才提示。
+          try {
+            if ('speechSynthesis' in window && !abortedRef.current) {
+              const u = new SpeechSynthesisUtterance(chunks[idx]);
+              u.lang = 'en-US';
+              u.rate = rate;
+              const en = window.speechSynthesis.getVoices().filter((v) => v.lang.startsWith('en-'));
+              if (en[0]) u.voice = en[0];
+              u.onend = () => onDone();
+              u.onerror = () => { notifyTtsFailure(); onDone(); };
+              window.speechSynthesis.speak(u);
+              setIsSpeaking(true);
+              return;
+            }
+          } catch { /* ignore */ }
+          notifyTtsFailure();
+          onDone();
         }
       };
 

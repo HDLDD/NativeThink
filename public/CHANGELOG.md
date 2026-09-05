@@ -31,6 +31,10 @@
 
 
 
+
+## 2026-09-06
+- feat(ux): five user-perspective improvements (`458d3ee`)
+
 ## 2026-09-05
 - fix(tts): prewarm rate mismatch made warmup useless; collapse learning setup panel (`8ddbd21`)
 
@@ -51,6 +55,17 @@
 
 ## 2026-09-05
 - feat: desktop app release — local API server, pro reader redesign, UX overhaul (`8c9d11d`)
+
+## 2026-09-06 (2) — 学习闭环 + 朗读可靠性
+
+### 学习闭环三件套
+- feat: **阅读器查词"一键加入学习"** — 查词弹窗新增按钮：写入该词源词书的 SM-2 学习记录（立即到期），复习闪卡队列马上出现这个词——阅读→背词闭环打通
+- feat: **错词专项重练** — 复习检测页新增"错词重练 (N)"入口：答错(评分≤2)的词自动累计，一键进入乱序重练队列，答对自动移出错词本；头部显示专攻模式
+- feat: **收藏单词导入拼写** — 拼写页词书下拉新增"导入收藏单词"：❤ 收藏过的词一键转为拼写条目（配合"单词拼写"模式），去重导入、自动切到全部词书
+
+### 朗读可靠性（"朗读不出来"兜底）
+- fix: 服务端 SAPI 合成失败自动重试一次（负载下偶发 PowerShell 启动失败不再丢音）
+- feat: 客户端三级兜底 — 本地 SAPI → Edge 神经 → Google 代理全部失败时，**最终回退系统 SpeechSynthesis 直读**；连这也失败才提示"朗读暂时不可用"（5 秒去重防刷屏）——任何情况下不再无声无息
 
 ## 2026-09-06 — 使用者视角体验优化
 

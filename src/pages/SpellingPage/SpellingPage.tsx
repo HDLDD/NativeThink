@@ -22,6 +22,7 @@ import {
   Loader2,
   Mic,
   ChevronDown,
+  Heart,
   Library,
 } from 'lucide-react';
 import {
@@ -781,6 +782,34 @@ export default function SpellingPage() {
   );
 
   /** Build sentence database from ALL word bank levels (into global cache) */
+  // ── 导入收藏单词：作为单词条目加入拼写队列（适合"单词拼写"模式） ──
+  const importFavoriteWords = useCallback(() => {
+    const wordFavs = favorites.filter((f) => f.type === 'word');
+    if (wordFavs.length === 0) {
+      toast.info('还没有收藏单词 — 在词库/阅读中点 ❤ 收藏后即可导入');
+      return;
+    }
+    const items = wordFavs.map((f) => ({
+      en: f.content.trim(),
+      zh: f.meaning || '',
+      source: 'favorite' as const,
+      level: 'favorites',
+      difficulty: 'intermediate' as const,
+    }));
+    const added = addSentences(items);
+    if (added > 0) {
+      toast.success(`已导入 ${added} 个收藏单词（建议配合"单词拼写"模式）`);
+      if (activeLevel !== 'all') {
+        setActiveLevel('all');
+        rebuildSession({ level: 'all' });
+      } else {
+        rebuildSession();
+      }
+    } else {
+      toast.info('收藏单词都已导入过');
+    }
+  }, [favorites, addSentences, activeLevel, rebuildSession]);
+
   const handleBuildDatabase = useCallback(async () => {
     setBuilding(true);
     try {
@@ -1110,6 +1139,14 @@ export default function SpellingPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[170px] max-h-[320px] overflow-y-auto">
+              {/* 收藏单词导入 */}
+              <DropdownMenuItem onClick={importFavoriteWords} className="gap-2 text-xs font-bold">
+                <Heart className="size-3.5 text-rose-500" />
+                导入收藏单词 {favorites.filter((f) => f.type === 'word').length > 0 && (
+                  <span className="ml-auto text-[10px] text-muted-foreground">{favorites.filter((f) => f.type === 'word').length}</span>
+                )}
+              </DropdownMenuItem>
+              <div className="h-px bg-border my-1" />
               <DropdownMenuItem
                 onClick={() => handleLevelChange('all')}
                 disabled={activeLevel === 'all'}

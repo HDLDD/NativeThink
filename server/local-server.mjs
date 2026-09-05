@@ -485,7 +485,13 @@ export async function startServer(opts) {
       if (isEdge) {
         await synthesizeEdgeMp3(text, voice.slice('srv:edge:'.length), parseFloat(rate) || 1, cachePath);
       } else {
-        await synthesizeWav(text, rate, cachePath, voice || null);
+        // SAPI spawn occasionally hiccups under load — one retry before failing
+        try {
+          await synthesizeWav(text, rate, cachePath, voice || null);
+        } catch (err) {
+          console.warn('[api] tts retry after:', err.message);
+          await synthesizeWav(text, rate, cachePath, voice || null);
+        }
       }
     };
 
