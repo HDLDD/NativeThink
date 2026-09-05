@@ -34,6 +34,10 @@
 
 
 
+
+## 2026-09-06
+- feat(vocab): immersive mode entry — mode cards home, hide all other entries inside a mode, back button (`a9f7926`)
+
 ## 2026-09-06
 - feat(vocab): focused study mode — overview hidden while studying, back button to return (`169c2cc`)
 

@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
-import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft } from 'lucide-react';
+import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, ArrowRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFavorites } from '@/lib/use-favorites';
+import { useWordLearning } from '@/lib/use-word-learning';
 import { WordImage } from '@/components/WordImage';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
@@ -825,6 +826,10 @@ export default function DeepVocabularyPage() {
 
   // ── 沉浸式模式：进入某模式后隐藏其它模式入口，<- 返回模式选择 ──
   const [immersed, setImmersed] = useState(false);
+  const { dueForReview: homeDue, state: homeWordState } = useWordLearning(selectedLevel);
+  const homeLearnedToday = Object.keys(homeWordState.progress).length > 0
+    ? homeWordState.todayLearned.length
+    : 0;
   const enterMode = (key: string) => { handleTabChange(key); setImmersed(true); };
 
   // Word list pagination with configurable page size
@@ -888,18 +893,56 @@ export default function DeepVocabularyPage() {
       </div>
       )}
 
-      {/* ── 模式选择主页 ── */}
+      {/* ── 模式选择主页（竖排 · 突出重点） ── */}
       {!immersed && (
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 stagger">
-        {MODES.map((m) => (
+      <div className="flex flex-col gap-3 stagger">
+
+        {/* 主推：每日学习 */}
+        <button
+          onClick={() => enterMode('daily')}
+          className="group relative overflow-hidden p-6 rounded-[28px] text-left transition-all duration-200 border-2 border-transparent bg-gradient-to-br from-[#00B894] to-emerald-500 shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30 hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.99]"
+        >
+          <span className="absolute -right-4 -top-6 text-[120px] leading-none text-white/10 select-none pointer-events-none">🧠</span>
+          <span className="relative block text-[10px] font-black uppercase tracking-[0.2em] text-white/70 mb-1">Daily Learning · 主推</span>
+          <span className="relative flex items-center gap-2 mb-1">
+            <span className="text-xl font-black italic text-white">每日学习</span>
+            <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-black">今日已学 {homeLearnedToday}</span>
+          </span>
+          <span className="relative block text-xs text-white/80 font-medium">SM-2 间隔记忆 · 每天按计划推进新词</span>
+          <ArrowRight className="relative size-5 text-white absolute right-6 top-1/2 -translate-y-1/2 group-hover:translate-x-1 transition-transform" />
+        </button>
+
+        {/* 复习 */}
+        <button
+          onClick={() => enterMode('flashcard')}
+          className="group flex items-center gap-4 p-4 rounded-[24px] border-2 border-border bg-card text-left transition-all duration-200 hover:border-[#6C5CE7]/40 hover:shadow-md hover:-translate-y-0.5"
+        >
+          <span className="size-12 rounded-2xl bg-violet-50 dark:bg-violet-500/15 flex items-center justify-center text-2xl shrink-0">🔄</span>
+          <span className="flex-1 min-w-0">
+            <span className="flex items-center gap-2">
+              <span className="text-sm font-black text-foreground group-hover:text-[#6C5CE7] transition-colors">复习检测</span>
+              {homeDue.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 text-[10px] font-black">{homeDue.length} 个到期</span>
+              )}
+            </span>
+            <span className="block text-[11px] text-muted-foreground mt-0.5">SM-2 闪卡 · 巩固记忆{homeDue.length > 0 ? ' · 有到期单词待复习' : ''}</span>
+          </span>
+          <ChevronRight className="size-4 text-muted-foreground shrink-0 group-hover:text-[#6C5CE7] transition-colors" />
+        </button>
+
+        {/* 其余模式 */}
+        {MODES.filter((m) => m.key !== 'daily' && m.key !== 'flashcard').map((m) => (
           <button
             key={m.key}
             onClick={() => enterMode(m.key)}
-            className="group p-5 rounded-[24px] border-2 border-border text-left transition-all duration-200 hover:border-[#00B894]/40 hover:shadow-md hover:-translate-y-0.5"
+            className="group flex items-center gap-4 p-4 rounded-[24px] border-2 border-border bg-card text-left transition-all duration-200 hover:border-[#00B894]/40 hover:shadow-md hover:-translate-y-0.5"
           >
-            <span className="text-2xl block mb-2">{m.icon}</span>
-            <span className="block text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors">{m.label}</span>
-            <span className="block text-[11px] text-muted-foreground mt-0.5">{m.desc}</span>
+            <span className="size-12 rounded-2xl bg-muted flex items-center justify-center text-2xl shrink-0">{m.icon}</span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors">{m.label}</span>
+              <span className="block text-[11px] text-muted-foreground mt-0.5">{m.desc}</span>
+            </span>
+            <ChevronRight className="size-4 text-muted-foreground shrink-0 group-hover:text-[#00B894] transition-colors" />
           </button>
         ))}
       </div>
