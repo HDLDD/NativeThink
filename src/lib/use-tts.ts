@@ -33,7 +33,7 @@ export interface SpeakOptions {
 
 export interface TTSHandle {
   speak: (text: string, opts?: SpeakOptions) => void;
-  prewarm: (text: string) => void;
+  prewarm: (text: string, opts?: { rate?: number }) => void;
   pause: () => void;
   resume: () => void;
   cancel: () => void;
@@ -461,12 +461,14 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
   // Prewarm: silently fetch audio URL so browser caches it.
   // Call with the NEXT word while current word is displayed.
-  const prewarm = useCallback((text: string) => {
+  const prewarm = useCallback((text: string, opts?: { rate?: number }) => {
     const cleaned = cleanText(text);
     if (!cleaned) return;
-    // Only prewarm the local server engine (fastest) — fills the synth cache
+    // Fill the local server synth cache with the SAME rate/voice the actual
+    // speak() will request — a mismatched cache key makes prewarm useless.
+    const rate = opts?.rate ?? settings.rate;
     try {
-      const url = cfTtsUrl(cleaned, settings.rate, settings.selectedVoiceURI);
+      const url = cfTtsUrl(cleaned, rate, settings.selectedVoiceURI);
       // Use fetch with low priority so it doesn't compete with current playback
       fetch(url, { priority: 'low' }).catch(() => {});
     } catch { /* */ }

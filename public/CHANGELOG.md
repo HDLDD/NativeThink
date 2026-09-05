@@ -29,6 +29,10 @@
 
 
 
+
+## 2026-09-05
+- feat(images): extend illustrations to daily sentence card and daily learning mode (`2ea823f`)
+
 ## 2026-09-05
 - feat(words): real photo illustrations for vocabulary detail + flashcards (`3cf1780`)
 
@@ -43,6 +47,16 @@
 
 ## 2026-09-05
 - feat: desktop app release — local API server, pro reader redesign, UX overhaul (`8c9d11d`)
+
+## 2026-08-28 (17) — 学习设置折叠 + 闪卡朗读提速
+
+### 交互
+- feat: **学习设置默认折叠** — 学习方式/每日学习量面板不再常显：收起为一行摘要（"闪卡 · 每日 100 词"），点击展开修改，界面更聚焦
+
+### 朗读延迟（根因修复）
+- fix: **prewarm 语速不匹配导致预热完全无效** — 预热用 settings.rate（0.9）写缓存，实际朗读用 0.85，缓存 key 对不上，每次切词都要现场合成（~1s 等待）。现在 prewarm 支持传入与朗读一致的语速
+- feat: **会话预热** — 进入学习/复习队列时自动预合成前 3 个词；闪卡切词时继续预合成下一个词 → 首词与切词朗读均接近零等待
+- 覆盖：每日学习闪卡、复习闪卡、词库浏览
 
 ## 2026-08-28 (16) — 插图扩展：每日一句 + 学习模式
 

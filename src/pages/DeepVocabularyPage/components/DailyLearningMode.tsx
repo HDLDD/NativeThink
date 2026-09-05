@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
-import { Brain, Target, CheckCircle2, RotateCw, Sparkles, Volume2, BookOpen, ArrowRight, XCircle, Edit3, Shuffle, Headphones, Link2, PenLine } from 'lucide-react';
+import { Brain, Target, CheckCircle2, RotateCw, Sparkles, Volume2, BookOpen, ArrowRight, XCircle, Edit3, Shuffle, Headphones, Link2, PenLine, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +47,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   const tts = useTTS();
 
   const [reviewMode, setReviewMode] = useState<ReviewMode>('flashcard');
+  const [setupOpen, setSetupOpen] = useState(false); // 学习设置默认折叠
   const [sessionWords, setSessionWords] = useState<IWordEntry[]>([]);
   const [levelToast, setLevelToast] = useState<string | null>(null);
 
@@ -158,7 +159,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       // 正面：朗读单词 + 预加载下一个单词的音频
       ttsRef.current.speak(word.word, { rate: 0.85 });
       const next = sessionWords[currentIdx + 1];
-      if (next) ttsRef.current.prewarm(next.word);
+      if (next) ttsRef.current.prewarm(next.word, { rate: 0.85 });
     } else if (word.examples[0]) {
       // 反面：朗读例句（等翻面动画完成）
       const timer = setTimeout(() => {
@@ -206,6 +207,10 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       return;
     }
     setSessionWords(all);
+    // 会话预热：预合成前 3 个词，首词朗读零等待
+    all.slice(0, 3).forEach((w, i) => {
+      setTimeout(() => ttsRef.current.prewarm(w.word, { rate: 0.85 }), 120 * i);
+    });
     setCurrentIdx(0);
     setFlipped(false);
     setRated(false);
@@ -500,10 +505,25 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
         </div>
       </div>
 
-      {/* Learning mode selector + quota — hidden in simple mode */}
+      {/* Learning mode selector + quota — 默认折叠，点击摘要行展开（不常显） */}
       {!simple && (
       <Card className="rounded-2xl border-border shadow-sm">
         <CardContent className="p-3 space-y-3">
+          {/* 摘要行（始终显示） */}
+          <button
+            className="w-full flex items-center justify-between gap-2 group"
+            onClick={() => setSetupOpen((v) => !v)}
+          >
+            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground shrink-0">学习设置</span>
+            <span className="flex items-center gap-2 text-xs font-bold text-foreground group-hover:text-[#00B894] transition-colors">
+              {modeLabels.find((m) => m.key === reviewMode)?.label || '闪卡'} · 每日 {dailyQuota} 词
+              <ChevronDown className={cn('size-4 text-muted-foreground transition-transform duration-200', setupOpen && 'rotate-180')} />
+            </span>
+          </button>
+
+          {/* 展开的完整设置 */}
+          {setupOpen && (
+          <>
           {/* Mode selector */}
           <div className="flex items-center justify-between gap-2">
             <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground shrink-0">学习方式</span>
@@ -575,6 +595,8 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               />
             </div>
           </div>
+          </>
+          )}
         </CardContent>
       </Card>
       )}

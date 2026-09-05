@@ -68,6 +68,13 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const ttsRef = useRef(tts);
   ttsRef.current = tts;
   const lastSpokenKey = useRef('');
+  // 会话预热：进入队列时预合成前 3 个词，首词朗读零等待
+  useEffect(() => {
+    if (!autoSpeak) return;
+    queue.slice(0, 3).forEach((w, i) => {
+      setTimeout(() => ttsRef.current.prewarm(w.word, { rate: 0.85 }), 120 * i);
+    });
+  }, [queue]);
   useEffect(() => {
     if (!autoSpeak) return;
     const word = queue[currentIdx];
@@ -79,7 +86,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     if (!isFlipped) {
       ttsRef.current.speak(word.word, { rate: 0.85 });
       const next = queue[currentIdx + 1];
-      if (next) ttsRef.current.prewarm(next.word);
+      if (next) ttsRef.current.prewarm(next.word, { rate: 0.85 });
     } else if (word.examples[0]) {
       const timer = setTimeout(() => { ttsRef.current.speak(cleanText(word.examples[0].en), { rate: 0.85 }); }, 400);
       return () => clearTimeout(timer);

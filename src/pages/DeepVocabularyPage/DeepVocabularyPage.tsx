@@ -727,7 +727,7 @@ export default function DeepVocabularyPage() {
     // Prewarm the next word's audio for instant playback
     const idx = filteredWords.findIndex((w) => w.word === selectedWord.word);
     const next = filteredWords[idx + 1];
-    if (next) browseTtsRef.current.prewarm(next.word);
+    if (next) browseTtsRef.current.prewarm(next.word, { rate: 0.9 });
   }, [selectedWord, tab]);
 
   const switchLevel = (level: string) => {
