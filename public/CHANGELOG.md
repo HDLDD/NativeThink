@@ -24,6 +24,10 @@
 
 
 
+
+## 2026-09-05
+- feat: desktop app release — local API server, pro reader redesign, UX overhaul (`8c9d11d`)
+
 ## 2026-08-28 (12) — 朗读提速 + 阅读器专业版重做
 
 ### 朗读（修复慢/不朗读）

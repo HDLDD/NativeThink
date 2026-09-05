@@ -58,7 +58,7 @@ export default function AppSidebar() {
   const { pathname } = useLocation();
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-card">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border/70 bg-card/85 backdrop-blur-md">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-4 group-data-[state=collapsed]:px-0 group-data-[state=collapsed]:justify-center">
           <div className="size-10 shrink-0 rounded-2xl bg-gradient-to-br from-[#00B894] to-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30">

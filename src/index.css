@@ -188,3 +188,76 @@ main ::-webkit-scrollbar-track { background: transparent; }
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
   cursor: grab;
 }
+
+/* ═══════════ Premium surface polish（纯视觉层，不影响任何功能） ═══════════ */
+
+/* 环境光背景：柔和青绿渐变铺底（固定，不随滚动） */
+body {
+  background:
+    radial-gradient(1100px 560px at 88% -12%, rgb(0 184 148 / 0.07), transparent 60%),
+    radial-gradient(900px 520px at -12% 112%, rgb(99 102 241 / 0.05), transparent 55%),
+    var(--background);
+  background-attachment: fixed;
+}
+.dark body {
+  background:
+    radial-gradient(1100px 560px at 88% -12%, rgb(0 184 148 / 0.09), transparent 60%),
+    radial-gradient(900px 520px at -12% 112%, rgb(99 102 241 / 0.07), transparent 55%),
+    var(--background);
+  background-attachment: fixed;
+}
+
+/* 卡片：分层柔影 + 悬浮微抬升（纯视觉反馈） */
+[data-slot="card"] {
+  box-shadow:
+    0 1px 2px rgb(16 24 40 / 0.04),
+    0 10px 28px -18px rgb(16 24 40 / 0.12);
+  transition: box-shadow 220ms ease, transform 220ms ease, border-color 220ms ease;
+}
+[data-slot="card"]:hover {
+  box-shadow:
+    0 2px 4px rgb(16 24 40 / 0.05),
+    0 18px 44px -22px rgb(16 24 40 / 0.18);
+  border-color: color-mix(in srgb, var(--border) 72%, #00B894 14%);
+}
+.dark [data-slot="card"] {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.25),
+    0 10px 28px -18px rgb(0 0 0 / 0.45);
+}
+
+/* 主色：品牌渐变 + 柔光（按钮/激活态/进度统一质感） */
+.bg-\[\#00B894\] {
+  background-image: linear-gradient(135deg, #00D2A9 0%, #00B894 48%, #00A286 100%);
+  box-shadow: 0 4px 14px -5px rgb(0 184 148 / 0.55);
+}
+.bg-\[\#00B894\]:hover { filter: brightness(1.06); }
+
+/* 按钮：按压回弹手感 */
+[data-slot="button"] {
+  transition: transform 130ms ease, box-shadow 200ms ease, background-color 200ms ease,
+    color 200ms ease, border-color 200ms ease, filter 200ms ease;
+}
+[data-slot="button"]:active { transform: scale(0.97); }
+
+/* 输入框：聚焦青绿光环 */
+[data-slot="input"]:focus-visible,
+textarea:focus-visible {
+  border-color: #00B894 !important;
+  box-shadow: 0 0 0 3px rgb(0 184 148 / 0.16) !important;
+}
+
+/* 标题微收字距，更精致的排版 */
+h1, h2, h3 { letter-spacing: -0.015em; }
+
+/* 滚动条全局柔化（替代默认粗灰条） */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb {
+  background: hsl(180 12% 74% / 0.8);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: hsl(180 12% 62% / 0.9); background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+.dark ::-webkit-scrollbar-thumb { background-color: hsl(180 10% 30% / 0.8); background-clip: content-box; }
