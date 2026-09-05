@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
-import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings } from 'lucide-react';
+import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,6 +22,7 @@ import DailyLearningMode from './components/DailyLearningMode';
 import FlashcardMode from './components/FlashcardMode';
 import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
 import CollocationsTab from './components/CollocationsTab';
+import { VocabTestTab } from './components/VocabTestTab';
 
 interface IWordAiData { sentences: { en: string; zh: string }[]; explanation: string; }
 
@@ -63,6 +64,7 @@ const MODES = [
   { key: 'flashcard', label: '复习检测', icon: '🔄', desc: 'SM-2 间隔记忆复习' },
   { key: 'browse', label: '词库浏览', icon: '📖', desc: '自由浏览全部词汇' },
   { key: 'collocations', label: '搭配学习', icon: '🔗', desc: '常用搭配与短语' },
+  { key: 'vocabtest', label: '词汇量测试', icon: '🎯', desc: '1分钟估算词汇量' },
 ] as const;
 
 const REVIEW_MODES = [
@@ -581,6 +583,62 @@ export default function DeepVocabularyPage() {
 
   const wordKey = (w: IWordEntry) => w.word.toLowerCase();
 
+  // ── AI 深度解析（词根/联想/易混淆）— 按词缓存 ──
+  const [deepData, setDeepData] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(safeStorage.getItem('__nativethink_word_deep') || '{}'); } catch { return {}; }
+  });
+  const [deepLoading, setDeepLoading] = useState(false);
+  const handleGenerateDeep = async (w: IWordEntry) => {
+    if (!isConfigured || deepLoading) return;
+    const key = w.word.toLowerCase();
+    setDeepLoading(true);
+    try {
+      const result = await aiChat([
+        { role: 'system', content: '你是英语词汇教学专家。用中文回复纯文本（不用markdown），严格包含三部分：【词根词缀】拆解构词逻辑；【联想记忆】一个生动的记忆钩子；【易混淆】1-2个形近或义近词及区别。总共不超过130字。' },
+        { role: 'user', content: `单词: ${w.word}${w.phonetic ? ` (${w.phonetic})` : ''}\n含义: ${w.meaning}\n词性: ${w.partOfSpeech}` },
+      ], { temperature: 0.6, maxTokens: 400 });
+      const text = (result || '').trim();
+      if (text) {
+        setDeepData((prev) => {
+          const next = { ...prev, [key]: text };
+          try { safeStorage.setItem('__nativethink_word_deep', JSON.stringify(next)); } catch { /* quota */ }
+          return next;
+        });
+      } else toast.error('生成失败，请重试');
+    } catch { toast.error('AI 服务暂不可用'); }
+    finally { setDeepLoading(false); }
+  };
+
+  /** 点击同/反义词芯片：词库有该词则跳转详情，否则提示 */
+  const jumpToWord = (word: string) => {
+    const target = word.toLowerCase();
+    const found = queryWords({ search: target, limit: 10 }).find((w) => w.word.toLowerCase() === target);
+    if (found) {
+      setSelectedWord(found);
+      try { found.word && tts.speak(found.word, { rate: 0.9 }); } catch { /* ignore */ }
+    } else {
+      toast.info(`词库未收录 "${word}"`);
+    }
+  };
+
+  // ── 动态同根词：用常见前后缀形态学匹配当前词库（静态 wordFamily 字段基本为空） ──
+  const derivedFamily = useMemo(() => {
+    if (!selectedWord) return [] as string[];
+    const base = selectedWord.word.toLowerCase();
+    if (base.length < 3) return [];
+    const suffixes = ['s', 'es', 'ed', 'd', 'ing', 'ly', 'ness', 'ment', 'tion', 'sion', 'ance', 'ence', 'er', 'or', 'est', 'ful', 'less', 'ive', 'ous', 'ally', 'ify', 'ize', 'ise', 'ation', 'ical', 'ic'];
+    const prefixes = ['un', 're', 'dis', 'in', 'im', 'over', 'under'];
+    const cands = new Set<string>();
+    for (const s of suffixes) cands.add(base + s);
+    for (const p of prefixes) cands.add(p + base);
+    // 去尾变形：happy→happiness 已覆盖；再试去 e / 变 y→i
+    if (base.endsWith('e')) { const stem = base.slice(0, -1); for (const s of ['ing', 'ed', 'ation']) cands.add(stem + s); }
+    if (base.endsWith('y')) { const stem = base.slice(0, -1) + 'i'; for (const s of ['ness', 'es', 'ly']) cands.add(stem + s); }
+    const pool = queryWords({ level: selectedLevel === 'all' ? undefined : selectedLevel });
+    const bankSet = new Set(pool.map((w) => w.word.toLowerCase()));
+    return [...cands].filter((c) => bankSet.has(c)).slice(0, 8);
+  }, [selectedWord, selectedLevel]);
+
   const handleGenerateWordSentences = async (word: IWordEntry) => {
     if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
     const key = wordKey(word);
@@ -887,6 +945,7 @@ export default function DeepVocabularyPage() {
           <TabsTrigger value="flashcard" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#6C5CE7] data-[state=active]:shadow-sm"><RotateCw className="size-4 mr-2" />复习</TabsTrigger>
           <TabsTrigger value="browse" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-sky-500 data-[state=active]:shadow-sm"><BookOpen className="size-4 mr-2" />词库浏览</TabsTrigger>
           <TabsTrigger value="collocations" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-amber-500 data-[state=active]:shadow-sm"><Link2 className="size-4 mr-2" />搭配学习</TabsTrigger>
+          <TabsTrigger value="vocabtest" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-rose-500 data-[state=active]:shadow-sm"><Target className="size-4 mr-2" />测词汇量</TabsTrigger>
         </TabsList>
         </div>{/* end sticky header */}
 
@@ -1220,6 +1279,86 @@ export default function DeepVocabularyPage() {
                           </div>
                         </div>
                       )}
+                      {(selectedWord.synonyms.length > 0 || selectedWord.antonyms.length > 0) && (
+                        <div className="grid sm:grid-cols-2 gap-3 mb-4">
+                          {selectedWord.synonyms.length > 0 && (
+                            <div className="p-3.5 rounded-2xl bg-[#00B894]/5 border border-[#00B894]/15">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-[#00B894]">同义词 · 点击跳转</span>
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {selectedWord.synonyms.map((s, i) => (
+                                  <Badge
+                                    key={i}
+                                    onClick={(e) => { e.stopPropagation(); jumpToWord(s); }}
+                                    className="rounded-full px-2.5 py-1 text-xs font-bold bg-white/80 dark:bg-card text-[#00B894] border border-[#00B894]/20 cursor-pointer hover:bg-[#00B894]/15 transition-colors"
+                                  >
+                                    {s}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {selectedWord.antonyms.length > 0 && (
+                            <div className="p-3.5 rounded-2xl bg-rose-500/5 border border-rose-500/15">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-rose-500">反义词 · 点击跳转</span>
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {selectedWord.antonyms.map((a, i) => (
+                                  <Badge
+                                    key={i}
+                                    onClick={(e) => { e.stopPropagation(); jumpToWord(a); }}
+                                    className="rounded-full px-2.5 py-1 text-xs font-bold bg-white/80 dark:bg-card text-rose-500 border border-rose-500/20 cursor-pointer hover:bg-rose-500/15 transition-colors"
+                                  >
+                                    {a}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {derivedFamily.length > 0 && (
+                        <div className="mb-4">
+                          <span className="text-xs font-black uppercase tracking-wider text-foreground">同根词 · 词库内点击跳转</span>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {derivedFamily.map((f, i) => (
+                              <Badge
+                                key={i}
+                                onClick={(e) => { e.stopPropagation(); jumpToWord(f); }}
+                                className="rounded-full px-3 py-1.5 text-xs font-bold bg-indigo-500/10 text-indigo-500 border-none cursor-pointer hover:bg-indigo-500/20 transition-colors"
+                              >
+                                {f}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {/* AI 深度解析 */}
+                      <div className="rounded-2xl border border-violet-200/50 bg-violet-50/40 dark:bg-violet-500/5 p-4">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-xs font-black uppercase tracking-wider text-violet-500 flex items-center gap-1.5">
+                            <Lightbulb className="size-3.5" />深度解析 · 词根与记忆
+                          </span>
+                          {!selectedWord.deepExplanation && !deepData[wordKey(selectedWord)] && (
+                            <Button
+                              variant="outline" size="sm"
+                              onClick={() => handleGenerateDeep(selectedWord)}
+                              disabled={!isConfigured || deepLoading}
+                              className="rounded-xl border-dashed border-violet-300 text-violet-500 text-[10px] font-black uppercase tracking-wider h-7"
+                            >
+                              {deepLoading ? <Loader2 className="size-3 mr-1 animate-spin" /> : <Wand2 className="size-3 mr-1" />}
+                              {isConfigured ? 'AI 生成' : '需配置 AI'}
+                            </Button>
+                          )}
+                        </div>
+                        {deepLoading ? (
+                          <p className="text-sm text-muted-foreground flex items-center gap-2">
+                            <Loader2 className="size-3.5 animate-spin text-violet-400" />AI 正在解析…
+                          </p>
+                        ) : (
+                          <p className="text-sm text-foreground/80 font-medium leading-relaxed">
+                            {selectedWord.deepExplanation || deepData[wordKey(selectedWord)] || '生成词根拆解、联想记忆法和易混淆词辨析，帮你把这个词刻进脑子。'}
+                          </p>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                   {selectedWord.examples.map((ex, i) => (
@@ -1403,6 +1542,14 @@ export default function DeepVocabularyPage() {
             favorites={favorites}
             selectedWord={selectedWord}
             onSelectWord={handleSelectWordFromColloc}
+          />
+        </TabsContent>
+
+        {/* 词汇量测试 */}
+        <TabsContent value="vocabtest" className="mt-0">
+          <VocabTestTab
+            level={selectedLevel}
+            levelLabel={BOOKS.find((b) => b.key === selectedLevel)?.label || selectedLevel.toUpperCase()}
           />
         </TabsContent>
 

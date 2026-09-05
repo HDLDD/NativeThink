@@ -26,11 +26,27 @@
 
 
 
+
+## 2026-09-05
+- feat(spelling): wordbook picker entry, top-right switcher, random non-repeating queue (`00bed4b`)
+
 ## 2026-09-05
 - style: premium UI polish — ambient gradients, layered card shadows, gradient primary, tactile buttons (CSS-only, zero logic changes) (`fd4183a`)
 
 ## 2026-09-05
 - feat: desktop app release — local API server, pro reader redesign, UX overhaul (`8c9d11d`)
+
+## 2026-08-28 (14) — 词汇模块扩展
+
+### 词库浏览 · 详情面板增强
+- feat: **同根词推导** — 按前后缀形态学规则在当前词库内动态匹配同根词（un-/re-/dis- 前缀，-tion/-ness/-ful 等后缀，含去 e / 变 y 变形），点击芯片直接跳转到该词详情并朗读；解决词库静态 wordFamily 字段为空的问题
+- feat: **同义词/反义词芯片** — 数据存在时分组展示（绿/红双栏），点击在词库内跳转，未收录则提示
+- feat: **AI 深度解析** — 详情页新增"深度解析"卡：一键生成词根词缀拆解 + 联想记忆钩子 + 易混淆词辨析（约130字），按词缓存到本地（无 AI 配置时显示引导）
+
+### 新功能：词汇量测试
+- feat: 词汇页新增「测词汇量」tab — 从当前词书按 4 个词频区间分层抽样 12 题（看单词选释义，干扰项同区间采样），自动朗读单词
+- 结果估算词汇量区间（600–14600）+ 阶段评语（入门/进阶/流利/大神），历史最佳成绩持久化
+- 向导模式新增「词汇量测试」入口；全程基于已加载词书采样，不触发额外大词库加载
 
 ## 2026-08-28 (13) — 句子拼写：词书直入 + 随机不重复出题
 
