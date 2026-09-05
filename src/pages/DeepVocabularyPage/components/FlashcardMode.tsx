@@ -9,6 +9,7 @@ import { findWord, getWordCounts } from '@/data/wordbank';
 import { useWordLearning } from '@/lib/use-word-learning';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { cn, cleanText } from '@/lib/utils';
+import { WordImage } from '@/components/WordImage';
 import { toast } from 'sonner';
 import { useTTS } from '@/lib/use-tts';
 
@@ -203,7 +204,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
               <CardContent className="p-8 text-center">
                 {!isFlipped ? (
                   <>
-                    <Badge className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground mb-6">
+                    <Badge className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground mb-4">
                       {currentIdx + 1} / {queue.length}
                       {state.progress[cw.word.toLowerCase()] && (
                         <span className="ml-1.5 text-[#6C5CE7]">
@@ -211,6 +212,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                         </span>
                       )}
                     </Badge>
+                    <WordImage word={cw.word} className="h-36 sm:h-44 mb-4" />
                     <div className="flex items-center justify-center gap-3 mb-2">
                       <h2 className="text-4xl font-black italic text-foreground tracking-tight">{cw.word}</h2>
                       <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(cw.word, { rate: 0.9 }); }}

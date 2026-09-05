@@ -27,6 +27,10 @@
 
 
 
+
+## 2026-09-05
+- feat(vocabulary): derived word-family chips, AI deep analysis, vocab-size test (`1dd32f1`)
+
 ## 2026-09-05
 - feat(spelling): wordbook picker entry, top-right switcher, random non-repeating queue (`00bed4b`)
 
@@ -35,6 +39,13 @@
 
 ## 2026-09-05
 - feat: desktop app release — local API server, pro reader redesign, UX overhaul (`8c9d11d`)
+
+## 2026-08-28 (15) — 单词插图
+
+### 新功能
+- feat: **单词真实插图** — 词汇详情面板与闪卡正面展示与单词匹配的真实照片，帮助形象记忆
+- 双源图片代理 `/api/word-image`：百度图片为主、Bing 图片备选（自动降级），国内直连、无需任何 API Key；实测 apple/dog/rain/book/sunshine/happy/ocean 全部稳定返回 8 张
+- WordImage 组件：结果本地缓存 30 天（同词秒出）、点击轮换多图、单图加载失败自动切下一张、全部失败时显示首字母占位卡（无挫败感）
 
 ## 2026-08-28 (14) — 词汇模块扩展
 

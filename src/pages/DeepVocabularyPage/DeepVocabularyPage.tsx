@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFavorites } from '@/lib/use-favorites';
+import { WordImage } from '@/components/WordImage';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn, cleanText, extractJson } from '@/lib/utils';
@@ -1258,6 +1259,7 @@ export default function DeepVocabularyPage() {
                           </Button>
                         </div>
                       </div>
+                      <WordImage word={selectedWord.word} className="mb-6" />
                       <div className="grid grid-cols-3 gap-3 mb-6">
                         <div className="p-4 rounded-2xl bg-muted/50"><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">语域</p><p className="text-sm font-black text-foreground">{selectedWord.register === 'formal' ? '正式' : selectedWord.register === 'informal' ? '非正式' : '中性'}</p></div>
                         <div className="p-4 rounded-2xl bg-muted/50"><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">单词序号</p><p className="text-sm font-black text-foreground">#{selectedWord.frequencyRank}</p></div>

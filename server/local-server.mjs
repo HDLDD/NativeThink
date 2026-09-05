@@ -100,6 +100,7 @@ const ROUTES = {
   '/api/feedback/submit': 'api/feedback/submit.js',
   '/api/tts': 'api/tts.js',
   '/api/wikipedia': 'api/wikipedia.js',
+  '/api/word-image': 'api/word-image.js',
 };
 
 function ensureJwtSecret(dataDir) {
