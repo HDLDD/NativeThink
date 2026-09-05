@@ -9,6 +9,39 @@ import type { ISpellingSentence, ISpellingProgress, ISpellingLearningState, Spel
 
 const STORAGE_KEY = '__nativethink_spelling_progress';
 const COMPLETED_KEY = '__nativethink_spelling_completed';
+/** 最近出题记录 — id → 上次出现时间戳（跨轮次防重复优先级） */
+const SERVED_KEY = '__nativethink_spelling_served';
+
+/** Fisher-Yates 洗牌（均匀分布，优于 sort(random) 的有偏乱序） */
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function loadServed(): Record<string, number> {
+  try { return JSON.parse(safeStorage.getItem(SERVED_KEY) || '{}'); } catch { return {}; }
+}
+
+/** 记录一批句子刚刚被出题（持久化，跨会话） */
+function markServed(ids: string[]): void {
+  if (ids.length === 0) return;
+  try {
+    const served = loadServed();
+    const now = Date.now();
+    for (const id of ids) served[id] = now;
+    // 防膨胀：最多保留 4000 条记录（超出删最旧的）
+    const entries = Object.entries(served);
+    if (entries.length > 4000) {
+      entries.sort((a, b) => a[1] - b[1]);
+      for (const [id] of entries.slice(0, entries.length - 4000)) delete served[id];
+    }
+    safeStorage.setItem(SERVED_KEY, JSON.stringify(served));
+  } catch { /* quota */ }
+}
 
 function loadCompletedIds(): string[] {
   try {
@@ -215,22 +248,27 @@ export function useSpellingLearning() {
     };
   }, [state.progress, state.todayPracticed, completedSentenceIds]);
 
-  /** Build session queue: new sentences first, then learning/reviewing ones. Completed and mastered excluded. */
+  /** Build session queue: 随机且不重复 — 复习句优先（按到期时间），新句
+   * Fisher-Yates 洗牌且**最近出过的排最后**（跨轮次不重复），已完成/已掌握排除。 */
   const buildSessionQueue = useCallback(
     (allSentences: ISpellingSentence[]): string[] => {
       const progress = state.progress;
       const completedSet = new Set(completedSentenceIds);
+      const served = loadServed();
 
       // Exclude completed sentences
       const pending = allSentences.filter((s) => !completedSet.has(s.id));
 
       const due: string[] = [];
-      const newOnes: string[] = [];
+      const neverServed: string[] = [];
+      const seenBefore: string[] = [];
 
       for (const s of pending) {
         const p = progress[s.id];
         if (!p || p.status === 'new') {
-          newOnes.push(s.id);
+          // 从未出过的排前；出过的按"最久未出"排序 — 保证轮次间尽量不重复
+          if (served[s.id]) seenBefore.push(s.id);
+          else neverServed.push(s.id);
         } else if (p.status === 'mastered') {
           // Mastered sentences do not repeat
           continue;
@@ -240,11 +278,14 @@ export function useSpellingLearning() {
         }
       }
 
-      // Order: due first (by oldest nextReview), then new (shuffled)
+      // Order: due first (by oldest nextReview), then unseen (shuffled), then seen (least-recently-served first)
       due.sort((a, b) => (progress[a]?.nextReview || 0) - (progress[b]?.nextReview || 0));
-      const shuffled = [...newOnes].sort(() => Math.random() - 0.5);
+      const shuffledNew = shuffle(neverServed);
+      const seenSorted = seenBefore.sort((a, b) => (served[a] || 0) - (served[b] || 0));
 
-      return [...due, ...shuffled];
+      const queue = [...due, ...shuffledNew, ...seenSorted];
+      markServed(queue);
+      return queue;
     },
     [state.progress, completedSentenceIds],
   );

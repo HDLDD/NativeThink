@@ -25,8 +25,23 @@
 
 
 
+
+## 2026-09-05
+- style: premium UI polish — ambient gradients, layered card shadows, gradient primary, tactile buttons (CSS-only, zero logic changes) (`fd4183a`)
+
 ## 2026-09-05
 - feat: desktop app release — local API server, pro reader redesign, UX overhaul (`8c9d11d`)
+
+## 2026-08-28 (13) — 句子拼写：词书直入 + 随机不重复出题
+
+### 交互重构
+- feat: **词书选择直入** — 首次进入直接显示词书卡片（四级/高考/中考/六级/雅思/托福/考研/专业/高阶/全部），点选即加载即练习，废除"建立句子库"步骤
+- feat: **词书切换移至右上角** — 练习页右上角下拉切换当前词书（刻意远离操作流避免误触），当前词书高亮显示，切换时按钮内嵌加载动画
+- feat: **刷新自动恢复** — 记住上次使用的词书，重新打开应用自动加载并恢复到上次练习位置，无需重选；加载失败自动回退到词书选择页
+
+### 算法
+- feat: **随机且不重复出题** — Fisher-Yates 均匀洗牌（替换有偏的 sort(random)）；持久化"最近出题记录"，从未练过的句子优先、最近出过的排最后（最久未出先出），跨轮次/跨会话不重复；已完成与已掌握的句子照旧排除
+- 算法性质已单元验证：无重复 ✓ 未出过优先 ✓ 最久未出排序 ✓ 随机性 ✓
 
 ## 2026-08-28 (12) — 朗读提速 + 阅读器专业版重做
 

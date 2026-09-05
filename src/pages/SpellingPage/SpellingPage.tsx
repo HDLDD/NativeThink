@@ -21,7 +21,12 @@ import {
   ChevronRight as ChevronRightIcon,
   Loader2,
   Mic,
+  ChevronDown,
+  Library,
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/EmptyState';
 import { Input } from '@/components/ui/input';
@@ -795,7 +800,8 @@ export default function SpellingPage() {
         await new Promise(r => setTimeout(r, 50));
       }
       toast.success(`数据库建立完成：共导入 ${totalImported} 条例句`);
-      rebuildSession();
+      setActiveLevel('all');
+      rebuildSession({ level: 'all' });
     } catch {
       toast.error('建库失败，请重试');
     }
@@ -825,6 +831,33 @@ export default function SpellingPage() {
     }
   }, [currentIndex, activeLevel, persistPosition]);
 
+  // ── 自动恢复：刷新后直接载入上次的词书，跳过选择页 ──
+  const [autoEntering, setAutoEntering] = useState(false);
+  const autoEnterRef = useRef(false);
+  useEffect(() => {
+    if (autoEnterRef.current) return;
+    autoEnterRef.current = true;
+    try {
+      const raw = safeStorage.getItem(RESUME_KEY);
+      if (!raw) return; // 首次使用 → 显示词书选择页
+      const saved = JSON.parse(raw);
+      if (!saved?.activeLevel) return;
+      (async () => {
+        setAutoEntering(true);
+        try {
+          if (saved.activeLevel === 'all') {
+            await handleBuildDatabase();
+          } else {
+            pendingResumeIndex.current = saved.currentIndex ?? 0;
+            await handleLevelChange(saved.activeLevel);
+          }
+        } catch { /* ignore */ }
+        // 加载失败（缓存仍为空）→ 回退到词书选择页
+        if (getWBSentences().length === 0) setAutoEntering(false);
+      })();
+    } catch { /* ignore */ }
+  }, []);
+
   // Restore saved position on mount (after sentences are loaded)
   useEffect(() => {
     if (sentences.length === 0 || resumeDoneRef.current) return;
@@ -844,40 +877,83 @@ export default function SpellingPage() {
   const isFav = currentSentence ? isFavorited(currentSentence.en, 'spelling') : false;
   const currentProgress = currentSentence ? getProgress(currentSentence.id) : null;
 
-  // Welcome screen — no sentences yet (hook state AND global word bank cache), build database or use AI
-  if (sentences.length === 0 && getWBSentences().length === 0) {
+  // ── 自动恢复中：显示加载屏（失败会回退到词书选择页） ──
+  if (autoEntering && (levelLoading || building)) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 px-4">
-        <EmptyState
-          icon={Sparkles}
-          title="句子拼写"
-          description={<>首次使用需要建立句子数据库<br />将自动导入全部词库（9 级）的所有例句</>}
-          className="mb-2"
-        />
+      <div className="flex flex-col items-center justify-center py-32 px-4 space-y-4">
+        <Loader2 className="size-8 animate-spin text-[#00B894]" />
+        <p className="text-sm font-bold text-foreground">正在加载词书…</p>
+        <p className="text-xs text-muted-foreground">例句将在本地随机排列，练过的句子不会立刻重复</p>
+      </div>
+    );
+  }
 
-        <Button
-          onClick={handleBuildDatabase}
-          disabled={building}
-          className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2 px-8 mb-4"
-        >
-          {building ? (
-            <><RefreshCw className="size-4 animate-spin" /> 建库中...</>
-          ) : (
-            <><BookOpen className="size-4" /> 建立句子库</>
-          )}
-        </Button>
+  // ── 词书选择首屏：选一本词书直接进入，无需手动建库 ──
+  if (sentences.length === 0 && getWBSentences().length === 0 && !autoEntering) {
+    const WORDBOOK_CARDS: { level: string; label: string; desc: string }[] = [
+      { level: 'cet4', label: '四级', desc: '大学基础 · 例句丰富' },
+      { level: 'gaokao', label: '高考', desc: '高中核心词汇' },
+      { level: 'zhongkao', label: '中考', desc: '初中入门' },
+      { level: 'cet6', label: '六级', desc: '大学进阶' },
+      { level: 'ielts', label: '雅思', desc: '出国留学' },
+      { level: 'toefl', label: '托福', desc: '北美学术' },
+      { level: 'postgraduate', label: '考研', desc: '研究生考试' },
+      { level: 'professional', label: '专业', desc: '职场专业术语' },
+      { level: 'advanced', label: '高阶', desc: '母语者语料' },
+      { level: 'all', label: '全部词库', desc: '全量加载（较多数据）' },
+    ];
+    const pickWordbook = (level: string) => {
+      if (level === 'all') handleBuildDatabase();
+      else handleLevelChange(level);
+    };
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#00B894]/10 text-[#00B894] text-[10px] font-black uppercase tracking-wider">
+            <Sparkles className="size-3.5" /> Spelling Practice
+          </div>
+          <h1 className="text-3xl font-black italic text-foreground">句子拼写</h1>
+          <p className="text-sm text-muted-foreground">选择一本词书，立即开始随机拼写练习</p>
+        </div>
 
-        <p className="text-xs text-muted-foreground/60 text-center max-w-md">
-          也可以先通过 AI 添加自定义句子
-        </p>
-        <Button
-          onClick={() => setShowAIDialog(true)}
-          variant="outline"
-          className="rounded-xl font-bold gap-2 mt-2"
-        >
-          <Sparkles className="size-4" />
-          AI 添加句子
-        </Button>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {WORDBOOK_CARDS.map((wb) => {
+            const loadingThis = (building || levelLoading) && activeLevel === wb.level;
+            return (
+              <button
+                key={wb.level}
+                onClick={() => pickWordbook(wb.level)}
+                disabled={building || levelLoading}
+                className={cn(
+                  'group p-4 rounded-2xl border-2 border-border text-left transition-all duration-200',
+                  'hover:border-[#00B894]/40 hover:shadow-md hover:-translate-y-0.5',
+                  'disabled:opacity-60 disabled:cursor-wait',
+                )}
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <BookOpen className="size-4 text-[#00B894]" />
+                  <span className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors">
+                    {wb.label}
+                  </span>
+                  {loadingThis && <RefreshCw className="size-3.5 animate-spin text-[#00B894] ml-auto" />}
+                </div>
+                <p className="text-[11px] text-muted-foreground">{wb.desc}</p>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="text-center">
+          <p className="text-xs text-muted-foreground/60 mb-2">或者用 AI 生成自定义句子</p>
+          <Button
+            onClick={() => setShowAIDialog(true)}
+            variant="outline"
+            className="rounded-xl font-bold gap-2"
+          >
+            <Sparkles className="size-4" />
+            AI 添加句子
+          </Button>
+        </div>
 
         <AIBatchAddDialog
           open={showAIDialog}
@@ -940,39 +1016,8 @@ export default function SpellingPage() {
 
       {/* ── Header Controls ── */}
       <Card className="p-4 rounded-2xl border-border/50 shadow-sm space-y-4">
-        {/* Row 1: Mode toggles */}
-        {/* Level filter + Mode toggles */}
+        {/* Row 1: 拼写模式 / 音频 / 自动朗读 / 词书切换（右上角，避免误触） */}
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-xl border border-border p-0.5 bg-muted/50">
-              <button
-                onClick={() => handleLevelChange('all')}
-                className={cn(
-                  'px-2.5 py-1.5 rounded-[10px] text-[10px] font-bold transition-all whitespace-nowrap',
-                  activeLevel === 'all'
-                    ? 'bg-[#00B894] text-white shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                全部
-              </button>
-              {['zhongkao','gaokao','cet4','cet6','ielts','toefl','postgraduate','professional','advanced'].map((lvl) => (
-                <button
-                  key={lvl}
-                  onClick={() => handleLevelChange(lvl)}
-                  className={cn(
-                    'px-2.5 py-1.5 rounded-[10px] text-[10px] font-bold transition-all whitespace-nowrap',
-                    activeLevel === lvl
-                      ? 'bg-[#00B894] text-white shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'})[lvl]}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mr-2">
               拼写模式
@@ -1046,6 +1091,48 @@ export default function SpellingPage() {
           >
             {autoRead ? '🔊 自动' : '🔇 静音'}
           </button>
+
+          {/* 词书切换（右上角 — 刻意远离操作流，避免误改） */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={building || levelLoading}
+                className="rounded-[10px] gap-1.5 text-xs font-bold h-8 border-border hover:border-[#00B894]/40"
+                title="切换词书"
+              >
+                <Library className="size-3.5 text-[#00B894]" />
+                {activeLevel === 'all' ? '全部词库' : ({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[activeLevel] || activeLevel}
+                {building || levelLoading
+                  ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+                  : <ChevronDown className="size-3.5 text-muted-foreground" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[170px] max-h-[320px] overflow-y-auto">
+              <DropdownMenuItem
+                onClick={() => handleLevelChange('all')}
+                disabled={activeLevel === 'all'}
+                className="gap-2 text-xs font-bold"
+              >
+                <BookOpen className="size-3.5 text-muted-foreground" />
+                全部词库
+              </DropdownMenuItem>
+              <div className="h-px bg-border my-1" />
+              {(['zhongkao','gaokao','cet4','cet6','ielts','toefl','postgraduate','professional','advanced'] as const).map((lvl) => (
+                <DropdownMenuItem
+                  key={lvl}
+                  onClick={() => handleLevelChange(lvl)}
+                  disabled={activeLevel === lvl}
+                  className="gap-2 text-xs font-bold"
+                >
+                  <BookOpen className={cn('size-3.5', activeLevel === lvl ? 'text-[#00B894]' : 'text-muted-foreground')} />
+                  {({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[lvl]}
+                  {activeLevel === lvl && <Check className="size-3.5 text-[#00B894] ml-auto" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Loading indicator — like DeepVocabularyPage */}
