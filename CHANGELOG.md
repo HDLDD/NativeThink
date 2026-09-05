@@ -32,6 +32,10 @@
 
 
 
+
+## 2026-09-06
+- feat: learning loop trio + guaranteed TTS fallback (`a9ebb2a`)
+
 ## 2026-09-06
 - feat(ux): five user-perspective improvements (`458d3ee`)
 

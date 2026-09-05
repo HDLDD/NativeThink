@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
-import { Brain, Target, CheckCircle2, RotateCw, Sparkles, Volume2, BookOpen, ArrowRight, XCircle, Edit3, Shuffle, Headphones, Link2, PenLine, ChevronDown } from 'lucide-react';
+import { Brain, Target, CheckCircle2, RotateCw, Sparkles, Volume2, BookOpen, ArrowRight, ArrowLeft, XCircle, Edit3, Shuffle, Headphones, Link2, PenLine, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -446,10 +446,18 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
 
   const currentLevelLabel = levels?.find((l) => l.key === level)?.label || '全部';
   const currentModeLabel = modeLabels.find((m) => m.key === reviewMode)?.label || '闪卡';
+  // 学习中 → 隐藏概览（标题/KPI/进度/设置），只保留学习卡片 + 左上返回
+  const inSession = sessionWords.length > 0 && !!currentWord;
+  const exitSession = () => {
+    setSessionWords([]);
+    setCurrentIdx(0);
+    setFlipped(false);
+  };
 
   return (
     <div className="space-y-4">
-      {/* Learning header + level selector */}
+      {/* Learning header + level selector（仅概览显示） */}
+      {!inSession && (
       <div className="flex items-center justify-between gap-2 flex-wrap relative">
         <div className="flex items-center gap-2">
           <div
@@ -495,8 +503,11 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
           </div>
         )}
       </div>
+      )}
 
-      {/* Top stats */}
+      {/* Top stats（仅概览显示） */}
+      {!inSession && (
+      <>
       <div className="grid grid-cols-4 gap-2">
         <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-100 text-center">
           <p className="text-lg font-black text-[#00B894]">{learnedToday}</p>
@@ -531,9 +542,11 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
           </span>
         </div>
       )}
+      </>
+      )}
 
-      {/* Learning mode selector + quota — 默认折叠，点击摘要行展开（不常显） */}
-      {!simple && (
+      {/* Learning mode selector + quota — 默认折叠；学习中隐藏 */}
+      {!simple && !inSession && (
       <Card className="rounded-2xl border-border shadow-sm">
         <CardContent className="p-3 space-y-3">
           {/* 摘要行（始终显示） */}
@@ -630,6 +643,27 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
 
       {/* Learning session */}
       {sessionWords.length > 0 && currentWord ? (
+        <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={exitSession}
+            className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-[#00B894]"
+            title="返回概览"
+          >
+            <ArrowLeft className="size-5" />
+          </Button>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Badge className="rounded-full px-3 py-1 text-[10px] font-black text-white border-0" style={{ backgroundColor: levelColor.accent }}>
+              {currentLevelLabel}
+            </Badge>
+            <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] font-black bg-muted text-muted-foreground border-0">
+              {currentModeLabel}
+            </Badge>
+          </div>
+          <span className="text-xs font-black text-muted-foreground tabular-nums shrink-0">{currentIdx + 1}/{sessionWords.length}</span>
+        </div>
         <AnimatePresence mode="wait">
           <MotionDiv
             key={level + reviewMode}
@@ -1200,6 +1234,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
           })()}
           </MotionDiv>
         </AnimatePresence>
+        </div>
       ) : (
         <Card className={cn('rounded-[40px] border-border shadow-sm overflow-hidden')}>
           {/* Colored top strip based on level */}

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
-import { RotateCw, Volume2, Sparkles, XCircle } from 'lucide-react';
+import { RotateCw, Volume2, Sparkles, XCircle, ArrowLeft } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +39,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
 
   // ── 错词重练队列 ──
   const [wrongDrill, setWrongDrill] = useState(false);
+  const [started, setStarted] = useState(false); // 概览 vs 学习中
   const wrongEntries = useMemo(() => {
     const out: IWordEntry[] = [];
     for (const [key, p] of Object.entries(state.progress)) {
@@ -158,6 +159,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || !cw) return;
+      if (!started) { if (e.code === 'Space') { e.preventDefault(); setStarted(true); } return; }
       if (e.code === 'Space') {
         e.preventDefault();
         if (!isFlipped) flip();
@@ -171,7 +173,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cw, isFlipped, rated, flip, advance, markWithQuality]);
+  }, [cw, isFlipped, rated, started, flip, advance, markWithQuality]);
 
   if (!cw) {
     return (
@@ -202,65 +204,86 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       </div>
     );
   }
+  // ── 概览：标题 + 统计 + 开始按钮（进入学习后隐藏，<- 返回） ──
+  if (!started) {
+    return (
+      <div className="space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="size-9 rounded-xl bg-[#6C5CE7]/10 flex items-center justify-center text-[#6C5CE7]">
+              <RotateCw className="size-4.5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-black italic text-foreground">复习检测</h2>
+              <p className="text-[9px] font-bold text-muted-foreground">SM-2 间隔记忆 · 巩固已学单词</p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setWrongDrill(true); setStarted(true); setIdx(0); setFlipped(false); setRated(false); }}
+            disabled={wrongEntries.length === 0}
+            className="rounded-xl text-[10px] font-black uppercase tracking-wider gap-1.5 border-border hover:border-rose-300 hover:text-rose-500"
+          >
+            <XCircle className="size-3.5" />
+            错词重练 ({wrongEntries.length})
+          </Button>
+        </div>
 
+        {/* SM-2 Stats */}
+        <div className="grid grid-cols-4 gap-2">
+          <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-500/15 border border-rose-100 text-center">
+            <p className="text-lg font-black text-rose-500">{stats.due}</p>
+            <p className="text-[8px] font-black uppercase tracking-wider text-rose-600">待复习</p>
+          </div>
+          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-100 text-center">
+            <p className="text-lg font-black text-[#00B894]">{stats.mastered}</p>
+            <p className="text-[8px] font-black uppercase tracking-wider text-emerald-600">已掌握</p>
+          </div>
+          <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-100 text-center">
+            <p className="text-lg font-black text-amber-500">{stats.learning}</p>
+            <p className="text-[8px] font-black uppercase tracking-wider text-amber-600">学习中</p>
+          </div>
+          <div className="p-2.5 rounded-xl bg-[#6C5CE7]/5 border border-[#6C5CE7]/10 text-center">
+            <p className="text-lg font-black text-[#6C5CE7]">{sessionReviewCount}</p>
+            <p className="text-[8px] font-black uppercase tracking-wider text-[#6C5CE7]/70">本次复习</p>
+          </div>
+        </div>
+
+        <div className="flex justify-center pt-2">
+          <Button
+            onClick={() => setStarted(true)}
+            disabled={queue.length === 0}
+            className="bg-[#6C5CE7] hover:bg-[#5A4BD1] text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-violet-200/50 gap-2"
+          >
+            <RotateCw className="size-4" />开始复习（{queue.length} 张卡片）
+          </Button>
+        </div>
+      </div>
+  );
+  }
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className={cn('size-9 rounded-xl flex items-center justify-center', wrongDrill ? 'bg-rose-500/10 text-rose-500' : 'bg-[#6C5CE7]/10 text-[#6C5CE7]')}>
-            {wrongDrill ? <XCircle className="size-4.5" /> : <RotateCw className="size-4.5" />}
-          </div>
-          <div>
-            <h2 className="text-sm font-black italic text-foreground">{wrongDrill ? '错词重练' : '复习检测'}</h2>
-            <p className="text-[9px] font-bold text-muted-foreground">{wrongDrill ? `专攻 ${wrongEntries.length} 个答错过的单词` : 'SM-2 间隔记忆 · 巩固已学单词'}</p>
-          </div>
-        </div>
-        {/* 错词重练入口 */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => { setWrongDrill((v) => !v); setIdx(0); setFlipped(false); setRated(false); }}
-          disabled={wrongEntries.length === 0 && !wrongDrill}
-          className={cn(
-            'rounded-xl text-[10px] font-black uppercase tracking-wider gap-1.5',
-            wrongDrill ? 'border-rose-300 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10' : 'border-border hover:border-rose-300 hover:text-rose-500',
+    <div className="space-y-4">
+        {/* 学习中头部：返回 + 进度 */}
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => { setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); setRated(false); }}
+            className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-[#6C5CE7]"
+            title="返回概览"
+          >
+            <ArrowLeft className="size-5" />
+          </Button>
+          {wrongDrill && (
+            <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] font-black bg-rose-500/10 text-rose-500 border-0">
+              错词重练中
+            </Badge>
           )}
-        >
-          <XCircle className="size-3.5" />
-          {wrongDrill ? '退出重练' : `错词重练 (${wrongEntries.length})`}
-        </Button>
-      </div>
-
-      {/* SM-2 Stats */}
-      <div className="grid grid-cols-4 gap-2">
-        <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-500/15 border border-rose-100 text-center">
-          <p className="text-lg font-black text-rose-500">{stats.due}</p>
-          <p className="text-[8px] font-black uppercase tracking-wider text-rose-600">待复习</p>
+          <div className="flex-1" />
+          <span className="text-xs font-black text-muted-foreground tabular-nums shrink-0">{currentIdx + 1}/{queue.length}</span>
         </div>
-        <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-100 text-center">
-          <p className="text-lg font-black text-[#00B894]">{stats.mastered}</p>
-          <p className="text-[8px] font-black uppercase tracking-wider text-emerald-600">已掌握</p>
-        </div>
-        <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-100 text-center">
-          <p className="text-lg font-black text-amber-500">{stats.learning}</p>
-          <p className="text-[8px] font-black uppercase tracking-wider text-amber-600">学习中</p>
-        </div>
-        <div className="p-2.5 rounded-xl bg-[#6C5CE7]/5 border border-[#6C5CE7]/10 text-center">
-          <p className="text-lg font-black text-[#6C5CE7]">{sessionReviewCount}</p>
-          <p className="text-[8px] font-black uppercase tracking-wider text-[#6C5CE7]/70">本次复习</p>
-        </div>
-      </div>
-
-      {/* Progress bar */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-[#6C5CE7] to-violet-400 rounded-full transition-all duration-300"
-            style={{ width: `${((currentIdx + 1) / queue.length) * 100}%` }} />
-        </div>
-        <span className="text-xs font-black text-muted-foreground tabular-nums">{currentIdx + 1}/{queue.length}</span>
-      </div>
-
       {/* Flashcard */}
       <div className="flex justify-center">
         <AnimatePresence mode="wait">
