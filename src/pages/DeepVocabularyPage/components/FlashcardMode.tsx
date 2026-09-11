@@ -165,7 +165,14 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
 
   const advance = () => {
     setDir(1); setFlipped(false); setRated(false);
-    setTimeout(() => setIdx((p) => (p + 1) % queue.length), 150);
+    setTimeout(() => setIdx((p) => {
+      const next = (p + 1) % queue.length;
+      // 走完最后一循环回第一张 = 完成一整轮，给个里程碑反馈
+      if (next === 0 && p === queue.length - 1) {
+        toast.success(`🎉 完成一整轮 ${queue.length} 张卡片 · 累计评分 ${sessionReviewCount} 次，巩固完成`, { duration: 4000 });
+      }
+      return next;
+    }), 150);
   };
 
   // ── 全键盘操作：空格翻面/默认好评，1-5 评分，→ 下一个 ──

@@ -460,6 +460,18 @@ export default function WritingPage() {
   const charCount = essay.length;
   const formatTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
+  // Ctrl/Cmd + Enter 快捷提交（写作工具的通用习惯）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && selectedPrompt && essay.trim() && !isSubmitting) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   const startWriting = (prompt: IWritingPrompt) => {
     setSelectedPrompt(prompt);
     setEssay('');
@@ -932,6 +944,18 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
                 placeholder="开始写作...&#10;&#10;提示：先在脑海中构建文章框架，然后逐步展开叙述。"
                 className="min-h-[300px] resize-y rounded-3xl border-border bg-muted/30 focus-visible:ring-2 focus-visible:ring-emerald-200 text-base leading-relaxed"
               />
+              {/* 字数目标进度（min 词内从 0 → 100%，达成后转绿） */}
+              <div className="mt-4 h-1.5 rounded-full bg-muted overflow-hidden" aria-hidden>
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all duration-300',
+                    wordCount >= selectedPrompt.wordLimit.min
+                      ? 'bg-gradient-to-r from-[#00B894] to-emerald-400'
+                      : 'bg-amber-400',
+                  )}
+                  style={{ width: `${Math.min(100, (wordCount / Math.max(1, selectedPrompt.wordLimit.min)) * 100)}%` }}
+                />
+              </div>
               <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
                 <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium flex-wrap">
                   <Button
@@ -957,6 +981,7 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
                   onClick={handleSubmit}
                   disabled={isSubmitting || wordCount < selectedPrompt.wordLimit.min}
                   className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+                  title="快捷键：Ctrl + Enter"
                 >
                   {isSubmitting ? (
                     <>
@@ -1008,7 +1033,7 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
                   <div className="text-center py-12">
                     <PenLine className="size-12 mx-auto mb-3 text-muted-foreground opacity-30" />
                     <p className="text-sm text-muted-foreground font-medium">
-                      完成右侧的写作后点击"提交并获取反馈"<br />
+                      完成左侧的写作后点击"提交并获取反馈"<br />
                       AI 会从语法、地道度和结构方面给出建议
                     </p>
                   </div>

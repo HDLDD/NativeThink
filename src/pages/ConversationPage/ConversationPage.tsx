@@ -177,6 +177,52 @@ export default function ConversationPage() {
     setMessages([]);
     setAnalysis('');
     setShowAnalysis(false);
+    // Duolingo 式：AI 角色先开口，进入场景即刻有真实语境
+    requestOpening(scenario);
+  };
+
+  /** 让 AI 角色生成场景开场白；失败则静默回到空状态 */
+  const requestOpening = async (scenario: IScenario) => {
+    if (!isConfigured || isLoading) return;
+    setIsLoading(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let full = '';
+    const aiMsg: IMessage = { role: 'ai', content: '', timestamp: Date.now() };
+    setMessages([aiMsg]);
+    try {
+      const stream = aiStream(
+        [
+          {
+            role: 'system',
+            content: `${scenario.role}\n\nImportant rules:\n1. Reply in English only, no Chinese\n2. Keep responses 2-5 sentences, natural and conversational\n3. Stay in character, don't break the fourth wall`,
+          },
+          {
+            role: 'user',
+            content: "Open the conversation in character: greet me naturally and set the scene in one short turn (at most one question). Do not describe the scene in stage directions — just speak.",
+          },
+        ],
+        { temperature: 0.9, signal: controller.signal },
+      );
+      for await (const chunk of stream) {
+        if (!mountedRef.current) break;
+        if (chunk.content) {
+          full += chunk.content;
+          setMessages([{ role: 'ai', content: full, timestamp: aiMsg.timestamp }]);
+        }
+      }
+      if (!mountedRef.current) return;
+      if (full.trim()) {
+        if (autoRead) { try { tts.speak(full); } catch { /* ignore */ } }
+      } else {
+        setMessages([]);
+      }
+    } catch {
+      if (mountedRef.current) setMessages([]);
+    } finally {
+      if (mountedRef.current) setIsLoading(false);
+      abortRef.current = null;
+    }
   };
 
   const handleSend = async (e: React.FormEvent) => {
@@ -965,6 +1011,26 @@ export default function ConversationPage() {
         </ScrollArea>
 
         <div className="p-4 border-t border-border bg-card">
+          {/* 卡住求助：对话刚开始且未输入时，给可一键填入的求助短语 */}
+          {messages.length <= 1 && !input.trim() && (
+            <div className="max-w-3xl mx-auto mb-2.5 flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground/60 shrink-0">卡住了？</span>
+              {[
+                'Could you say that again more slowly?',
+                'How do you say ______ in English?',
+                'What should I say in this situation?',
+                'Sorry, I am not sure how to respond.',
+              ].map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setInput(p)}
+                  className="px-2.5 py-1 rounded-full bg-muted/70 hover:bg-emerald-500/10 hover:text-[#00B894] text-[11px] font-bold text-muted-foreground transition-colors"
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
           <form onSubmit={handleSend} className="max-w-3xl mx-auto flex gap-3">
             <Input
               value={input}

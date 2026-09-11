@@ -41,6 +41,10 @@
 
 
 
+
+## 2026-09-12
+- fix(vocab): dedupe book-progress bars; record study minutes in daily learning (`a22da2c`)
+
 ## 2026-09-12
 - feat: think practice history, real progress KPIs, favorites page header (`9aaa343`)
 
