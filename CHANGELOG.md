@@ -45,6 +45,10 @@
 
 
 
+
+## 2026-09-12
+- style(spelling): blank underlines now white (`48a8f46`)
+
 ## 2026-09-12
 - fix(spelling): stack sentence and blank line vertically (`8e19190`)
 

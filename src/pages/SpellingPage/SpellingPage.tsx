@@ -410,6 +410,16 @@ export default function SpellingPage() {
   const [levelLoading, setLevelLoading] = useState(false);  // loading word bank data for level switch
   const [activeLevel, setActiveLevel] = useState('all');     // filter by level ('all' or level code)
 
+  // 本轮句数（像背单词的"每日学习量"一样，控制一轮学习的句子数量）
+  const [roundSize, setRoundSize] = useState<number>(() => {
+    try {
+      const v = parseInt(safeStorage.getItem('__nativethink_spelling_round_size') || '', 10);
+      return v > 0 && v <= 500 ? v : 10;
+    } catch { return 10; }
+  });
+  const roundSizeRef = useRef(roundSize);
+  roundSizeRef.current = roundSize;
+
   // AI dialog state
   const [aiTopic, setAiTopic] = useState('');
   const [aiDifficulty, setAiDifficulty] = useState<SpellingDifficulty>('intermediate');
@@ -431,7 +441,8 @@ export default function SpellingPage() {
         return;
       }
       const filtered = level === 'all' ? allSentences : allSentences.filter((s) => s.level === level);
-      const queue = buildSessionQueue(filtered);
+      // 截断到本轮句数（像背单词的每日学习量，避免 6966 句的大山）
+      const queue = buildSessionQueue(filtered).slice(0, Math.max(1, roundSizeRef.current));
       setSessionQueue(queue);
 
       // Restore resume index if pending, else start at 0
@@ -447,6 +458,16 @@ export default function SpellingPage() {
     },
     [sentences, buildSessionQueue, activeLevel],
   );
+
+  /** 切换本轮句数 — 立即重新排队（选择新一轮的句子） */
+  const changeRoundSize = useCallback((n: number) => {
+    const v = Math.max(1, Math.min(500, n));
+    setRoundSize(v);
+    roundSizeRef.current = v;
+    try { safeStorage.setItem('__nativethink_spelling_round_size', String(v)); } catch { /* ignore */ }
+    rebuildSession();
+    toast.success(`本轮改为 ${v} 句，已重新排队`, { duration: 1500 });
+  }, [rebuildSession]);
 
   // Initialize session on sentences load — auto-reset completed if all done
   useEffect(() => {
@@ -1226,6 +1247,42 @@ export default function SpellingPage() {
             <Badge variant="secondary" className="rounded-lg text-[10px] font-bold">
               今日 {learningStats.todayPracticed} 句
             </Badge>
+          </div>
+
+          {/* 本轮句数 — 像背单词的每日学习量一样可选 */}
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mr-0.5">本轮</span>
+            {[5, 10, 20, 50].map((n) => (
+              <button
+                key={n}
+                onClick={() => changeRoundSize(n)}
+                className={cn(
+                  'px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap',
+                  roundSize === n
+                    ? 'bg-[#00B894] text-white shadow-sm'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                )}
+              >
+                {n}句
+              </button>
+            ))}
+            <input
+              type="number"
+              min={1}
+              max={500}
+              value={roundSize}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (v > 0 && v <= 500) {
+                  setRoundSize(v);
+                  roundSizeRef.current = v;
+                  try { safeStorage.setItem('__nativethink_spelling_round_size', String(v)); } catch { /* ignore */ }
+                }
+              }}
+              onBlur={() => { if (roundSize !== sessionQueue.length) { rebuildSession(); toast.success(`本轮 ${roundSize} 句`, { duration: 1200 }); } }}
+              title="自定义本轮句数（失焦后生效）"
+              className="w-12 px-1.5 py-0.5 rounded-lg bg-muted text-[10px] font-black text-center outline-none focus:ring-2 focus:ring-[#00B894]/30"
+            />
           </div>
 
           {/* Action buttons */}
