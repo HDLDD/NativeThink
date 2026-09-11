@@ -48,6 +48,10 @@
 
 
 
+
+## 2026-09-12
+- fix(android): build with JDK 21 — Capacitor 8 requires source level 21 (`8ae7743`)
+
 ## 2026-09-12
 - feat(ai): factory-baked API key + glm-4.6-flash as out-of-box config (`31babc0`)
 

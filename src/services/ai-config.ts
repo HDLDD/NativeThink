@@ -94,10 +94,10 @@ export const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
   },
   glm: {
     name: '智谱 GLM',
-    description: '智谱 AI — GLM-4.6-Flash 免费',
+    description: '智谱 AI — GLM-4.7-Flash 免费',
     apiEndpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-    defaultModel: 'glm-4.6-flash',
-    freeModel: 'glm-4.6-flash',
+    defaultModel: 'glm-4.7-flash',
+    freeModel: 'glm-4.7-flash',
     registerUrl: 'https://open.bigmodel.cn',
     supportsStreaming: true,
   },

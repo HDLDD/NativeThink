@@ -22,7 +22,7 @@ const PROVIDER_DEFAULT_MODELS = {
   deepseek: 'deepseek-chat',
   doubao: 'doubao-lite-32k',
   qwen: 'qwen-turbo',
-  glm: 'glm-4-flash',
+  glm: 'glm-4.7-flash',
   siliconflow: 'Qwen/Qwen2.5-7B-Instruct',
   moonshot: 'moonshot-v1-8k',
   groq: 'llama-3.1-8b-instant',
@@ -42,7 +42,7 @@ export async function onRequest(context) {
     return Response.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { provider = 'deepseek', model, messages, max_tokens = 4096, temperature = 0.7, stream = true, apiKey: clientApiKey } = body;
+  const { provider = 'deepseek', model, messages, max_tokens = 4096, temperature = 0.7, stream = true, apiKey: clientApiKey, thinking } = body;
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return Response.json({ error: 'Messages array is required' }, { status: 400 });
@@ -63,6 +63,18 @@ export async function onRequest(context) {
 
   const modelId = model || PROVIDER_DEFAULT_MODELS[provider] || 'deepseek-chat';
 
+  // GLM 4.5+ 系列支持关闭思考模式 — 出厂免费模型要求响应快，默认关
+  const upstreamBody = {
+    model: modelId,
+    messages,
+    max_tokens,
+    temperature,
+    stream,
+  };
+  if (provider === 'glm') {
+    upstreamBody.thinking = thinking || { type: 'disabled' };
+  }
+
   try {
     const aiResp = await fetch(endpoint, {
       method: 'POST',
@@ -70,13 +82,7 @@ export async function onRequest(context) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: modelId,
-        messages,
-        max_tokens,
-        temperature,
-        stream,
-      }),
+      body: JSON.stringify(upstreamBody),
     });
 
     if (!aiResp.ok) {
