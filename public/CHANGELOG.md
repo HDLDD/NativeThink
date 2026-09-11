@@ -46,6 +46,10 @@
 
 
 
+
+## 2026-09-12
+- feat(spelling): selectable round size; factory GLM model -> glm-4.6-flash (`8eacb97`)
+
 ## 2026-09-12
 - style(spelling): blank underlines now white (`48a8f46`)
 

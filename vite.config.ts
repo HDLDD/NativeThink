@@ -1,7 +1,16 @@
 import path from 'path'
+import fs from 'node:fs'
 import type { Plugin } from 'vite'
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
+
+// ── 出厂内置 API Key ──
+// 从 gitignore 的 scripts/.apikey 读取（一行文本），构建/开发时注入客户端。
+// 密钥不进仓库；换 Key 只需改该文件后重新打包。
+let factoryApiKey = ''
+try {
+  factoryApiKey = fs.readFileSync(path.resolve(__dirname, 'scripts/.apikey'), 'utf8').trim()
+} catch { /* 文件不存在 — 出厂未内置 */ }
 
 // Mock virtual:capabilities for Cloudflare Pages (Lark platform virtual module)
 // This plugin resolves the virtual module to an empty object at build time
@@ -64,6 +73,8 @@ export default defineConfig({
   // 让 dev 模式（普通浏览器，无 Node 环境）下 src/index.tsx 里的 process.env 可用；构建时 esbuild 本就会替换
   define: {
     'process.env.CLIENT_BASE_PATH': JSON.stringify(process.env.CLIENT_BASE_PATH || '/'),
+    // 出厂内置 API Key（可为空 — scripts/.apikey 不存在时）
+    '__FACTORY_API_KEY__': JSON.stringify(factoryApiKey),
   },
   plugins: [tailwindcss(), mockVirtualCapabilities(), fixHtmlPlaceholders()],
   resolve: {

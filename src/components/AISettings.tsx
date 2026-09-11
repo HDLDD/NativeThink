@@ -30,6 +30,7 @@ import {
   clearAPIKey,
   getActiveProvider,
   setActiveProvider,
+  isFactoryKey,
 } from '@/services/ai-config';
 import { chat, buildMessages } from '@/services/ai-service';
 import { toast } from 'sonner';
@@ -216,6 +217,11 @@ export default function AISettings() {
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-black text-foreground">{cfg.name}</h3>
                     <div className="flex items-center gap-1">
+                      {isFactoryKey(provider) && (
+                        <Badge className="rounded-full px-2 py-0 text-[9px] font-black bg-violet-50 dark:bg-violet-500/15 text-violet-500 border-none">
+                          出厂内置
+                        </Badge>
+                      )}
                       {isConfigured && (
                         <Badge className="rounded-full px-2 py-0 text-[9px] font-black bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 border-none">
                           已配置

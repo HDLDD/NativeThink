@@ -5,6 +5,34 @@
  * Free tiers available for all listed providers.
  */
 
+// 出厂内置 API Key — 构建时由 vite.config 从 gitignore 的 scripts/.apikey 注入。
+// 用户未配置自己的 Key 时，出厂默认服务商（GLM）自动回落使用它。
+declare const __FACTORY_API_KEY__: string;
+
+const FACTORY_API_KEY: string =
+  typeof __FACTORY_API_KEY__ !== 'undefined' ? __FACTORY_API_KEY__ : '';
+
+/** 出厂默认服务商（出厂 Key 归属） */
+export const FACTORY_PROVIDER: AIProvider = 'glm';
+
+/** 出厂是否内置了 API Key */
+export function hasFactoryKey(): boolean {
+  return FACTORY_API_KEY.length > 0;
+}
+
+/**
+ * 该服务商当前是否正在使用出厂内置 Key
+ * （用户未配置自己的 Key，且出厂 Key 覆盖此服务商）
+ */
+export function isFactoryKey(provider: AIProvider): boolean {
+  if (provider !== FACTORY_PROVIDER || !FACTORY_API_KEY) return false;
+  try {
+    return !localStorage.getItem(`ai_key_${provider}`);
+  } catch {
+    return true;
+  }
+}
+
 export type AIProvider =
   | 'deepseek'
   | 'doubao'
@@ -105,13 +133,17 @@ export const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
 /**
  * Get API key from localStorage.
  * Keys are stored as: ai_key_<provider>
+ * 出厂兜底：默认服务商未配置用户 Key 时，回落到构建时注入的出厂 Key。
  */
 export function getAPIKey(provider: AIProvider): string | null {
   try {
-    return localStorage.getItem(`ai_key_${provider}`);
+    const stored = localStorage.getItem(`ai_key_${provider}`);
+    if (stored) return stored;
   } catch {
     return null;
   }
+  if (provider === FACTORY_PROVIDER && FACTORY_API_KEY) return FACTORY_API_KEY;
+  return null;
 }
 
 /** Event dispatched whenever AI config changes — hooks listen to refresh UI state */
