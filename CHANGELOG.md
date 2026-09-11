@@ -38,6 +38,10 @@
 
 
 
+
+## 2026-09-12
+- feat(ux): immersive focus mode + vocab session polish (`1471c43`)
+
 ## 2026-09-11
 - feat(android): Capacitor APK packaging — cloud API redirect, icon pipeline, GLM model bump (`d09ff90`)
 

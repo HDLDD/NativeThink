@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -121,7 +124,13 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   // ── State ──
   const [pageIdx, setPageIdx] = useState(() => {
     const saved = loadProgress(content.id);
-    return saved.page > 0 ? saved.page : startPage;
+    if (saved.page > 0) return saved.page;
+    if (startPage > 0) return startPage;
+    // 首次打开整本书：跳过古籍版权页/前言，直接从第一个章节标记开始读
+    const firstChapterPg = content.pages?.find(
+      (pg) => pg.paragraphs?.some((p) => p?.en?.startsWith('##CHAPTER##')),
+    );
+    return firstChapterPg ? Math.max(0, firstChapterPg.pageNumber - 1) : 0;
   });
   const [transMode, setTransMode] = useState<TransMode>('bilingual');
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg' | 'xl'>(() => {
@@ -851,16 +860,16 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         </DialogContent>
       </Dialog>
 
-      {/* ── Chapter TOC Dialog ── */}
-      <Dialog open={tocOpen} onOpenChange={setTocOpen}>
-        <DialogContent className="max-w-md rounded-[28px] p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-6 pb-2">
-            <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
+      {/* ── Chapter TOC — 左侧抽屉，阅读中随手唤起 ── */}
+      <Sheet open={tocOpen} onOpenChange={setTocOpen}>
+        <SheetContent side="left" className="w-80 sm:w-96 rounded-r-[28px] p-0 overflow-hidden">
+          <SheetHeader className="px-6 pt-6 pb-2">
+            <SheetTitle className="text-lg font-black text-foreground flex items-center gap-2">
               <ListTree className="size-5 text-[#00B894]" />
               目录 · {chapters.length} 章
-            </DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="max-h-[60vh] px-3 pb-4">
+            </SheetTitle>
+          </SheetHeader>
+          <ScrollArea className="h-[calc(100vh-7rem)] px-3 pb-6">
             <div className="space-y-0.5">
               {chapters.map((ch, i) => (
                 <button
@@ -877,8 +886,8 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
               ))}
             </div>
           </ScrollArea>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {/* ── Word Lookup Dialog — Chinese + English definitions ── */}
       <Dialog open={lookupOpen} onOpenChange={setLookupOpen}>
