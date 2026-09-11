@@ -43,6 +43,10 @@
 
 
 
+
+## 2026-09-12
+- feat(sfx): learning feedback sounds + spelling line bounce inline with sentence (`8770ba1`)
+
 ## 2026-09-12
 - feat: writing & conversation UX polish from mainstream chat/writing tools (`0ac7379`)
 

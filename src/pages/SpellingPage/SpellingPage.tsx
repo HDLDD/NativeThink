@@ -1254,27 +1254,25 @@ export default function SpellingPage() {
 
       {/* ── Sentence Card ── */}
       <Card className="rounded-2xl border-border/50 shadow-sm overflow-hidden">
-        {/* 中文提示 + 拼写线 — 线紧跟在句子后面 */}
+        {/* 中文提示 + 拼写线 — 线紧跟在句子下一行（不与句子同行） */}
         <div className="bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5 px-6 py-5 border-b border-border/50 text-center space-y-3">
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
-            <p className="text-lg font-bold text-foreground/90">{currentSentence?.zh}</p>
-            {mode === 'dictation' && currentSentence && (
-              <div className="min-w-[180px] max-w-full text-left">
-                <DictationInput
-                  words={getWords(currentSentence.en)}
-                  userInputs={dictationInputs}
-                  setUserInput={(i, v) => setDictationInputs((prev) => {
-                    const next = [...prev];
-                    next[i] = v;
-                    return next;
-                  })}
-                  submitted={submitted}
-                  correctWords={results?.wordResults || {}}
-                  inputRefs={inputRefs}
-                />
-              </div>
-            )}
-          </div>
+          <p className="text-lg font-bold text-foreground/90">{currentSentence?.zh}</p>
+          {mode === 'dictation' && currentSentence && (
+            <div className="max-w-full">
+              <DictationInput
+                words={getWords(currentSentence.en)}
+                userInputs={dictationInputs}
+                setUserInput={(i, v) => setDictationInputs((prev) => {
+                  const next = [...prev];
+                  next[i] = v;
+                  return next;
+                })}
+                submitted={submitted}
+                correctWords={results?.wordResults || {}}
+                inputRefs={inputRefs}
+              />
+            </div>
+          )}
           {(currentSentence?.source === 'word_example' && currentSentence.sourceWord) && (
             <div className="flex items-center justify-center gap-2 mt-2">
               <Badge variant="outline" className="rounded-md text-[10px] h-5 font-bold text-[#00B894] border-[#00B894]/30">
