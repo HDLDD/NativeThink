@@ -546,9 +546,9 @@ export default function ProgressPage() {
               <div className="size-12 rounded-2xl bg-orange-50 dark:bg-orange-500/15 text-orange-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Flame className="size-5.5" />
               </div>
-              <div className="flex items-center gap-1 text-[11px] font-black text-emerald-500">
+              <div className="flex items-center gap-1 text-[11px] font-black text-muted-foreground">
                 <TrendingUp className="size-3.5" />
-                +12%
+                累计 {stats.totalDays} 天
               </div>
             </div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
@@ -585,7 +585,7 @@ export default function ProgressPage() {
               <div className="size-12 rounded-2xl bg-indigo-50 dark:bg-indigo-500/15 text-indigo-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Clock className="size-5.5" />
               </div>
-              <div className="text-[11px] font-black text-emerald-500">总时长</div>
+              <div className="text-[11px] font-black text-muted-foreground">打卡 {calendar.filter((r) => r.checkedIn).length} 天</div>
             </div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
               累计学习
@@ -602,7 +602,7 @@ export default function ProgressPage() {
               <div className="size-12 rounded-2xl bg-pink-50 dark:bg-pink-500/15 text-pink-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Heart className="size-5.5" />
               </div>
-              <div className="text-[11px] font-black text-emerald-500">收藏</div>
+              <div className="text-[11px] font-black text-muted-foreground">本周 +{favorites.filter((f) => Date.now() - f.createdAt < 7 * 86400000).length}</div>
             </div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
               地道表达

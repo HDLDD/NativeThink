@@ -39,6 +39,10 @@
 
 
 
+
+## 2026-09-12
+- feat(reader): true fullscreen reading + skip front matter + TOC drawer (`cb02d1b`)
+
 ## 2026-09-12
 - feat(ux): immersive focus mode + vocab session polish (`1471c43`)
 

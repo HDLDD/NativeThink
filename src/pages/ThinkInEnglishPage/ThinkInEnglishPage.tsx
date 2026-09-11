@@ -14,6 +14,7 @@ import {
   Wand2,
   Volume2,
   X,
+  History,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -55,6 +56,27 @@ export default function ThinkInEnglishPage() {
   const [detectorResult, setDetectorResult] = useState('');
   const [detectorLoading, setDetectorLoading] = useState(false);
   const detectorAbortRef = useRef<AbortController | null>(null);
+
+  // ── 检测器练习历史（本地最近 8 条，点击回填） ──
+  const [detectorHistory, setDetectorHistory] = useState<string[]>(() => {
+    try {
+      const raw = safeStorage.getItem('__nativethink_practice_history');
+      const list: { type: string; userInput: string }[] = raw ? JSON.parse(raw) : [];
+      return [...new Set(list.filter((r) => r.type === 'detector').map((r) => r.userInput))].slice(0, 8);
+    } catch { return []; }
+  });
+  const recordDetectorHistory = (input: string) => {
+    setDetectorHistory((prev) => {
+      const next = [input, ...prev.filter((s) => s !== input)].slice(0, 8);
+      try {
+        const raw = safeStorage.getItem('__nativethink_practice_history');
+        const list: unknown[] = raw ? JSON.parse(raw) : [];
+        list.unshift({ type: 'detector', userInput: input, feedback: '', createdAt: Date.now() });
+        safeStorage.setItem('__nativethink_practice_history', JSON.stringify(list.slice(0, 50)));
+      } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   // Translation exercise
   const [currentExerciseIdx, setCurrentExerciseIdx] = useState(0);
@@ -189,6 +211,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
           }
         }
       }
+      if (full.trim()) recordDetectorHistory(input);
     } catch (err) {
       toast.error('AI 服务暂不可用，请稍后重试');
       setDetectorResult('> ⚠️ AI 服务连接失败，请检查网络后重试。');
@@ -800,6 +823,25 @@ The chineseText should subtly embed English thinking patterns so learners discov
                     </div>
                   </CardContent>
                 </Card>
+              )}
+
+              {/* 练习历史 — 空闲时展示最近检测过的句子，点击回填复练 */}
+              {!detectorResult && !detectorLoading && detectorHistory.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1 shrink-0">
+                    <History className="size-3.5" />最近练习
+                  </span>
+                  {detectorHistory.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setDetectorInput(s)}
+                      title={s}
+                      className="px-3 py-1.5 rounded-full bg-muted hover:bg-emerald-500/10 hover:text-[#00B894] text-xs font-bold text-muted-foreground max-w-[240px] truncate transition-colors"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>

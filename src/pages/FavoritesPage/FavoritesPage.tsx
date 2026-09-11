@@ -99,7 +99,19 @@ export default function FavoritesPage() {
   // ── Empty state ──
   if (favorites.length === 0) {
     return (
-      <div className="max-w-2xl mx-auto pt-8">
+      <div className="max-w-2xl mx-auto pt-4 space-y-6">
+        {/* 与浏览视图一致的页面头 */}
+        <div className="flex items-center gap-3">
+          <div className="size-12 rounded-2xl bg-gradient-to-br from-rose-400 to-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-200/50 dark:shadow-rose-900/30">
+            <Heart className="size-6 fill-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black italic text-foreground">收藏本</h1>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              共 0 条收藏
+            </p>
+          </div>
+        </div>
         <EmptyState
           icon={Heart}
           title="收藏本是空的"
