@@ -53,7 +53,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   const [reviewMode, setReviewMode] = useState<ReviewMode>('flashcard');
   const [setupOpen, setSetupOpen] = useState(false); // 学习设置默认折叠
 
-  // ── 本书进度：当前词书已学/总数（词库为静态数据，可安全 memo） ──
+  // ── 本书进度：当前词书已学/总数（词库为静态数据，可安全 memo；展示于概览 Hero 底部） ──
   const bookProgress = useMemo(() => {
     const words = queryWords({ level: level === 'all' ? undefined : level });
     const total = words.length;
@@ -559,22 +559,6 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
           <p className="text-[8px] font-black uppercase tracking-wider text-sky-600">已学单词</p>
         </div>
       </div>
-
-      {/* 本书进度条 */}
-      {bookProgress && !simple && (
-        <div className="flex items-center gap-3 px-1">
-          <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground shrink-0">本书进度</span>
-          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-[#00B894] to-emerald-400 rounded-full transition-all duration-500"
-              style={{ width: `${(bookProgress.learned / bookProgress.total) * 100}%` }}
-            />
-          </div>
-          <span className="text-[9px] font-bold text-muted-foreground tabular-nums shrink-0">
-            {bookProgress.learned}/{bookProgress.total} · {Math.round((bookProgress.learned / bookProgress.total) * 100)}%
-          </span>
-        </div>
-      )}
       </>
       )}
 

@@ -40,6 +40,10 @@
 
 
 
+
+## 2026-09-12
+- feat: think practice history, real progress KPIs, favorites page header (`9aaa343`)
+
 ## 2026-09-12
 - feat(reader): true fullscreen reading + skip front matter + TOC drawer (`cb02d1b`)
 
