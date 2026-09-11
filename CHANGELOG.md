@@ -44,6 +44,10 @@
 
 
 
+
+## 2026-09-12
+- fix(spelling): stack sentence and blank line vertically (`8e19190`)
+
 ## 2026-09-12
 - feat(sfx): learning feedback sounds + spelling line bounce inline with sentence (`8770ba1`)
 

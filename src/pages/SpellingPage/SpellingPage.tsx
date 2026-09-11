@@ -191,7 +191,7 @@ function DictationInput({
                 </span>
               </span>
 
-              {/* Underline — thicker brand color on focus; focused slot bounces */}
+              {/* Underline — 白色空线；聚焦加粗品牌色；已填半透品牌色；判分绿/红 */}
               <div
                 className={cn(
                   'spelling-line h-[2px] w-full mt-0.5 rounded-full transition-all duration-200',
@@ -201,7 +201,7 @@ function DictationInput({
                       : 'bg-rose-400'
                     : hasValue
                       ? 'bg-[#00B894]/60'
-                      : 'bg-muted-foreground/25 group-hover:bg-muted-foreground/50',
+                      : 'bg-white/90 group-hover:bg-white',
                   'group-focus-within:h-[3px] group-focus-within:bg-[#00B894]',
                 )}
               />
