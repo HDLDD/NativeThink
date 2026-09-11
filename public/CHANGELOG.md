@@ -36,6 +36,10 @@
 
 
 
+
+## 2026-09-06
+- feat(vocab): daily-learning overview redesigned — gradient hero with badges, CTA, book progress; KPI row compacted; redundant heading removed (`04f6bbd`)
+
 ## 2026-09-06
 - feat(vocab): vertical home layout — hero card for daily learning with live stats, due-count badge on review row (`6ea1e75`)
 

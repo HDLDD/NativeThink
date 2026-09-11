@@ -17,6 +17,17 @@
   </head>
   <body>
     <div id="root"></div>
+  <script>
+    // 移动端（Capacitor APK）：/api/* 走云端 Pages 部署
+    if (window.Capacitor) {
+      window.__API_BASE__ = 'https://nativethink.pages.dev';
+      const __of = window.fetch.bind(window);
+      window.fetch = function (input, init) {
+        if (typeof input === 'string' && input.indexOf('/api/') === 0) input = window.__API_BASE__ + input;
+        return __of(input, init);
+      };
+    }
+  </script>
     <script type="module" src="/src/index.tsx"></script>
   </body>
 </html>

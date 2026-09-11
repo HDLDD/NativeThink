@@ -159,8 +159,9 @@ function googleTTSUrl(text: string): string {
 // ── Tier 2b: Local server TTS (Edge neural voices + Windows SAPI) ──
 
 function cfTtsUrl(text: string, rate: number, voice?: string | null): string {
+  const base = (typeof window !== 'undefined' && (window as any).__API_BASE__) || '';
   const v = voice ? `&voice=${encodeURIComponent(voice)}` : '';
-  return `/api/tts?text=${encodeURIComponent(text)}&rate=${rate.toFixed(2)}${v}`;
+  return `${base}/api/tts?text=${encodeURIComponent(text)}&rate=${rate.toFixed(2)}${v}`;
 }
 
 /** True when the selected voice is served by the local desktop server */
