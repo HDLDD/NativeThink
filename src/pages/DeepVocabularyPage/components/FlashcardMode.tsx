@@ -8,6 +8,7 @@ import type { IWordEntry } from '@/data/wordbank/schema';
 import { findWord, getWordCounts } from '@/data/wordbank';
 import { useWordLearning } from '@/lib/use-word-learning';
 import { useLearningStats } from '@/lib/use-learning-stats';
+import { useImmersive } from '@/lib/focus-mode';
 import { cn, cleanText } from '@/lib/utils';
 import { WordImage } from '@/components/WordImage';
 import { toast } from 'sonner';
@@ -127,6 +128,19 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   }, [currentLevel]);
 
   const cw = queue[currentIdx];
+  useImmersive(started && !!cw);
+
+  // 专注模式下 ESC 退出到概览
+  useEffect(() => {
+    if (!started) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) {
+        setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); setRated(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [started]);
 
   const stats = useMemo(() => {
     let mastered = 0, learning = 0;
@@ -304,7 +318,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                         </span>
                       )}
                     </Badge>
-                    <WordImage word={cw.word} className="h-36 sm:h-44 mb-4" />
+                    <WordImage word={cw.word} hideOnEmpty className="h-36 sm:h-44 mb-4" />
                     <div className="flex items-center justify-center gap-3 mb-2">
                       <h2 className="text-4xl font-black italic text-foreground tracking-tight">{cw.word}</h2>
                       <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(cw.word, { rate: 0.9 }); }}

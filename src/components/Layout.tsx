@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/AppSidebar';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import Header from '@/components/Header';
+import { useFocusMode } from '@/lib/focus-mode';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { safeStorage } from '@/lib/safe-storage';
@@ -63,6 +64,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 
 export function Layout() {
   const location = useLocation();
+  const { focused } = useFocusMode();
 
   // Route change UX: reset scroll to top, retrigger the page-enter animation,
   // and remember the last visited module (for "继续上次学习" on the dashboard)
@@ -79,9 +81,9 @@ export function Layout() {
 
   return (
     <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="flex flex-col min-w-0 overflow-x-hidden bg-background">
-        <Header />
+      {!focused && <AppSidebar />}
+      <SidebarInset className="flex flex-col min-w-0 overflow-x-hidden bg-background min-h-screen">
+        {!focused && <Header />}
         <main className="flex-1 w-full overflow-y-auto px-4 sm:px-6 lg:px-10 py-4 sm:py-6 lg:py-8 pb-20 lg:pb-8">
           <div className="max-w-[1600px] mx-auto">
             {/* keyed by pathname → remounts on navigation → page-enter animation */}
@@ -94,7 +96,7 @@ export function Layout() {
             </ErrorBoundary>
           </div>
         </main>
-        <MobileBottomNav />
+        {!focused && <MobileBottomNav />}
       </SidebarInset>
     </SidebarProvider>
   );

@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { AuthProvider } from "./lib/auth-provider";
 import CloudSyncProvider from "./components/CloudSyncProvider";
+import { FocusModeProvider } from "./lib/focus-mode";
 import App from "./app";
 import "./index.css";
 
@@ -60,6 +61,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter basename={process.env.CLIENT_BASE_PATH || "/"}>
       <SafeShell>
+        <FocusModeProvider>
         <AuthProvider>
           <CloudSyncProvider>
           <ErrorBoundary fallbackRender={({ error, resetErrorBoundary }) => (
@@ -69,6 +71,7 @@ createRoot(document.getElementById("root")!).render(
           </ErrorBoundary>
           </CloudSyncProvider>
         </AuthProvider>
+        </FocusModeProvider>
       </SafeShell>
     </BrowserRouter>
   </StrictMode>,

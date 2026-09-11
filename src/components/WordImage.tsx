@@ -36,9 +36,11 @@ function saveCache(word: string, urls: string[]): void {
 interface Props {
   word: string;
   className?: string;
+  /** true = 无图时整块隐藏（闪卡等沉浸场景），不显示占位箱 */
+  hideOnEmpty?: boolean;
 }
 
-export function WordImage({ word, className }: Props) {
+export function WordImage({ word, className, hideOnEmpty }: Props) {
   const key = word.toLowerCase();
   const [urls, setUrls] = useState<string[] | null>(null); // null = 未加载
   const [idx, setIdx] = useState(0);
@@ -66,6 +68,9 @@ export function WordImage({ word, className }: Props) {
   }, [urls]);
 
   const src = urls && urls.length > 0 ? urls[idx % urls.length] : null;
+
+  // 沉浸场景：加载中/无图时不渲染占位箱，让内容（单词）成为绝对主角
+  if (hideOnEmpty && (urls === null || !src || broken)) return null;
 
   return (
     <div

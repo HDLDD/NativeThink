@@ -37,6 +37,10 @@
 
 
 
+
+## 2026-09-11
+- feat(android): Capacitor APK packaging — cloud API redirect, icon pipeline, GLM model bump (`d09ff90`)
+
 ## 2026-09-06
 - feat(vocab): daily-learning overview redesigned — gradient hero with badges, CTA, book progress; KPI row compacted; redundant heading removed (`04f6bbd`)
 

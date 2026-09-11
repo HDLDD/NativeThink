@@ -199,7 +199,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
           <div className="flex gap-2 flex-wrap">
             {DAILY_COUNTS.map((n) => (
               <button key={n} onClick={() => setDailyCount(n)}
-                className={cn('flex-1 py-3 rounded-2xl text-sm font-black transition-all',
+                className={cn('flex-1 py-3 rounded-2xl text-sm font-black whitespace-nowrap transition-all',
                   dailyCount === n ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50' : 'bg-muted text-muted-foreground hover:bg-muted/80')}>{n}词</button>
             ))}
           </div>

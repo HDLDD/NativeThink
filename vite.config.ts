@@ -61,6 +61,10 @@ function fixHtmlPlaceholders(): Plugin {
 
 export default defineConfig({
   base: process.env.CLIENT_BASE_PATH || '/',
+  // 让 dev 模式（普通浏览器，无 Node 环境）下 src/index.tsx 里的 process.env 可用；构建时 esbuild 本就会替换
+  define: {
+    'process.env.CLIENT_BASE_PATH': JSON.stringify(process.env.CLIENT_BASE_PATH || '/'),
+  },
   plugins: [tailwindcss(), mockVirtualCapabilities(), fixHtmlPlaceholders()],
   resolve: {
     alias: {

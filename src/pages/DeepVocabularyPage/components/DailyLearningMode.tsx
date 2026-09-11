@@ -10,6 +10,8 @@ import type { IWordEntry } from '@/data/wordbank/schema';
 import { findWord, getRandomWords, queryWords } from '@/data/wordbank';
 import { useWordLearning } from '@/lib/use-word-learning';
 import { useTTS } from '@/lib/use-tts';
+import { useImmersive } from '@/lib/focus-mode';
+import { useLearningStats } from '@/lib/use-learning-stats';
 import { WordImage } from '@/components/WordImage';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -45,6 +47,8 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   const { LazyMotionDiv: MotionDiv, LazyAnimatePresence: AnimatePresence } = useFramerMotion();
   const { state, dailyQuota, setDailyQuota, todayRemaining, dueForReview, getNewWords, recordReview, resetProgress } = useWordLearning(level);
   const tts = useTTS();
+  // 学习时长统计（供仪表盘/学习记录的连续打卡与时长展示）
+  const { addStudyMinutes } = useLearningStats();
 
   const [reviewMode, setReviewMode] = useState<ReviewMode>('flashcard');
   const [setupOpen, setSetupOpen] = useState(false); // 学习设置默认折叠
@@ -84,6 +88,10 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isFlipped, setFlipped] = useState(false);
   const [rated, setRated] = useState(false);
+
+  // 会话完成庆祝（借鉴 Duolingo 完课页）
+  const [sessionDone, setSessionDone] = useState(false);
+  const sessionStatsRef = useRef({ review: 0, fresh: 0, startedAt: 0 });
 
   // Choice mode state
   const [choiceOptions, setChoiceOptions] = useState<IWordEntry[]>([]);
@@ -218,6 +226,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       return;
     }
     setSessionWords(all);
+    sessionStatsRef.current = { review: reviewWords.length, fresh: newOnes.length, startedAt: Date.now() };
     // 会话预热：预合成前 3 个词，首词朗读零等待
     all.slice(0, 3).forEach((w, i) => {
       setTimeout(() => ttsRef.current.prewarm(w.word, { rate: 0.85 }), 120 * i);
@@ -399,6 +408,8 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   };
 
   const handleNext = () => {
+    // 每完成一张卡记 24 秒学习时长（仪表盘/学习记录的时长与打卡数据源）
+    addStudyMinutes(0.4, 'vocabulary');
     if (currentIdx < sessionWords.length - 1) {
       const nextIdx = currentIdx + 1;
       setCurrentIdx(nextIdx);
@@ -428,7 +439,8 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
         generateMatchPairs(sessionWords[nextIdx], sessionWords);
       }
     } else {
-      startSession();
+      // 本轮完成 → 庆祝页（而非无感循环开始下一轮）
+      setSessionDone(true);
     }
   };
 
@@ -448,11 +460,44 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   const currentModeLabel = modeLabels.find((m) => m.key === reviewMode)?.label || '闪卡';
   // 学习中 → 隐藏概览（标题/KPI/进度/设置），只保留学习卡片 + 左上返回
   const inSession = sessionWords.length > 0 && !!currentWord;
+  useImmersive(inSession);
   const exitSession = () => {
     setSessionWords([]);
     setCurrentIdx(0);
     setFlipped(false);
+    setSessionDone(false);
   };
+
+  // 专注模式下 ESC 直接退出会话
+  useEffect(() => {
+    if (!inSession) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) exitSession();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [inSession]);
+
+  // 闪卡键盘操作：空格翻面 → 默认「比较熟悉」→ 下一个；1-5 评分；→ 下一个
+  useEffect(() => {
+    if (!inSession || sessionDone || reviewMode !== 'flashcard') return;
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!isFlipped) setFlipped(true);
+        else if (!rated) handleRate(4);
+        else handleNext();
+      } else if (isFlipped && !rated && ['1', '2', '3', '4', '5'].includes(e.key)) {
+        handleRate([0, 2, 3, 4, 5][parseInt(e.key, 10) - 1]);
+      } else if (e.key === 'ArrowRight' && rated) {
+        handleNext();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [inSession, sessionDone, reviewMode, isFlipped, rated, currentIdx, sessionWords]);
 
   return (
     <div className="space-y-4">
@@ -638,7 +683,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
             size="icon"
             onClick={exitSession}
             className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-[#00B894]"
-            title="返回概览"
+            title="返回概览 (Esc)"
           >
             <ArrowLeft className="size-5" />
           </Button>
@@ -650,7 +695,6 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               {currentModeLabel}
             </Badge>
           </div>
-          <span className="text-xs font-black text-muted-foreground tabular-nums shrink-0">{currentIdx + 1}/{sessionWords.length}</span>
         </div>
         <AnimatePresence mode="wait">
           <MotionDiv
@@ -666,17 +710,12 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
             <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-[#00B894] to-emerald-400 rounded-full transition-all duration-300"
-                style={{ width: `${((currentIdx + 1) / sessionWords.length) * 100}%` }}
+                style={{ width: `${((currentIdx + (rated ? 1 : 0)) / sessionWords.length) * 100}%` }}
               />
             </div>
             <span className="text-xs font-black text-muted-foreground tabular-nums">
               {currentIdx + 1}/{sessionWords.length}
             </span>
-          </div>
-          {/* Current level badge */}
-          <div className="flex items-center justify-center gap-2">
-            <Badge className="rounded-full px-2.5 py-0.5 text-[9px] font-black bg-emerald-500/10 text-emerald-600 border-emerald-200">{currentLevelLabel}</Badge>
-            <Badge className="rounded-full px-2.5 py-0.5 text-[9px] font-black bg-[#6C5CE7]/10 text-[#6C5CE7] border-violet-200">{currentModeLabel}</Badge>
           </div>
 
           {/* ===== FLASHCARD MODE ===== */}
@@ -703,7 +742,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                             <Badge className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground mb-4">
                               {state.progress[currentWord.word.toLowerCase()] ? '复习' : '新学'}
                             </Badge>
-                            <WordImage word={currentWord.word} className="h-36 sm:h-44 mb-4" />
+                            <WordImage word={currentWord.word} hideOnEmpty className="h-36 sm:h-44 mb-4" />
                             <div className="flex items-center justify-center gap-3 mb-3">
                               <h2 className="text-5xl font-black italic text-foreground tracking-tight">{currentWord.word}</h2>
                               <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(currentWord.word, { rate: 0.9 }); }} className="rounded-2xl bg-muted text-muted-foreground hover:text-[#00B894]">
@@ -749,18 +788,20 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                     { q: 3, label: '基本记得', color: 'bg-amber-500 hover:bg-amber-600' },
                     { q: 4, label: '比较熟悉', color: 'bg-emerald-500 hover:bg-emerald-600' },
                     { q: 5, label: '完全掌握', color: 'bg-[#00B894] hover:bg-[#00A080]' },
-                  ].map(({ q, label, color }) => (
+                  ].map(({ q, label, color }, i) => (
                     <button key={q} onClick={() => handleRate(q)}
-                      className={cn('px-3 py-2 rounded-2xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg transition-all hover:scale-105', color)}>
+                      className={cn('relative px-3 py-2 rounded-2xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg transition-all hover:scale-105', color)}>
                       {label}
+                      <span className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-black/25 text-[8px] font-black flex items-center justify-center">{i + 1}</span>
                     </button>
                   ))}
+                  <span className="w-full text-center text-[9px] text-muted-foreground font-bold mt-1">键盘：空格 翻面 / 1-5 评分 / → 下一个</span>
                 </div>
               )}
               {rated && (
                 <div className="flex justify-center">
                   <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
-                    {currentIdx < sessionWords.length - 1 ? '下一个' : '再来一组'}
+                    {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                     <ArrowRight className="size-4 ml-2" />
                   </Button>
                 </div>
@@ -818,7 +859,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               {choiceSelected && (
                 <div className="flex justify-center">
                   <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
-                    {currentIdx < sessionWords.length - 1 ? '下一个' : '再来一组'}
+                    {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                     <ArrowRight className="size-4 ml-2" />
                   </Button>
                 </div>
@@ -922,7 +963,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               {spellingChecked && (
                 <div className="flex justify-center">
                   <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
-                    {currentIdx < sessionWords.length - 1 ? '下一个' : '再来一组'}
+                    {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                     <ArrowRight className="size-4 ml-2" />
                   </Button>
                 </div>
@@ -1028,7 +1069,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               {listeningChecked && (
                 <div className="flex justify-center">
                   <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
-                    {currentIdx < sessionWords.length - 1 ? '下一个' : '再来一组'}
+                    {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                     <ArrowRight className="size-4 ml-2" />
                   </Button>
                 </div>
@@ -1111,7 +1152,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               {allMatched && rated && (
                 <div className="flex justify-center">
                   <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
-                    {currentIdx < sessionWords.length - 1 ? '下一个' : '再来一组'}
+                    {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                     <ArrowRight className="size-4 ml-2" />
                   </Button>
                 </div>
@@ -1212,7 +1253,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                 {fillblankChecked && (
                   <div className="flex justify-center">
                     <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
-                      {currentIdx < sessionWords.length - 1 ? '下一个' : '再来一组'}
+                      {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                       <ArrowRight className="size-4 ml-2" />
                     </Button>
                   </div>
@@ -1222,6 +1263,49 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
           })()}
           </MotionDiv>
         </AnimatePresence>
+
+        {/* ── 本轮完成庆祝（Duolingo 式完课页） ── */}
+        {sessionDone && (
+          <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center p-4">
+            <MotionDiv
+              initial={{ scale: 0.9, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 20 }}
+              className="w-full max-w-sm rounded-[32px] border-2 border-[#00B894]/20 bg-card shadow-2xl p-8 text-center space-y-5"
+            >
+              <div className="text-6xl select-none" style={{ animation: 'session-cheer 600ms ease both' }}>🎉</div>
+              <div className="space-y-1">
+                <p className="text-2xl font-black italic text-foreground">本轮完成！</p>
+                <p className="text-xs font-bold text-muted-foreground">进步 +{sessionStatsRef.current.review + sessionStatsRef.current.fresh} 词，继续保持</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-100 dark:border-emerald-500/20">
+                  <p className="text-xl font-black text-[#00B894]">{sessionStatsRef.current.fresh}</p>
+                  <p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">新学</p>
+                </div>
+                <div className="p-3 rounded-2xl bg-violet-50 dark:bg-violet-500/15 border border-violet-100 dark:border-violet-500/20">
+                  <p className="text-xl font-black text-[#6C5CE7]">{sessionStatsRef.current.review}</p>
+                  <p className="text-[9px] font-black uppercase tracking-wider text-violet-600">复习</p>
+                </div>
+                <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/15 border border-amber-100 dark:border-amber-500/20">
+                  <p className="text-xl font-black text-amber-500">{Math.max(1, Math.round((Date.now() - sessionStatsRef.current.startedAt) / 60000))}</p>
+                  <p className="text-[9px] font-black uppercase tracking-wider text-amber-600">分钟</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={exitSession} className="flex-1 rounded-2xl text-xs font-black">
+                  返回概览
+                </Button>
+                <Button
+                  onClick={() => { setSessionDone(false); startSession(); }}
+                  className="flex-1 rounded-2xl bg-[#00B894] hover:bg-[#00A080] text-white text-xs font-black shadow-lg shadow-emerald-200/50"
+                >
+                  <BookOpen className="size-4 mr-1.5" />再来一组
+                </Button>
+              </div>
+            </MotionDiv>
+          </div>
+        )}
         </div>
       ) : (
         <div
