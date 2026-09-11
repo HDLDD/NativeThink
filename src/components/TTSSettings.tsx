@@ -20,7 +20,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useTTSSettings, getEnglishVoices } from '@/lib/tts-settings';
-import { cleanText } from '@/lib/utils';
+import { isSfxEnabled, setSfxEnabled, sfxTick } from '@/lib/sfx';
+import { cleanText, cn } from '@/lib/utils';
 
 /** Unified voice option: browser SpeechSynthesis voice OR local-server voice */
 interface VoiceOption {
@@ -49,6 +50,8 @@ export default function TTSSettings() {
   const { settings, updateSettings } = useTTSSettings();
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [open, setOpen] = useState(false);
+  // 提示音效开关（答对/答错/拼写完成等反馈音）
+  const [sfxOn, setSfxOn] = useState(isSfxEnabled);
 
   const fromSystemVoices = (list: SpeechSynthesisVoice[]): VoiceOption[] =>
     list.map((v) => ({ uri: v.voiceURI, name: v.name, lang: v.lang, source: 'system' as const }));
@@ -254,6 +257,30 @@ export default function TTSSettings() {
             <Play className="size-3.5 mr-2" />
             测试声音
           </Button>
+
+          {/* 提示音效开关（答题正误 / 拼写完成等） */}
+          <div className="flex items-center justify-between gap-2 pt-3 border-t border-border">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">提示音效</p>
+              <p className="text-[9px] text-muted-foreground/60 mt-0.5">答题正误、拼写完成等反馈音</p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={sfxOn}
+              onClick={() => { const v = !sfxOn; setSfxOn(v); setSfxEnabled(v); if (v) sfxTick(); }}
+              className={cn(
+                'relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0',
+                sfxOn ? 'bg-[#00B894]' : 'bg-muted-foreground/30',
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform duration-200',
+                  sfxOn ? 'translate-x-[18px]' : 'translate-x-0.5',
+                )}
+              />
+            </button>
+          </div>
         </div>
       </PopoverContent>
     </Popover>

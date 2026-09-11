@@ -52,6 +52,19 @@ body {
   60%  { opacity: 1; transform: scale(1.15) rotate(6deg); }
   100% { opacity: 1; transform: scale(1) rotate(0deg); }
 }
+
+/* 拼写线跳动 — 当前聚焦的空格下划线像呼吸一样起伏 */
+@keyframes spelling-line-bounce {
+  0%, 100% { transform: translateY(0) scaleX(1); }
+  35%      { transform: translateY(-3px) scaleX(0.88); }
+  65%      { transform: translateY(0) scaleX(1.08); }
+}
+.spelling-line {
+  transform-origin: center;
+}
+div:has(> input:focus) > .spelling-line {
+  animation: spelling-line-bounce 0.9s ease-in-out infinite;
+}
 .stagger > *:nth-child(1) { animation-delay: 0ms; }
 .stagger > *:nth-child(2) { animation-delay: 35ms; }
 .stagger > *:nth-child(3) { animation-delay: 70ms; }

@@ -42,6 +42,10 @@
 
 
 
+
+## 2026-09-12
+- feat: writing & conversation UX polish from mainstream chat/writing tools (`0ac7379`)
+
 ## 2026-09-12
 - fix(vocab): dedupe book-progress bars; record study minutes in daily learning (`a22da2c`)
 

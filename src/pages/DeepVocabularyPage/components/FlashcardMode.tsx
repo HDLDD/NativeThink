@@ -13,6 +13,7 @@ import { cn, cleanText } from '@/lib/utils';
 import { WordImage } from '@/components/WordImage';
 import { toast } from 'sonner';
 import { useTTS } from '@/lib/use-tts';
+import { sfxComplete } from '@/lib/sfx';
 
 const FL_LEVEL_COLORS: Record<string, string> = {
   all: '#00B894', zhongkao: '#EF4444', gaokao: '#F97316', cet4: '#0EA5E9', cet6: '#6C5CE7', ielts: '#F59E0B', toefl: '#EC4899', postgraduate: '#8B5CF6', professional: '#14B8A6', advanced: '#64748B',
@@ -169,6 +170,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       const next = (p + 1) % queue.length;
       // 走完最后一循环回第一张 = 完成一整轮，给个里程碑反馈
       if (next === 0 && p === queue.length - 1) {
+        sfxComplete();
         toast.success(`🎉 完成一整轮 ${queue.length} 张卡片 · 累计评分 ${sessionReviewCount} 次，巩固完成`, { duration: 4000 });
       }
       return next;

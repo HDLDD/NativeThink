@@ -12,6 +12,7 @@ import { useWordLearning } from '@/lib/use-word-learning';
 import { useTTS } from '@/lib/use-tts';
 import { useImmersive } from '@/lib/focus-mode';
 import { useLearningStats } from '@/lib/use-learning-stats';
+import { sfxCorrect, sfxWrong, sfxTick, sfxComplete } from '@/lib/sfx';
 import { WordImage } from '@/components/WordImage';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -312,6 +313,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setChoiceSelected(word);
     const correct = word === currentWord.word;
     setChoiceCorrect(correct);
+    if (correct) sfxCorrect(); else sfxWrong();
     recordReview(currentWord, correct ? 5 : 2);
     setRated(true);
   };
@@ -321,6 +323,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setSpellingChecked(true);
     const correct = spellingInput.trim().toLowerCase() === currentWord.word.toLowerCase();
     setSpellingCorrect(correct);
+    if (correct) sfxCorrect(); else sfxWrong();
     recordReview(currentWord, correct ? 5 : 2);
     setRated(true);
   };
@@ -330,6 +333,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setListeningChecked(true);
     const correct = listeningInput.trim().toLowerCase() === currentWord.word.toLowerCase();
     setListeningCorrect(correct);
+    if (correct) sfxCorrect(); else sfxWrong();
     recordReview(currentWord, correct ? 5 : 2);
     setRated(true);
   };
@@ -349,6 +353,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
 
     if (pair.word === selectedMatchWord) {
       // Correct match!
+      sfxTick();
       const newMatched = new Set(matchedWordSet);
       newMatched.add(selectedMatchWord);
       setMatchedWordSet(newMatched);
@@ -356,6 +361,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       setMatchFlashError(null);
     } else {
       // Wrong match — flash error
+      sfxWrong();
       setMatchFlashError(meaning);
       setTimeout(() => setMatchFlashError(null), 600);
       setSelectedMatchWord(null);
@@ -367,6 +373,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
 
   useEffect(() => {
     if (allMatched && !rated) {
+      sfxCorrect();
       recordReview(currentWord, 5);
       setRated(true);
     }
@@ -377,6 +384,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setFillblankChecked(true);
     const correct = fillblankInput.trim().toLowerCase() === currentWord.word.toLowerCase();
     setFillblankCorrect(correct);
+    if (correct) sfxCorrect(); else sfxWrong();
     recordReview(currentWord, correct ? 5 : 2);
     setRated(true);
   };
@@ -387,6 +395,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setSpellingChecked(true);
     setSpellingCorrect(false);
     setSpellingHint(true);
+    sfxWrong();
     recordReview(currentWord, 1); // quality 1 = forgot
     setRated(true);
   };
@@ -395,6 +404,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setListeningChecked(true);
     setListeningCorrect(false);
     setListeningHint(true);
+    sfxWrong();
     recordReview(currentWord, 1);
     setRated(true);
   };
@@ -403,6 +413,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setFillblankChecked(true);
     setFillblankCorrect(false);
     setFillblankHint(true);
+    sfxWrong();
     recordReview(currentWord, 1);
     setRated(true);
   };
@@ -477,6 +488,11 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [inSession]);
+
+  // 本轮完成 → 播放完成提示音
+  useEffect(() => {
+    if (sessionDone) sfxComplete();
+  }, [sessionDone]);
 
   // 闪卡键盘操作：空格翻面 → 默认「比较熟悉」→ 下一个；1-5 评分；→ 下一个
   useEffect(() => {

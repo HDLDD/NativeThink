@@ -57,6 +57,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { safeStorage } from '@/lib/safe-storage';
 import { useTTS } from '@/lib/use-tts';
+import { sfxCorrect, sfxWrong, sfxComplete } from '@/lib/sfx';
 import { useFavorites } from '@/lib/use-favorites';
 import { useAI } from '@/hooks/use-ai';
 import { useSpellingSentences } from '@/lib/use-spelling-sentences';
@@ -190,10 +191,10 @@ function DictationInput({
                 </span>
               </span>
 
-              {/* Underline — thicker brand color on focus */}
+              {/* Underline — thicker brand color on focus; focused slot bounces */}
               <div
                 className={cn(
-                  'h-[2px] w-full mt-0.5 rounded-full transition-all duration-200',
+                  'spelling-line h-[2px] w-full mt-0.5 rounded-full transition-all duration-200',
                   submitted
                     ? isCorrect
                       ? 'bg-emerald-400'
@@ -310,6 +311,45 @@ function FillDisplay({
 }
 
 // ── Main Page ──
+
+/** 本轮完成横幅 — 挂载时播放完成提示音 */
+function CompletionBanner({ todayPracticed, onRestart, onShowRecords }: {
+  todayPracticed: number;
+  onRestart: () => void;
+  onShowRecords: () => void;
+}) {
+  useEffect(() => { sfxComplete(); }, []);
+  return (
+    <Card className="p-6 rounded-2xl border-[#00B894]/20 shadow-sm bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5">
+      <div className="flex flex-col items-center justify-center text-center">
+        <Check className="size-8 text-[#00B894] mb-2" />
+        <h2 className="text-lg font-black italic mb-1">本轮完成！</h2>
+        <p className="text-xs text-muted-foreground mb-4">
+          今日已练习 {todayPracticed} 句
+        </p>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            onClick={onRestart}
+            className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-1.5"
+          >
+            <RefreshCw className="size-3.5" />
+            再来一轮
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onShowRecords}
+            className="rounded-xl font-bold gap-1.5"
+          >
+            <BookOpen className="size-3.5" />
+            学习记录
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 export default function SpellingPage() {
   // Hooks
@@ -513,6 +553,10 @@ export default function SpellingPage() {
 
     setResults({ wordResults, score: correctCount, total: totalWords });
     setSubmitted(true);
+
+    // 提示音：全对 → 完成音；有错 → 错误音
+    if (correctCount === totalWords) sfxCorrect();
+    else sfxWrong();
 
     // Re-read the sentence aloud after submit
     tts.speak(currentSentence.en);
@@ -1009,40 +1053,16 @@ export default function SpellingPage() {
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
       {/* ── Inline completion banner ── */}
       {completionShown && (
-        <Card className="p-6 rounded-2xl border-[#00B894]/20 shadow-sm bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5">
-          <div className="flex flex-col items-center justify-center text-center">
-            <Check className="size-8 text-[#00B894] mb-2" />
-            <h2 className="text-lg font-black italic mb-1">本轮完成！</h2>
-            <p className="text-xs text-muted-foreground mb-4">
-              今日已练习 {learningStats.todayPracticed} 句
-            </p>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => {
-                  resetCompletedAll();
-                  setImportDirty(c => c + 1);
-                  setCompletionShown(false);
-                }}
-                className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-1.5"
-              >
-                <RefreshCw className="size-3.5" />
-                再来一轮
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowManageDialog(true)}
-                className="rounded-xl font-bold gap-1.5"
-              >
-                <BookOpen className="size-3.5" />
-                学习记录
-              </Button>
-            </div>
-          </div>
-        </Card>
+        <CompletionBanner
+          todayPracticed={learningStats.todayPracticed}
+          onRestart={() => {
+            resetCompletedAll();
+            setImportDirty(c => c + 1);
+            setCompletionShown(false);
+          }}
+          onShowRecords={() => setShowManageDialog(true)}
+        />
       )}
-
       {/* ── Header Controls ── */}
       <Card className="p-4 rounded-2xl border-border/50 shadow-sm space-y-4">
         {/* Row 1: 拼写模式 / 音频 / 自动朗读 / 词书切换（右上角，避免误触） */}
@@ -1234,9 +1254,27 @@ export default function SpellingPage() {
 
       {/* ── Sentence Card ── */}
       <Card className="rounded-2xl border-border/50 shadow-sm overflow-hidden">
-        {/* Chinese translation — centered */}
-        <div className="bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5 px-6 py-5 border-b border-border/50 text-center">
-          <p className="text-lg font-bold text-foreground/90">{currentSentence?.zh}</p>
+        {/* 中文提示 + 拼写线 — 线紧跟在句子后面 */}
+        <div className="bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5 px-6 py-5 border-b border-border/50 text-center space-y-3">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
+            <p className="text-lg font-bold text-foreground/90">{currentSentence?.zh}</p>
+            {mode === 'dictation' && currentSentence && (
+              <div className="min-w-[180px] max-w-full text-left">
+                <DictationInput
+                  words={getWords(currentSentence.en)}
+                  userInputs={dictationInputs}
+                  setUserInput={(i, v) => setDictationInputs((prev) => {
+                    const next = [...prev];
+                    next[i] = v;
+                    return next;
+                  })}
+                  submitted={submitted}
+                  correctWords={results?.wordResults || {}}
+                  inputRefs={inputRefs}
+                />
+              </div>
+            )}
+          </div>
           {(currentSentence?.source === 'word_example' && currentSentence.sourceWord) && (
             <div className="flex items-center justify-center gap-2 mt-2">
               <Badge variant="outline" className="rounded-md text-[10px] h-5 font-bold text-[#00B894] border-[#00B894]/30">
@@ -1258,34 +1296,9 @@ export default function SpellingPage() {
           )}
         </div>
 
-        {/* Input area */}
+        {/* Input area — 句子拼写的输入线已内联到句子后面，这里只剩单词拼写 */}
         <div className="px-6 py-6 space-y-6">
-          {mode === 'dictation' ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 mb-3 justify-center">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  句子拼写
-                </span>
-                <span className="text-[11px] text-muted-foreground/60">
-                  ({currentSentence ? getWords(currentSentence.en).length : 0} 个单词)
-                </span>
-              </div>
-              {currentSentence && (
-                <DictationInput
-                  words={getWords(currentSentence.en)}
-                  userInputs={dictationInputs}
-                  setUserInput={(i, v) => setDictationInputs((prev) => {
-                    const next = [...prev];
-                    next[i] = v;
-                    return next;
-                  })}
-                  submitted={submitted}
-                  correctWords={results?.wordResults || {}}
-                  inputRefs={inputRefs}
-                />
-              )}
-            </div>
-          ) : (
+          {mode === 'fill' && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 mb-3 justify-center">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
