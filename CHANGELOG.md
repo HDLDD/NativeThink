@@ -47,6 +47,10 @@
 
 
 
+
+## 2026-09-12
+- feat(ai): factory-baked API key + glm-4.6-flash as out-of-box config (`31babc0`)
+
 ## 2026-09-12
 - feat(spelling): selectable round size; factory GLM model -> glm-4.6-flash (`8eacb97`)
 
