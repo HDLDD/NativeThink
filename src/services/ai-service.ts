@@ -12,6 +12,12 @@ import {
   getConfiguredProviders,
   getAPIKey,
 } from './ai-config';
+import { toast } from 'sonner';
+import {
+  isAutoFallbackEnabled,
+  isLocalLlmReady,
+  localStreamChat,
+} from '@/lib/local-llm';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -45,7 +51,7 @@ export interface StreamChunk {
  *     console.log(chunk.content);
  *   }
  */
-export async function* streamChat(
+async function* apiStreamChat(
   messages: ChatMessage[],
   options: StreamCallOptions = {},
 ): AsyncGenerator<StreamChunk, void, undefined> {
@@ -162,7 +168,7 @@ export async function* streamChat(
  * Non-streaming chat completion. Returns the full response text.
  * Routes through server proxy to protect API keys.
  */
-export async function chat(
+async function apiChat(
   messages: ChatMessage[],
   options: StreamCallOptions = {},
 ): Promise<string> {
@@ -256,4 +262,69 @@ export function appendUserMessage(
   userContent: string,
 ): ChatMessage[] {
   return [...existing, { role: 'user', content: userContent }];
+}
+
+/**
+ * 出厂 Key 限流/断网时的离线兜底 — API 失败后自动切换端侧小模型。
+ * 仅当用户开启"离线自动回落"且小模型已下载时才介入；否则原样抛错。
+ */
+let lastFallbackToast = 0;
+function hintOfflineFallback() {
+  const now = Date.now();
+  if (now - lastFallbackToast < 30_000) return;
+  lastFallbackToast = now;
+  if (isLocalLlmReady()) {
+    toast.info('AI 服务不可用，已切换离线小模型', { duration: 2500 });
+  } else {
+    toast.info('AI 服务不可用 — 可在 AI 设置中下载离线备用小模型', { duration: 3500 });
+  }
+}
+
+export async function* streamChat(
+  messages: ChatMessage[],
+  options: StreamCallOptions = {},
+): AsyncGenerator<StreamChunk, void, undefined> {
+  try {
+    for await (const chunk of apiStreamChat(messages, options)) {
+      yield chunk;
+    }
+    return;
+  } catch (err) {
+    if (options.signal?.aborted) throw err;
+    if (!isAutoFallbackEnabled() || !isLocalLlmReady()) {
+      hintOfflineFallback();
+      throw err;
+    }
+    for await (const chunk of localStreamChat(messages, {
+      maxTokens: options.maxTokens ? Math.min(options.maxTokens, 600) : 400,
+      temperature: options.temperature,
+      signal: options.signal,
+    })) {
+      yield chunk;
+    }
+  }
+}
+
+export async function chat(
+  messages: ChatMessage[],
+  options: StreamCallOptions = {},
+): Promise<string> {
+  try {
+    return await apiChat(messages, options);
+  } catch (err) {
+    if (options.signal?.aborted) throw err;
+    if (!isAutoFallbackEnabled() || !isLocalLlmReady()) {
+      hintOfflineFallback();
+      throw err;
+    }
+    let out = '';
+    for await (const chunk of localStreamChat(messages, {
+      maxTokens: options.maxTokens ? Math.min(options.maxTokens, 600) : 400,
+      temperature: options.temperature,
+      signal: options.signal,
+    })) {
+      out += chunk.content;
+    }
+    return out;
+  }
 }

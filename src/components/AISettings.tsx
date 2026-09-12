@@ -10,6 +10,8 @@ import {
   Trash2,
   ExternalLink,
   Cpu,
+  Bot,
+  Download,
 } from 'lucide-react';
 import {
   Dialog,
@@ -33,6 +35,16 @@ import {
   isFactoryKey,
 } from '@/services/ai-config';
 import { chat, buildMessages } from '@/services/ai-service';
+import {
+  downloadLocalLlm,
+  clearLocalLlmCache,
+  getLocalLlmStatus,
+  getDownloadProgress,
+  subscribeLocalLlm,
+  isAutoFallbackEnabled,
+  setAutoFallbackEnabled,
+  type LocalLlmStatus,
+} from '@/lib/local-llm';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -64,6 +76,15 @@ function createInitialState(): ProviderStates {
 export default function AISettings() {
   const [open, setOpen] = useState(false);
   const [states, setStates] = useState<ProviderStates>(createInitialState);
+  // 离线备用小模型
+  const [llmStatus, setLlmStatus] = useState<LocalLlmStatus>(getLocalLlmStatus);
+  const [llmProgress, setLlmProgress] = useState(getDownloadProgress);
+  const [llmAuto, setLlmAuto] = useState(isAutoFallbackEnabled);
+
+  useEffect(() => subscribeLocalLlm(() => {
+    setLlmStatus(getLocalLlmStatus());
+    setLlmProgress(getDownloadProgress());
+  }), []);
 
   useEffect(() => {
     if (open) setStates(createInitialState());
@@ -365,6 +386,70 @@ export default function AISettings() {
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* ── 离线备用小模型 ── */}
+        <div className="px-6 pb-4">
+          <div className="p-4 rounded-2xl border border-violet-200 dark:border-violet-500/20 bg-violet-50/50 dark:bg-violet-500/5 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-black text-foreground flex items-center gap-1.5">
+                  <Bot className="size-3.5 text-violet-500" />
+                  离线备用小模型
+                  <Badge className={cn(
+                    'rounded-full px-2 py-0 text-[9px] font-black border-none',
+                    llmStatus === 'ready' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600'
+                      : llmStatus === 'downloading' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600'
+                      : 'bg-muted text-muted-foreground',
+                  )}>
+                    {llmStatus === 'ready' ? '就绪' : llmStatus === 'downloading' ? `下载中 ${llmProgress}%` : '未下载'}
+                  </Badge>
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
+                  Qwen2.5-0.5B（约 400MB）· API 限流或断网时自动兜底，可完全离线
+                </p>
+              </div>
+              {llmStatus === 'ready' ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    try { await clearLocalLlmCache(); setLlmStatus(getLocalLlmStatus()); toast.success('已清除离线模型'); } catch { toast.error('清除失败'); }
+                  }}
+                  className="rounded-xl text-[10px] font-black shrink-0"
+                >
+                  清除
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  disabled={llmStatus === 'downloading'}
+                  onClick={() => downloadLocalLlm().catch(() => toast.error('下载失败，请检查网络后重试'))}
+                  className="rounded-xl bg-violet-500 hover:bg-violet-600 text-white text-[10px] font-black shrink-0"
+                >
+                  {llmStatus === 'downloading' ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <Download className="size-3.5 mr-1" />}
+                  {llmStatus === 'downloading' ? '下载中' : '下载'}
+                </Button>
+              )}
+            </div>
+            <label className="flex items-center justify-between gap-2 cursor-pointer">
+              <span className="text-[11px] font-bold text-muted-foreground">API 失败时自动使用离线小模型</span>
+              <button
+                role="switch"
+                aria-checked={llmAuto}
+                onClick={() => { const v = !llmAuto; setLlmAuto(v); setAutoFallbackEnabled(v); }}
+                className={cn(
+                  'relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0',
+                  llmAuto ? 'bg-[#00B894]' : 'bg-muted-foreground/30',
+                )}
+              >
+                <span className={cn(
+                  'absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform duration-200',
+                  llmAuto ? 'translate-x-[18px]' : 'translate-x-0.5',
+                )} />
+              </button>
+            </label>
           </div>
         </div>
 

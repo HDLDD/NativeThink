@@ -53,6 +53,10 @@
 
 
 
+
+## 2026-09-12
+- fix(mobile): CORS for APK, scroll jank, TTS caching, image relevance (`7eec358`)
+
 ## 2026-09-12
 - fix(images): fetch Bing + Baidu in parallel and merge — faster response, more candidates per word (`63fafb0`)
 
