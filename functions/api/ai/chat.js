@@ -22,7 +22,7 @@ const PROVIDER_DEFAULT_MODELS = {
   deepseek: 'deepseek-chat',
   doubao: 'doubao-lite-32k',
   qwen: 'qwen-turbo',
-  glm: 'glm-4.7-flash',
+  glm: 'glm-4-flash',
   siliconflow: 'Qwen/Qwen2.5-7B-Instruct',
   moonshot: 'moonshot-v1-8k',
   groq: 'llama-3.1-8b-instant',
@@ -64,30 +64,49 @@ export async function onRequest(context) {
   const modelId = model || PROVIDER_DEFAULT_MODELS[provider] || 'deepseek-chat';
 
   // GLM 4.5+ 系列支持关闭思考模式 — 出厂免费模型要求响应快，默认关
-  const upstreamBody = {
-    model: modelId,
-    messages,
-    max_tokens,
-    temperature,
-    stream,
+  const buildUpstreamBody = (mid) => {
+    const b = {
+      model: mid,
+      messages,
+      max_tokens,
+      temperature,
+      stream,
+    };
+    if (provider === 'glm') {
+      b.thinking = thinking || { type: 'disabled' };
+    }
+    return b;
   };
-  if (provider === 'glm') {
-    upstreamBody.thinking = thinking || { type: 'disabled' };
-  }
+
+  // GLM 免费档高峰期常返回 429（1305 访问量过大）— 自动按候选链降级重试
+  const glmChain = [modelId, 'glm-4.5-flash', 'glm-4-flash'].filter(
+    (m, i, arr) => m && arr.indexOf(m) === i,
+  );
+  const candidates = provider === 'glm' ? glmChain : [modelId];
 
   try {
-    const aiResp = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(upstreamBody),
-    });
+    let aiResp = null;
+    let lastErrorText = 'Unknown error';
+    for (const mid of candidates) {
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(buildUpstreamBody(mid)),
+      });
+      if (resp.ok) {
+        aiResp = resp;
+        break;
+      }
+      lastErrorText = await resp.text().catch(() => 'Unknown error');
+      // 仅对限流/服务端错误降级重试；鉴权类错误(401/403)直接失败
+      if (![429, 500, 502, 503, 504].includes(resp.status)) break;
+    }
 
-    if (!aiResp.ok) {
-      const errorText = await aiResp.text().catch(() => 'Unknown error');
-      return Response.json({ error: `AI provider error: ${aiResp.status}`, detail: errorText }, { status: 502 });
+    if (!aiResp) {
+      return Response.json({ error: `AI provider error`, detail: lastErrorText }, { status: 502 });
     }
 
     // Stream the response back to the client

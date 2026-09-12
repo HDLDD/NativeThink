@@ -49,6 +49,10 @@
 
 
 
+
+## 2026-09-12
+- feat(ai): factory free model glm-4.7-flash + thinking disabled (`317e3e0`)
+
 ## 2026-09-12
 - fix(android): build with JDK 21 — Capacitor 8 requires source level 21 (`8ae7743`)
 
