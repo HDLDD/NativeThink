@@ -10,7 +10,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ImageOff, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const CACHE_PREFIX = '__nativethink_word_img_';
+const CACHE_PREFIX = '__nativethink_word_img_v2_';
 const TTL = 30 * 24 * 3600 * 1000;
 
 interface CacheEntry {
@@ -51,7 +51,10 @@ export function WordImage({ word, className, hideOnEmpty }: Props) {
     setUrls(null); setIdx(0); setBroken(false);
     const cached = loadCache(key);
     if (cached) { setUrls(cached); return; }
-    fetch(`/api/word-image?word=${encodeURIComponent(key)}`)
+    // 带超时的插图请求 — 上游慢时不无限转圈
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    fetch(`/api/word-image?word=${encodeURIComponent(key)}`, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : { images: [] }))
       .then((data) => {
         if (cancelled) return;
@@ -59,8 +62,9 @@ export function WordImage({ word, className, hideOnEmpty }: Props) {
         if (imgs.length) { saveCache(key, imgs); setUrls(imgs); }
         else setUrls([]);
       })
-      .catch(() => { if (!cancelled) setUrls([]); });
-    return () => { cancelled = true; };
+      .catch(() => { if (!cancelled) setUrls([]); })
+      .finally(() => clearTimeout(timer));
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [key]);
 
   const cycle = useCallback(() => {

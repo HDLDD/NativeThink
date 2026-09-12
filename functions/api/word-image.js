@@ -31,47 +31,51 @@ export async function onRequest(context) {
     `&word=${encodeURIComponent(word)}&queryWord=${encodeURIComponent(word)}` +
     `&cl=2&lm=-1&ie=utf-8&oe=utf-8&pn=0&rn=10`;
 
+  // 学习场景安全过滤 — 命中可疑词的 URL 直接丢弃
+  const UNSAFE_RE = /(sex|porn|nsfw|nude|lingerie|bikini|sexy|lust|erotic|boobs|breast|xxx|hentai|sensual|escort)/i;
+
   const images = [];
   const seen = new Set();
   const push = (raw) => {
     if (!raw) return;
     const u = String(raw).replace(/^http:\/\//i, 'https://');
     if (!u.startsWith('https://') || seen.has(u) || u.length > 500) return;
+    if (UNSAFE_RE.test(u)) return;
     seen.add(u);
     images.push(u);
   };
 
-  // ── 源 1：百度图片建议接口 ──
+  // ── 源 1：Bing 图片（SafeSearch 严格模式 — 相关且安全，学习场景首选） ──
   try {
-    const res = await fetch(api, {
-      headers: { 'User-Agent': CHROME_UA, Referer: 'https://image.baidu.com/', Accept: 'application/json' },
+    const bingUrl = `https://cn.bing.com/images/async?q=${encodeURIComponent(word)}&first=0&count=10&mmasync=1&adlt=strict`;
+    const res = await fetch(bingUrl, {
+      headers: { 'User-Agent': CHROME_UA, Referer: 'https://cn.bing.com/', Accept: 'text/html' },
     });
     if (res.ok) {
-      const text = await res.text();
-      const start = text.indexOf('{');
-      if (start !== -1) {
-        const data = JSON.parse(text.slice(start));
-        const items = Array.isArray(data?.data) ? data.data : [];
-        for (const item of items) push(item?.thumbURL || item?.middleURL || item?.hoverURL || '');
-      }
+      const html = await res.text();
+      // 直接抽取 murl（原图地址）— 属性内是 &quot; 转义
+      const re1 = /murl&quot;:&quot;(https?:\/\/[^&]+?)&quot;/g;
+      const re2 = /murl":"(https?:\/\/[^"]+?)"/g;
+      let m;
+      while ((m = re1.exec(html)) !== null) push(m[1].replace(/&amp;/g, '&'));
+      while ((m = re2.exec(html)) !== null) push(m[1].replace(/\\u002f/gi, '/').replace(/&amp;/g, '&'));
     }
-  } catch { /* fall through to bing */ }
+  } catch { /* fall through to baidu */ }
 
-  // ── 源 2（备选）：Bing 图片 async HTML（百度限流/为空时） ──
+  // ── 源 2（备选）：百度图片建议接口 ──
   if (images.length < 3) {
     try {
-      const bingUrl = `https://cn.bing.com/images/async?q=${encodeURIComponent(word)}&first=0&count=10&mmasync=1`;
-      const res = await fetch(bingUrl, {
-        headers: { 'User-Agent': CHROME_UA, Referer: 'https://cn.bing.com/', Accept: 'text/html' },
+      const res = await fetch(api, {
+        headers: { 'User-Agent': CHROME_UA, Referer: 'https://image.baidu.com/', Accept: 'application/json' },
       });
       if (res.ok) {
-        const html = await res.text();
-        // 直接抽取 murl（原图地址）— 属性内是 &quot; 转义
-        const re1 = /murl&quot;:&quot;(https?:\/\/[^&]+?)&quot;/g;
-        const re2 = /murl":"(https?:\/\/[^"]+?)"/g;
-        let m;
-        while ((m = re1.exec(html)) !== null) push(m[1].replace(/&amp;/g, '&'));
-        while ((m = re2.exec(html)) !== null) push(m[1].replace(/\\u002f/gi, '/').replace(/&amp;/g, '&'));
+        const text = await res.text();
+        const start = text.indexOf('{');
+        if (start !== -1) {
+          const data = JSON.parse(text.slice(start));
+          const items = Array.isArray(data?.data) ? data.data : [];
+          for (const item of items) push(item?.thumbURL || item?.middleURL || item?.hoverURL || '');
+        }
       }
     } catch { /* give up — empty list */ }
   }

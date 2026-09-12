@@ -105,6 +105,27 @@ export default defineConfig({
         target: 'https://nativethink.pages.dev',
         changeOrigin: true,
       },
+      // 插图/维基/B站 — 之前漏配导致 dev 环境插图全部 404
+      '/api/word-image': {
+        target: 'https://nativethink.pages.dev',
+        changeOrigin: true,
+      },
+      '/api/wikipedia': {
+        target: 'https://nativethink.pages.dev',
+        changeOrigin: true,
+      },
+      '/api/bilibili-info': {
+        target: 'https://nativethink.pages.dev',
+        changeOrigin: true,
+      },
+      '/api/bilibili-subtitle': {
+        target: 'https://nativethink.pages.dev',
+        changeOrigin: true,
+      },
+      '/api/bilibili-transcribe': {
+        target: 'https://nativethink.pages.dev',
+        changeOrigin: true,
+      },
     },
   },
   build: {

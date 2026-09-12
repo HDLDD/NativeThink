@@ -50,6 +50,10 @@
 
 
 
+
+## 2026-09-12
+- fix(ai): auto-failover for GLM free-tier rate limits (`52420c6`)
+
 ## 2026-09-12
 - feat(ai): factory free model glm-4.7-flash + thinking disabled (`317e3e0`)
 
