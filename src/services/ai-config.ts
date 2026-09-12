@@ -25,15 +25,13 @@ export function hasFactoryKey(): boolean {
  * （用户未配置自己的 Key，且出厂 Key 覆盖此服务商）
  */
 export function isFactoryKey(provider: AIProvider): boolean {
-  if (provider !== FACTORY_PROVIDER || !FACTORY_API_KEY) return false;
-  try {
-    return !localStorage.getItem(`ai_key_${provider}`);
-  } catch {
-    return true;
-  }
+  if (!FACTORY_API_KEY) return false;
+  if (provider === 'factory') return true;
+  return provider === FACTORY_PROVIDER;
 }
 
 export type AIProvider =
+  | 'factory'
   | 'deepseek'
   | 'doubao'
   | 'qwen'
@@ -42,7 +40,9 @@ export type AIProvider =
   | 'moonshot'
   | 'groq';
 
+// 'factory' = 出厂免费配置（内置 Key，独立选项，不与用户自配的 GLM 重叠）
 export const ALL_PROVIDERS: AIProvider[] = [
+  'factory',
   'deepseek',
   'doubao',
   'qwen',
@@ -65,6 +65,15 @@ export interface ProviderConfig {
 }
 
 export const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
+  factory: {
+    name: '智谱免费 · 出厂',
+    description: '出厂内置 Key · 无需注册配置 · glm-4-flash（实测最快免费款，高峰自动换备用）',
+    apiEndpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    defaultModel: 'glm-4-flash',
+    freeModel: 'glm-4-flash',
+    registerUrl: 'https://open.bigmodel.cn',
+    supportsStreaming: true,
+  },
   deepseek: {
     name: 'DeepSeek',
     description: '深度求索 — 免费 500 万 token，R1 推理模型',
@@ -136,6 +145,8 @@ export const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
  * 出厂兜底：默认服务商未配置用户 Key 时，回落到构建时注入的出厂 Key。
  */
 export function getAPIKey(provider: AIProvider): string | null {
+  // 出厂免费选项：始终使用内置 Key（用户无法也不会覆盖）
+  if (provider === 'factory') return FACTORY_API_KEY || null;
   try {
     const stored = localStorage.getItem(`ai_key_${provider}`);
     if (stored) return stored;
@@ -171,12 +182,16 @@ export function getActiveProvider(): AIProvider {
   try {
     const stored = localStorage.getItem('ai_active_provider');
     if (stored && (ALL_PROVIDERS as string[]).includes(stored)) {
+      // 迁移：老默认 'glm' 且用户没配自己的 GLM Key → 归到出厂免费选项
+      if (stored === 'glm' && !localStorage.getItem('ai_key_glm')) {
+        return 'factory';
+      }
       return stored as AIProvider;
     }
   } catch {
     // ignore
   }
-  return 'glm';
+  return 'factory';
 }
 
 export function setActiveProvider(provider: AIProvider): void {

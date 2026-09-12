@@ -60,6 +60,10 @@
 
 
 
+
+## 2026-09-12
+- fix(dashboard): remove daily-sentence illustration (`08b32fe`)
+
 ## 2026-09-12
 - perf: enable cross-origin isolation for multi-threaded WASM inference (`e351902`)
 

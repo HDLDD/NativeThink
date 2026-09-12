@@ -79,6 +79,12 @@ for (const dir of ['electron', 'server', 'functions']) {
 }
 copy(path.join(root, 'dist', 'client'), path.join(APP, 'dist', 'client'));
 
+// 离线小模型（可选 — 存在时才打包，APK/桌面内置后零下载）
+if (fs.existsSync(path.join(root, 'models-bundled'))) {
+  console.log('[4.5/6] copying bundled offline model (~750MB)...');
+  copy(path.join(root, 'models-bundled'), path.join(APP, 'models-bundled'));
+}
+
 console.log('[5/6] copying production dependencies...');
 const entries = ['jose', 'undici', 'msedge-tts'];
 const deps = collectDeps(entries);

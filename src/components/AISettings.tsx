@@ -43,6 +43,7 @@ import {
   subscribeLocalLlm,
   isAutoFallbackEnabled,
   setAutoFallbackEnabled,
+  hasBundledModel,
   type LocalLlmStatus,
 } from '@/lib/local-llm';
 import { toast } from 'sonner';
@@ -80,11 +81,16 @@ export default function AISettings() {
   const [llmStatus, setLlmStatus] = useState<LocalLlmStatus>(getLocalLlmStatus);
   const [llmProgress, setLlmProgress] = useState(getDownloadProgress);
   const [llmAuto, setLlmAuto] = useState(isAutoFallbackEnabled);
+  const [llmBundled, setLlmBundled] = useState(false);
 
   useEffect(() => subscribeLocalLlm(() => {
     setLlmStatus(getLocalLlmStatus());
     setLlmProgress(getDownloadProgress());
   }), []);
+
+  useEffect(() => {
+    if (open) hasBundledModel().then(setLlmBundled);
+  }, [open]);
 
   useEffect(() => {
     if (open) setStates(createInitialState());
@@ -266,18 +272,28 @@ export default function AISettings() {
                     <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-[#00B894] font-bold">
                       {cfg.freeModel}
                     </code>
-                    <a
-                      href={cfg.registerUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-[#00B894] hover:underline"
-                    >
-                      获取 Key
-                      <ExternalLink className="size-2.5" />
-                    </a>
+                    {provider !== 'factory' && (
+                      <a
+                        href={cfg.registerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-[#00B894] hover:underline"
+                      >
+                        获取 Key
+                        <ExternalLink className="size-2.5" />
+                      </a>
+                    )}
                   </div>
 
-                  {/* API Key input */}
+                  {/* API Key input — factory 无需 Key */}
+                  {provider === 'factory' ? (
+                    <div className="flex items-center gap-1.5 mb-2.5 px-2.5 py-2 rounded-xl bg-violet-50/60 dark:bg-violet-500/10 border border-violet-200/60 dark:border-violet-500/20">
+                      <Bot className="size-3.5 text-violet-500 shrink-0" />
+                      <span className="text-[10px] font-bold text-violet-600 dark:text-violet-300">
+                        出厂内置 Key · 免注册即用 · 不可修改
+                      </span>
+                    </div>
+                  ) : (
                   <div className="flex gap-1.5 mb-2.5">
                     <div className="relative flex-1">
                       <Key className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -308,6 +324,8 @@ export default function AISettings() {
                       </Button>
                     )}
                   </div>
+
+                  )}
 
                   {/* Action buttons */}
                   <div className="flex gap-1.5">
@@ -403,7 +421,7 @@ export default function AISettings() {
                       : llmStatus === 'downloading' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600'
                       : 'bg-muted text-muted-foreground',
                   )}>
-                    {llmStatus === 'ready' ? '就绪' : llmStatus === 'downloading' ? (llmProgress >= 99 ? '加载中…' : `下载中 ${llmProgress}%`) : '未下载'}
+                    {llmStatus === 'ready' ? (llmBundled ? '就绪 · 内置' : '就绪') : llmStatus === 'downloading' ? (llmProgress >= 99 ? '加载中…' : `下载中 ${llmProgress}%`) : llmBundled ? '就绪 · 内置' : '未下载'}
                   </Badge>
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
@@ -425,11 +443,11 @@ export default function AISettings() {
                 <Button
                   size="sm"
                   disabled={llmStatus === 'downloading'}
-                  onClick={() => downloadLocalLlm().catch(() => toast.error('下载失败，请检查网络后重试'))}
+                  onClick={() => downloadLocalLlm().catch(() => toast.error(llmBundled ? '内置模型加载失败' : '下载失败，请检查网络后重试'))}
                   className="rounded-xl bg-violet-500 hover:bg-violet-600 text-white text-[10px] font-black shrink-0"
                 >
                   {llmStatus === 'downloading' ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <Download className="size-3.5 mr-1" />}
-                  {llmStatus === 'downloading' ? '下载中' : '下载'}
+                  {llmStatus === 'downloading' ? (llmProgress >= 99 ? '加载中' : '下载中') : llmBundled ? '加载内置模型' : '下载'}
                 </Button>
               )}
             </div>

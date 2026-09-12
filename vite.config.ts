@@ -4,12 +4,34 @@ import type { Plugin } from 'vite'
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
 
+// dev 环境伺服内置离线小模型（models-bundled/ → /models/）
+function serveBundledModels(): Plugin {
+  return {
+    name: 'serve-bundled-models',
+    configureServer(server) {
+      server.middlewares.use('/models', (req, res, next) => {
+        const rel = decodeURIComponent((req.url || '').split('?')[0]).replace(/^\/+/, '');
+        const file = path.resolve(process.cwd(), 'models-bundled', rel);
+        if (!file.startsWith(path.resolve(process.cwd(), 'models-bundled')) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+          res.statusCode = 404;
+          res.end();
+          return;
+        }
+        const ext = path.extname(file).toLowerCase();
+        const types: Record<string, string> = { '.json': 'application/json', '.onnx': 'application/octet-stream', '.txt': 'text/plain' };
+        res.setHeader('Content-Type', types[ext] || 'application/octet-stream');
+        fs.createReadStream(file).pipe(res);
+      });
+    },
+  };
+}
+
 // ── 出厂内置 API Key ──
 // 从 gitignore 的 scripts/.apikey 读取（一行文本），构建/开发时注入客户端。
 // 密钥不进仓库；换 Key 只需改该文件后重新打包。
 let factoryApiKey = ''
 try {
-  factoryApiKey = fs.readFileSync(path.resolve(__dirname, 'scripts/.apikey'), 'utf8').trim()
+  factoryApiKey = fs.readFileSync(path.resolve(process.cwd(), 'scripts/.apikey'), 'utf8').trim()
 } catch { /* 文件不存在 — 出厂未内置 */ }
 
 // Mock virtual:capabilities for Cloudflare Pages (Lark platform virtual module)
@@ -76,7 +98,7 @@ export default defineConfig({
     // 出厂内置 API Key（可为空 — scripts/.apikey 不存在时）
     '__FACTORY_API_KEY__': JSON.stringify(factoryApiKey),
   },
-  plugins: [tailwindcss(), mockVirtualCapabilities(), fixHtmlPlaceholders()],
+  plugins: [tailwindcss(), mockVirtualCapabilities(), fixHtmlPlaceholders(), serveBundledModels()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

@@ -47,6 +47,16 @@ export function isLocalLlmReady(): boolean {
   return getLocalLlmStatus() === 'ready';
 }
 
+/** 探测安装包是否内置了模型（同源 /models/<id>/config.json） */
+export async function hasBundledModel(): Promise<boolean> {
+  try {
+    const res = await fetch(`/models/${MODEL_ID}/config.json`, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return false;
+    const text = await res.text();
+    return text.trimStart().startsWith('{');
+  } catch { return false; }
+}
+
 /** 清除已下载的模型（浏览器 Cache API）并重置状态 */
 export async function clearLocalLlmCache(): Promise<void> {
   try { await caches.delete('transformers-cache'); } catch { /* ignore */ }
@@ -63,6 +73,10 @@ export async function downloadLocalLlm(): Promise<void> {
   emit();
   pipePromise = (async () => {
     const tf = await import('@huggingface/transformers');
+    // 打包版（桌面/APK）把模型文件放在同源 /models/ 下 — 零下载直接加载
+    tf.env.allowLocalModels = true;
+    tf.env.localModelPath = '/models/';
+    tf.env.allowRemoteModels = true;
     const device = (navigator as any).gpu ? 'webgpu' : 'wasm';
     let lastActivity = Date.now();
     const progress_callback = (p: { status?: string; progress?: number }) => {

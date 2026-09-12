@@ -191,6 +191,22 @@ export async function startServer(opts) {
   function serveStatic(req, res, pathname) {
     let rel = decodeURIComponent(pathname);
     if (rel === '/') rel = '/index.html';
+    // 内置离线小模型：/models/* → models-bundled/（不存在时 404，让 transformers 回落远程）
+    if (rel.startsWith('/models/')) {
+      const modelPath = path.join(path.resolve(__dirname, '..', 'models-bundled'), rel.slice('/models/'.length));
+      fs.readFile(modelPath, (mErr, mBuf) => {
+        if (mErr) { res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not found'); return; }
+        const mExt = path.extname(modelPath).toLowerCase();
+        res.writeHead(200, {
+          'Content-Type': MIME[mExt] || 'application/octet-stream',
+          'Content-Length': mBuf.length,
+          'Cache-Control': 'public, max-age=31536000, immutable',
+          ...ISOLATION_HEADERS,
+        });
+        res.end(mBuf);
+      });
+      return;
+    }
     const filePath = path.join(distDir, rel);
     // Prevent path traversal
     if (!filePath.startsWith(distDir)) {
