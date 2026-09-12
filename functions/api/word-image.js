@@ -35,16 +35,20 @@ async function handler(context) {
   // 学习场景安全过滤 — 命中可疑词的 URL 直接丢弃
   const UNSAFE_RE = /(sex|porn|nsfw|nude|lingerie|bikini|sexy|lust|erotic|boobs|breast|xxx|hentai|sensual|escort)/i;
 
-  const images = [];
+  // 两组分开收集：缩略图（快，优先展示）与原图（点换图时的备选）
+  const thumbs = [];
+  const originals = [];
   const seen = new Set();
-  const push = (raw) => {
+  const pushTo = (list) => (raw) => {
     if (!raw) return;
     const u = String(raw).replace(/^http:\/\//i, 'https://');
     if (!u.startsWith('https://') || seen.has(u) || u.length > 500) return;
     if (UNSAFE_RE.test(u)) return;
     seen.add(u);
-    images.push(u);
+    list.push(u);
   };
+  const pushThumb = pushTo(thumbs);
+  const pushOrig = pushTo(originals);
 
   // ── 双源并行：Bing 安全搜索（相关+安全） + 百度（实物图命中率高） ──
   const bingUrl = `https://cn.bing.com/images/async?q=${encodeURIComponent(word)}&first=0&count=10&mmasync=1&adlt=strict`;
@@ -54,16 +58,16 @@ async function handler(context) {
     .then(async (res) => {
       if (!res.ok) return;
       const html = await res.text();
-      // 优先 turl 缩略图（Bing CDN，几十 KB 秒开）；murl 原图作为换图备选
+      // turl = Bing CDN 缩略图（几十 KB 秒开）；murl = 原图（点换图备选）
       const reT1 = /turl&quot;:&quot;(https?:\/\/[^&]+?)&quot;/g;
       const reT2 = /turl":"(https?:\/\/[^"]+?)"/g;
-      const re1 = /murl&quot;:&quot;(https?:\/\/[^&]+?)&quot;/g;
-      const re2 = /murl":"(https?:\/\/[^"]+?)"/g;
+      const reM1 = /murl&quot;:&quot;(https?:\/\/[^&]+?)&quot;/g;
+      const reM2 = /murl":"(https?:\/\/[^"]+?)"/g;
       let m;
-      while ((m = reT1.exec(html)) !== null) push(m[1].replace(/&amp;/g, '&'));
-      while ((m = reT2.exec(html)) !== null) push(m[1].replace(/\\u002f/gi, '/').replace(/&amp;/g, '&'));
-      while ((m = re1.exec(html)) !== null) push(m[1].replace(/&amp;/g, '&'));
-      while ((m = re2.exec(html)) !== null) push(m[1].replace(/\\u002f/gi, '/').replace(/&amp;/g, '&'));
+      while ((m = reT1.exec(html)) !== null) pushThumb(m[1].replace(/&amp;/g, '&'));
+      while ((m = reT2.exec(html)) !== null) pushThumb(m[1].replace(/\\u002f/gi, '/').replace(/&amp;/g, '&'));
+      while ((m = reM1.exec(html)) !== null) pushOrig(m[1].replace(/&amp;/g, '&'));
+      while ((m = reM2.exec(html)) !== null) pushOrig(m[1].replace(/\\u002f/gi, '/').replace(/&amp;/g, '&'));
     })
     .catch(() => {});
 
@@ -77,23 +81,27 @@ async function handler(context) {
       if (start === -1) return;
       const data = JSON.parse(text.slice(start));
       const items = Array.isArray(data?.data) ? data.data : [];
-      for (const item of items) push(item?.thumbURL || item?.middleURL || item?.hoverURL || '');
+      for (const item of items) {
+        pushThumb(item?.thumbURL || '');
+        pushOrig(item?.middleURL || item?.hoverURL || '');
+      }
     })
     .catch(() => {});
 
   await Promise.allSettled([fromBing, fromBaidu]);
 
-  // 相关性优先：URL 里含单词本身的排前面（如 apple-pie.jpg 之于 apple）
+  // 相关性优先：各组内 URL 含单词本身的排前面（apple-pie.jpg 之于 apple）
   const w = word.replace(/[^a-z]/g, '');
-  if (w.length >= 3) {
-    images.sort((a, b) => {
+  const relevanceSort = (list) => {
+    if (w.length < 3) return list;
+    return [...list].sort((a, b) => {
       const am = a.toLowerCase().includes(w) ? 0 : 1;
       const bm = b.toLowerCase().includes(w) ? 0 : 1;
       return am - bm;
     });
-  }
+  };
 
-  return json({ images: images.slice(0, 8) });
+  return json({ images: [...relevanceSort(thumbs), ...relevanceSort(originals)].slice(0, 8) });
 }
 
 

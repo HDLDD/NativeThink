@@ -57,6 +57,10 @@
 
 
 
+
+## 2026-09-12
+- feat: built-in dictionary, e-reader paging, midnight reset, faster images (`cd3c806`)
+
 ## 2026-09-12
 - fix(ai): prefer hf-mirror host on Chinese/Android devices for offline model download (`bc64186`)
 
