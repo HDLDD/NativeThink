@@ -45,13 +45,13 @@ export async function onRequest(context) {
     images.push(u);
   };
 
-  // ── 源 1：Bing 图片（SafeSearch 严格模式 — 相关且安全，学习场景首选） ──
-  try {
-    const bingUrl = `https://cn.bing.com/images/async?q=${encodeURIComponent(word)}&first=0&count=10&mmasync=1&adlt=strict`;
-    const res = await fetch(bingUrl, {
-      headers: { 'User-Agent': CHROME_UA, Referer: 'https://cn.bing.com/', Accept: 'text/html' },
-    });
-    if (res.ok) {
+  // ── 双源并行：Bing 安全搜索（相关+安全） + 百度（实物图命中率高） ──
+  const bingUrl = `https://cn.bing.com/images/async?q=${encodeURIComponent(word)}&first=0&count=10&mmasync=1&adlt=strict`;
+  const fromBing = fetch(bingUrl, {
+    headers: { 'User-Agent': CHROME_UA, Referer: 'https://cn.bing.com/', Accept: 'text/html' },
+  })
+    .then(async (res) => {
+      if (!res.ok) return;
       const html = await res.text();
       // 直接抽取 murl（原图地址）— 属性内是 &quot; 转义
       const re1 = /murl&quot;:&quot;(https?:\/\/[^&]+?)&quot;/g;
@@ -59,26 +59,24 @@ export async function onRequest(context) {
       let m;
       while ((m = re1.exec(html)) !== null) push(m[1].replace(/&amp;/g, '&'));
       while ((m = re2.exec(html)) !== null) push(m[1].replace(/\\u002f/gi, '/').replace(/&amp;/g, '&'));
-    }
-  } catch { /* fall through to baidu */ }
+    })
+    .catch(() => {});
 
-  // ── 源 2（备选）：百度图片建议接口 ──
-  if (images.length < 3) {
-    try {
-      const res = await fetch(api, {
-        headers: { 'User-Agent': CHROME_UA, Referer: 'https://image.baidu.com/', Accept: 'application/json' },
-      });
-      if (res.ok) {
-        const text = await res.text();
-        const start = text.indexOf('{');
-        if (start !== -1) {
-          const data = JSON.parse(text.slice(start));
-          const items = Array.isArray(data?.data) ? data.data : [];
-          for (const item of items) push(item?.thumbURL || item?.middleURL || item?.hoverURL || '');
-        }
-      }
-    } catch { /* give up — empty list */ }
-  }
+  const fromBaidu = fetch(api, {
+    headers: { 'User-Agent': CHROME_UA, Referer: 'https://image.baidu.com/', Accept: 'application/json' },
+  })
+    .then(async (res) => {
+      if (!res.ok) return;
+      const text = await res.text();
+      const start = text.indexOf('{');
+      if (start === -1) return;
+      const data = JSON.parse(text.slice(start));
+      const items = Array.isArray(data?.data) ? data.data : [];
+      for (const item of items) push(item?.thumbURL || item?.middleURL || item?.hoverURL || '');
+    })
+    .catch(() => {});
+
+  await Promise.allSettled([fromBing, fromBaidu]);
 
   return json({ images: images.slice(0, 8) });
 }
