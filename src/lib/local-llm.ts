@@ -64,7 +64,7 @@ export async function downloadLocalLlm(): Promise<void> {
   pipePromise = (async () => {
     const tf = await import('@huggingface/transformers');
     const device = (navigator as any).gpu ? 'webgpu' : 'wasm';
-    return tf.pipeline('text-generation', MODEL_ID, {
+    const build = () => tf.pipeline('text-generation', MODEL_ID, {
       dtype: 'q4',
       device,
       progress_callback: (p: { status?: string; progress?: number }) => {
@@ -74,6 +74,14 @@ export async function downloadLocalLlm(): Promise<void> {
         }
       },
     });
+    try {
+      return await build();
+    } catch {
+      // 国内网络访问 huggingface.co 常失败 → 换 hf-mirror 镜像重试一次
+      (tf.env as any).remoteHost = 'https://hf-mirror.com';
+      (tf.env as any).remotePathTemplate = '{model}/resolve/{revision}/';
+      return await build();
+    }
   })();
   try {
     await pipePromise;
