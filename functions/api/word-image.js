@@ -54,10 +54,14 @@ async function handler(context) {
     .then(async (res) => {
       if (!res.ok) return;
       const html = await res.text();
-      // 直接抽取 murl（原图地址）— 属性内是 &quot; 转义
+      // 优先 turl 缩略图（Bing CDN，几十 KB 秒开）；murl 原图作为换图备选
+      const reT1 = /turl&quot;:&quot;(https?:\/\/[^&]+?)&quot;/g;
+      const reT2 = /turl":"(https?:\/\/[^"]+?)"/g;
       const re1 = /murl&quot;:&quot;(https?:\/\/[^&]+?)&quot;/g;
       const re2 = /murl":"(https?:\/\/[^"]+?)"/g;
       let m;
+      while ((m = reT1.exec(html)) !== null) push(m[1].replace(/&amp;/g, '&'));
+      while ((m = reT2.exec(html)) !== null) push(m[1].replace(/\\u002f/gi, '/').replace(/&amp;/g, '&'));
       while ((m = re1.exec(html)) !== null) push(m[1].replace(/&amp;/g, '&'));
       while ((m = re2.exec(html)) !== null) push(m[1].replace(/\\u002f/gi, '/').replace(/&amp;/g, '&'));
     })

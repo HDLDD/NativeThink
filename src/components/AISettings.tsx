@@ -403,7 +403,7 @@ export default function AISettings() {
                       : llmStatus === 'downloading' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600'
                       : 'bg-muted text-muted-foreground',
                   )}>
-                    {llmStatus === 'ready' ? '就绪' : llmStatus === 'downloading' ? `下载中 ${llmProgress}%` : '未下载'}
+                    {llmStatus === 'ready' ? '就绪' : llmStatus === 'downloading' ? (llmProgress >= 99 ? '加载中…' : `下载中 ${llmProgress}%`) : '未下载'}
                   </Badge>
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">

@@ -56,6 +56,10 @@
 
 
 
+
+## 2026-09-12
+- fix(ai): prefer hf-mirror host on Chinese/Android devices for offline model download (`bc64186`)
+
 ## 2026-09-12
 - feat(ai): hf-mirror.com fallback for offline model download (China network) (`c40352c`)
 

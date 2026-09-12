@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import type { IReadingContent, TransMode, IParagraph } from '@/data/reading';
 import { buildPages } from '@/data/reading';
 import { queryWords, preloadLevels, getEssentialLevels, isAllReady, findWord } from '@/data/wordbank';
+import { lookupDictionary } from '@/data/dictionary';
 import { useWordLearning } from '@/lib/use-word-learning';
 
 const LEVELS = [
@@ -41,25 +42,40 @@ function saveProgress(contentId: string, page: number) {
   try { safeStorage.setItem(`__reader_progress_${contentId}`, JSON.stringify({ page })); } catch { /* */ }
 }
 
-// ── Word lookup: wordbank Chinese + dictionary API English ──
-async function lookupWord(word: string): Promise<{ word: string; phonetic: string; meaning: string; zhMeaning: string } | null> {
+// ── Word lookup: 词库中文 → 本地大词典(ECDICT, 离线秒查) → 在线词典 API ──
+async function lookupWord(word: string): Promise<{ word: string; phonetic: string; meaning: string; zhMeaning: string; fromForm?: string } | null> {
   const cleaned = word.replace(/[^a-zA-Z'-]/g, '').toLowerCase();
   if (!cleaned || cleaned.length < 2) return null;
 
-  // Try wordbank first (offline, instant Chinese)
+  // 1) 学习词库（离线，即时中文）
   const bankResults = queryWords({ search: cleaned, limit: 1 });
-  const zhMeaning = bankResults.length > 0 ? (bankResults[0].meaning || '') : '';
+  const bankZh = bankResults.length > 0 ? (bankResults[0].meaning || '') : '';
 
+  // 2) 本地大词典 — 5.7 万常用词，含英英释义 + 音标，离线秒查
+  try {
+    const entry = await lookupDictionary(cleaned);
+    if (entry) {
+      return {
+        word: entry.word,
+        phonetic: entry.phonetic || '',
+        meaning: entry.definition || entry.translation || bankZh || '未找到释义',
+        zhMeaning: entry.translation || bankZh,
+        fromForm: entry.fromForm,
+      };
+    }
+  } catch { /* fall through to online API */ }
+
+  // 3) 在线词典 API（最后手段 — 大词典未收录的生僻词）
   try {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(cleaned)}`);
-    if (!res.ok) return { word: cleaned, phonetic: '', meaning: zhMeaning || '未找到释义', zhMeaning };
+    if (!res.ok) return { word: cleaned, phonetic: '', meaning: bankZh || '未找到释义', zhMeaning: bankZh };
     const data = await res.json();
     const entry = data[0];
     const phonetic = entry.phonetic || (entry.phonetics?.[0]?.text) || '';
     const meaning = entry.meanings?.[0]?.definitions?.[0]?.definition || '';
-    return { word: cleaned, phonetic, meaning, zhMeaning };
+    return { word: cleaned, phonetic, meaning, zhMeaning: bankZh };
   } catch {
-    return { word: cleaned, phonetic: '', meaning: zhMeaning || '未找到释义', zhMeaning };
+    return { word: cleaned, phonetic: '', meaning: bankZh || '未找到释义', zhMeaning: bankZh };
   }
 }
 
@@ -157,7 +173,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   }, [fontSize, readerTheme]);
   const [lookupOpen, setLookupOpen] = useState(false);
   const [lookupWord_State, setLookupWordState] = useState('');
-  const [lookupData, setLookupData] = useState<{ word: string; phonetic: string; meaning: string; zhMeaning: string } | null>(null);
+  const [lookupData, setLookupData] = useState<{ word: string; phonetic: string; meaning: string; zhMeaning: string; fromForm?: string } | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
 
   // Translation cache
@@ -271,6 +287,11 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   }, []);
   const goPrev = () => { if (currentPage > 0) turnTo(currentPage - 1, 'prev'); };
   const goNext = () => { if (currentPage < activePages - 1) turnTo(currentPage + 1, 'next'); };
+
+  // 翻页后内容从头显示（否则新页面带着上一页的滚动位置，像"还在滚动"）
+  useEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [currentPage]);
 
   // Sync refs for the 连读 onEnd closure
   currentPageRef.current = currentPage;
@@ -400,16 +421,37 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     swipeOffsetRef.current = 0;
   }, []);
 
-  // Keyboard navigation: ← → for pages, Esc to close
+  // 滚轮 = 电子书式翻页：页面内容滚到底才翻下一页 / 滚到顶才翻上一页
+  const wheelLockRef = useRef(0);
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    const now = Date.now();
+    if (now - wheelLockRef.current < 400) return;
+    const el = contentRef.current;
+    if (!el) return;
+    const atTop = el.scrollTop <= 0;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+    if (e.deltaY > 0 && atBottom && currentPage < activePages - 1) {
+      wheelLockRef.current = now;
+      goNext();
+    } else if (e.deltaY < 0 && atTop && currentPage > 0) {
+      wheelLockRef.current = now;
+      goPrev();
+    }
+  }, [currentPage, activePages, goNext, goPrev]);
+
+  // Keyboard navigation: ←/→/PageUp/PageDown/空格翻页, Esc 关闭
+  // （依赖里带上 currentPage — 旧实现闭包过期导致翻一页后按键失效）
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') goPrev();
-      else if (e.key === 'ArrowRight') goNext();
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') goPrev();
+      else if (e.key === 'ArrowRight' || e.key === 'PageDown') goNext();
       else if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activePages, onClose]);
+  }, [goPrev, goNext, onClose]);
 
   // Word click — lookup Chinese + English definitions
   // ── 最近查词记录（跨会话，最多 18 条） ──
@@ -641,6 +683,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchCancel}
+        onWheel={handleWheel}
       >
         {/* Swipe edge indicators -- visual feedback during horizontal swipe */}
         {swipeOffset > 20 && (
@@ -898,6 +941,11 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
               {lookupWord_State}
               {lookupData?.phonetic && (
                 <span className="text-sm font-normal text-muted-foreground">{lookupData.phonetic}</span>
+              )}
+              {lookupData?.fromForm && (
+                <span className="text-[9px] font-bold text-[#00B894] bg-[#00B894]/10 px-1.5 py-0.5 rounded-full">
+                  {lookupData.fromForm} → {lookupData.word}
+                </span>
               )}
             </DialogTitle>
           </DialogHeader>

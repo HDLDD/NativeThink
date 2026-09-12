@@ -64,13 +64,28 @@ export async function downloadLocalLlm(): Promise<void> {
   pipePromise = (async () => {
     const tf = await import('@huggingface/transformers');
     const device = (navigator as any).gpu ? 'webgpu' : 'wasm';
+    let lastActivity = Date.now();
     const progress_callback = (p: { status?: string; progress?: number }) => {
+      lastActivity = Date.now();
       if (p?.status === 'progress' && typeof p.progress === 'number') {
         const v = Math.max(downloadProgress, Math.min(99, Math.round(p.progress)));
         if (v !== downloadProgress) { downloadProgress = v; emit(); }
       }
     };
-    const build = () => tf.pipeline('text-generation', MODEL_ID, { dtype: 'q4', device, progress_callback });
+    // 下载阶段看门狗：45 秒无进度视为该源不可用 → 换下一个源重试
+    // （进度到 99 后进入 wasm 加载阶段，可能 legitimately 很慢，不看门狗）
+    const build = () => new Promise<any>((resolve, reject) => {
+      const watchdog = setInterval(() => {
+        if (downloadProgress >= 99) { clearInterval(watchdog); return; }
+        if (Date.now() - lastActivity > 45_000) {
+          clearInterval(watchdog);
+          reject(new Error('download-timeout'));
+        }
+      }, 5000);
+      tf.pipeline('text-generation', MODEL_ID, { dtype: 'q4', device, progress_callback })
+        .then((r: any) => { clearInterval(watchdog); resolve(r); })
+        .catch((e: any) => { clearInterval(watchdog); reject(e); });
+    });
 
     // 中文环境（手机）直连 huggingface.co 常年失败 → 首选 hf-mirror 镜像
     const zh = (navigator.language || '').toLowerCase().startsWith('zh') || /android/i.test(navigator.userAgent);
@@ -82,6 +97,7 @@ export async function downloadLocalLlm(): Promise<void> {
     for (const host of hosts) {
       (tf.env as any).remoteHost = host;
       (tf.env as any).remotePathTemplate = '{model}/resolve/{revision}/';
+      lastActivity = Date.now();
       try {
         return await build();
       } catch (e) {

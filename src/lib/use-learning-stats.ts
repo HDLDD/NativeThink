@@ -65,6 +65,21 @@ export function useLearningStats() {
   const [stats, setStats] = useState<ILearningStats>(DEFAULT_STATS);
   const [calendar, setCalendar] = useState<ICalendarRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
+  // 跨天感知：今日目标/时长在第二天要显示为 0（即使还没开始学习）
+  const [todayStr, setTodayStr] = useState(() => formatDate(new Date()));
+
+  useEffect(() => {
+    const check = () => {
+      const d = formatDate(new Date());
+      setTodayStr((prev) => (prev === d ? prev : d));
+    };
+    const id = setInterval(check, 30_000);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, []);
 
   const loadFromStorage = useCallback(() => {
     try {
@@ -198,8 +213,13 @@ export function useLearningStats() {
     saveCalendar(newCalendar);
   }, [saveStats, saveCalendar]);
 
+  // 今日分钟数是"当天"概念 — 跨天后显示为 0（持久化数据不动，不影响连胜计算）
+  const displayStats = stats.lastStudyDate === todayStr
+    ? stats
+    : { ...stats, todayMinutes: 0 };
+
   return {
-    stats,
+    stats: displayStats,
     calendar,
     loaded,
     addStudyMinutes,
