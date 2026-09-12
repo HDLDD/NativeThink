@@ -1,3 +1,4 @@
+import { withCors, preflight, isPreflight } from '../_lib/cors.js';
 /**
  * GET /api/wikipedia?action=search&q=earth&limit=20
  * GET /api/wikipedia?action=page&title=Earth
@@ -28,7 +29,7 @@ async function wikiFetch(params) {
   return res.json();
 }
 
-export async function onRequest(context) {
+async function handler(context) {
   const { request } = context;
   const url = new URL(request.url);
   const action = url.searchParams.get('action') || 'search';
@@ -96,4 +97,11 @@ export async function onRequest(context) {
       { status: 502, headers: CORS_HEADERS },
     );
   }
+}
+
+
+// ── CORS：Capacitor APK (https://localhost) 跨域 + OPTIONS 预检 ──
+export async function onRequest(context) {
+  if (isPreflight(context.request)) return preflight();
+  return withCors(await handler(context));
 }

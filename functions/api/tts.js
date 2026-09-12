@@ -1,3 +1,4 @@
+import { withCors, preflight, isPreflight } from '../_lib/cors.js';
 /**
  * Cloudflare Pages Function — TTS MP3 proxy.
  *
@@ -13,7 +14,7 @@
 
 const GOOGLE_TTS = 'https://translate.google.com/translate_tts';
 
-export async function onRequest(context) {
+async function handler(context) {
   const { request } = context;
   const url = new URL(request.url);
   const text = url.searchParams.get('text');
@@ -55,4 +56,11 @@ export async function onRequest(context) {
   } catch (err) {
     return new Response(`TTS proxy error: ${err.message}`, { status: 500 });
   }
+}
+
+
+// ── CORS：Capacitor APK (https://localhost) 跨域 + OPTIONS 预检 ──
+export async function onRequest(context) {
+  if (isPreflight(context.request)) return preflight();
+  return withCors(await handler(context));
 }

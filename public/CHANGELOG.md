@@ -52,6 +52,10 @@
 
 
 
+
+## 2026-09-12
+- fix(images): fetch Bing + Baidu in parallel and merge — faster response, more candidates per word (`63fafb0`)
+
 ## 2026-09-12
 - fix(images): dev proxy missing endpoints + safe & snappy word images (`26a4a52`)
 

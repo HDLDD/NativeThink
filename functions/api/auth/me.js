@@ -1,7 +1,8 @@
+import { withCors, preflight, isPreflight } from '../../_lib/cors.js';
 /** GET /api/auth/me */
 import { authenticate } from '../../_lib/auth.js';
 
-export async function onRequest(context) {
+async function handler(context) {
   const { request, env } = context;
   try {
     const session = await authenticate(request, env);
@@ -11,4 +12,11 @@ export async function onRequest(context) {
     console.error('me error:', e);
     return Response.json({ error: '服务器内部错误' }, { status: 500 });
   }
+}
+
+
+// ── CORS：Capacitor APK (https://localhost) 跨域 + OPTIONS 预检 ──
+export async function onRequest(context) {
+  if (isPreflight(context.request)) return preflight();
+  return withCors(await handler(context));
 }

@@ -1,8 +1,9 @@
+import { withCors, preflight, isPreflight } from '../../_lib/cors.js';
 /** POST/GET /api/data/sync — batch upload/download user data */
 import { authenticate } from '../../_lib/auth.js';
 import { userDataKey } from '../../_lib/kv.js';
 
-export async function onRequest(context) {
+async function handler(context) {
   const { request, env } = context;
 
   // Defensive: KV binding not configured
@@ -52,4 +53,11 @@ export async function onRequest(context) {
     console.error('sync error:', e);
     return Response.json({ error: '同步失败，请稍后重试' }, { status: 500 });
   }
+}
+
+
+// ── CORS：Capacitor APK (https://localhost) 跨域 + OPTIONS 预检 ──
+export async function onRequest(context) {
+  if (isPreflight(context.request)) return preflight();
+  return withCors(await handler(context));
 }

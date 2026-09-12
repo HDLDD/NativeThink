@@ -1,3 +1,4 @@
+import { withCors, preflight, isPreflight } from '../_lib/cors.js';
 /**
  * Cloudflare Pages Function — 获取 B站视频/合集信息
  *
@@ -8,7 +9,7 @@
 
 const BILIBILI_API = 'https://api.bilibili.com/x/web-interface/view';
 
-export async function onRequest(context) {
+async function handler(context) {
   const { request, env } = context;
   const url = new URL(request.url);
   const bvid = url.searchParams.get('bvid');
@@ -57,4 +58,11 @@ export async function onRequest(context) {
       status: 500,
     });
   }
+}
+
+
+// ── CORS：Capacitor APK (https://localhost) 跨域 + OPTIONS 预检 ──
+export async function onRequest(context) {
+  if (isPreflight(context.request)) return preflight();
+  return withCors(await handler(context));
 }

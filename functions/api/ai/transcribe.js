@@ -1,3 +1,4 @@
+import { withCors, preflight, isPreflight } from '../../_lib/cors.js';
 /**
  * POST /api/ai/transcribe — 音频转写字幕
  *
@@ -120,7 +121,7 @@ const WHISPER_MODELS = {
   glm: 'GLM-ASR-2512',
 };
 
-export async function onRequest(context) {
+async function handler(context) {
   const { request, env } = context;
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
@@ -256,4 +257,11 @@ export async function onRequest(context) {
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   }
+}
+
+
+// ── CORS：Capacitor APK (https://localhost) 跨域 + OPTIONS 预检 ──
+export async function onRequest(context) {
+  if (isPreflight(context.request)) return preflight();
+  return withCors(await handler(context));
 }

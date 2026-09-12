@@ -1,3 +1,4 @@
+import { withCors, preflight, isPreflight } from '../_lib/cors.js';
 /**
  * Cloudflare Pages Function — B站音频转写字幕
  *
@@ -146,7 +147,7 @@ async function wbiSign(params) {
 
 // ── Handler ──
 
-export async function onRequest(context) {
+async function handler(context) {
   const { request, env } = context;
   const url = new URL(request.url);
   // NOTE: Bilibili API bvid lookup is case-sensitive — never toUpperCase()
@@ -285,4 +286,11 @@ export async function onRequest(context) {
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   }
+}
+
+
+// ── CORS：Capacitor APK (https://localhost) 跨域 + OPTIONS 预检 ──
+export async function onRequest(context) {
+  if (isPreflight(context.request)) return preflight();
+  return withCors(await handler(context));
 }

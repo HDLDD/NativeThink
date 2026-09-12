@@ -164,6 +164,31 @@ function cfTtsUrl(text: string, rate: number, voice?: string | null): string {
   return `${base}/api/tts?text=${encodeURIComponent(text)}&rate=${rate.toFixed(2)}${v}`;
 }
 
+// ── Cache API 层：合成过的语音本地永久缓存 — 手机端重复朗读零等待 ──
+const TTS_CACHE_NAME = 'nativethink-tts-v1';
+
+/** 静默拉取并写入 Cache API（幂等；已缓存则跳过） */
+async function warmTtsCache(url: string): Promise<void> {
+  try {
+    if (typeof caches === 'undefined') return;
+    const cache = await caches.open(TTS_CACHE_NAME);
+    if (await cache.match(url)) return;
+    const resp = await fetch(url, { priority: 'low' } as RequestInit);
+    if (resp.ok) await cache.put(url, resp.clone());
+  } catch { /* ignore */ }
+}
+
+/** 命中缓存时返回 blob URL（即时起播），否则原样返回网络 URL */
+async function getCachedOrUrl(url: string): Promise<string> {
+  try {
+    if (typeof caches === 'undefined') return url;
+    const cache = await caches.open(TTS_CACHE_NAME);
+    const hit = await cache.match(url);
+    if (hit) return URL.createObjectURL(await hit.blob());
+  } catch { /* ignore */ }
+  return url;
+}
+
 /** True when the selected voice is served by the local desktop server */
 function isServerVoice(voiceURI: string | null | undefined): boolean {
   return !!voiceURI && voiceURI.startsWith('srv:');
@@ -349,14 +374,13 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       };
 
       if (engine === 'cf') {
-        // Prefetch the NEXT chunk while this one plays — the local server
-        // synthesizes into cache, so the next segment starts instantly.
-        // Playback request goes first, prefetch second → FIFO order holds.
+        // 预取下一句到 Cache API；当前句优先走本地缓存（二次朗读零等待）
         const next = chunks[idx + 1];
-        if (next) {
-          fetch(cfTtsUrl(next, rate, settings.selectedVoiceURI), { priority: 'low' }).catch(() => {});
-        }
-        playUrl(cfTtsUrl(chunks[idx], rate, settings.selectedVoiceURI), { applyRate: !isServerVoice(settings.selectedVoiceURI) });
+        if (next) warmTtsCache(cfTtsUrl(next, rate, settings.selectedVoiceURI)).catch(() => {});
+        const url = cfTtsUrl(chunks[idx], rate, settings.selectedVoiceURI);
+        getCachedOrUrl(url)
+          .then((u) => playUrl(u, { applyRate: !isServerVoice(settings.selectedVoiceURI) }))
+          .catch(onFail);
       } else if (engine === 'edge') {
         edgeTTSBlob(chunks[idx], rate, edgeVoiceFor(settings.selectedVoiceURI))
           .then((blob) => playUrl(URL.createObjectURL(blob)))
@@ -497,8 +521,8 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     const rate = opts?.rate ?? settings.rate;
     try {
       const url = cfTtsUrl(cleaned, rate, settings.selectedVoiceURI);
-      // Use fetch with low priority so it doesn't compete with current playback
-      fetch(url, { priority: 'low' }).catch(() => {});
+      // 写入 Cache API（比单纯 HTTP 缓存可靠）— speak() 命中后即时起播
+      warmTtsCache(url).catch(() => {});
     } catch { /* */ }
   }, [settings.rate, settings.selectedVoiceURI]);
 
@@ -531,7 +555,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         // finishes playing, later chunks are already cached (no gaps)
         chunks.slice(1, 9).forEach((c, i) => {
           setTimeout(() => {
-            fetch(cfTtsUrl(c, rate, settings.selectedVoiceURI), { priority: 'low' }).catch(() => {});
+            warmTtsCache(cfTtsUrl(c, rate, settings.selectedVoiceURI)).catch(() => {});
           }, 60 * (i + 1));
         });
         playChunkWithFallback(chunks, 0, rate, 0);

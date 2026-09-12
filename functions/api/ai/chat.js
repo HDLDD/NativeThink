@@ -1,3 +1,4 @@
+import { withCors, preflight, isPreflight } from '../../_lib/cors.js';
 /**
  * POST /api/ai/chat — AI chat proxy (streaming)
  *
@@ -28,7 +29,7 @@ const PROVIDER_DEFAULT_MODELS = {
   groq: 'llama-3.1-8b-instant',
 };
 
-export async function onRequest(context) {
+async function handler(context) {
   const { request, env } = context;
 
   if (request.method !== 'POST') {
@@ -127,4 +128,11 @@ export async function onRequest(context) {
   } catch (err) {
     return Response.json({ error: `Request failed: ${err.message}` }, { status: 500 });
   }
+}
+
+
+// ── CORS：Capacitor APK (https://localhost) 跨域 + OPTIONS 预检 ──
+export async function onRequest(context) {
+  if (isPreflight(context.request)) return preflight();
+  return withCors(await handler(context));
 }

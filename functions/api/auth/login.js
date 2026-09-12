@@ -1,8 +1,9 @@
+import { withCors, preflight, isPreflight } from '../../_lib/cors.js';
 /** POST /api/auth/login */
 import { verifyPassword } from '../../_lib/crypto.js';
 import { signToken } from '../../_lib/jwt.js';
 
-export async function onRequest(context) {
+async function handler(context) {
   const { request, env } = context;
 
   // Defensive: KV binding not configured
@@ -38,4 +39,11 @@ export async function onRequest(context) {
     console.error('login error:', e);
     return Response.json({ error: '服务器内部错误，请稍后重试' }, { status: 500 });
   }
+}
+
+
+// ── CORS：Capacitor APK (https://localhost) 跨域 + OPTIONS 预检 ──
+export async function onRequest(context) {
+  if (isPreflight(context.request)) return preflight();
+  return withCors(await handler(context));
 }

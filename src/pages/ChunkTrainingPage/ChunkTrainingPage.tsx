@@ -146,15 +146,19 @@ export default function ChunkTrainingPage() {
 
   // ── Position memory: restore list state across page refreshes ──
   const CHUNK_POS_KEY = '__nativethink_chunk_position';
-  const [chunkPosMemory, setChunkPosMemory] = useState<{ source?: string; page?: number; scrollTop?: number; tab?: string }>(() => {
+  const [chunkPosMemory] = useState<{ source?: string; page?: number; scrollTop?: number; tab?: string }>(() => {
     try { const s = localStorage.getItem(CHUNK_POS_KEY); return s ? JSON.parse(s) : {}; } catch { return {}; }
   });
+  const chunkPosRef = useRef(chunkPosMemory);
+  const chunkPosSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveChunkPosition = (partial: Record<string, unknown>) => {
-    setChunkPosMemory((prev) => {
-      const next = { ...prev, ...partial };
-      try { localStorage.setItem(CHUNK_POS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
+    // 滚动热路径：绝不 setState（顶层 state 每次滚动触发全页重渲染 → 手机上滚动抖动）。
+    // 只写 ref，停止滚动 250ms 后一次性持久化到 localStorage。
+    Object.assign(chunkPosRef.current, partial);
+    if (chunkPosSaveTimer.current) clearTimeout(chunkPosSaveTimer.current);
+    chunkPosSaveTimer.current = setTimeout(() => {
+      try { localStorage.setItem(CHUNK_POS_KEY, JSON.stringify(chunkPosRef.current)); } catch { /* ignore */ }
+    }, 250);
   };
 
   const libraryScrollRef = useRef<HTMLDivElement>(null);

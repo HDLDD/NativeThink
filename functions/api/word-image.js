@@ -1,3 +1,4 @@
+import { withCors, preflight, isPreflight } from '../_lib/cors.js';
 /**
  * GET /api/word-image?word=apple — 单词插图代理
  *
@@ -17,7 +18,7 @@ function json(data, status = 200) {
   });
 }
 
-export async function onRequest(context) {
+async function handler(context) {
   const url = new URL(context.request.url);
   const word = (url.searchParams.get('word') || '').trim().toLowerCase();
 
@@ -78,5 +79,22 @@ export async function onRequest(context) {
 
   await Promise.allSettled([fromBing, fromBaidu]);
 
+  // 相关性优先：URL 里含单词本身的排前面（如 apple-pie.jpg 之于 apple）
+  const w = word.replace(/[^a-z]/g, '');
+  if (w.length >= 3) {
+    images.sort((a, b) => {
+      const am = a.toLowerCase().includes(w) ? 0 : 1;
+      const bm = b.toLowerCase().includes(w) ? 0 : 1;
+      return am - bm;
+    });
+  }
+
   return json({ images: images.slice(0, 8) });
+}
+
+
+// ── CORS：Capacitor APK (https://localhost) 跨域 + OPTIONS 预检 ──
+export async function onRequest(context) {
+  if (isPreflight(context.request)) return preflight();
+  return withCors(await handler(context));
 }
