@@ -59,6 +59,10 @@
 
 
 
+
+## 2026-09-12
+- perf: enable cross-origin isolation for multi-threaded WASM inference (`e351902`)
+
 ## 2026-09-12
 - fix(images): thumbnails and originals grouped separately — relevance sort was pushing big originals ahead of fast thumbnails (`a3cb492`)
 
