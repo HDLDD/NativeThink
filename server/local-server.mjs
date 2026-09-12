@@ -22,6 +22,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const BILIBILI_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
+// 跨域隔离 → SharedArrayBuffer/多线程 WASM（离线小模型加载与推理提速数倍）
+// credentialless 允许跨域图片/音频继续加载（Chromium），不支持的头会被忽略（降级单线程）
+const ISOLATION_HEADERS = {
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'credentialless',
+};
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -220,6 +227,7 @@ export async function startServer(opts) {
                 'Content-Type': MIME[ext] || 'application/octet-stream',
                 'Content-Length': buf.length,
                 'Cache-Control': cacheControl,
+                ...ISOLATION_HEADERS,
               });
               res.end(buf);
               return;
@@ -230,6 +238,7 @@ export async function startServer(opts) {
               'Content-Encoding': 'gzip',
               'Vary': 'Accept-Encoding',
               'Cache-Control': cacheControl,
+              ...ISOLATION_HEADERS,
             });
             res.end(gz);
           });
@@ -239,6 +248,7 @@ export async function startServer(opts) {
           'Content-Type': MIME[ext] || 'application/octet-stream',
           'Content-Length': buf.length,
           'Cache-Control': cacheControl,
+          ...ISOLATION_HEADERS,
         });
         res.end(buf);
       });

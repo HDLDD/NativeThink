@@ -58,6 +58,10 @@
 
 
 
+
+## 2026-09-12
+- fix(images): thumbnails and originals grouped separately — relevance sort was pushing big originals ahead of fast thumbnails (`a3cb492`)
+
 ## 2026-09-12
 - feat: built-in dictionary, e-reader paging, midnight reset, faster images (`cd3c806`)
 

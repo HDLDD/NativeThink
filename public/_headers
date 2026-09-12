@@ -1,0 +1,6 @@
+# Cloudflare Pages 响应头
+# 跨域隔离 → SharedArrayBuffer/多线程 WASM（离线小模型提速）
+# credentialless 模式：Chromium 下跨域图片/音频仍可加载（不带凭据）
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless

@@ -84,6 +84,11 @@ export default defineConfig({
     },
   },
   server: {
+    // 跨域隔离 → 多线程 WASM（离线小模型提速）；credentialless 允许跨域图片/音频
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+    },
     proxy: {
       '/api/tts': {
         target: 'https://nativethink.pages.dev',
