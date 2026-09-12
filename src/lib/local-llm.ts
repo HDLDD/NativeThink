@@ -64,24 +64,31 @@ export async function downloadLocalLlm(): Promise<void> {
   pipePromise = (async () => {
     const tf = await import('@huggingface/transformers');
     const device = (navigator as any).gpu ? 'webgpu' : 'wasm';
-    const build = () => tf.pipeline('text-generation', MODEL_ID, {
-      dtype: 'q4',
-      device,
-      progress_callback: (p: { status?: string; progress?: number }) => {
-        if (p?.status === 'progress' && typeof p.progress === 'number') {
-          const v = Math.max(downloadProgress, Math.min(99, Math.round(p.progress)));
-          if (v !== downloadProgress) { downloadProgress = v; emit(); }
-        }
-      },
-    });
-    try {
-      return await build();
-    } catch {
-      // 国内网络访问 huggingface.co 常失败 → 换 hf-mirror 镜像重试一次
-      (tf.env as any).remoteHost = 'https://hf-mirror.com';
+    const progress_callback = (p: { status?: string; progress?: number }) => {
+      if (p?.status === 'progress' && typeof p.progress === 'number') {
+        const v = Math.max(downloadProgress, Math.min(99, Math.round(p.progress)));
+        if (v !== downloadProgress) { downloadProgress = v; emit(); }
+      }
+    };
+    const build = () => tf.pipeline('text-generation', MODEL_ID, { dtype: 'q4', device, progress_callback });
+
+    // 中文环境（手机）直连 huggingface.co 常年失败 → 首选 hf-mirror 镜像
+    const zh = (navigator.language || '').toLowerCase().startsWith('zh') || /android/i.test(navigator.userAgent);
+    const hosts = zh
+      ? ['https://hf-mirror.com', 'https://huggingface.co']
+      : ['https://huggingface.co', 'https://hf-mirror.com'];
+
+    let lastErr: unknown = null;
+    for (const host of hosts) {
+      (tf.env as any).remoteHost = host;
       (tf.env as any).remotePathTemplate = '{model}/resolve/{revision}/';
-      return await build();
+      try {
+        return await build();
+      } catch (e) {
+        lastErr = e;
+      }
     }
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
   })();
   try {
     await pipePromise;

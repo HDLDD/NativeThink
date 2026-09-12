@@ -55,6 +55,10 @@
 
 
 
+
+## 2026-09-12
+- feat(ai): hf-mirror.com fallback for offline model download (China network) (`c40352c`)
+
 ## 2026-09-12
 - feat(ai): on-device fallback mini model for phones (`70db2a8`)
 
