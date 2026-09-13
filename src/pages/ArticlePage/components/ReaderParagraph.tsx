@@ -58,7 +58,7 @@ function ReaderParagraphImpl({
         <>
           {/* English — clickable words + paragraph actions */}
           {(transMode === 'en' || transMode === 'bilingual') && (
-            <div className="flex items-start gap-2 group/para">
+            <div className="relative flex items-start gap-2 group/para">
               <p
                 className={cn(
                   FONT_SIZE_CLASSES[fontSize],
@@ -84,9 +84,10 @@ function ReaderParagraphImpl({
                   );
                 })}
               </p>
+              <div className="absolute right-0 top-0 flex flex-col gap-1 items-end">
               <button
                 onClick={(e) => { e.stopPropagation(); onSpeak(cleanText(displayEn)); }}
-                className="shrink-0 text-muted-foreground/25 hover:text-[#00B894] transition-colors mt-0.5 opacity-0 group-hover/para:opacity-100"
+                className="shrink-0 size-7 rounded-lg bg-background/80 flex items-center justify-center text-muted-foreground/40 hover:text-[#00B894] transition-colors opacity-0 group-hover/para:opacity-100"
                 title="朗读段落"
               >
                 <Volume2 className="size-3.5" />
@@ -95,7 +96,7 @@ function ReaderParagraphImpl({
                 <button
                   onClick={(e) => { e.stopPropagation(); onTranslate(pageIdx, paraIdx); }}
                   disabled={translating}
-                  className="shrink-0 text-muted-foreground/25 hover:text-amber-500 transition-colors mt-0.5 opacity-0 group-hover/para:opacity-100"
+                  className="shrink-0 size-7 rounded-lg bg-background/80 flex items-center justify-center text-muted-foreground/40 hover:text-amber-500 transition-colors opacity-0 group-hover/para:opacity-100"
                   title="翻译本段"
                 >
                   {translating ? <Loader2 className="size-3 animate-spin" /> : <Globe className="size-3" />}
@@ -119,13 +120,14 @@ function ReaderParagraphImpl({
               <button
                 onClick={(e) => { e.stopPropagation(); onToggleFav(para); }}
                 className={cn(
-                  'shrink-0 mt-0.5 transition-colors opacity-0 group-hover/para:opacity-100',
-                  faved ? 'text-rose-500' : 'text-muted-foreground/25 hover:text-rose-500',
+                  'shrink-0 size-7 rounded-lg bg-background/80 flex items-center justify-center transition-colors opacity-0 group-hover/para:opacity-100',
+                  faved ? 'text-rose-500' : 'text-muted-foreground/40 hover:text-rose-500',
                 )}
                 title={faved ? '取消收藏本句' : '收藏本句'}
               >
                 <Heart className={cn('size-3.5', faved && 'fill-current')} />
               </button>
+              </div>
             </div>
           )}
           {/* Chinese translation */}

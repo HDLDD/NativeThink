@@ -67,6 +67,10 @@
 
 
 
+
+## 2026-09-14
+- feat(tts): native Android TTS engine as primary voice path (`92e05fa`)
+
 ## 2026-09-13
 - feat(reader): novel-style reading UI + full-book batch translation engine (`b6d6a11`)
 
