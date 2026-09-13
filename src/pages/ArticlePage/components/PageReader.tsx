@@ -185,6 +185,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const [transLoading, setTransLoading] = useState(false);
   const [paraTranslating, setParaTranslating] = useState<string | null>(null);
   const [transAllLoading, setTransAllLoading] = useState(false);
+  const [transProgress, setTransProgress] = useState<{ done: number; total: number } | null>(null);
 
   // Level conversion
   const [convertLevel, setConvertLevel] = useState<string>(content.difficulty || 'intermediate');
@@ -568,28 +569,48 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const translateCurrentPage = async () => {
     if (!isConfigured || !currentPageData || !needsTranslation) return;
     setTransLoading(true);
+    const untranslatedIdx = currentPageData.paragraphs
+      .map((p, i) => (!p.zh && !p.en.startsWith('##CHAPTER##') ? i : -1))
+      .filter((i) => i >= 0);
+    const total = untranslatedIdx.length;
+    setTransProgress({ done: 0, total });
     try {
-      const untranslated = currentPageData.paragraphs.filter((p) => !p.zh);
-      const zhResults: string[] = [];
-      for (const p of untranslated) {
-        const result = await aiChat([
-          { role: 'system', content: 'Translate the following English to natural Chinese. Return ONLY the Chinese translation, no extra text, no markdown.' },
-          { role: 'user', content: p.en.slice(0, 1500) },
-        ], { temperature: 0.3, maxTokens: 1024 });
-        zhResults.push(result.trim());
-      }
-      const newCache = { ...transCache, [currentPage]: zhResults };
-      setTransCache(newCache);
-      safeStorage.setItem(TR_CACHE_KEY, JSON.stringify(newCache));
-      const updatedPages = [...validPages];
-      let zi = 0;
-      updatedPages[currentPage] = {
-        ...currentPageData,
-        paragraphs: currentPageData.paragraphs.map((p) => (!p.zh && zi < zhResults.length ? { ...p, zh: zhResults[zi++] } : p)),
+      // 双并发 — 免费模型单段约 5s，串行整页要 20s+，并行减半
+      const queue = [...untranslatedIdx];
+      const results = new Map<number, string>();
+      const worker = async () => {
+        while (queue.length) {
+          const i = queue.shift()!;
+          try {
+            const result = await aiChat([
+              { role: 'system', content: 'Translate the following English to natural Chinese. Return ONLY the Chinese translation, no extra text, no markdown.' },
+              { role: 'user', content: currentPageData.paragraphs[i].en.slice(0, 1500) },
+            ], { temperature: 0.3, maxTokens: 1024 });
+            results.set(i, result.trim());
+          } catch { /* 单段失败 — 留空可重试 */ }
+          setTransProgress((prev) => (prev ? { ...prev, done: prev.done + 1 } : prev));
+        }
       };
-      setDisplayContent({ ...activeContent, pages: updatedPages });
+      await Promise.all(Array.from({ length: Math.min(2, queue.length) }, worker));
+
+      const zhResults = untranslatedIdx.map((i) => results.get(i) || '').filter(Boolean);
+      if (zhResults.length > 0) {
+        const newCache = { ...transCache, [currentPage]: zhResults };
+        setTransCache(newCache);
+        safeStorage.setItem(TR_CACHE_KEY, JSON.stringify(newCache));
+        const updatedPages = [...validPages];
+        let zi = 0;
+        updatedPages[currentPage] = {
+          ...currentPageData,
+          paragraphs: currentPageData.paragraphs.map((p) => (!p.zh && zi < zhResults.length ? { ...p, zh: zhResults[zi++] } : p)),
+        };
+        setDisplayContent({ ...activeContent, pages: updatedPages });
+        toast.success(`本页翻译完成（${zhResults.length}/${total} 段）`);
+      } else {
+        toast.error('翻译失败，请稍后重试');
+      }
     } catch { toast.error('翻译失败'); }
-    finally { setTransLoading(false); }
+    finally { setTransLoading(false); setTransProgress(null); }
   };
 
   const translateAllPages = async () => {
@@ -755,6 +776,28 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             style={{ background: `linear-gradient(to left, rgba(0,184,148,${Math.min((-swipeOffset - 20) / 80, 0.6)}), transparent)` }}
           >
             <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 size-6 text-[#00B894]" style={{ opacity: Math.min((-swipeOffset - 20) / 80, 0.6) }} />
+          </div>
+        )}
+        {/* AI 翻译横条 — 双语/中文模式下当前页有未翻译段时显示 */}
+        {needsTranslation && (
+          <div className="px-4 sm:px-6 pt-4">
+            <button
+              onClick={(e) => { e.stopPropagation(); translateCurrentPage(); }}
+              disabled={transLoading || transAllLoading}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-[#00B894]/10 border border-[#00B894]/30 hover:bg-[#00B894]/20 hover:border-[#00B894]/50 transition-all text-xs font-black text-[#00B894] disabled:opacity-60"
+            >
+              {transLoading || transAllLoading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  AI 翻译中 {transProgress ? `${transProgress.done}/${transProgress.total}` : '…'} 段
+                </>
+              ) : (
+                <>
+                  <Globe className="size-4" />
+                  AI 对照翻译本页（约 5~15 秒）
+                </>
+              )}
+            </button>
           </div>
         )}
         {/* Page content with swipe translate; keyed by page → directional turn animation */}

@@ -64,6 +64,10 @@
 
 
 
+
+## 2026-09-13
+- fix(reader): StrictMode-safe full-text upgrade + sentence favorites + error toasts (`ee806e1`)
+
 ## 2026-09-13
 - fix(theme): set body color to --foreground — dark mode inherited text was invisible (`9f77b87`)
 
