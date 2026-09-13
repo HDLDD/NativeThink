@@ -25,6 +25,13 @@ import { queryWords, preloadLevels, getEssentialLevels, isAllReady, findWord } f
 import { lookupDictionary } from '@/data/dictionary';
 import { useWordLearning } from '@/lib/use-word-learning';
 import { fetchFullBook } from '@/data/book-fulltext';
+import { translateChapterByIndex, translateBook, getChapterTranslation, splitChapters } from '@/data/book-translation';
+import NovelReader from './NovelReader';
+import ReaderParagraph from './ReaderParagraph';
+import {
+  buildNovelChapters, chapterForPage,
+  type ReaderMode, type ReaderProgress, type ReaderFontSize,
+} from './reader-shared';
 
 const LEVELS = [
   { key: 'beginner' as const, label: '初级', color: '#00B894' },
@@ -33,14 +40,15 @@ const LEVELS = [
 ];
 
 // ── Reading progress persistence ──
-function loadProgress(contentId: string): { page: number } {
+// page: 翻页模式页码 / 小说模式章节起始页；chapter+ratio+perChapter 为小说模式进度
+function loadProgress(contentId: string): ReaderProgress {
   try {
     const raw = safeStorage.getItem(`__reader_progress_${contentId}`);
-    return raw ? JSON.parse(raw) : { page: 0 };
+    return raw ? { page: 0, ...JSON.parse(raw) } : { page: 0 };
   } catch { return { page: 0 }; }
 }
-function saveProgress(contentId: string, page: number) {
-  try { safeStorage.setItem(`__reader_progress_${contentId}`, JSON.stringify({ page })); } catch { /* */ }
+function saveProgress(contentId: string, data: ReaderProgress) {
+  try { safeStorage.setItem(`__reader_progress_${contentId}`, JSON.stringify(data)); } catch { /* */ }
 }
 
 // ── Word lookup: 词库中文 → 本地大词典(ECDICT, 离线秒查) → 在线词典 API ──
@@ -106,9 +114,14 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const turnRef = useRef<(target: number, dir: 'next' | 'prev') => void>(() => {});
   const speakPageRef = useRef<() => void>(() => {});
   const [autoReadPages, setAutoReadPages] = useState(false);
+  // 阅读模式 ref — 供不随渲染重跑的闭包（连读 onEnd、全文升级 effect）读取最新模式
+  const modeRef = useRef<ReaderMode>('novel');
+  // 小说模式 refs — 连读以"章"为单元推进
+  const novelChapterIdxRef = useRef(0);
+  const novelFrontMatterRef = useRef(false);
 
   const tts = useTTS({
-    // When 连读 is on, advance to the next page and keep reading after each page
+    // When 连读 is on, advance to the next unit (page/chapter) and keep reading after each
     onEnd: () => {
       if (!autoReadRef.current) return;
       setTimeout(() => {
@@ -119,7 +132,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         } else {
           autoReadRef.current = false;
           setAutoReadPages(false);
-          toast.success('整篇连读完成');
+          toast.success(modeRef.current === 'novel' ? '全书连读完成' : '整篇连读完成');
         }
       }, 420);
     },
@@ -150,7 +163,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     return firstChapterPg ? Math.max(0, firstChapterPg.pageNumber - 1) : 0;
   });
   const [transMode, setTransMode] = useState<TransMode>('bilingual');
-  const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg' | 'xl'>(() => {
+  const [fontSize, setFontSize] = useState<ReaderFontSize>(() => {
     try {
       const prefs = JSON.parse(safeStorage.getItem('__nativethink_reader_prefs') || '{}');
       if (['sm', 'base', 'lg', 'xl'].includes(prefs.fontSize)) return prefs.fontSize;
@@ -168,10 +181,18 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     return 'light';
   });
   const toggleChrome = useCallback(() => setChromeVisible((v) => !v), []);
+  // ── 阅读模式：novel = 章节制滚动（起点式，默认）；paged = 左右翻页（旧实现） ──
+  const [readerMode, setReaderMode] = useState<ReaderMode>(() => {
+    try {
+      const prefs = JSON.parse(safeStorage.getItem('__nativethink_reader_prefs') || '{}');
+      if (prefs.mode === 'paged' || prefs.mode === 'novel') return prefs.mode;
+    } catch { /* ignore */ }
+    return 'novel';
+  });
   // Persist reader preferences
   useEffect(() => {
-    try { safeStorage.setItem('__nativethink_reader_prefs', JSON.stringify({ fontSize, theme: readerTheme })); } catch { /* quota */ }
-  }, [fontSize, readerTheme]);
+    try { safeStorage.setItem('__nativethink_reader_prefs', JSON.stringify({ fontSize, theme: readerTheme, mode: readerMode })); } catch { /* quota */ }
+  }, [fontSize, readerTheme, readerMode]);
   const [lookupOpen, setLookupOpen] = useState(false);
   const [lookupWord_State, setLookupWordState] = useState('');
   const [lookupData, setLookupData] = useState<{ word: string; phonetic: string; meaning: string; zhMeaning: string; fromForm?: string } | null>(null);
@@ -191,6 +212,9 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const [convertLevel, setConvertLevel] = useState<string>(content.difficulty || 'intermediate');
   const [convertLoading, setConvertLoading] = useState(false);
   const [displayContent, setDisplayContent] = useState(content);
+  // 小说模式进度（含每章位置）— ref 共享给 NovelReader，保存后立即可读
+  const novelProgressRef = useRef<ReaderProgress | null>(null);
+  if (novelProgressRef.current === null) novelProgressRef.current = loadProgress(content.id);
   // ── 书籍全文升级：内置版是压缩节选 — 打开后后台拉取完整原文，真章节目录可用 ──
   const [fullTextLoading, setFullTextLoading] = useState(false);
   const [fullTextDone, setFullTextDone] = useState(false);
@@ -215,8 +239,16 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       // 升级前停在前言/版权页 → 自动跳到第一章
       const firstChapterPage = result.pages.findIndex((pg) => pg.paragraphs.some((p) => p.en.startsWith('##CHAPTER##')));
       if (firstChapterPage >= 0 && currentPageRef.current < firstChapterPage) {
-        setPageIdx(firstChapterPage);
-        setPageAnim('next');
+        if (modeRef.current === 'novel') {
+          // 小说模式：仍停在前言章 → 跳到第一章（章节 0 为 ##CHAPTER## 前内容时）
+          if (novelFrontMatterRef.current) {
+            novelChapterIdxRef.current = 1;
+            setNovelChapterIdx(1);
+          }
+        } else {
+          setPageIdx(firstChapterPage);
+          setPageAnim('next');
+        }
       }
     }).catch(() => { if (!cancelled) setFullTextLoading(false); });
     return () => { cancelled = true; };
@@ -283,6 +315,8 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       };
       setDisplayContent(newContent);
       setPageIdx(0);
+      novelChapterIdxRef.current = 0;
+      setNovelChapterIdx(0);
       toast.success(`已转换为${lvl.label}等级！`);
     } catch { toast.error('转换失败'); }
     finally { setConvertLoading(false); }
@@ -295,6 +329,44 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const currentPage = activePages > 0 ? Math.max(0, Math.min(pageIdx, activePages - 1)) : 0;
   const currentPageData = validPages[currentPage] || null;
 
+  // ── 小说模式：章节骨架（##CHAPTER## 标记 → 章节制滚动阅读） ──
+  const novelChapters = useMemo(() => {
+    const vp = activeContent?.pages?.filter((p) => p && Array.isArray(p.paragraphs)) || [];
+    return buildNovelChapters(vp, activeContent?.zhTitle || activeContent?.title || '全文');
+  }, [activeContent]);
+  const mapPageToChapter = useCallback(
+    (page: number) => chapterForPage(novelChapters, page),
+    [novelChapters],
+  );
+  // 当前章节号 — 从持久化进度恢复：小说模式保存时 page=章节起始页，
+  // 翻页模式保存精确页码，两种情况按页码映射都能落到正确章节
+  const [novelChapterIdx, setNovelChapterIdx] = useState(() => {
+    const prog = novelProgressRef.current;
+    if (prog && prog.page > 0) return mapPageToChapter(prog.page);
+    return 0;
+  });
+
+  // 小说模式进度保存：章节号 + 章内滚动比例（0-1），并按章记住位置
+  const saveNovelProgress = useCallback((chapterIdx: number, ratio: number) => {
+    const prev = novelProgressRef.current || loadProgress(content.id);
+    const ch = novelChapters[chapterIdx];
+    const rounded = Math.round(ratio * 1000) / 1000;
+    const next: ReaderProgress = {
+      ...prev,
+      page: ch ? ch.startPage : prev.page,
+      chapter: chapterIdx,
+      ratio: rounded,
+      perChapter: { ...(prev.perChapter || {}), [String(chapterIdx)]: rounded },
+    };
+    novelProgressRef.current = next;
+    saveProgress(content.id, next);
+  }, [content.id, novelChapters]);
+
+  const handleNovelChapterChange = useCallback((idx: number) => {
+    novelChapterIdxRef.current = idx;
+    setNovelChapterIdx(idx);
+  }, []);
+
   // Preload only essential wordbank levels for Chinese word lookup (not all 9 levels)
   useEffect(() => {
     if (!isAllReady()) {
@@ -303,8 +375,27 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     }
   }, []);
 
-  // Save progress
-  useEffect(() => { saveProgress(activeContent.id, currentPage); }, [activeContent.id, currentPage]);
+  // Save progress — 翻页模式存页码（保留小说模式的章节字段）；小说模式由 NovelReader 按"章节+滚动位置"存
+  useEffect(() => {
+    if (modeRef.current === 'novel') return;
+    saveProgress(activeContent.id, { ...loadProgress(activeContent.id), page: currentPage });
+  }, [activeContent.id, currentPage]);
+
+  // 切换阅读模式时恢复对应模式的进度（页码 ↔ 章节号）
+  const prevModeRef = useRef<ReaderMode>(readerMode);
+  useEffect(() => {
+    if (prevModeRef.current === readerMode) return;
+    prevModeRef.current = readerMode;
+    const prog = loadProgress(content.id);
+    if (readerMode === 'paged') {
+      if (prog.page > 0) setPageIdx(prog.page);
+    } else {
+      const ci = mapPageToChapter(prog.page || 0);
+      novelChapterIdxRef.current = ci;
+      novelProgressRef.current = prog;
+      setNovelChapterIdx(ci);
+    }
+  }, [readerMode, content.id, novelChapters, mapPageToChapter]);
 
   // Page navigation — with directional slide animation.
   // turnTo sets the anim class BEFORE the page renders so the remounted
@@ -325,12 +416,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [currentPage]);
 
-  // Sync refs for the 连读 onEnd closure
-  currentPageRef.current = currentPage;
-  activePagesRef.current = activePages;
-  turnRef.current = turnTo;
-
-  /** 朗读当前页（连读模式的核心步骤，也被工具栏按钮调用） */
+  /** 朗读当前页（翻页模式的连读核心步骤，也被工具栏按钮调用） */
   const speakCurrentPage = useCallback(() => {
     const data = validPages[currentPageRef.current];
     if (!data) return;
@@ -340,20 +426,51 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       .join(' ');
     if (text) safeSpeak(text);
   }, [validPages, safeSpeak]);
-  speakPageRef.current = speakCurrentPage;
 
-  /** 切换连读：开启即从当前页开始朗读，结束/关闭自动停止 */
+  /** 朗读当前章（小说模式的朗读/连读单元） */
+  const speakCurrentChapter = useCallback(() => {
+    const ch = novelChapters[novelChapterIdxRef.current];
+    if (!ch) return;
+    const text = ch.items
+      .filter((it) => !it.para.en.startsWith('##CHAPTER##'))
+      .map((it) => cleanText(it.para.en))
+      .join(' ');
+    if (text) safeSpeak(text);
+  }, [novelChapters, safeSpeak]);
+
+  // Sync refs for the 连读 onEnd closure — 小说模式以"章"为单元，翻页模式以"页"为单元
+  modeRef.current = readerMode;
+  if (readerMode === 'novel') {
+    novelChapterIdxRef.current = novelChapterIdx;
+    novelFrontMatterRef.current = novelChapters.length > 1 && !!novelChapters[0]?.isFrontMatter && novelChapterIdx === 0;
+    currentPageRef.current = novelChapterIdx;
+    activePagesRef.current = Math.max(1, novelChapters.length);
+    turnRef.current = (target: number) => {
+      const clamped = Math.max(0, Math.min(target, novelChapters.length - 1));
+      novelChapterIdxRef.current = clamped;
+      setNovelChapterIdx(clamped);
+    };
+    speakPageRef.current = speakCurrentChapter;
+  } else {
+    novelFrontMatterRef.current = false;
+    currentPageRef.current = currentPage;
+    activePagesRef.current = activePages;
+    turnRef.current = turnTo;
+    speakPageRef.current = speakCurrentPage;
+  }
+
+  /** 切换连读：开启即从当前页/章开始朗读，结束/关闭自动停止 */
   const toggleAutoRead = useCallback(() => {
     const next = !autoReadRef.current;
     autoReadRef.current = next;
     setAutoReadPages(next);
     if (next) {
-      toast.success('连读已开启 — 读完本页自动继续下一页');
-      speakCurrentPage();
+      toast.success(readerMode === 'novel' ? '连读已开启 — 读完本章自动继续下一章' : '连读已开启 — 读完本页自动继续下一页');
+      if (readerMode === 'novel') speakCurrentChapter(); else speakCurrentPage();
     } else {
       tts.cancel();
     }
-  }, [speakCurrentPage, tts]);
+  }, [readerMode, speakCurrentPage, speakCurrentChapter, tts]);
 
   // Touch swipe handlers (must be after goPrev/goNext and currentPage/activePages are defined)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -471,15 +588,16 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     }
   }, [currentPage, activePages, goNext, goPrev]);
 
-  // Keyboard navigation: ←/→/PageUp/PageDown/空格翻页, Esc 关闭
+  // Keyboard navigation: ←/→/PageUp/PageDown 翻页（仅翻页模式）, Esc 关闭
   // （依赖里带上 currentPage — 旧实现闭包过期导致翻一页后按键失效）
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key === 'Escape') { onClose(); return; }
+      if (modeRef.current === 'novel') return; // 小说模式自然滚动 — 方向键交给浏览器
       if (e.key === 'ArrowLeft' || e.key === 'PageUp') goPrev();
       else if (e.key === 'ArrowRight' || e.key === 'PageDown') goNext();
-      else if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -565,6 +683,12 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
   // ── AI Translation ──
   const needsTranslation = transMode !== 'en' && currentPageData?.paragraphs.some((p) => !p.zh);
+  // 小说模式：当前章内有未翻译段
+  const currentNovelChapter = novelChapters.length > 0
+    ? novelChapters[Math.min(novelChapterIdx, novelChapters.length - 1)] || null
+    : null;
+  const novelNeedsTranslation = transMode !== 'en' && !!currentNovelChapter
+    && currentNovelChapter.items.some((it) => !it.para.zh && !it.para.en.startsWith('##CHAPTER##'));
 
   const translateCurrentPage = async () => {
     if (!isConfigured || !currentPageData || !needsTranslation) return;
@@ -612,6 +736,109 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     } catch { toast.error('翻译失败'); }
     finally { setTransLoading(false); setTransProgress(null); }
   };
+
+  // ── 小说模式：整章 AI 翻译（章节段落可跨页，按 pageIdx+paraIdx 定位） ──
+  const translateCurrentChapter = async () => {
+    if (!isConfigured || !currentNovelChapter) return;
+    setTransLoading(true);
+    const total = currentNovelChapter.items.filter((it) => !it.para.zh && !it.para.en.startsWith('##CHAPTER##')).length;
+    setTransProgress({ done: 0, total });
+    try {
+      // 批量引擎：4 段合并为一次请求 + 限流退避 + IndexedDB 断点续传
+      const res = await translateChapterByIndex(activeContent, novelChapterIdx, {
+        batchSize: 4,
+        concurrency: 2,
+        onProgress: (pp) => setTransProgress({ done: pp.segDone, total: pp.segTotal }),
+      });
+      // 按段落原文对号回填（splitChapters 顺序 → 小说章节 items）
+      const zhMap = new Map<string, string>();
+      const chapters = splitChapters(activeContent);
+      chapters[novelChapterIdx]?.paragraphs.forEach((en, i) => {
+        if (res.zh[i] && en.trim()) zhMap.set(en, res.zh[i]);
+      });
+      const updatedPages = [...validPages];
+      let ok = 0;
+      for (const it of currentNovelChapter.items) {
+        const zh = zhMap.get(it.para.en);
+        if (!zh || it.para.zh) continue;
+        const page = updatedPages[it.pageIdx];
+        if (!page) continue;
+        updatedPages[it.pageIdx] = {
+          ...page,
+          paragraphs: page.paragraphs.map((p, i) => (i === it.paraIdx && !p.zh ? { ...p, zh } : p)),
+        };
+        ok++;
+      }
+      if (ok > 0) {
+        const newCache = { ...transCache };
+        currentNovelChapter.items.forEach((it) => {
+          const pg = updatedPages[it.pageIdx];
+          if (!pg) return;
+          const zhList = pg.paragraphs.filter((p) => p.zh).map((p) => p.zh);
+          if (zhList.length > 0) newCache[it.pageIdx] = zhList;
+        });
+        setTransCache(newCache);
+        safeStorage.setItem(TR_CACHE_KEY, JSON.stringify(newCache));
+        setDisplayContent({ ...activeContent, pages: updatedPages });
+        toast.success(`本章翻译完成（${ok} 段）`);
+        if (res.failed > 0) toast.info(`${res.failed} 段未成功 — 再次点击可补翻`);
+      } else {
+        toast.error('翻译失败，请稍后重试');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error && e.message.includes('已在翻译中') ? '全书预翻译正在进行中' : '翻译失败，请稍后重试');
+    }
+    finally { setTransLoading(false); setTransProgress(null); }
+  };
+
+  // ── 整书预翻译（后台队列，结果落 IndexedDB，阅读到哪章哪章自动显示） ──
+  const [bookTrans, setBookTrans] = useState<{ chaptersDone: number; chaptersTotal: number; chapterTitle: string; segDone: number; segTotal: number } | null>(null);
+  const bookAbortRef = useRef<AbortController | null>(null);
+  const startBookTranslation = () => {
+    if (bookTrans) return;
+    const ac = new AbortController();
+    bookAbortRef.current = ac;
+    const gid = activeContent.gutenbergId ?? 0;
+    translateBook(activeContent, {
+      signal: ac.signal,
+      onProgress: (pp) => setBookTrans({ chaptersDone: pp.chaptersDone, chaptersTotal: pp.chaptersTotal, chapterTitle: pp.chapterTitle, segDone: pp.segDone, segTotal: pp.segTotal }),
+    })
+      .then((r) => {
+        setBookTrans(null);
+        toast.success(r.completed ? '全书预翻译完成 — 离线也能对照阅读' : '预翻译已中止');
+      })
+      .catch((e) => {
+        setBookTrans(null);
+        toast.error('预翻译失败：' + (e instanceof Error ? e.message.slice(0, 60) : '未知错误'));
+      });
+  };
+  const stopBookTranslation = () => bookAbortRef.current?.abort();
+
+  // 章节切换时：该章已预翻译 → 自动合并译文到正文
+  useEffect(() => {
+    if (readerMode !== 'novel') return;
+    const bookId = activeContent.id;
+    if (!bookId) return;
+    let cancelled = false;
+    getChapterTranslation(bookId, novelChapterIdx).then((zh) => {
+      if (cancelled || !zh) return;
+      const chapters = splitChapters(activeContent);
+      const ch = chapters[novelChapterIdx];
+      if (!ch) return;
+      const zhMap = new Map<string, string>();
+      ch.paragraphs.forEach((en, i) => { if (zh[i] && en.trim()) zhMap.set(en, zh[i]); });
+      if (zhMap.size === 0) return;
+      setDisplayContent((prev) => ({
+        ...prev,
+        pages: prev.pages.map((pg) => (
+          pg.paragraphs.some((p) => zhMap.has(p.en)) && pg.paragraphs.some((p) => !p.zh && zhMap.has(p.en))
+            ? { ...pg, paragraphs: pg.paragraphs.map((p) => (zhMap.has(p.en) && !p.zh ? { ...p, zh: zhMap.get(p.en)! } : p)) }
+            : pg
+        )),
+      }));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [readerMode, novelChapterIdx, activeContent]);
 
   const translateAllPages = async () => {
     if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
@@ -706,7 +933,41 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   }
 
   return (
-    <div className={cn('fixed inset-0 z-50 bg-background flex flex-col', readerTheme === 'paper' && 'reader-paper', readerTheme === 'night' && 'reader-night')}>
+    <div className={cn('fixed inset-0 z-50 bg-background flex flex-col', readerTheme === 'paper' && 'reader-paper', readerTheme === 'night' && 'reader-night')} data-reader-mode={readerMode}>
+      {/* ════ 小说模式：章节目录 + 章内滚动阅读（起点式） ════ */}
+      {readerMode === 'novel' && (
+        <NovelReader
+          content={activeContent}
+          chapters={novelChapters}
+          chapterIdx={novelChapterIdx}
+          fontSize={fontSize}
+          transMode={transMode}
+          fullTextLoading={fullTextLoading}
+          fullTextDone={fullTextDone}
+          progressRef={novelProgressRef}
+          onClose={onClose}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenToc={() => setTocOpen(true)}
+          onChapterChange={handleNovelChapterChange}
+          onProgress={saveNovelProgress}
+          onWordClick={handleWordClick}
+          onSpeakPara={(text) => safeSpeak(text)}
+          onTranslatePara={translateParagraph}
+          paraTranslating={paraTranslating}
+          onToggleParaFav={toggleParaFav}
+          isParaFaved={paraFaved}
+          needsTranslation={novelNeedsTranslation}
+          onTranslateChapter={translateCurrentChapter}
+          transLoading={transLoading}
+          transProgress={transProgress}
+          bookTranslation={bookTrans}
+          onStartBookTranslation={startBookTranslation}
+          onStopBookTranslation={stopBookTranslation}
+        />
+      )}
+      {/* ════ 翻页模式（保留旧实现） ════ */}
+      {readerMode === 'paged' && (
+        <>
       {/* ── 阅读进度条（当前页/总页） ── */}
       {activePages > 0 && (
         <div className="shrink-0 h-0.5 bg-muted/60">
@@ -809,83 +1070,22 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             pageAnim === 'prev' && 'page-turn-prev',
           )}
         >
-          {currentPageData?.paragraphs.map((para, i) => {
-            const displayEn = para.en.startsWith('##CHAPTER##') ? para.en.replace('##CHAPTER##', '') : para.en;
-            const isChapter = para.en.startsWith('##CHAPTER##');
-            const fontSizeClass = fontSize === 'sm' ? 'text-base leading-7' : fontSize === 'base' ? 'text-lg leading-8' : fontSize === 'lg' ? 'text-xl leading-9' : 'text-2xl leading-10';
-
-            return (
-              <div key={i} className={isChapter ? 'text-center pt-10 pb-3' : ''}>
-                {isChapter ? (
-                  <div className="flex items-center justify-center gap-3">
-                    <span className="h-px w-8 sm:w-12 bg-[#00B894]/30" />
-                    <h3 className="text-base sm:text-lg font-black text-[#00B894] tracking-wide">{displayEn}</h3>
-                    <span className="h-px w-8 sm:w-12 bg-[#00B894]/30" />
-                  </div>
-                ) : (
-                  <>
-                    {/* English — clickable words + paragraph speak */}
-                    {(transMode === 'en' || transMode === 'bilingual') && (
-                      <div className="flex items-start gap-2 group/para">
-                        <p className={cn(fontSizeClass, 'text-foreground/85 font-medium flex-1')}>
-                          {displayEn.split(/\s+/).filter(Boolean).map((w, wi) => {
-                            const clean = w.replace(/[^a-zA-Z'-]/g, '');
-                            const isWord = clean.length >= 2;
-                            return (
-                              <span key={wi}>
-                                {wi > 0 && ' '}
-                                <span
-                                  className={cn(
-                                    isWord && 'cursor-pointer hover:text-[#00B894] hover:underline underline-offset-2 transition-colors',
-                                  )}
-                                  onClick={isWord ? (e) => handleWordClick(e, w) : undefined}
-                                >
-                                  {w}
-                                </span>
-                              </span>
-                            );
-                          })}
-                        </p>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); safeSpeak(cleanText(displayEn)); }}
-                          className="shrink-0 text-muted-foreground/25 hover:text-[#00B894] transition-colors mt-0.5 opacity-0 group-hover/para:opacity-100"
-                          title="朗读段落"
-                        >
-                          <Volume2 className="size-3.5" />
-                        </button>
-                        {!para.zh && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); translateParagraph(currentPage, i); }}
-                            disabled={paraTranslating === `${currentPage}-${i}`}
-                            className="shrink-0 text-muted-foreground/25 hover:text-amber-500 transition-colors mt-0.5 opacity-0 group-hover/para:opacity-100"
-                            title="翻译本段"
-                          >
-                            {paraTranslating === `${currentPage}-${i}` ? <Loader2 className="size-3 animate-spin" /> : <Globe className="size-3" />}
-                          </button>
-                        )}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleParaFav(para); }}
-                          className={cn(
-                            'shrink-0 mt-0.5 transition-colors opacity-0 group-hover/para:opacity-100',
-                            paraFaved(para.en) ? 'text-rose-500' : 'text-muted-foreground/25 hover:text-rose-500',
-                          )}
-                          title={paraFaved(para.en) ? '取消收藏本句' : '收藏本句'}
-                        >
-                          <Heart className={cn('size-3.5', paraFaved(para.en) && 'fill-current')} />
-                        </button>
-                      </div>
-                    )}
-                    {/* Chinese translation */}
-                    {(transMode === 'zh' || transMode === 'bilingual') && para.zh && (
-                      <p className="text-base text-muted-foreground leading-7 mt-1.5 pl-3 border-l-2 border-[#00B894]/50">
-                        {para.zh}
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-            );
-          })}
+          {currentPageData?.paragraphs.map((para, i) => (
+            <ReaderParagraph
+              key={i}
+              para={para}
+              fontSize={fontSize}
+              transMode={transMode}
+              pageIdx={currentPage}
+              paraIdx={i}
+              translating={paraTranslating === `${currentPage}-${i}`}
+              onWordClick={handleWordClick}
+              onSpeak={(text) => safeSpeak(text)}
+              onTranslate={translateParagraph}
+              onToggleFav={toggleParaFav}
+              faved={paraFaved(para.en)}
+            />
+          ))}
         </div>
       </div>
 
@@ -916,6 +1116,8 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           </Button>
         </div>
       </footer>
+        </>
+      )}
 
       {/* ── 阅读设置面板 ── */}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
@@ -924,6 +1126,18 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             <DialogTitle className="text-base font-black text-foreground">阅读设置</DialogTitle>
           </DialogHeader>
           <div className="px-5 pb-6 space-y-5">
+            {/* 阅读模式 */}
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">阅读模式</p>
+              <div className="flex items-center gap-0.5 bg-muted rounded-xl p-1">
+                {([{ key: 'novel', label: '小说模式' }, { key: 'paged', label: '翻页模式' }] as { key: ReaderMode; label: string }[]).map(({ key, label }) => (
+                  <button key={key} onClick={() => setReaderMode(key)}
+                    className={cn('flex-1 py-1.5 rounded-lg text-xs font-bold transition-all',
+                      readerMode === key ? 'bg-background text-[#00B894] shadow-sm' : 'text-muted-foreground')}>{label}</button>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground/70 mt-1.5">小说模式：章节目录 + 章内滚动阅读（起点式）；翻页模式：左右翻页</p>
+            </div>
             {/* 显示模式 */}
             <div>
               <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">显示模式</p>
@@ -967,12 +1181,12 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             <div>
               <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">朗读</p>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={speakCurrentPage} className="flex-1 rounded-xl text-xs font-bold gap-1">
-                  <Volume2 className="size-3.5" />朗读本页
+                <Button variant="outline" size="sm" onClick={readerMode === 'novel' ? speakCurrentChapter : speakCurrentPage} className="flex-1 rounded-xl text-xs font-bold gap-1">
+                  <Volume2 className="size-3.5" />{readerMode === 'novel' ? '朗读本章' : '朗读本页'}
                 </Button>
                 <Button variant="outline" size="sm" onClick={toggleAutoRead}
                   className={cn('flex-1 rounded-xl text-xs font-bold gap-1', autoReadPages && 'bg-[#00B894] hover:bg-[#00a882] text-white border-transparent')}>
-                  <Repeat className={cn('size-3.5', autoReadPages && 'animate-pulse')} />{autoReadPages ? '连读中…' : '连读全篇'}
+                  <Repeat className={cn('size-3.5', autoReadPages && 'animate-pulse')} />{autoReadPages ? '连读中…' : (readerMode === 'novel' ? '连读全书' : '连读全篇')}
                 </Button>
               </div>
             </div>
@@ -981,9 +1195,14 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
               <div>
                 <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">AI 工具</p>
                 <div className="flex gap-2">
-                  {needsTranslation && (
-                    <Button variant="outline" size="sm" onClick={translateCurrentPage} disabled={transLoading} className="flex-1 rounded-xl text-xs font-bold gap-1">
-                      {transLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Globe className="size-3.5" />}翻译本页
+                  {(readerMode === 'novel' ? novelNeedsTranslation : needsTranslation) && (
+                    <Button
+                      variant="outline" size="sm"
+                      onClick={readerMode === 'novel' ? translateCurrentChapter : translateCurrentPage}
+                      disabled={transLoading} className="flex-1 rounded-xl text-xs font-bold gap-1"
+                    >
+                      {transLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Globe className="size-3.5" />}
+                      {readerMode === 'novel' ? '翻译本章' : '翻译本页'}
                     </Button>
                   )}
                   <Button variant="outline" size="sm" onClick={translateAllPages} disabled={transAllLoading} className="flex-1 rounded-xl text-xs font-bold gap-1">
@@ -1025,7 +1244,17 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
               {chapters.map((ch, i) => (
                 <button
                   key={i}
-                  onClick={() => { turnTo(ch.page, ch.page > currentPage ? 'next' : 'prev'); setTocOpen(false); }}
+                  onClick={() => {
+                    if (readerMode === 'novel') {
+                      // 小说模式：点目录直接跳章
+                      const ci = mapPageToChapter(ch.page);
+                      novelChapterIdxRef.current = ci;
+                      setNovelChapterIdx(ci);
+                    } else {
+                      turnTo(ch.page, ch.page > currentPage ? 'next' : 'prev');
+                    }
+                    setTocOpen(false);
+                  }}
                   className={cn(
                     'w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-muted',
                     ch.page === currentPage ? 'text-[#00B894] bg-muted/60' : 'text-foreground/80',

@@ -1348,7 +1348,7 @@ export default function DeepVocabularyPage() {
                           </Button>
                         </div>
                       </div>
-                      <WordImage word={selectedWord.word} className="mb-6" />
+                      <WordImage word={selectedWord.word} hideOnEmpty className="mb-6" />
                       <div className="grid grid-cols-3 gap-3 mb-6">
                         <div className="p-4 rounded-2xl bg-muted/50"><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">语域</p><p className="text-sm font-black text-foreground">{selectedWord.register === 'formal' ? '正式' : selectedWord.register === 'informal' ? '非正式' : '中性'}</p></div>
                         <div className="p-4 rounded-2xl bg-muted/50"><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">单词序号</p><p className="text-sm font-black text-foreground">#{selectedWord.frequencyRank}</p></div>

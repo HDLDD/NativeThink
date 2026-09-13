@@ -65,6 +65,10 @@
 
 
 
+
+## 2026-09-13
+- feat(reader): visible in-page translation banner + parallel translation with progress (`ed530a1`)
+
 ## 2026-09-13
 - fix(reader): StrictMode-safe full-text upgrade + sentence favorites + error toasts (`ee806e1`)
 
