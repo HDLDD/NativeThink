@@ -62,7 +62,7 @@ function splitMultiChapterParagraph(text: string): string[] | null {
   return parts;
 }
 
-function cleanBookParagraphs(enParas: string[]): IParagraph[] {
+export function cleanBookParagraphs(enParas: string[]): IParagraph[] {
   const result: IParagraph[] = [];
   let foundStart = false;
   let foundEnd = false;
@@ -133,7 +133,7 @@ function bookContent(
   const paragraphs = cleanBookParagraphs(enParas);
   const pages = buildPages(paragraphs);
   const totalWords = paragraphs.reduce((sum, p) => sum + p.en.split(/\s+/).filter(Boolean).length, 0);
-  return { id, type: 'book', title, zhTitle, author, zhAuthor, source: 'Project Gutenberg', topic, difficulty, pages, totalWords };
+  return { id, type: 'book', title, zhTitle, author, zhAuthor, source: 'Project Gutenberg', topic, difficulty, pages, totalWords, gutenbergId: Number(id) || undefined };
 }
 
 const _p1342: string[] = [

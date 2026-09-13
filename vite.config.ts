@@ -137,6 +137,10 @@ export default defineConfig({
         target: 'https://nativethink.pages.dev',
         changeOrigin: true,
       },
+      '/api/gutenberg': {
+        target: 'https://nativethink.pages.dev',
+        changeOrigin: true,
+      },
       '/api/wikipedia': {
         target: 'https://nativethink.pages.dev',
         changeOrigin: true,

@@ -28,6 +28,8 @@ export interface IReadingContent {
   cover?: string;
   pages: IPage[];
   totalWords: number;
+  /** Project Gutenberg 书籍 ID — 存在时阅读器可运行时升级为完整版 */
+  gutenbergId?: number;
 }
 
 /** Build pages from paragraph pairs — autopaginate by word count (~200-400 words/page) */

@@ -61,6 +61,10 @@
 
 
 
+
+## 2026-09-12
+- feat(ai): independent factory provider + bundled offline model in packages (`f309c9c`)
+
 ## 2026-09-12
 - fix(dashboard): remove daily-sentence illustration (`08b32fe`)
 

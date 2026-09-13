@@ -24,6 +24,7 @@ import { buildPages } from '@/data/reading';
 import { queryWords, preloadLevels, getEssentialLevels, isAllReady, findWord } from '@/data/wordbank';
 import { lookupDictionary } from '@/data/dictionary';
 import { useWordLearning } from '@/lib/use-word-learning';
+import { fetchFullBook } from '@/data/book-fulltext';
 
 const LEVELS = [
   { key: 'beginner' as const, label: '初级', color: '#00B894' },
@@ -189,6 +190,33 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const [convertLevel, setConvertLevel] = useState<string>(content.difficulty || 'intermediate');
   const [convertLoading, setConvertLoading] = useState(false);
   const [displayContent, setDisplayContent] = useState(content);
+  // ── 书籍全文升级：内置版是压缩节选 — 打开后后台拉取完整原文，真章节目录可用 ──
+  const fullTextTriedRef = useRef<number | null>(null);
+  const [fullTextLoading, setFullTextLoading] = useState(false);
+  useEffect(() => {
+    const gid = content.gutenbergId;
+    if (!gid || fullTextTriedRef.current === gid) return;
+    fullTextTriedRef.current = gid;
+    let cancelled = false;
+    setFullTextLoading(true);
+    fetchFullBook(gid).then((result) => {
+      if (cancelled || !result) { setFullTextLoading(false); return; }
+      setDisplayContent((prev) => ({
+        ...prev,
+        pages: result.pages,
+        totalWords: result.totalWords,
+      }));
+      setFullTextLoading(false);
+      toast.success(`已加载完整版 · ${result.chapterCount} 章 · ${Math.round(result.totalWords / 1000)}k 词`, { duration: 3000 });
+      // 升级前停在前言/版权页 → 自动跳到第一章
+      const firstChapterPage = result.pages.findIndex((pg) => pg.paragraphs.some((p) => p.en.startsWith('##CHAPTER##')));
+      if (firstChapterPage >= 0 && currentPageRef.current < firstChapterPage) {
+        setPageIdx(firstChapterPage);
+        setPageAnim('next');
+      }
+    }).catch(() => { if (!cancelled) setFullTextLoading(false); });
+    return () => { cancelled = true; };
+  }, [content.gutenbergId]);
 
   // Mobile toolbar collapse
   const [isMobile, setIsMobile] = useState(() =>
@@ -306,7 +334,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       .filter((p) => !p.en.startsWith('##CHAPTER##'))
       .map((p) => cleanText(p.en))
       .join(' ');
-    if (text) safeSpeak(text, { rate: 0.85 });
+    if (text) safeSpeak(text);
   }, [validPages, safeSpeak]);
   speakPageRef.current = speakCurrentPage;
 
@@ -654,7 +682,10 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             <X className="size-5" />
           </Button>
           <div className="flex-1 min-w-0 text-center px-1">
-            <h2 className="text-sm font-black text-foreground truncate">{activeContent.zhTitle || activeContent.title}</h2>
+            <h2 className="text-sm font-black text-foreground truncate">
+              {activeContent.zhTitle || activeContent.title}
+              {fullTextLoading && <Loader2 className="size-3 inline ml-1.5 animate-spin text-[#00B894]" />}
+            </h2>
             <p className="text-[10px] font-medium text-muted-foreground truncate">
               {activeContent.author ? activeContent.author + ' · ' : ''}{activeContent.source}
             </p>
@@ -749,7 +780,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                           })}
                         </p>
                         <button
-                          onClick={(e) => { e.stopPropagation(); safeSpeak(cleanText(displayEn), { rate: 0.85 }); }}
+                          onClick={(e) => { e.stopPropagation(); safeSpeak(cleanText(displayEn)); }}
                           className="shrink-0 text-muted-foreground/25 hover:text-[#00B894] transition-colors mt-0.5 opacity-0 group-hover/para:opacity-100"
                           title="朗读段落"
                         >
@@ -974,7 +1005,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             <div className="flex gap-2">
               <Button
                 size="sm"
-                onClick={() => safeSpeak(lookupWord_State, { rate: 0.85 })}
+                onClick={() => safeSpeak(lookupWord_State)}
                 variant="outline"
                 className="rounded-xl text-xs font-bold gap-1 flex-1"
               >
