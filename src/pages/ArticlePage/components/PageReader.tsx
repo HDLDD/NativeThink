@@ -191,15 +191,17 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const [convertLoading, setConvertLoading] = useState(false);
   const [displayContent, setDisplayContent] = useState(content);
   // ── 书籍全文升级：内置版是压缩节选 — 打开后后台拉取完整原文，真章节目录可用 ──
-  const fullTextTriedRef = useRef<number | null>(null);
   const [fullTextLoading, setFullTextLoading] = useState(false);
+  const [fullTextDone, setFullTextDone] = useState(false);
   useEffect(() => {
     const gid = content.gutenbergId;
-    if (!gid || fullTextTriedRef.current === gid) return;
-    fullTextTriedRef.current = gid;
+    if (!gid) return;
+    // 不用 ref 做一次性守卫 — StrictMode 双执行会取消第一次并把第二次拦死。
+    // fetchFullBook 自带并发去重 + IndexedDB 缓存，重复调用是安全的。
     let cancelled = false;
     setFullTextLoading(true);
     fetchFullBook(gid).then((result) => {
+      (window as any).__ftThen = 'cancelled=' + cancelled + ' result=' + (result ? result.pages.length + 'p' : 'null');
       if (cancelled || !result) { setFullTextLoading(false); return; }
       setDisplayContent((prev) => ({
         ...prev,
@@ -207,6 +209,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         totalWords: result.totalWords,
       }));
       setFullTextLoading(false);
+      setFullTextDone(true);
       toast.success(`已加载完整版 · ${result.chapterCount} 章 · ${Math.round(result.totalWords / 1000)}k 词`, { duration: 3000 });
       // 升级前停在前言/版权页 → 自动跳到第一章
       const firstChapterPage = result.pages.findIndex((pg) => pg.paragraphs.some((p) => p.en.startsWith('##CHAPTER##')));
@@ -482,6 +485,24 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   }, [goPrev, goNext, onClose]);
 
   // Word click — lookup Chinese + English definitions
+  // ── 段落（句子）收藏 — 点击 ❤ 收藏当前段落原文与翻译 ──
+  const paraFaved = (text: string) => isFavorited(cleanText(text).slice(0, 200), 'article');
+  const toggleParaFav = (para: IParagraph) => {
+    const content = cleanText(para.en).slice(0, 200);
+    if (isFavorited(content, 'article')) {
+      const fav = favorites.find((f) => f.type === 'article' && f.content === content);
+      if (fav) { removeFavorite(fav.id); toast.success('已取消收藏'); }
+    } else {
+      addFavorite({
+        type: 'article',
+        content,
+        meaning: para.zh || '',
+        category: activeContent.zhTitle || activeContent.title,
+      });
+      toast.success('句子已收藏 — 在「我的收藏」查看');
+    }
+  };
+
   // ── 最近查词记录（跨会话，最多 18 条） ──
   const [recentLookups, setRecentLookups] = useState<string[]>(() => {
     try { return JSON.parse(safeStorage.getItem('__reader_lookup_recent') || '[]'); } catch { return []; }
@@ -627,7 +648,9 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         paragraphs: page.paragraphs.map((p, i) => i === paraIdx ? { ...p, zh } : p),
       };
       setDisplayContent({ ...activeContent, pages: updatedPages });
-    } catch { /* silent */ }
+    } catch {
+      toast.error('AI 翻译失败，请稍后重试');
+    }
     finally { setParaTranslating(null); }
   };
 
@@ -688,6 +711,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             </h2>
             <p className="text-[10px] font-medium text-muted-foreground truncate">
               {activeContent.author ? activeContent.author + ' · ' : ''}{activeContent.source}
+              {!fullTextLoading && fullTextDone && <span className="ml-1.5 text-[9px] font-black text-[#00B894]">完整版</span>}
             </p>
           </div>
           {chapters.length > 0 && (
@@ -796,6 +820,16 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                             {paraTranslating === `${currentPage}-${i}` ? <Loader2 className="size-3 animate-spin" /> : <Globe className="size-3" />}
                           </button>
                         )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleParaFav(para); }}
+                          className={cn(
+                            'shrink-0 mt-0.5 transition-colors opacity-0 group-hover/para:opacity-100',
+                            paraFaved(para.en) ? 'text-rose-500' : 'text-muted-foreground/25 hover:text-rose-500',
+                          )}
+                          title={paraFaved(para.en) ? '取消收藏本句' : '收藏本句'}
+                        >
+                          <Heart className={cn('size-3.5', paraFaved(para.en) && 'fill-current')} />
+                        </button>
                       </div>
                     )}
                     {/* Chinese translation */}

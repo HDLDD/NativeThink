@@ -17,7 +17,7 @@ export interface FullBookResult {
 }
 
 const CACHE_PREFIX = 'book-full-';
-const fetchAbort = new Map<number, AbortController>();
+const inFlight = new Map<number, Promise<FullBookResult | null>>();
 
 function splitParagraphs(text: string): string[] {
   // 古腾堡 txt：段落以空行分隔；把硬换行合并成整段
@@ -27,40 +27,31 @@ function splitParagraphs(text: string): string[] {
     .filter((p) => p.length > 1);
 }
 
-/** 抓取并解析完整原文（带 IndexedDB 缓存；重复打开秒出） */
-export async function fetchFullBook(
+/** 抓取并解析完整原文（Promise 共享去重 + IndexedDB 缓存） */
+export function fetchFullBook(
   gutenbergId: number,
   onStatus?: (s: 'fetching' | 'parsing' | 'done') => void,
 ): Promise<FullBookResult | null> {
+  const existing = inFlight.get(gutenbergId);
+  if (existing) return existing;
+
   const cacheKey = CACHE_PREFIX + gutenbergId;
-  try {
-    const cached = await idbGet<FullBookResult>(cacheKey);
-    if (cached?.pages?.length) {
-      onStatus?.('done');
-      return cached;
-    }
-  } catch { /* idb 不可用 — 继续网络抓取 */ }
-
-  // 并发去重：同一本书只抓一次
-  const existing = fetchAbort.get(gutenbergId);
-  if (existing) {
-    // 等待进行中的那次
-    await new Promise<void>((r) => { const t = setInterval(() => { if (!fetchAbort.has(gutenbergId)) { clearInterval(t); r(); } }, 200); });
+  (window as any).__ft = 'start';
+  const p = (async (): Promise<FullBookResult | null> => {
     try {
-      const cached2 = await idbGet<FullBookResult>(cacheKey);
-      if (cached2?.pages?.length) return cached2;
-    } catch { /* ignore */ }
-    return null;
-  }
+      const cached = await idbGet<FullBookResult>(cacheKey);
+      (window as any).__ft = cached ? 'cache-hit' : 'cache-miss';
+      if (cached?.pages?.length) {
+        onStatus?.('done');
+        return cached;
+      }
+    } catch { (window as any).__ft = 'idb-err'; }
 
-  const controller = new AbortController();
-  fetchAbort.set(gutenbergId, controller);
-  try {
-    onStatus?.('fetching');
+    (window as any).__ft = 'fetching';
     // 走函数代理（gutenberg.org 无 CORS 头，浏览器无法直连）
     let text: string | null = null;
     try {
-      const res = await fetch(`/api/gutenberg?id=${gutenbergId}`, { signal: controller.signal });
+      const res = await fetch(`/api/gutenberg?id=${gutenbergId}`);
       if (res.ok) {
         const data = await res.json();
         text = data?.text || null;
@@ -83,7 +74,9 @@ export async function fetchFullBook(
     try { await idbSet(cacheKey, result); } catch { /* quota — 不阻塞 */ }
     onStatus?.('done');
     return result;
-  } finally {
-    fetchAbort.delete(gutenbergId);
-  }
+  })();
+
+  inFlight.set(gutenbergId, p);
+  p.finally(() => inFlight.delete(gutenbergId)).catch(() => {});
+  return p;
 }

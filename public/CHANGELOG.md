@@ -63,6 +63,10 @@
 
 
 
+
+## 2026-09-13
+- fix(theme): set body color to --foreground — dark mode inherited text was invisible (`9f77b87`)
+
 ## 2026-09-13
 - feat(reader): runtime full-text upgrade for books with real chapter navigation (`ae7010a`)
 
