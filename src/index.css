@@ -14,6 +14,7 @@ html {
 }
 
 body {
+  color: var(--foreground); /* 暗色模式下继承色文字（outline 按钮等）才会变浅 — 否则 UA 默认黑字看不见 */
   font-feature-settings: 'cv11', 'ss01';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

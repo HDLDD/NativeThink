@@ -62,6 +62,10 @@
 
 
 
+
+## 2026-09-13
+- feat(reader): runtime full-text upgrade for books with real chapter navigation (`ae7010a`)
+
 ## 2026-09-12
 - feat(ai): independent factory provider + bundled offline model in packages (`f309c9c`)
 
