@@ -66,6 +66,10 @@
 
 
 
+
+## 2026-09-13
+- feat(reader): novel-style reading UI + full-book batch translation engine (`b6d6a11`)
+
 ## 2026-09-13
 - feat(reader): visible in-page translation banner + parallel translation with progress (`ed530a1`)
 

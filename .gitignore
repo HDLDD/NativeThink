@@ -8,3 +8,4 @@ Thumbs.db
 .v3-cache/
 release/
 .local-data/
+models-bundled/

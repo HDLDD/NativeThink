@@ -13,6 +13,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import { Capacitor } from '@capacitor/core';
 import { useTTSSettings } from './tts-settings';
 import { cleanText } from './utils';
 
@@ -156,6 +157,20 @@ function googleTTSUrl(text: string): string {
   return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=${encodeURIComponent(text)}`;
 }
 
+// ── Tier 0: 原生 TTS（Android APK 内置插件 — 系统语音引擎，离线零延迟不断流） ──
+const IS_ANDROID_NATIVE = Capacitor.isNativePlatform?.() && Capacitor.getPlatform?.() === 'android';
+
+let nativeTtsPlugin: any = undefined; // undefined = 未加载，null = 不可用
+async function getNativeTts(): Promise<any | null> {
+  if (nativeTtsPlugin !== undefined) return nativeTtsPlugin;
+  try {
+    if (!Capacitor.isPluginAvailable?.('TextToSpeech')) { nativeTtsPlugin = null; return null; }
+    const mod = await import('@capacitor-community/text-to-speech');
+    nativeTtsPlugin = (mod as any).TextToSpeech;
+  } catch { nativeTtsPlugin = null; }
+  return nativeTtsPlugin;
+}
+
 // ── Tier 2b: Local server TTS (Edge neural voices + Windows SAPI) ──
 
 function cfTtsUrl(text: string, rate: number, voice?: string | null): string {
@@ -234,6 +249,10 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   const safetyRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const primedRef = useRef(false);
   const audioUnlockedRef = useRef(false);
+  // 原生 TTS 状态
+  const nativeActiveRef = useRef(false);
+  const nativePausedRef = useRef(false);
+  const nativeReplayRef = useRef<(() => void) | null>(null);
 
   const ttsSupported = 'speechSynthesis' in window;
 
@@ -245,6 +264,11 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   };
   const stopAudio = () => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
+    // 原生引擎正在播 → 同步原生停止（仅原生激活时，避免与刚启动的 speak 竞态）
+    if (nativeActiveRef.current) {
+      nativeActiveRef.current = false;
+      void getNativeTts().then((t) => t?.stop().catch(() => {}));
+    }
   };
 
   // ── Load voices ──
@@ -311,9 +335,11 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
   const playChunkWithFallback = useCallback(
     (chunks: string[], idx: number, rate: number, engineIdx: number) => {
-      // Desktop build: /api/tts is served by the local Windows SAPI engine
-      // (offline, cached) — fastest first; edge/google as fallbacks
-      const engines: Array<'cf' | 'edge' | 'google'> = ['cf', 'edge', 'google'];
+      // Android APK：原生系统 TTS 引擎优先 — 离线、即时、不断流；
+      // 失败（无语音引擎等）再走网络引擎链。桌面构建 /api/tts 走本地 SAPI。
+      const engines: Array<'native' | 'cf' | 'edge' | 'google'> = IS_ANDROID_NATIVE
+        ? ['native', 'cf', 'edge', 'google']
+        : ['cf', 'edge', 'google'];
       const engine = engines[engineIdx];
       if (!engine || abortedRef.current || idx >= chunks.length) {
         stopAudio();
@@ -372,6 +398,34 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         // still fails (e.g. no prior user gesture), cascade to next engine
         a.play().catch(() => { if (audioRef.current === a) audioRef.current = null; onFail(); });
       };
+
+      if (engine === 'native') {
+        getNativeTts()
+          .then((plugin) => {
+            if (!plugin) { onFail(); return; }
+            stopAudio();
+            nativeActiveRef.current = true;
+            nativeReplayRef.current = () => playChunkWithFallback(chunks, idx, rate, 0);
+            setIsSpeaking(true); setIsPaused(false);
+            plugin.speak({
+              text: chunks[idx],
+              lang: 'en-US',
+              rate: Math.min(1.5, Math.max(0.5, rate)),
+              pitch: 1,
+              volume: typeof settings.volume === 'number' ? settings.volume : 1,
+            })
+              .then(() => {
+                nativeActiveRef.current = false;
+                if (!abortedRef.current) onDone();
+              })
+              .catch(() => {
+                nativeActiveRef.current = false;
+                if (!abortedRef.current) onFail();
+              });
+          })
+          .catch(() => onFail());
+        return;
+      }
 
       if (engine === 'cf') {
         // 预取下一句到 Cache API；当前句优先走本地缓存（二次朗读零等待）
@@ -587,6 +641,14 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   }, [ssCancel]);
 
   const pause = useCallback(() => {
+    if (nativeActiveRef.current) {
+      // 原生引擎不支持暂停 — 停止并在恢复时重播当前段
+      void getNativeTts().then((t) => t?.stop().catch(() => {}));
+      nativeActiveRef.current = false;
+      nativePausedRef.current = true;
+      setIsPaused(true);
+      return;
+    }
     if (audioRef.current && !audioRef.current.paused) {
       audioRef.current.pause();
       clearSafety(); // paused chunk must not be killed by the 25s safety timer
@@ -598,6 +660,12 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   }, [clearSafety]);
 
   const resume = useCallback(() => {
+    if (nativePausedRef.current) {
+      nativePausedRef.current = false;
+      setIsPaused(false);
+      nativeReplayRef.current?.();
+      return;
+    }
     if (audioRef.current && audioRef.current.paused) {
       audioRef.current.play().catch(() => {});
       setIsPaused(false);
