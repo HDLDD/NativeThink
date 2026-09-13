@@ -68,6 +68,10 @@
 
 
 
+
+## 2026-09-14
+- fix(reader): paragraph action buttons overlay instead of reserving width; nav below reader (`78e9dc3`)
+
 ## 2026-09-14
 - feat(tts): native Android TTS engine as primary voice path (`92e05fa`)
 
