@@ -13,6 +13,9 @@ import { useTTS } from '@/lib/use-tts';
 import { useImmersive } from '@/lib/focus-mode';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { sfxCorrect, sfxWrong, sfxTick, sfxComplete } from '@/lib/sfx';
+import STATIC_COLLOC_TRANSLATIONS from '@/data/wordbank/collocation-translations';
+import { useAI } from '@/hooks/use-ai';
+import { safeStorage } from '@/lib/safe-storage';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -49,6 +52,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   const tts = useTTS();
   // 学习时长统计（供仪表盘/学习记录的连续打卡与时长展示）
   const { addStudyMinutes } = useLearningStats();
+  const { chat: aiChat } = useAI();
 
   const [reviewMode, setReviewMode] = useState<ReviewMode>('flashcard');
   const [setupOpen, setSetupOpen] = useState(false); // 学习设置默认折叠
@@ -88,6 +92,35 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isFlipped, setFlipped] = useState(false);
   const [rated, setRated] = useState(false);
+
+  // 闪卡背面的搭配短语：中文翻译复用搭配学习页的静态表 + 同一份 AI 缓存
+  const COLLOC_AI_CACHE_KEY = '__nativethink_colloc_ai_tranlations';
+  const [collocCache, setCollocCache] = useState<Record<string, string>>(() => {
+    try { const raw = safeStorage.getItem(COLLOC_AI_CACHE_KEY); return raw ? JSON.parse(raw) : {}; } catch { return {}; }
+  });
+  const [collocTranslating, setCollocTranslating] = useState<string | null>(null);
+  const collocZh = (phrase: string): string | null =>
+    STATIC_COLLOC_TRANSLATIONS[phrase.toLowerCase()] || collocCache[phrase.toLowerCase()] || null;
+  const translateColloc = async (phrase: string) => {
+    const key = phrase.toLowerCase();
+    if (STATIC_COLLOC_TRANSLATIONS[key] || collocCache[key] || collocTranslating) return;
+    setCollocTranslating(key);
+    try {
+      const zh = await aiChat(
+        [
+          { role: 'system', content: 'Translate this English collocation/phrase into natural concise Chinese (max 12 chars). Return ONLY the Chinese, no pinyin, no explanation.' },
+          { role: 'user', content: phrase },
+        ],
+        { temperature: 0.2, maxTokens: 40 },
+      );
+      setCollocCache((prev) => {
+        const next = { ...prev, [key]: zh.trim() };
+        try { safeStorage.setItem(COLLOC_AI_CACHE_KEY, JSON.stringify(next)); } catch { /* quota */ }
+        return next;
+      });
+    } catch { toast.error('搭配翻译失败，请稍后重试'); }
+    finally { setCollocTranslating(null); }
+  };
 
   // 会话完成庆祝（借鉴 Duolingo 完课页）
   const [sessionDone, setSessionDone] = useState(false);
@@ -770,6 +803,41 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                               <div className="p-4 rounded-2xl bg-white/60 border border-indigo-100 mb-4">
                                 <p className="text-sm text-foreground/80 italic font-medium">"{currentWord.examples[0].en}"</p>
                                 <p className="text-xs text-muted-foreground mt-2">{currentWord.examples[0].zh}</p>
+                              </div>
+                            )}
+                            {/* 搭配 / 短语 — 点按可朗读，缺中文可 AI 补译 */}
+                            {currentWord.collocations.length > 0 && (
+                              <div className="pt-3 border-t border-indigo-100">
+                                <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-center gap-1">
+                                  <Link2 className="size-3 text-[#6C5CE7]" />常用搭配
+                                </p>
+                                <div className="space-y-1.5">
+                                  {currentWord.collocations.slice(0, 3).map((c) => {
+                                    const zh = collocZh(c);
+                                    return (
+                                      <div key={c} className="flex items-center justify-center gap-2 text-center">
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); tts.speak(c, { rate: 0.85 }); }}
+                                          className="text-sm font-bold text-[#6C5CE7] hover:underline underline-offset-2 transition-colors"
+                                          title="朗读搭配"
+                                        >
+                                          {c}
+                                        </button>
+                                        {zh ? (
+                                          <span className="text-xs text-muted-foreground">{zh}</span>
+                                        ) : (
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); translateColloc(c); }}
+                                            className="text-[9px] font-bold text-muted-foreground/60 hover:text-[#00B894] transition-colors shrink-0"
+                                            title="AI 翻译该搭配"
+                                          >
+                                            {collocTranslating === c.toLowerCase() ? '翻译中…' : '译'}
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             )}
                           </>

@@ -71,6 +71,10 @@
 
 
 
+
+## 2026-09-15
+- feat(vocab): quick flashcard mode — word only, know/don't-know (`ed8daf1`)
+
 ## 2026-09-15
 - fix(flashcards): remove illustrations + adaptive font size for long words (`29db814`)
 
