@@ -13,7 +13,6 @@ import { useTTS } from '@/lib/use-tts';
 import { useImmersive } from '@/lib/focus-mode';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { sfxCorrect, sfxWrong, sfxTick, sfxComplete } from '@/lib/sfx';
-import { WordImage } from '@/components/WordImage';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -742,9 +741,11 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                             <Badge className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground mb-4">
                               {state.progress[currentWord.word.toLowerCase()] ? '复习' : '新学'}
                             </Badge>
-                            <WordImage word={currentWord.word} hideOnEmpty className="h-36 sm:h-44 mb-4" />
-                            <div className="flex items-center justify-center gap-3 mb-3">
-                              <h2 className="text-5xl font-black italic text-foreground tracking-tight">{currentWord.word}</h2>
+                            <div className="flex items-center justify-center gap-3 mb-3 max-w-full">
+                              <h2 className={cn(
+                                'font-black italic text-foreground tracking-tight break-words min-w-0',
+                                currentWord.word.length > 14 ? 'text-3xl' : currentWord.word.length > 10 ? 'text-4xl' : 'text-5xl',
+                              )}>{currentWord.word}</h2>
                               <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(currentWord.word, { rate: 0.9 }); }} className="rounded-2xl bg-muted text-muted-foreground hover:text-[#00B894]">
                                 <Volume2 className="size-5" />
                               </Button>

@@ -69,6 +69,10 @@
 
 
 
+
+## 2026-09-14
+- chore: changelog sync (`ac46227`)
+
 ## 2026-09-14
 - fix(reader): paragraph action buttons overlay instead of reserving width; nav below reader (`78e9dc3`)
 

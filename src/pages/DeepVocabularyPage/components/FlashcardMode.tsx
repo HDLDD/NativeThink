@@ -10,7 +10,6 @@ import { useWordLearning } from '@/lib/use-word-learning';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useImmersive } from '@/lib/focus-mode';
 import { cn, cleanText } from '@/lib/utils';
-import { WordImage } from '@/components/WordImage';
 import { toast } from 'sonner';
 import { useTTS } from '@/lib/use-tts';
 import { sfxComplete } from '@/lib/sfx';
@@ -327,9 +326,11 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                         </span>
                       )}
                     </Badge>
-                    <WordImage word={cw.word} hideOnEmpty className="h-36 sm:h-44 mb-4" />
-                    <div className="flex items-center justify-center gap-3 mb-2">
-                      <h2 className="text-4xl font-black italic text-foreground tracking-tight">{cw.word}</h2>
+                    <div className="flex items-center justify-center gap-3 mb-2 max-w-full">
+                      <h2 className={cn(
+                        'font-black italic text-foreground tracking-tight break-words min-w-0',
+                        cw.word.length > 14 ? 'text-2xl sm:text-3xl' : cw.word.length > 10 ? 'text-3xl sm:text-4xl' : 'text-4xl',
+                      )}>{cw.word}</h2>
                       <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(cw.word, { rate: 0.9 }); }}
                         className="rounded-2xl bg-muted text-muted-foreground hover:text-[#6C5CE7]"><Volume2 className="size-5" /></Button>
                     </div>
