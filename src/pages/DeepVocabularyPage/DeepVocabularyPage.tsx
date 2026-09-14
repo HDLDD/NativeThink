@@ -22,6 +22,7 @@ import { queryWords, preloadLevels, isLevelReady, WORD_COUNTS, ALL_PARTS_OF_SPEE
 import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
 import DailyLearningMode from './components/DailyLearningMode';
 import FlashcardMode from './components/FlashcardMode';
+import QuickCardMode from './components/QuickCardMode';
 import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
 import CollocationsTab from './components/CollocationsTab';
 import { VocabTestTab } from './components/VocabTestTab';
@@ -63,6 +64,7 @@ const BOOKS = [
 
 const MODES = [
   { key: 'daily', label: '每日学习', icon: '🧠', desc: '按计划每天学新词' },
+  { key: 'quickcard', label: '快速闪卡', icon: '⚡', desc: '只单词 · 认识/不认识' },
   { key: 'flashcard', label: '复习检测', icon: '🔄', desc: 'SM-2 间隔记忆复习' },
   { key: 'browse', label: '词库浏览', icon: '📖', desc: '自由浏览全部词汇' },
   { key: 'collocations', label: '搭配学习', icon: '🔗', desc: '常用搭配与短语' },
@@ -1041,6 +1043,10 @@ export default function DeepVocabularyPage() {
 
         <TabsContent value="daily" className="mt-0">
           <DailyLearningMode level={selectedLevel} counts={counts} />
+        </TabsContent>
+
+        <TabsContent value="quickcard" className="mt-0">
+          <QuickCardMode level={selectedLevel} />
         </TabsContent>
 
         <TabsContent value="flashcard" className="mt-0">

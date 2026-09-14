@@ -70,6 +70,10 @@
 
 
 
+
+## 2026-09-15
+- fix(flashcards): remove illustrations + adaptive font size for long words (`29db814`)
+
 ## 2026-09-14
 - chore: changelog sync (`ac46227`)
 
