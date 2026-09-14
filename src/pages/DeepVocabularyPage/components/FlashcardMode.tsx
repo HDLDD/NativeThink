@@ -201,14 +201,14 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-2">
-          <div className="size-8 rounded-xl bg-[#6C5CE7]/10 flex items-center justify-center text-[#6C5CE7]">
+          <div className="size-8 rounded-xl bg-[#6C5CE7]/10 flex items-center justify-center text-ink-violet">
             <RotateCw className="size-4" />
           </div>
           <h2 className="text-sm font-black italic text-foreground">复习检测</h2>
         </div>
         <div className="text-center py-16 space-y-4">
           <div className="size-16 rounded-full bg-[#6C5CE7]/10 flex items-center justify-center mx-auto">
-            <RotateCw className="size-8 text-[#6C5CE7]" />
+            <RotateCw className="size-8 text-ink-violet" />
           </div>
           <p className="text-muted-foreground text-sm font-medium">
             {stats.due > 0
@@ -233,7 +233,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
         {/* Header */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
-            <div className="size-9 rounded-xl bg-[#6C5CE7]/10 flex items-center justify-center text-[#6C5CE7]">
+            <div className="size-9 rounded-xl bg-[#6C5CE7]/10 flex items-center justify-center text-ink-violet">
               <RotateCw className="size-4.5" />
             </div>
             <div>
@@ -260,7 +260,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             <p className="text-[8px] font-black uppercase tracking-wider text-rose-600">待复习</p>
           </div>
           <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-100 text-center">
-            <p className="text-lg font-black text-[#00B894]">{stats.mastered}</p>
+            <p className="text-lg font-black text-ink-teal">{stats.mastered}</p>
             <p className="text-[8px] font-black uppercase tracking-wider text-emerald-600">已掌握</p>
           </div>
           <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-100 text-center">
@@ -268,8 +268,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             <p className="text-[8px] font-black uppercase tracking-wider text-amber-600">学习中</p>
           </div>
           <div className="p-2.5 rounded-xl bg-[#6C5CE7]/5 border border-[#6C5CE7]/10 text-center">
-            <p className="text-lg font-black text-[#6C5CE7]">{sessionReviewCount}</p>
-            <p className="text-[8px] font-black uppercase tracking-wider text-[#6C5CE7]/70">本次复习</p>
+            <p className="text-lg font-black text-ink-violet">{sessionReviewCount}</p>
+            <p className="text-[8px] font-black uppercase tracking-wider text-ink-violet/70">本次复习</p>
           </div>
         </div>
 
@@ -293,7 +293,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             variant="ghost"
             size="icon"
             onClick={() => { setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); setRated(false); }}
-            className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-[#6C5CE7]"
+            className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-ink-violet"
             title="返回概览"
           >
             <ArrowLeft className="size-5" />
@@ -321,7 +321,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                     <Badge className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground mb-4">
                       {currentIdx + 1} / {queue.length}
                       {state.progress[cw.word.toLowerCase()] && (
-                        <span className="ml-1.5 text-[#6C5CE7]">
+                        <span className="ml-1.5 text-ink-violet">
                           · {state.progress[cw.word.toLowerCase()].status === 'mastered' ? '已掌握' : '复习中'}
                         </span>
                       )}
@@ -332,17 +332,17 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                         cw.word.length > 14 ? 'text-2xl sm:text-3xl' : cw.word.length > 10 ? 'text-3xl sm:text-4xl' : 'text-4xl',
                       )}>{cw.word}</h2>
                       <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(cw.word, { rate: 0.9 }); }}
-                        className="rounded-2xl bg-muted text-muted-foreground hover:text-[#6C5CE7]"><Volume2 className="size-5" /></Button>
+                        className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-violet"><Volume2 className="size-5" /></Button>
                     </div>
-                    <p className="text-sm font-bold text-[#6C5CE7] mb-1">{cw.partOfSpeech}</p>
+                    <p className="text-sm font-bold text-ink-violet mb-1">{cw.partOfSpeech}</p>
                     <p className="text-sm text-muted-foreground font-medium">{cw.phonetic}</p>
                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-4">
-                      <Sparkles className="size-3.5 inline mr-1 text-[#6C5CE7]" />点击翻转查看释义
+                      <Sparkles className="size-3.5 inline mr-1 text-ink-violet" />点击翻转查看释义
                     </p>
                   </>
                 ) : (
                   <>
-                    <Badge className="rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wider bg-violet-100 dark:bg-violet-500/20 text-[#6C5CE7] mb-3">
+                    <Badge className="rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wider bg-violet-100 dark:bg-violet-500/20 text-ink-violet mb-3">
                       释义 · {cw.partOfSpeech}
                     </Badge>
                     <p className="text-xl font-black text-foreground mb-2">{cw.meaning}</p>

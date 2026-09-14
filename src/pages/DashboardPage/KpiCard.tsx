@@ -53,7 +53,7 @@ function KpiCardInner({
             {label}
           </p>
           <p
-            className="text-2xl font-black text-foreground transition-colors group-hover:text-[#00B894]"
+            className="text-2xl font-black text-foreground transition-colors group-hover:text-ink-teal"
             style={{ fontFeatureSettings: "'cv11'" }}
           >
             {value}

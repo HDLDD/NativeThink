@@ -177,7 +177,7 @@ export default function QuickCardMode({ level }: { level: string }) {
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-100 dark:border-emerald-500/20">
-              <p className="text-xl font-black text-[#00B894]">{known}</p>
+              <p className="text-xl font-black text-ink-teal">{known}</p>
               <p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">认识</p>
             </div>
             <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/15 border border-amber-100 dark:border-amber-500/20">
@@ -214,13 +214,13 @@ export default function QuickCardMode({ level }: { level: string }) {
         <Button
           variant="ghost" size="icon"
           onClick={() => { setQueue([]); setDone(false); }}
-          className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-[#00B894]"
+          className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-ink-teal"
           title="返回概览 (Esc)"
         >
           <ArrowLeft className="size-5" />
         </Button>
         <div className="flex items-center gap-1.5">
-          <Zap className="size-4 text-[#00B894]" />
+          <Zap className="size-4 text-ink-teal" />
           <span className="text-xs font-black italic text-foreground">快速闪卡</span>
         </div>
         <div className="flex items-center gap-1 ml-auto">
@@ -277,7 +277,7 @@ export default function QuickCardMode({ level }: { level: string }) {
                   <Button
                     variant="ghost" size="icon"
                     onClick={() => tts.speak(cw.word, { rate: 0.9 })}
-                    className="rounded-2xl bg-muted text-muted-foreground hover:text-[#00B894] shrink-0"
+                    className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal shrink-0"
                   >
                     <Volume2 className="size-4.5" />
                   </Button>
@@ -285,7 +285,7 @@ export default function QuickCardMode({ level }: { level: string }) {
 
                 {revealed ? (
                   <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2 pt-1">
-                    <p className="text-sm font-bold text-[#6C5CE7]">
+                    <p className="text-sm font-bold text-ink-violet">
                       {cw.partOfSpeech}{cw.phonetic ? ` · ${cw.phonetic}` : ''}
                     </p>
                     <p className="text-xl font-black text-foreground">{cw.meaning}</p>

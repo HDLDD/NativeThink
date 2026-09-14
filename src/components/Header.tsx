@@ -74,13 +74,13 @@ export default function Header() {
             </div>
             <div className="w-px h-4 bg-border" />
             <div className="flex items-center gap-2">
-              <Clock className="size-4 text-[#00B894]" />
+              <Clock className="size-4 text-ink-teal" />
               <span className="text-sm font-black italic text-foreground tabular-nums">
                 {timeStr}
               </span>
             </div>
             <div className="w-px h-4 bg-border" />
-            <span className="text-xs font-bold uppercase tracking-wider text-[#00B894]">
+            <span className="text-xs font-bold uppercase tracking-wider text-ink-teal">
               {weekDay}
             </span>
           </div>
@@ -93,7 +93,7 @@ export default function Header() {
                   variant="ghost"
                   size="icon"
                   aria-label="每日目标设置"
-                  className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894] transition-colors"
+                  className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
                 >
                   <Target className="size-4.5" />
                 </Button>
@@ -102,7 +102,7 @@ export default function Header() {
                 <div className="p-6 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10">
                   <DialogHeader>
                     <DialogTitle className="text-xl font-black italic text-foreground flex items-center gap-2">
-                      <Target className="size-5 text-[#00B894]" />
+                      <Target className="size-5 text-ink-teal" />
                       每日学习目标
                     </DialogTitle>
                   </DialogHeader>
@@ -121,7 +121,7 @@ export default function Header() {
                         className={`rounded-2xl font-black text-sm ${
                           stats.dailyGoalMinutes === min
                             ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30'
-                            : 'border-border hover:border-[#00B894] hover:text-[#00B894]'
+                            : 'border-border hover:border-[#00B894] hover:text-ink-teal'
                         }`}
                       >
                         {min} 分钟
@@ -142,7 +142,7 @@ export default function Header() {
                   window.open('https://b23.tv/nHHPunY', '_blank', 'noopener,noreferrer');
                 }
               }}
-              className="inline-flex items-center justify-center size-9 bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894] transition-colors"
+              className="inline-flex items-center justify-center size-9 bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
               aria-label="开发者B站主页"
               title="开发者B站主页"
             >
@@ -157,7 +157,7 @@ export default function Header() {
               size="icon"
               onClick={toggleTheme}
               aria-label="切换主题"
-              className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894] transition-colors"
+              className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
             >
               {theme === 'light' ? <Moon className="size-4.5" /> : <Sun className="size-4.5" />}
             </Button>

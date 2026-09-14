@@ -125,7 +125,7 @@ export default function GlobalWordSearch() {
           variant="ghost"
           size="icon"
           aria-label="全局单词搜索"
-          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894] transition-colors"
+          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
         >
           <Search className="size-4.5" />
         </Button>
@@ -224,7 +224,7 @@ export default function GlobalWordSearch() {
                         {/* Speak button */}
                         <button
                           onClick={() => tts.speak(word.word, { rate: 0.85 })}
-                          className="shrink-0 text-muted-foreground/40 hover:text-[#00B894] transition-colors"
+                          className="shrink-0 text-muted-foreground/40 hover:text-ink-teal transition-colors"
                           title={`朗读 "${word.word}"`}
                         >
                           <Volume2 className="size-4" />
@@ -299,7 +299,7 @@ export default function GlobalWordSearch() {
                                     </div>
                                     <button
                                       onClick={() => tts.speak(ex.en, { rate: 0.9 })}
-                                      className="shrink-0 text-muted-foreground/50 hover:text-[#00B894] transition-colors mt-0.5"
+                                      className="shrink-0 text-muted-foreground/50 hover:text-ink-teal transition-colors mt-0.5"
                                     >
                                       <Volume2 className="size-3.5" />
                                     </button>
@@ -399,7 +399,7 @@ export default function GlobalWordSearch() {
         {dataReady && query.trim() && results.length > 0 && (
           <div className="p-3 border-t border-border bg-muted/20 shrink-0 text-center">
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-              点击单词展开详情 · 点击 <Volume2 className="size-3 inline-block mx-0.5 text-[#00B894]" /> 朗读 · 点击 <Heart className="size-3 inline-block mx-0.5 text-rose-500 fill-current" /> 收藏
+              点击单词展开详情 · 点击 <Volume2 className="size-3 inline-block mx-0.5 text-ink-teal" /> 朗读 · 点击 <Heart className="size-3 inline-block mx-0.5 text-rose-500 fill-current" /> 收藏
             </p>
           </div>
         )}

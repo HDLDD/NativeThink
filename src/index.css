@@ -157,6 +157,14 @@ main ::-webkit-scrollbar-track { background: transparent; }
   .stream-caret { animation: none; opacity: 0; }
 }
 
+/* ── 文字品牌色工具类（自动适配明暗，见 tailwind-theme.css 变量） ── */
+@utility text-ink-violet {
+  color: var(--ink-violet);
+}
+@utility text-ink-teal {
+  color: var(--ink-teal);
+}
+
 /* ── 阅读器主题（微信读书式：浅色/纸张/夜间） ── */
 .reader-paper {
   --background: #F6F1E6;

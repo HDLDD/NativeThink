@@ -122,7 +122,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-2">
-          <div className="size-10 rounded-xl bg-[#00B894]/10 flex items-center justify-center text-[#00B894]">
+          <div className="size-10 rounded-xl bg-[#00B894]/10 flex items-center justify-center text-ink-teal">
             <CheckCircle2 className="size-5" />
           </div>
           <div>
@@ -135,7 +135,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
         <Card className="rounded-[32px] border-2 border-emerald-200/50 shadow-sm overflow-hidden">
           <CardContent className="p-8 text-center space-y-6">
             <div className="size-20 rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-500/20 dark:to-teal-500/20 flex items-center justify-center mx-auto">
-              <Sparkles className="size-10 text-[#00B894]" />
+              <Sparkles className="size-10 text-ink-teal" />
             </div>
             <div>
               <h3 className="text-2xl font-black italic text-foreground">太棒了！</h3>
@@ -144,7 +144,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20">
-                <p className="text-3xl font-black text-[#00B894]">{knownIds.size}</p>
+                <p className="text-3xl font-black text-ink-teal">{knownIds.size}</p>
                 <p className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1">
                   <CheckCircle2 className="size-3" />认识
                 </p>
@@ -165,7 +165,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
                   style={{ width: `${total > 0 ? Math.round((knownIds.size / total) * 100) : 0}%` }}
                 />
               </div>
-              <span className="text-sm font-black text-[#00B894] tabular-nums">
+              <span className="text-sm font-black text-ink-teal tabular-nums">
                 {total > 0 ? Math.round((knownIds.size / total) * 100) : 0}%
               </span>
             </div>
@@ -199,7 +199,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="size-10 rounded-xl bg-[#00B894]/10 flex items-center justify-center text-[#00B894]">
+              <div className="size-10 rounded-xl bg-[#00B894]/10 flex items-center justify-center text-ink-teal">
                 <Heart className="size-5" />
               </div>
               <div>
@@ -238,7 +238,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="size-10 rounded-xl bg-[#00B894]/10 flex items-center justify-center text-[#00B894]">
+            <div className="size-10 rounded-xl bg-[#00B894]/10 flex items-center justify-center text-ink-teal">
               <Heart className="size-5" />
             </div>
             <div>
@@ -268,7 +268,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
       {/* Header + type filter */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="size-10 rounded-xl bg-[#00B894]/10 flex items-center justify-center text-[#00B894]">
+          <div className="size-10 rounded-xl bg-[#00B894]/10 flex items-center justify-center text-ink-teal">
             <Heart className="size-5" />
           </div>
           <div>
@@ -293,7 +293,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
               className={cn(
                 'px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border-2',
                 filterType === type
-                  ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]'
+                  ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal'
                   : 'border-border bg-muted text-muted-foreground hover:border-muted-foreground/30',
               )}
             >
@@ -314,7 +314,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
           <p className="text-[8px] font-black uppercase tracking-wider text-sky-600 dark:text-sky-400">已回顾</p>
         </div>
         <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 text-center">
-          <p className="text-lg font-black text-[#00B894]">{knownIds.size}</p>
+          <p className="text-lg font-black text-ink-teal">{knownIds.size}</p>
           <p className="text-[8px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">认识</p>
         </div>
         <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 text-center">
@@ -381,7 +381,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
                             e.stopPropagation();
                             tts.speak(cw.content, { rate: 0.85 });
                           }}
-                          className="rounded-2xl bg-muted text-muted-foreground hover:text-[#00B894] shrink-0"
+                          className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal shrink-0"
                         >
                           <Volume2 className="size-5" />
                         </Button>
@@ -390,13 +390,13 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
                         <p className="text-xs font-bold text-muted-foreground mt-2">{cw.category}</p>
                       )}
                       <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-4">
-                        <Sparkles className="size-3.5 inline mr-1 text-[#00B894]" />
+                        <Sparkles className="size-3.5 inline mr-1 text-ink-teal" />
                         点击翻转查看释义
                       </p>
                     </>
                   ) : (
                     <>
-                      <Badge className="rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wider bg-emerald-100 dark:bg-emerald-500/20 text-[#00B894] mb-3">
+                      <Badge className="rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wider bg-emerald-100 dark:bg-emerald-500/20 text-ink-teal mb-3">
                         释义 · {TYPE_LABELS[cw.type] || cw.type}
                       </Badge>
                       <p className="text-xl font-black text-foreground mb-2">{cw.meaning}</p>
@@ -411,7 +411,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
                                 e.stopPropagation();
                                 tts.speak(cleanText(cw.example), { rate: 0.85 });
                               }}
-                              className="rounded-lg size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+                              className="rounded-lg size-7 text-muted-foreground hover:text-ink-teal shrink-0"
                             >
                               <Volume2 className="size-3.5" />
                             </Button>

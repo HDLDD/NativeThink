@@ -928,35 +928,35 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
         <TabsList className="bg-muted p-1.5 rounded-3xl h-auto">
           <TabsTrigger
             value="library"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <Puzzle className="size-4 mr-2" />
             语块库
           </TabsTrigger>
           <TabsTrigger
             value="replace"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <CheckCircle2 className="size-4 mr-2" />
             替换练习
           </TabsTrigger>
           <TabsTrigger
             value="chain"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <Trophy className="size-4 mr-2" />
             接龙游戏
           </TabsTrigger>
           <TabsTrigger
             value="phrases"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <BookOpen className="size-4 mr-2" />
             短语库
           </TabsTrigger>
           <TabsTrigger
             value="review"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <RotateCw className="size-4 mr-2" />
             短语复习
@@ -969,7 +969,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
             <CardHeader className="pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] flex items-center justify-center">
+                  <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center">
                     <Puzzle className="size-5.5" />
                   </div>
                   <div>
@@ -1090,13 +1090,13 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   className={cn(
                     'flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold transition-all border-2',
                     librarySource === 'builtin'
-                      ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]'
+                      ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal'
                       : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
                   )}
                 >
                   <Puzzle className="size-3.5" />
                   内置语块
-                  <Badge className="ml-0.5 text-[9px] font-black rounded-full px-1.5 py-0 bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] border-none">
+                  <Badge className="ml-0.5 text-[9px] font-black rounded-full px-1.5 py-0 bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal border-none">
                     {memorizedFilteredBuiltIn.length}
                   </Badge>
                 </button>
@@ -1253,7 +1253,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                         className={cn(
                           'px-3 py-1 rounded-[10px] text-xs font-bold transition-all',
                           memoryFilter === key
-                            ? 'bg-white dark:bg-card text-[#00B894] shadow-sm'
+                            ? 'bg-white dark:bg-card text-ink-teal shadow-sm'
                             : 'text-muted-foreground hover:text-foreground',
                         )}
                       >
@@ -1295,7 +1295,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                 <div className="flex items-center gap-1.5">
                                   <button
                                     onClick={(e) => { e.stopPropagation(); tts.speak(chunk.content); }}
-                                    className="shrink-0 text-muted-foreground/40 hover:text-[#00B894] transition-colors"
+                                    className="shrink-0 text-muted-foreground/40 hover:text-ink-teal transition-colors"
                                     title={`朗读 "${chunk.content}"`}
                                   >
                                     <Volume2 className="size-3.5" />
@@ -1314,8 +1314,8 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                   className={cn(
                                     'p-0.5 rounded-lg transition-colors',
                                     memorizedChunks.has(chunk.id)
-                                      ? 'text-[#00B894] hover:text-[#00B894]/70'
-                                      : 'text-muted-foreground/30 hover:text-[#00B894]',
+                                      ? 'text-ink-teal hover:text-ink-teal/70'
+                                      : 'text-muted-foreground/30 hover:text-ink-teal',
                                   )}
                                 >
                                   <Brain className={cn('size-3.5', memorizedChunks.has(chunk.id) && 'fill-[#00B894]/20')} />
@@ -1357,7 +1357,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           size="sm"
                           onClick={() => setActivePage(Math.max(0, activePage - 1))}
                           disabled={activePage === 0}
-                          className="rounded-xl h-7 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894]"
+                          className="rounded-xl h-7 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-ink-teal"
                         >
                           <ChevronLeft className="size-3.5" />
                         </Button>
@@ -1371,7 +1371,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           size="sm"
                           onClick={() => setActivePage(Math.min(activeTotalPages - 1, activePage + 1))}
                           disabled={activePage >= activeTotalPages - 1}
-                          className="rounded-xl h-7 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894]"
+                          className="rounded-xl h-7 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-ink-teal"
                         >
                           <ChevronRight className="size-3.5" />
                         </Button>
@@ -1390,7 +1390,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                             {detailChunk.id.startsWith('ai_') && (
                               <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
                             )}
-                            <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] border-none">
+                            <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal border-none">
                               {CATEGORY_LABELS[detailChunk.category] || detailChunk.category}
                             </Badge>
                             <Badge variant="secondary" className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-muted">
@@ -1406,7 +1406,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                 if (idx > 0) setDetailChunk(activePageChunks[idx - 1]);
                               }}
                               disabled={activePageChunks.findIndex((c) => c.id === detailChunk.id) <= 0}
-                              className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+                              className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0"
                               title="上一个语块">
                               <ChevronLeft className="size-4" />
                             </Button>
@@ -1415,7 +1415,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                             </h2>
                             <Button variant="ghost" size="icon"
                               onClick={() => tts.speak(detailChunk.content)}
-                              className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894] shrink-0">
+                              className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal shrink-0">
                               <Volume2 className="size-4.5" />
                             </Button>
                             <Button variant="ghost" size="icon"
@@ -1424,7 +1424,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                 if (idx < activePageChunks.length - 1) setDetailChunk(activePageChunks[idx + 1]);
                               }}
                               disabled={activePageChunks.findIndex((c) => c.id === detailChunk.id) >= activePageChunks.length - 1}
-                              className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+                              className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0"
                               title="下一个语块">
                               <ChevronRight className="size-4" />
                             </Button>
@@ -1441,7 +1441,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           {/* Introduction */}
                           {detailChunk.introduction && (
                             <div className="mb-4 p-3 rounded-2xl bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/8 dark:to-teal-500/8 border border-[#00B894]/10">
-                              <p className="text-[10px] font-black uppercase tracking-wider text-[#00B894] mb-1">English Introduction</p>
+                              <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal mb-1">English Introduction</p>
                               <p className="text-sm text-foreground/80 leading-relaxed italic">{detailChunk.introduction}</p>
                             </div>
                           )}
@@ -1457,12 +1457,12 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           {/* Example */}
                           <div className="p-4 rounded-2xl bg-[#00B894]/5 border border-[#00B894]/10 mb-4">
                             <div className="flex items-center justify-between mb-1">
-                              <p className="text-[10px] font-black uppercase tracking-wider text-[#00B894]">例句</p>
+                              <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal">例句</p>
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => tts.speak(detailChunk.example, { rate: 0.9 })}
-                                className="rounded-lg size-7 text-muted-foreground hover:text-[#00B894]"
+                                className="rounded-lg size-7 text-muted-foreground hover:text-ink-teal"
                               >
                                 <Volume2 className="size-3.5" />
                               </Button>
@@ -1494,14 +1494,14 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                               <Brain
                                 className={cn(
                                   'size-4 mr-2',
-                                  memorizedChunks.has(detailChunk.id) && 'fill-[#00B894]/20 text-[#00B894]',
+                                  memorizedChunks.has(detailChunk.id) && 'fill-[#00B894]/20 text-ink-teal',
                                 )}
                               />
                               {memorizedChunks.has(detailChunk.id) ? '已记忆' : '记忆'}
                             </Button>
                             <Button
                               variant="outline"
-                              className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+                              className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
                               onClick={() => toggleFavorite(detailChunk)}
                             >
                               <Heart
@@ -1558,7 +1558,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   <div className="p-6 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10">
                     <DialogHeader>
                       <div className="flex items-center gap-2 mb-3">
-                        <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] border-none">
+                        <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal border-none">
                           {CATEGORY_LABELS[detailChunk.category] || detailChunk.category}
                         </Badge>
                         <Badge
@@ -1576,7 +1576,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           variant="ghost"
                           size="icon"
                           onClick={() => tts.speak(detailChunk.content)}
-                          className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894] shrink-0"
+                          className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal shrink-0"
                         >
                           <Volume2 className="size-4.5" />
                         </Button>
@@ -1598,7 +1598,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                     </div>
                     <div className="p-5 rounded-2xl bg-[#00B894]/5 border border-[#00B894]/10">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-[#00B894]">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal">
                           例句
                         </p>
                         <Button
@@ -1642,7 +1642,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           size="sm"
                           onClick={() => handleGenerateSentences(detailChunk)}
                           disabled={sentenceGenLoading === detailChunk.id}
-                          className="rounded-xl border-dashed border-violet-300 text-violet-500 hover:bg-violet-100 text-[10px] font-black uppercase tracking-wider"
+                          className="rounded-xl border-dashed border-violet-300 dark:border-violet-500/40 text-ink-violet hover:bg-violet-100 dark:hover:bg-violet-500/15 text-[10px] font-black uppercase tracking-wider"
                         >
                           {sentenceGenLoading === detailChunk.id ? (
                             <Loader2 className="size-3.5 mr-1 animate-spin" />
@@ -1657,7 +1657,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           {aiSentences[detailChunk.id].map((item, idx) => (
                             <div
                               key={idx}
-                              className="flex items-start gap-2 p-3 rounded-xl bg-white/60 border border-violet-100 group"
+                              className="flex items-start gap-2 p-3 rounded-xl bg-white/60 dark:bg-foreground/[0.07] border border-violet-100 dark:border-violet-500/20 group"
                             >
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm text-foreground/80 italic">「{item.en}」</p>
@@ -1665,7 +1665,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                               </div>
                               <button
                                 onClick={() => tts.speak(item.en, { rate: 0.9 })}
-                                className="shrink-0 p-0.5 rounded-lg text-muted-foreground/50 hover:text-[#00B894] hover:bg-emerald-50 opacity-0 group-hover:opacity-100 transition-all"
+                                className="shrink-0 p-0.5 rounded-lg text-muted-foreground/50 hover:text-ink-teal hover:bg-emerald-50 opacity-0 group-hover:opacity-100 transition-all"
                                 title="朗读"
                               >
                                 <Volume2 className="size-3.5" />
@@ -1705,7 +1705,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                     <div className="flex gap-2 pt-2">
                       <Button
                         variant="outline"
-                        className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+                        className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
                         onClick={() => tts.speak(detailChunk.example, { rate: 0.9 })}
                       >
                         <BookOpen className="size-4 mr-2" />
@@ -1720,14 +1720,14 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                         <Brain
                           className={cn(
                             'size-4 mr-2',
-                            memorizedChunks.has(detailChunk.id) && 'fill-[#00B894]/20 text-[#00B894]',
+                            memorizedChunks.has(detailChunk.id) && 'fill-[#00B894]/20 text-ink-teal',
                           )}
                         />
                         {memorizedChunks.has(detailChunk.id) ? '已记忆' : '记忆'}
                       </Button>
                       <Button
                         variant="outline"
-                        className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+                        className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
                         onClick={() => {
                           toggleFavorite(detailChunk);
                         }}
@@ -1771,7 +1771,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                     <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                       得分
                     </p>
-                    <p className="text-xl font-black italic text-[#00B894] tabular-nums">
+                    <p className="text-xl font-black italic text-ink-teal tabular-nums">
                       {score}/{answeredCount}
                     </p>
                   </div>
@@ -1789,7 +1789,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                     variant="outline"
                     size="sm"
                     onClick={nextQuestion}
-                    className="gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+                    className="gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
                   >
                     <RefreshCw className="size-3.5" />
                     下一题
@@ -1841,7 +1841,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           : showWrong
                             ? 'border-rose-400 bg-rose-50 text-rose-700'
                             : isSelected
-                              ? 'border-[#00B894] bg-[#00B894]/5 text-[#00B894]'
+                              ? 'border-[#00B894] bg-[#00B894]/5 text-ink-teal'
                               : 'border-border bg-card hover:border-[#00B894]/40 hover:bg-muted/30 text-foreground',
                       )}
                     >
@@ -1993,7 +1993,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                     `第 ${currentChainIdx + 1} 个`
                   )}
                 </div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#00B894] mb-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-ink-teal mb-3">
                   请使用这个语块造句
                 </p>
                 <div className="flex items-center justify-center gap-2 mb-3">
@@ -2004,7 +2004,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                     variant="ghost"
                     size="icon"
                     onClick={() => tts.speak(aiChainChallenge ? aiChainChallenge.chunk : chainChunks[currentChainIdx].content)}
-                    className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894] shrink-0"
+                    className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal shrink-0"
                   >
                     <Volume2 className="size-4.5" />
                   </Button>
@@ -2139,7 +2139,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                       if (chunks.length === 0) return null;
                       return (
                         <div key={letter} id={`phrase-l-${letter}`}>
-                          <div className="text-[10px] font-black text-[#00B894] mb-1 sticky top-0 bg-background/90 py-0.5">{letter} · {chunks.length}</div>
+                          <div className="text-[10px] font-black text-ink-teal mb-1 sticky top-0 bg-background/90 py-0.5">{letter} · {chunks.length}</div>
                           {chunks.map((chunk) => {
                             const exCount = (phraseExamples[chunk.id]?.length || 0) + 1;
                             return (
@@ -2186,7 +2186,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => tts.speak(selectedPhrase.content)} className="rounded-xl size-9 text-muted-foreground hover:text-[#00B894]">
+                          <Button variant="ghost" size="icon" onClick={() => tts.speak(selectedPhrase.content)} className="rounded-xl size-9 text-muted-foreground hover:text-ink-teal">
                             <Volume2 className="size-5" />
                           </Button>
                           <Button
@@ -2207,7 +2207,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                         </div>
                         {selectedPhrase.introduction && (
                           <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/8 dark:to-teal-500/8 border border-[#00B894]/10">
-                            <p className="text-[10px] font-black uppercase tracking-wider text-[#00B894] mb-1">English Introduction</p>
+                            <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal mb-1">English Introduction</p>
                             <p className="text-sm text-foreground/80 leading-relaxed italic">{selectedPhrase.introduction}</p>
                           </div>
                         )}
@@ -2234,7 +2234,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                         </div>
                         {/* Built-in example */}
                         <div className="p-4 rounded-2xl bg-[#00B894]/5 dark:bg-[#00B894]/10 border border-[#00B894]/10">
-                          <p className="text-xs font-black uppercase tracking-wider text-[#00B894] mb-1.5">内置例句</p>
+                          <p className="text-xs font-black uppercase tracking-wider text-ink-teal mb-1.5">内置例句</p>
                           <p className="text-sm text-foreground italic leading-relaxed">「{cleanText(selectedPhrase.example)}」</p>
                           {(selectedPhrase.exampleZh || exampleTranslations[selectedPhrase.id]) ? (
                             <p className="text-xs text-muted-foreground mt-1.5 font-medium">
@@ -2250,7 +2250,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                             </button>
                           )}
                           <div className="flex items-center gap-2 mt-2">
-                            <Button variant="ghost" size="icon" onClick={() => tts.speak(selectedPhrase.example, { rate: 0.9 })} className="rounded-lg size-6 text-muted-foreground hover:text-[#00B894]">
+                            <Button variant="ghost" size="icon" onClick={() => tts.speak(selectedPhrase.example, { rate: 0.9 })} className="rounded-lg size-6 text-muted-foreground hover:text-ink-teal">
                               <Volume2 className="size-3" />
                             </Button>
                             <Button
@@ -2338,7 +2338,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
             </Card>
             <Card className="rounded-[28px] border-border shadow-sm">
               <CardContent className="p-4 text-center">
-                <p className="text-2xl font-black text-[#00B894]">{phraseStats.mastered}</p>
+                <p className="text-2xl font-black text-ink-teal">{phraseStats.mastered}</p>
                 <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">已掌握</p>
               </CardContent>
             </Card>
@@ -2382,13 +2382,13 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                         className={cn(
                           'px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all',
                           reviewTtsMode === key
-                            ? 'bg-white dark:bg-card text-[#00B894] shadow-sm'
+                            ? 'bg-white dark:bg-card text-ink-teal shadow-sm'
                             : 'text-muted-foreground hover:text-foreground',
                         )}
                       >{label}</button>
                     ))}
                   </div>
-                  <Button onClick={() => startMemorizedReview()} variant="outline" size="sm" className="rounded-2xl text-[10px] font-black uppercase tracking-wider gap-1.5 border-[#00B894]/30 text-[#00B894] hover:bg-[#00B894]/10">
+                  <Button onClick={() => startMemorizedReview()} variant="outline" size="sm" className="rounded-2xl text-[10px] font-black uppercase tracking-wider gap-1.5 border-[#00B894]/30 text-ink-teal hover:bg-[#00B894]/10">
                     <Brain className="size-3.5" />已记 ({memorizedChunks.size})
                   </Button>
                   <Button onClick={() => startReview(20)} variant="outline" size="sm" className="rounded-2xl text-[10px] font-black uppercase tracking-wider gap-1.5">
@@ -2410,7 +2410,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                     <Button onClick={() => startReview(20)} size="sm" className="rounded-2xl text-xs font-bold bg-[#00B894] hover:bg-[#00A080] text-white">20 个</Button>
                     <Button onClick={() => startReview(allChunks.length)} variant="outline" size="sm" className="rounded-2xl text-xs font-bold">全部 ({allChunks.length})</Button>
                     {memorizedChunks.size > 0 && (
-                      <Button onClick={() => startMemorizedReview()} size="sm" className="rounded-2xl text-xs font-bold bg-[#00B894]/10 text-[#00B894] hover:bg-[#00B894]/20 border border-[#00B894]/30 gap-1.5">
+                      <Button onClick={() => startMemorizedReview()} size="sm" className="rounded-2xl text-xs font-bold bg-[#00B894]/10 text-ink-teal hover:bg-[#00B894]/20 border border-[#00B894]/30 gap-1.5">
                         <Brain className="size-3.5" />复习已记 ({memorizedChunks.size})
                       </Button>
                     )}
@@ -2419,7 +2419,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
               ) : reviewIdx >= reviewQueue.length ? (
                 <div className="text-center py-8">
                   <div className="size-20 rounded-3xl bg-emerald-50 dark:bg-emerald-500/15 mx-auto mb-4 flex items-center justify-center">
-                    <CheckCircle2 className="size-9 text-[#00B894]" />
+                    <CheckCircle2 className="size-9 text-ink-teal" />
                   </div>
                   <h3 className="text-xl font-black text-foreground mb-2">复习完成！</h3>
                   <p className="text-sm text-muted-foreground font-medium mb-1">
@@ -2475,7 +2475,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                         <Badge className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground mb-6">点击翻转</Badge>
                         <h2 className="text-4xl font-black italic text-foreground tracking-tight text-center">{reviewQueue[reviewIdx].content}</h2>
                         <div className="flex items-center gap-2 mt-4">
-                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(reviewQueue[reviewIdx].content); }} className="rounded-xl size-9 text-muted-foreground hover:text-[#00B894]">
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(reviewQueue[reviewIdx].content); }} className="rounded-xl size-9 text-muted-foreground hover:text-ink-teal">
                             <Volume2 className="size-5" />
                           </Button>
                         </div>
@@ -2487,7 +2487,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                         <p className="text-sm text-muted-foreground text-center mb-4">{reviewQueue[reviewIdx].usage}</p>
                         <div className="p-3 rounded-2xl bg-muted/30 max-w-full">
                           <p className="text-sm text-foreground/80 italic text-center">「{cleanText(reviewQueue[reviewIdx].example)}」</p>
-                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(reviewQueue[reviewIdx].example, { rate: 0.9 }); }} className="rounded-lg size-6 text-muted-foreground hover:text-[#00B894] mx-auto mt-1">
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(reviewQueue[reviewIdx].example, { rate: 0.9 }); }} className="rounded-lg size-6 text-muted-foreground hover:text-ink-teal mx-auto mt-1">
                             <Volume2 className="size-3" />
                           </Button>
                         </div>
@@ -2500,7 +2500,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                       variant="ghost" size="sm"
                       disabled={reviewIdx === 0}
                       onClick={() => { setReviewIdx((p) => p - 1); setReviewFlipped(false); }}
-                      className="rounded-2xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894]"
+                      className="rounded-2xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-ink-teal"
                     >
                       ← 上一张
                     </Button>

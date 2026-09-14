@@ -195,7 +195,7 @@ export default function AISettings() {
           variant="ghost"
           size="icon"
           aria-label="AI 设置"
-          className="relative bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894] transition-colors"
+          className="relative bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
         >
           <Cpu className="size-4.5" />
           {configuredCount > 0 && (
@@ -208,12 +208,12 @@ export default function AISettings() {
         <div className="p-6 border-b border-border bg-gradient-to-r from-emerald-50 to-indigo-50 dark:from-emerald-500/10 dark:to-indigo-500/10">
           <DialogHeader>
             <DialogTitle className="text-xl font-black italic text-foreground flex items-center gap-2">
-              <Sparkles className="size-5 text-[#00B894]" />
+              <Sparkles className="size-5 text-ink-teal" />
               AI 模型设置
             </DialogTitle>
             <p className="text-sm text-muted-foreground font-medium mt-1">
               已配置 {configuredCount}/{ALL_PROVIDERS.length} 个模型 · 当前：
-              <Badge className="ml-1.5 rounded-full px-2 py-0 text-[10px] font-black bg-[#00B894]/10 text-[#00B894] border-none">
+              <Badge className="ml-1.5 rounded-full px-2 py-0 text-[10px] font-black bg-[#00B894]/10 text-ink-teal border-none">
                 {PROVIDER_CONFIGS[activeP].name}
               </Badge>
             </p>
@@ -255,7 +255,7 @@ export default function AISettings() {
                         </Badge>
                       )}
                       {isActive && isConfigured && (
-                        <Badge className="rounded-full px-2 py-0 text-[9px] font-black bg-[#00B894]/15 text-[#00B894] border-none">
+                        <Badge className="rounded-full px-2 py-0 text-[9px] font-black bg-[#00B894]/15 text-ink-teal border-none">
                           当前
                         </Badge>
                       )}
@@ -269,7 +269,7 @@ export default function AISettings() {
 
                   {/* Model + register link */}
                   <div className="flex items-center justify-between mb-3">
-                    <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-[#00B894] font-bold">
+                    <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-ink-teal font-bold">
                       {cfg.freeModel}
                     </code>
                     {provider !== 'factory' && (
@@ -277,7 +277,7 @@ export default function AISettings() {
                         href={cfg.registerUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-[#00B894] hover:underline"
+                        className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-ink-teal hover:underline"
                       >
                         获取 Key
                         <ExternalLink className="size-2.5" />
@@ -336,7 +336,7 @@ export default function AISettings() {
                       disabled={st.testing || !st.key.trim()}
                       className={cn(
                         'flex-1 rounded-xl text-[9px] font-black uppercase tracking-wider h-8',
-                        'border-border hover:border-[#00B894] hover:text-[#00B894]',
+                        'border-border hover:border-[#00B894] hover:text-ink-teal',
                       )}
                     >
                       {st.testing ? (
@@ -371,7 +371,7 @@ export default function AISettings() {
                       </Button>
                     )}
                     {isActive && isConfigured && (
-                      <div className="flex items-center justify-center h-8 px-3 rounded-xl bg-[#00B894]/10 text-[#00B894] text-[9px] font-black uppercase tracking-wider shrink-0">
+                      <div className="flex items-center justify-center h-8 px-3 rounded-xl bg-[#00B894]/10 text-ink-teal text-[9px] font-black uppercase tracking-wider shrink-0">
                         <CheckCircle2 className="size-3 mr-1" />
                         使用中
                       </div>

@@ -50,7 +50,7 @@ export default function MobileBottomNav() {
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 h-full py-1 transition-colors',
                 isActive
-                  ? 'text-[#00B894]'
+                  ? 'text-ink-teal'
                   : 'text-foreground/60 hover:text-foreground',
               )}
             >

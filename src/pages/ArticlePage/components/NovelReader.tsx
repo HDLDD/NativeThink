@@ -285,9 +285,9 @@ export default function NovelReader({
               <div className="flex-1 min-w-0">
                 <h3 className="text-base sm:text-lg font-black text-foreground leading-snug flex items-center gap-2">
                   <span className="truncate">{content.zhTitle || content.title}</span>
-                  {fullTextLoading && <Loader2 className="size-3.5 shrink-0 animate-spin text-[#00B894]" />}
+                  {fullTextLoading && <Loader2 className="size-3.5 shrink-0 animate-spin text-ink-teal" />}
                   {!fullTextLoading && fullTextDone && (
-                    <span className="shrink-0 text-[9px] font-black text-[#00B894] bg-[#00B894]/10 px-1.5 py-0.5 rounded-full">完整版</span>
+                    <span className="shrink-0 text-[9px] font-black text-ink-teal bg-[#00B894]/10 px-1.5 py-0.5 rounded-full">完整版</span>
                   )}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
@@ -369,10 +369,10 @@ export default function NovelReader({
                       isCurrent && 'bg-[#00B894]/10 hover:bg-[#00B894]/15',
                     )}
                   >
-                    <span className={cn('text-[11px] font-black tabular-nums w-6 shrink-0', isCurrent ? 'text-[#00B894]' : 'text-muted-foreground/50')}>
+                    <span className={cn('text-[11px] font-black tabular-nums w-6 shrink-0', isCurrent ? 'text-ink-teal' : 'text-muted-foreground/50')}>
                       {String(i + 1).padStart(2, '0')}
                     </span>
-                    <span className={cn('flex-1 min-w-0 truncate text-sm font-bold', isCurrent ? 'text-[#00B894]' : 'text-foreground/85')}>
+                    <span className={cn('flex-1 min-w-0 truncate text-sm font-bold', isCurrent ? 'text-ink-teal' : 'text-foreground/85')}>
                       {ch.title}
                     </span>
                     {noteCount > 0 && (
@@ -407,8 +407,8 @@ export default function NovelReader({
             <p className="text-xs sm:text-sm font-black text-foreground truncate">{currentChapter?.title}</p>
             <p className="text-[10px] font-medium text-muted-foreground truncate">
               {chapterIdx + 1}/{chapters.length} · {content.zhTitle || content.title}
-              {fullTextLoading && <Loader2 className="size-3 inline ml-1.5 animate-spin text-[#00B894]" />}
-              {!fullTextLoading && fullTextDone && <span className="ml-1.5 text-[9px] font-black text-[#00B894]">完整版</span>}
+              {fullTextLoading && <Loader2 className="size-3 inline ml-1.5 animate-spin text-ink-teal" />}
+              {!fullTextLoading && fullTextDone && <span className="ml-1.5 text-[9px] font-black text-ink-teal">完整版</span>}
             </p>
           </div>
           <Button variant="ghost" size="icon" onClick={() => enterChapter(chapterIdx - 1)} disabled={chapterIdx <= 0} className="rounded-xl size-9 shrink-0" title="上一章">
@@ -453,7 +453,7 @@ export default function NovelReader({
             <button
               onClick={onTranslateChapter}
               disabled={transLoading}
-              className="w-full mb-6 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-[#00B894]/10 border border-[#00B894]/30 hover:bg-[#00B894]/20 hover:border-[#00B894]/50 transition-all text-xs font-black text-[#00B894] disabled:opacity-60"
+              className="w-full mb-6 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-[#00B894]/10 border border-[#00B894]/30 hover:bg-[#00B894]/20 hover:border-[#00B894]/50 transition-all text-xs font-black text-ink-teal disabled:opacity-60"
             >
               {transLoading ? (
                 <>
@@ -512,7 +512,7 @@ export default function NovelReader({
                       <p className="text-[11px] text-muted-foreground italic leading-relaxed line-clamp-2">{note.en}</p>
                       <p className="text-xs text-foreground/90 mt-1.5 whitespace-pre-wrap break-words">{note.note}</p>
                       <div className="flex items-center gap-3 mt-2">
-                        <button onClick={() => locateNote(itemIdx)} className="text-[10px] font-black text-[#00B894] hover:underline">定位原文</button>
+                        <button onClick={() => locateNote(itemIdx)} className="text-[10px] font-black text-ink-teal hover:underline">定位原文</button>
                         <button onClick={() => { locateNote(itemIdx); openNoteFromKey(key); }} className="text-[10px] font-black text-muted-foreground hover:underline">编辑</button>
                         <button onClick={() => { removeNote(key); toast('批注已删除'); }} className="text-[10px] font-black text-rose-500/80 hover:underline">删除</button>
                       </div>
@@ -531,11 +531,11 @@ export default function NovelReader({
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">下一章</p>
-                  <p className="text-sm font-black text-foreground truncate mt-0.5 group-hover:text-[#00B894] transition-colors">
+                  <p className="text-sm font-black text-foreground truncate mt-0.5 group-hover:text-ink-teal transition-colors">
                     {chapters[chapterIdx + 1]?.title}
                   </p>
                 </div>
-                <ChevronRight className="size-5 text-[#00B894] shrink-0" />
+                <ChevronRight className="size-5 text-ink-teal shrink-0" />
               </button>
             ) : (
               <div className="text-center py-4 space-y-3">

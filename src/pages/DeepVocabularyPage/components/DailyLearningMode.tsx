@@ -591,7 +591,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       <>
       <div className="grid grid-cols-4 gap-2">
         <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-100 text-center">
-          <p className="text-lg font-black text-[#00B894]">{learnedToday}</p>
+          <p className="text-lg font-black text-ink-teal">{learnedToday}</p>
           <p className="text-[8px] font-black uppercase tracking-wider text-emerald-600">今日新学</p>
         </div>
         <div className="p-2.5 rounded-xl bg-violet-50 dark:bg-violet-500/15 border border-violet-100 text-center">
@@ -620,7 +620,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
             onClick={() => setSetupOpen((v) => !v)}
           >
             <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground shrink-0">学习设置</span>
-            <span className="flex items-center gap-2 text-xs font-bold text-foreground group-hover:text-[#00B894] transition-colors">
+            <span className="flex items-center gap-2 text-xs font-bold text-foreground group-hover:text-ink-teal transition-colors">
               {modeLabels.find((m) => m.key === reviewMode)?.label || '闪卡'} · 每日 {dailyQuota} 词
               <ChevronDown className={cn('size-4 text-muted-foreground transition-transform duration-200', setupOpen && 'rotate-180')} />
             </span>
@@ -714,7 +714,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
             variant="ghost"
             size="icon"
             onClick={exitSession}
-            className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-[#00B894]"
+            className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-ink-teal"
             title="返回概览 (Esc)"
           >
             <ArrowLeft className="size-5" />
@@ -766,7 +766,9 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                   >
                     <Card className={cn(
                       'rounded-[40px] border-2 shadow-xl transition-all min-h-[300px] flex flex-col justify-center',
-                      isFlipped ? 'border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-50' : 'border-border bg-card',
+                      isFlipped
+                        ? 'border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-50 dark:border-indigo-500/30 dark:from-indigo-500/10 dark:to-violet-500/10'
+                        : 'border-border bg-card',
                     )}>
                       <CardContent className="p-10 text-center">
                         {!isFlipped ? (
@@ -779,19 +781,19 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                                 'font-black italic text-foreground tracking-tight break-words min-w-0',
                                 currentWord.word.length > 14 ? 'text-3xl' : currentWord.word.length > 10 ? 'text-4xl' : 'text-5xl',
                               )}>{currentWord.word}</h2>
-                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(currentWord.word, { rate: 0.9 }); }} className="rounded-2xl bg-muted text-muted-foreground hover:text-[#00B894]">
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(currentWord.word, { rate: 0.9 }); }} className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal">
                                 <Volume2 className="size-5" />
                               </Button>
                             </div>
-                            <p className="text-sm font-bold text-[#6C5CE7] mb-1">{currentWord.partOfSpeech}</p>
+                            <p className="text-sm font-bold text-ink-violet mb-1">{currentWord.partOfSpeech}</p>
                             <p className="text-base text-muted-foreground font-medium">{currentWord.phonetic}</p>
                             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-6">
-                              <Sparkles className="size-3.5 inline mr-1 text-[#00B894]" />点击翻转查看释义
+                              <Sparkles className="size-3.5 inline mr-1 text-ink-teal" />点击翻转查看释义
                             </p>
                           </>
                         ) : (
                           <>
-                            <Badge className="rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wider bg-indigo-100 dark:bg-indigo-500/20 text-indigo-500 mb-4">
+                            <Badge className="rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wider bg-indigo-100 dark:bg-indigo-500/20 text-indigo-500 dark:text-ink-violet mb-4">
                               释义 · {currentWord.partOfSpeech}
                             </Badge>
                             <p className="text-2xl font-black text-foreground mb-2">{currentWord.meaning}</p>
@@ -800,16 +802,16 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                               <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-[9px] font-bold bg-muted">#{currentWord.frequencyRank}</Badge>
                             </div>
                             {currentWord.examples[0] && (
-                              <div className="p-4 rounded-2xl bg-white/60 border border-indigo-100 mb-4">
+                              <div className="p-4 rounded-2xl bg-white/60 dark:bg-foreground/[0.07] border border-indigo-100 dark:border-indigo-500/20 mb-4">
                                 <p className="text-sm text-foreground/80 italic font-medium">"{currentWord.examples[0].en}"</p>
                                 <p className="text-xs text-muted-foreground mt-2">{currentWord.examples[0].zh}</p>
                               </div>
                             )}
                             {/* 搭配 / 短语 — 点按可朗读，缺中文可 AI 补译 */}
                             {currentWord.collocations.length > 0 && (
-                              <div className="pt-3 border-t border-indigo-100">
+                              <div className="pt-3 border-t border-indigo-100 dark:border-indigo-500/20">
                                 <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-center gap-1">
-                                  <Link2 className="size-3 text-[#6C5CE7]" />常用搭配
+                                  <Link2 className="size-3 text-ink-violet" />常用搭配
                                 </p>
                                 <div className="space-y-1.5">
                                   {currentWord.collocations.slice(0, 3).map((c) => {
@@ -818,7 +820,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                                       <div key={c} className="flex items-center justify-center gap-2 text-center">
                                         <button
                                           onClick={(e) => { e.stopPropagation(); tts.speak(c, { rate: 0.85 }); }}
-                                          className="text-sm font-bold text-[#6C5CE7] hover:underline underline-offset-2 transition-colors"
+                                          className="text-sm font-bold text-ink-violet hover:underline underline-offset-2 transition-colors"
                                           title="朗读搭配"
                                         >
                                           {c}
@@ -828,7 +830,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                                         ) : (
                                           <button
                                             onClick={(e) => { e.stopPropagation(); translateColloc(c); }}
-                                            className="text-[9px] font-bold text-muted-foreground/60 hover:text-[#00B894] transition-colors shrink-0"
+                                            className="text-[9px] font-bold text-muted-foreground/60 hover:text-ink-teal transition-colors shrink-0"
                                             title="AI 翻译该搭配"
                                           >
                                             {collocTranslating === c.toLowerCase() ? '翻译中…' : '译'}
@@ -888,11 +890,11 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                   </Badge>
                   <div className="flex items-center justify-center gap-3 mb-4">
                     <h2 className="text-4xl font-black italic text-foreground tracking-tight">{currentWord.word}</h2>
-                    <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.9 })} className="rounded-2xl bg-muted text-muted-foreground hover:text-[#00B894]">
+                    <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.9 })} className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal">
                       <Volume2 className="size-5" />
                     </Button>
                   </div>
-                  <p className="text-sm font-bold text-[#6C5CE7] mb-3">{currentWord.partOfSpeech} · {currentWord.phonetic}</p>
+                  <p className="text-sm font-bold text-ink-violet mb-3">{currentWord.partOfSpeech} · {currentWord.phonetic}</p>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-8">
                     选择正确的中文释义
                   </p>
@@ -944,7 +946,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                   <Badge className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground mb-6">
                     {state.progress[currentWord.word.toLowerCase()] ? '复习' : '新学'}
                   </Badge>
-                  <p className="text-sm font-bold text-[#6C5CE7] mb-2">{currentWord.partOfSpeech}</p>
+                  <p className="text-sm font-bold text-ink-violet mb-2">{currentWord.partOfSpeech}</p>
                   <p className="text-2xl font-black text-foreground mb-3">{currentWord.meaning}</p>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-8">
                     根据释义拼写单词
@@ -981,7 +983,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                   </div>
 
                   <div className="flex items-center justify-center gap-2 mt-3">
-                    <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.9 })} className="rounded-2xl bg-muted text-muted-foreground hover:text-[#00B894]">
+                    <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.9 })} className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal">
                       <Volume2 className="size-5" />
                     </Button>
                     <span className="text-xs text-muted-foreground font-medium">点击听发音</span>
@@ -1015,10 +1017,10 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                             <span className="text-sm font-black uppercase tracking-wider">不正确</span>
                           </div>
                           <p className="text-lg font-black text-foreground">
-                            正确答案：<span className="text-[#00B894] italic">{currentWord.word}</span>
+                            正确答案：<span className="text-ink-teal italic">{currentWord.word}</span>
                           </p>
                           <div className="flex items-center justify-center gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.8 })} className="rounded-xl bg-muted text-muted-foreground hover:text-[#00B894]">
+                            <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.8 })} className="rounded-xl bg-muted text-muted-foreground hover:text-ink-teal">
                               <Volume2 className="size-4" />
                             </Button>
                           </div>
@@ -1120,11 +1122,11 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                             <span className="text-sm font-black uppercase tracking-wider">不正确</span>
                           </div>
                           <p className="text-lg font-black text-foreground">
-                            正确答案：<span className="text-[#00B894] italic">{currentWord.word}</span>
+                            正确答案：<span className="text-ink-teal italic">{currentWord.word}</span>
                           </p>
                           <p className="text-sm text-muted-foreground">{currentWord.phonetic} · {currentWord.meaning}</p>
                           <div className="flex items-center justify-center gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.8 })} className="rounded-xl bg-muted text-muted-foreground hover:text-[#00B894]">
+                            <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.8 })} className="rounded-xl bg-muted text-muted-foreground hover:text-ink-teal">
                               <Volume2 className="size-4" />
                             </Button>
                           </div>
@@ -1180,7 +1182,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                             className={cn(
                               'w-full p-3 rounded-2xl border-2 text-center font-bold text-sm transition-all',
                               isMatched && 'border-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 cursor-default',
-                              isSelected && 'border-[#6C5CE7] bg-violet-50 dark:bg-violet-500/15 text-[#6C5CE7]',
+                              isSelected && 'border-[#6C5CE7] bg-violet-50 dark:bg-violet-500/15 text-ink-violet',
                               !isMatched && !isSelected && 'border-border bg-card hover:border-[#6C5CE7]/40 text-foreground',
                             )}
                           >
@@ -1256,8 +1258,8 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                     {/* Hint: meaning */}
                     <div className="flex items-center justify-center gap-2 mb-6">
                       <span className="text-xs font-bold text-muted-foreground">提示：</span>
-                      <span className="text-sm font-bold text-[#6C5CE7]">{currentWord.partOfSpeech} · {currentWord.meaning}</span>
-                      <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.85 })} className="rounded-xl bg-muted text-muted-foreground hover:text-[#00B894]">
+                      <span className="text-sm font-bold text-ink-violet">{currentWord.partOfSpeech} · {currentWord.meaning}</span>
+                      <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.85 })} className="rounded-xl bg-muted text-muted-foreground hover:text-ink-teal">
                         <Volume2 className="size-4" />
                       </Button>
                     </div>
@@ -1309,7 +1311,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                               <span className="text-sm font-black uppercase tracking-wider">不正确</span>
                             </div>
                             <p className="text-lg font-black text-foreground">
-                              正确答案：<span className="text-[#00B894] italic">{currentWord.word}</span>
+                              正确答案：<span className="text-ink-teal italic">{currentWord.word}</span>
                             </p>
                             <p className="text-sm text-muted-foreground">{currentWord.phonetic}</p>
                           </div>
@@ -1349,11 +1351,11 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-100 dark:border-emerald-500/20">
-                  <p className="text-xl font-black text-[#00B894]">{sessionStatsRef.current.fresh}</p>
+                  <p className="text-xl font-black text-ink-teal">{sessionStatsRef.current.fresh}</p>
                   <p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">新学</p>
                 </div>
                 <div className="p-3 rounded-2xl bg-violet-50 dark:bg-violet-500/15 border border-violet-100 dark:border-violet-500/20">
-                  <p className="text-xl font-black text-[#6C5CE7]">{sessionStatsRef.current.review}</p>
+                  <p className="text-xl font-black text-ink-violet">{sessionStatsRef.current.review}</p>
                   <p className="text-[9px] font-black uppercase tracking-wider text-violet-600">复习</p>
                 </div>
                 <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/15 border border-amber-100 dark:border-amber-500/20">

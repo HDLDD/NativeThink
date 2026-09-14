@@ -143,7 +143,7 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
         <Card className="col-span-12 lg:col-span-5 rounded-[40px] border-border shadow-sm">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
-              <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] flex items-center justify-center">
+              <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center">
                 <Target className="size-5.5" />
               </div>
               <div>
@@ -265,7 +265,7 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
               </div>
               <p className="text-5xl font-black italic text-white tracking-tight mb-1">
                 {stats.streakDays}
-                <span className="text-lg font-black text-[#00B894] ml-1">天</span>
+                <span className="text-lg font-black text-ink-teal ml-1">天</span>
               </p>
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                 连续学习天数
@@ -280,11 +280,11 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   累计学习
                 </span>
-                <BookOpen className="size-5 text-[#00B894]" />
+                <BookOpen className="size-5 text-ink-teal" />
               </div>
               <p className="text-4xl font-black italic text-foreground tracking-tight mb-1">
                 {stats.totalDays}
-                <span className="text-lg font-black text-[#00B894] ml-1">天</span>
+                <span className="text-lg font-black text-ink-teal ml-1">天</span>
               </p>
               <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 坚持就是胜利 ✨

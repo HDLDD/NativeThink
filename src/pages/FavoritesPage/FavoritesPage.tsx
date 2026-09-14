@@ -162,7 +162,7 @@ export default function FavoritesPage() {
                 className={cn(
                   'flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap',
                   filterType === key
-                    ? 'bg-white dark:bg-card text-[#00B894] shadow-sm'
+                    ? 'bg-white dark:bg-card text-ink-teal shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -246,7 +246,7 @@ export default function FavoritesPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => tts.speak(item.content)}
-                        className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <Volume2 className="size-3.5" />
                       </Button>
@@ -258,7 +258,7 @@ export default function FavoritesPage() {
                           try { navigator.clipboard?.writeText(text).then(() => toast.success('已复制')); } catch { /* ignore */ }
                         }}
                         title="复制"
-                        className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <Copy className="size-3.5" />
                       </Button>
@@ -275,7 +275,7 @@ export default function FavoritesPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => tts.speak(cleanText(item.example))}
-                          className="rounded-lg size-6 text-muted-foreground hover:text-[#00B894] shrink-0 opacity-0 group-hover/example:opacity-100 transition-opacity"
+                          className="rounded-lg size-6 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover/example:opacity-100 transition-opacity"
                         >
                           <Volume2 className="size-3" />
                         </Button>

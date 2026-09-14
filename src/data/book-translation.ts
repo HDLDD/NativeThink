@@ -22,6 +22,8 @@ import { idbGet, idbSet, idbDelete } from '@/lib/idb';
 
 // ─────────────────────────── 常量 ───────────────────────────
 
+import { translateWithLocalMt, isLocalMtReady, getTranslateEngine } from '@/lib/local-mt';
+
 const CHAPTER_MARKER = '##CHAPTER##';
 /** 单段送入 AI 的最大字符数（与 PageReader 逐段翻译的截断口径一致） */
 const MAX_SEGMENT_CHARS = 1500;
@@ -380,6 +382,44 @@ async function translateBatch(
   o: IResolvedOptions,
 ): Promise<IBatchOutcome> {
   const label = `ch${chapter.index}[${indices[0]}-${indices[indices.length - 1]}]`;
+
+  // ── 引擎策略：local = 只用本地；否则 AI 优先，失败/缺段由本地模型兜底 ──
+  // （实测 AI 批量约 0.2s/段远快于本地单线程 WASM 约 5s/段；本地负责在限流/断网时保证完成）
+  const engine = getTranslateEngine();
+  const localFirst = engine === 'local';
+
+  if (localFirst && isLocalMtReady()) {
+    try {
+      const texts = indices.map((gi) => chapter.paragraphs[gi] || '');
+      const zh = await translateWithLocalMt(texts, { signal: o.signal });
+      const map = new Map<number, string>();
+      indices.forEach((_, n) => { const t = (zh[n] || '').trim(); if (t) map.set(n, t); });
+      return { translations: map, failedCount: indices.length - map.size };
+    } catch (e) {
+      if (o.signal?.aborted) throw e;
+      console.warn(`[book-translation] ${label} 本地模型失败，回落 AI`, e);
+    }
+  }
+
+  /** AI 失败/缺段时用本地模型补齐（不联网、不限流） */
+  const fillWithLocal = async (map: Map<number, string>): Promise<Map<number, string>> => {
+    const missing = indices.filter((_, n) => !map.get(n));
+    const need = indices.filter((_, n) => !map.get(n)).length;
+    if (need === 0) return map;
+    if (!isLocalMtReady()) return map;
+    try {
+      const texts = missing.map((gi) => chapter.paragraphs[gi] || '');
+      console.info(`[book-translation] ${label} AI 缺 ${need} 段 → 本地模型兜底`);
+      const zh = await translateWithLocalMt(texts, { signal: o.signal });
+      missing.forEach((gi, n) => {
+        const idxLocal = indices.indexOf(gi);
+        const t = (zh[n] || '').trim();
+        if (t && idxLocal >= 0) map.set(idxLocal, t);
+      });
+    } catch { /* 兜底失败就保持原样 */ }
+    return map;
+  };
+
   try {
     const map = await withRetries(
       () => requestBatchTranslation(indices, chapter, o),
@@ -392,11 +432,18 @@ async function translateBatch(
       if (!map.get(n)) missing.push(n);
     }
     if (missing.length === 0) return { translations: map, failedCount: 0 };
+    // 本地模型兜底：把 AI 没给出的段补齐
+    const filled = await fillWithLocal(map);
+    const stillMissing = indices.filter((_, n) => !filled.get(n)).length;
+    if (stillMissing === 0) return { translations: filled, failedCount: 0 };
+    map.clear();
+    for (const [k, v] of filled) map.set(k, v);
 
     console.warn(`[book-translation] ${label} 批量结果缺 ${missing.length} 段，逐段补翻`);
-    const translations = new Map(map);
+    const translations = new Map(await fillWithLocal(map));
     let failedCount = 0;
     for (const n of missing) {
+      if (translations.get(n)) continue; // 本地兜底已补齐
       const zh = await translateSingle(chapter, indices[n], o);
       if (zh) translations.set(n, zh);
       else failedCount += 1;

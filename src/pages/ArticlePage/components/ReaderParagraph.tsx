@@ -51,7 +51,7 @@ function ReaderParagraphImpl({
       {isChapter ? (
         <div className="flex items-center justify-center gap-3">
           <span className="h-px w-8 sm:w-12 bg-[#00B894]/30" />
-          <h3 className="text-base sm:text-lg font-black text-[#00B894] tracking-wide">{displayEn}</h3>
+          <h3 className="text-base sm:text-lg font-black text-ink-teal tracking-wide">{displayEn}</h3>
           <span className="h-px w-8 sm:w-12 bg-[#00B894]/30" />
         </div>
       ) : (
@@ -74,7 +74,7 @@ function ReaderParagraphImpl({
                       {wi > 0 && ' '}
                       <span
                         className={cn(
-                          isWord && 'cursor-pointer hover:text-[#00B894] hover:underline underline-offset-2 transition-colors',
+                          isWord && 'cursor-pointer hover:text-ink-teal hover:underline underline-offset-2 transition-colors',
                         )}
                         onClick={isWord ? (e) => onWordClick(e, w) : undefined}
                       >
@@ -87,7 +87,7 @@ function ReaderParagraphImpl({
               <div className="absolute right-0 top-0 flex flex-col gap-1 items-end">
               <button
                 onClick={(e) => { e.stopPropagation(); onSpeak(cleanText(displayEn)); }}
-                className="shrink-0 size-7 rounded-lg bg-background/80 flex items-center justify-center text-muted-foreground/40 hover:text-[#00B894] transition-colors opacity-0 group-hover/para:opacity-100"
+                className="shrink-0 size-7 rounded-lg bg-background/80 flex items-center justify-center text-muted-foreground/40 hover:text-ink-teal transition-colors opacity-0 group-hover/para:opacity-100"
                 title="朗读段落"
               >
                 <Volume2 className="size-3.5" />

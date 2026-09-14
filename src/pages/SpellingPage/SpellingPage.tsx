@@ -170,7 +170,7 @@ function DictationInput({
               {/* Text above underline — with focus indicator vertical bar */}
               <span className="relative flex items-center">
                 {/* Vertical bar — shows on focus */}
-                <span className="absolute -left-[3px] text-[#00B894] font-black text-base leading-none select-none opacity-0 group-focus-within:opacity-100 transition-opacity duration-150">
+                <span className="absolute -left-[3px] text-ink-teal font-black text-base leading-none select-none opacity-0 group-focus-within:opacity-100 transition-opacity duration-150">
                   |
                 </span>
                 <span
@@ -322,7 +322,7 @@ function CompletionBanner({ todayPracticed, onRestart, onShowRecords }: {
   return (
     <Card className="p-6 rounded-2xl border-[#00B894]/20 shadow-sm bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5">
       <div className="flex flex-col items-center justify-center text-center">
-        <Check className="size-8 text-[#00B894] mb-2" />
+        <Check className="size-8 text-ink-teal mb-2" />
         <h2 className="text-lg font-black italic mb-1">本轮完成！</h2>
         <p className="text-xs text-muted-foreground mb-4">
           今日已练习 {todayPracticed} 句
@@ -975,7 +975,7 @@ export default function SpellingPage() {
   if (autoEntering && (levelLoading || building)) {
     return (
       <div className="flex flex-col items-center justify-center py-32 px-4 space-y-4">
-        <Loader2 className="size-8 animate-spin text-[#00B894]" />
+        <Loader2 className="size-8 animate-spin text-ink-teal" />
         <p className="text-sm font-bold text-foreground">正在加载词书…</p>
         <p className="text-xs text-muted-foreground">例句将在本地随机排列，练过的句子不会立刻重复</p>
       </div>
@@ -1003,7 +1003,7 @@ export default function SpellingPage() {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#00B894]/10 text-[#00B894] text-[10px] font-black uppercase tracking-wider">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#00B894]/10 text-ink-teal text-[10px] font-black uppercase tracking-wider">
             <Sparkles className="size-3.5" /> Spelling Practice
           </div>
           <h1 className="text-3xl font-black italic text-foreground">句子拼写</h1>
@@ -1025,11 +1025,11 @@ export default function SpellingPage() {
                 )}
               >
                 <div className="flex items-center gap-2 mb-1.5">
-                  <BookOpen className="size-4 text-[#00B894]" />
-                  <span className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors">
+                  <BookOpen className="size-4 text-ink-teal" />
+                  <span className="text-sm font-black text-foreground group-hover:text-ink-teal transition-colors">
                     {wb.label}
                   </span>
-                  {loadingThis && <RefreshCw className="size-3.5 animate-spin text-[#00B894] ml-auto" />}
+                  {loadingThis && <RefreshCw className="size-3.5 animate-spin text-ink-teal ml-auto" />}
                 </div>
                 <p className="text-[11px] text-muted-foreground">{wb.desc}</p>
               </button>
@@ -1154,7 +1154,7 @@ export default function SpellingPage() {
             className={cn(
               'px-3 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-200 border',
               autoRead
-                ? 'bg-[#00B894]/10 border-[#00B894]/30 text-[#00B894]'
+                ? 'bg-[#00B894]/10 border-[#00B894]/30 text-ink-teal'
                 : 'border-border text-muted-foreground hover:text-foreground',
             )}
             title={autoRead ? '点击关闭自动朗读' : '点击开启自动朗读'}
@@ -1172,7 +1172,7 @@ export default function SpellingPage() {
                 className="rounded-[10px] gap-1.5 text-xs font-bold h-8 border-border hover:border-[#00B894]/40"
                 title="切换词书"
               >
-                <Library className="size-3.5 text-[#00B894]" />
+                <Library className="size-3.5 text-ink-teal" />
                 {activeLevel === 'all' ? '全部词库' : ({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[activeLevel] || activeLevel}
                 {building || levelLoading
                   ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
@@ -1204,9 +1204,9 @@ export default function SpellingPage() {
                   disabled={activeLevel === lvl}
                   className="gap-2 text-xs font-bold"
                 >
-                  <BookOpen className={cn('size-3.5', activeLevel === lvl ? 'text-[#00B894]' : 'text-muted-foreground')} />
+                  <BookOpen className={cn('size-3.5', activeLevel === lvl ? 'text-ink-teal' : 'text-muted-foreground')} />
                   {({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[lvl]}
-                  {activeLevel === lvl && <Check className="size-3.5 text-[#00B894] ml-auto" />}
+                  {activeLevel === lvl && <Check className="size-3.5 text-ink-teal ml-auto" />}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -1216,8 +1216,8 @@ export default function SpellingPage() {
         {/* Loading indicator — like DeepVocabularyPage */}
         {levelLoading && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#00B894]/5 border border-[#00B894]/20">
-            <Loader2 className="size-4 text-[#00B894] animate-spin shrink-0" />
-            <span className="text-xs font-bold text-[#00B894]">正在加载词库...</span>
+            <Loader2 className="size-4 text-ink-teal animate-spin shrink-0" />
+            <span className="text-xs font-bold text-ink-teal">正在加载词库...</span>
           </div>
         )}
 
@@ -1332,7 +1332,7 @@ export default function SpellingPage() {
           )}
           {(currentSentence?.source === 'word_example' && currentSentence.sourceWord) && (
             <div className="flex items-center justify-center gap-2 mt-2">
-              <Badge variant="outline" className="rounded-md text-[10px] h-5 font-bold text-[#00B894] border-[#00B894]/30">
+              <Badge variant="outline" className="rounded-md text-[10px] h-5 font-bold text-ink-teal border-[#00B894]/30">
                 单词: {currentSentence.sourceWord}
               </Badge>
               {currentProgress && currentProgress.status !== 'new' && (
@@ -1666,7 +1666,7 @@ export default function SpellingPage() {
         <DialogContent className="rounded-2xl sm:max-w-sm" aria-describedby="manage-dialog-desc-main">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-black">
-              <BookOpen className="size-5 text-[#00B894]" />
+              <BookOpen className="size-5 text-ink-teal" />
               管理学习记录
             </DialogTitle>
             <p id="manage-dialog-desc-main" className="text-xs text-muted-foreground">
@@ -1676,7 +1676,7 @@ export default function SpellingPage() {
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-xl bg-muted/50 p-3 text-center">
-                <p className="text-lg font-black text-[#00B894]">{learningStats.mastered}</p>
+                <p className="text-lg font-black text-ink-teal">{learningStats.mastered}</p>
                 <p className="text-[10px] font-bold text-muted-foreground">已掌握</p>
               </div>
               <div className="rounded-xl bg-muted/50 p-3 text-center">
@@ -1753,7 +1753,7 @@ export default function SpellingPage() {
                           {fav.meaning}
                         </p>
                         <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <span className="text-[10px] font-bold text-[#00B894]">
+                          <span className="text-[10px] font-bold text-ink-teal">
                             点击练习 →
                           </span>
                         </div>
@@ -1794,7 +1794,7 @@ function AIBatchAddDialog({
       <DialogContent className="rounded-2xl sm:max-w-md" aria-describedby="ai-dialog-desc">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base font-black">
-            <Sparkles className="size-5 text-[#00B894]" />
+            <Sparkles className="size-5 text-ink-teal" />
             AI 批量添加句子
           </DialogTitle>
           <p id="ai-dialog-desc" className="text-xs text-muted-foreground">

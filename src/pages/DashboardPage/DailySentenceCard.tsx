@@ -66,7 +66,7 @@ function DailySentenceCardInner({
     <Card className="col-span-12 lg:col-span-5 rounded-[40px] border-border shadow-sm">
       <CardContent className="p-8">
         <div className="flex items-center gap-2 mb-6">
-          <div className="size-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] flex items-center justify-center">
+          <div className="size-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center">
             <Quote className="size-5" />
           </div>
           <div className="flex-1">
@@ -80,7 +80,7 @@ function DailySentenceCardInner({
               variant="ghost"
               size="icon"
               onClick={onShowHistory}
-              className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]"
+              className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal"
               title="历史记录"
             >
               <Clock className="size-4" />
@@ -89,7 +89,7 @@ function DailySentenceCardInner({
               variant="ghost"
               size="icon"
               onClick={onShuffle}
-              className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]"
+              className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal"
               title="换一句"
             >
               <RefreshCw className="size-4" />
@@ -117,7 +117,7 @@ function DailySentenceCardInner({
                 variant="ghost"
                 size="icon"
                 onClick={() => onTTS(dailyChunk.content)}
-                className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]"
+                className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal"
               >
                 <Volume2 className="size-4.5" />
               </Button>
@@ -129,7 +129,7 @@ function DailySentenceCardInner({
                   const text = `${dailyChunk.content}（${dailyChunk.meaning}）\n${cleanText(dailyChunk.example)}${exampleZh ? `\n${exampleZh}` : ''}`;
                   try { navigator.clipboard?.writeText(text).then(() => toast.success('已复制到剪贴板')); } catch { /* ignore */ }
                 }}
-                className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]"
+                className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal"
               >
                 <Copy className="size-4" />
               </Button>
@@ -148,7 +148,7 @@ function DailySentenceCardInner({
               size="icon"
               onClick={() => onTTS(dailyChunk.example, { rate: 0.9 })}
               aria-label="朗读例句"
-              className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+              className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0"
             >
               <Volume2 className="size-3.5" />
             </Button>
@@ -184,7 +184,7 @@ function DailySentenceCardInner({
 
         <div className="flex items-center justify-between">
           <div className="flex gap-2">
-            <span className="px-3 py-1.5 rounded-full bg-emerald-50 text-[#00B894] text-[10px] font-black uppercase tracking-wider">
+            <span className="px-3 py-1.5 rounded-full bg-emerald-50 text-ink-teal text-[10px] font-black uppercase tracking-wider">
               {categoryLabel}
             </span>
             <span className="px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-muted-foreground text-[10px] font-black uppercase tracking-wider">

@@ -193,7 +193,7 @@ export function VocabTestTab({ level, levelLabel }: Props) {
               <Button
                 variant="ghost" size="icon"
                 onClick={() => { try { tts.speak(current.word.word, { rate: 0.85 }); } catch { /* ignore */ } }}
-                className="rounded-xl text-muted-foreground hover:text-[#00B894]"
+                className="rounded-xl text-muted-foreground hover:text-ink-teal"
               >
                 <Volume2 className="size-5" />
               </Button>
@@ -218,7 +218,7 @@ export function VocabTestTab({ level, levelLabel }: Props) {
                     )}
                   >
                     <span className="flex items-center gap-2">
-                      {picked !== null && isAnswer && <CheckCircle2 className="size-4 text-[#00B894] shrink-0" />}
+                      {picked !== null && isAnswer && <CheckCircle2 className="size-4 text-ink-teal shrink-0" />}
                       {picked !== null && isPicked && !isAnswer && <XCircle className="size-4 text-rose-500 shrink-0" />}
                       {opt}
                     </span>
@@ -242,7 +242,7 @@ export function VocabTestTab({ level, levelLabel }: Props) {
           <Trophy className="size-12 text-amber-500 mx-auto" />
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">估算词汇量</p>
-            <p className="text-5xl font-black text-[#00B894] tabular-nums">≈ {est.toLocaleString()}</p>
+            <p className="text-5xl font-black text-ink-teal tabular-nums">≈ {est.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground mt-2">答对 {correctCount}/{questions.length} · 基于《{levelLabel}》词书</p>
           </div>
           <div className="rounded-2xl bg-muted/50 p-4">

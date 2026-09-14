@@ -841,7 +841,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                           +{extraSentences[selectedCorpus.id].length} AI
                         </Badge>
                       )}
-                      <Badge className="rounded-full px-3 py-1 text-[10px] font-black bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] border-none">
+                      <Badge className="rounded-full px-3 py-1 text-[10px] font-black bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal border-none">
                         {totalCompleted} 已完成
                       </Badge>
                       <Button
@@ -879,7 +879,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                     className={cn(
                       'text-2xl font-black leading-relaxed mb-6 p-5 rounded-[24px] transition-all duration-300',
                       tts.isSpeaking
-                        ? 'text-[#00B894] bg-[#00B894]/5 border border-[#00B894]/20'
+                        ? 'text-ink-teal bg-[#00B894]/5 border border-[#00B894]/20'
                         : 'text-foreground',
                     )}
                   >
@@ -890,8 +890,8 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                   {currentSentence.annotatedText && (
                     <div className="p-4 rounded-[24px] bg-gradient-to-br from-[#00B894]/5 to-emerald-50 dark:from-[#00B894]/10 dark:to-emerald-500/10 border border-[#00B894]/10 mb-6">
                       <div className="flex items-center gap-2 mb-2">
-                        <Sparkles className="size-4 text-[#00B894]" />
-                        <span className="text-xs font-black uppercase tracking-wider text-[#00B894]">语音标注</span>
+                        <Sparkles className="size-4 text-ink-teal" />
+                        <span className="text-xs font-black uppercase tracking-wider text-ink-teal">语音标注</span>
                       </div>
                       <p className="text-sm text-foreground/80 italic">
                         {currentSentence.annotatedText.replace(/<u>/g, '').replace(/<\/u>/g, '')}
@@ -912,7 +912,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                         size="icon"
                         onClick={prevSentence}
                         disabled={currentSentenceIdx === 0}
-                        className="size-12 rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-[#00B894] disabled:opacity-40"
+                        className="size-12 rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-ink-teal disabled:opacity-40"
                       >
                         <SkipBack className="size-5" />
                       </Button>
@@ -934,7 +934,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                         size="icon"
                         onClick={nextSentence}
                         disabled={currentSentenceIdx === totalSentences - 1}
-                        className="size-12 rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-[#00B894] disabled:opacity-40"
+                        className="size-12 rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-ink-teal disabled:opacity-40"
                       >
                         <SkipForward className="size-5" />
                       </Button>
@@ -947,7 +947,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                         onClick={toggleLoop}
                         className={cn(
                           'rounded-2xl gap-1.5 text-[10px] font-black uppercase tracking-wider',
-                          isLooping ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground hover:text-[#00B894]',
+                          isLooping ? 'bg-[#00B894]/10 text-ink-teal' : 'bg-muted text-muted-foreground hover:text-ink-teal',
                         )}
                       >
                         <Repeat className="size-3.5" />
@@ -976,7 +976,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                         size="sm"
                         onClick={playCurrentSentence}
                         disabled={tts.isSpeaking}
-                        className="rounded-2xl gap-2 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+                        className="rounded-2xl gap-2 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
                       >
                         <Volume2 className="size-4" />再听一遍
                       </Button>
@@ -1025,7 +1025,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                       {/* Live transcript while recording */}
                       {recordingVoice && userTranscript && (
                         <div className="p-3 rounded-2xl bg-[#00B894]/5 border border-[#00B894]/20">
-                          <p className="text-[10px] font-black uppercase tracking-wider text-[#00B894] mb-1">正在听...</p>
+                          <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal mb-1">正在听...</p>
                           <p className="text-sm italic text-foreground/80">{userTranscript}</p>
                         </div>
                       )}

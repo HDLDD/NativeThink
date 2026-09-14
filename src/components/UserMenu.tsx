@@ -16,7 +16,7 @@ export default function UserMenu() {
           variant="ghost"
           size="sm"
           onClick={() => setAuthOpen(true)}
-          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894] transition-colors gap-1.5 text-xs font-bold"
+          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors gap-1.5 text-xs font-bold"
         >
           <User className="size-4" />
           <span className="hidden sm:inline">登录</span>
@@ -33,9 +33,9 @@ export default function UserMenu() {
           variant="ghost"
           size="sm"
           onClick={() => setMenuOpen(!menuOpen)}
-          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894] transition-colors gap-1.5 text-xs font-bold"
+          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors gap-1.5 text-xs font-bold"
         >
-          <div className="size-5 rounded-full bg-[#00B894]/20 text-[#00B894] flex items-center justify-center text-[10px] font-black">
+          <div className="size-5 rounded-full bg-[#00B894]/20 text-ink-teal flex items-center justify-center text-[10px] font-black">
             {user?.email?.[0]?.toUpperCase() || 'U'}
           </div>
           <span className="hidden sm:inline max-w-[80px] truncate">{user?.email?.split('@')[0]}</span>

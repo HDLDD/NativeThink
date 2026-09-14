@@ -72,6 +72,10 @@
 
 
 
+
+## 2026-09-15
+- feat(vocab): collocations on the daily-learning flashcard back (`7b4281b`)
+
 ## 2026-09-15
 - feat(vocab): quick flashcard mode — word only, know/don't-know (`ed8daf1`)
 

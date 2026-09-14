@@ -74,17 +74,17 @@ function HistoryCalendarInner({
         <div className="p-4">
           {/* Month navigation */}
           <div className="flex items-center justify-between mb-4">
-            <Button variant="ghost" size="icon" onClick={onPrevMonth} className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]">
+            <Button variant="ghost" size="icon" onClick={onPrevMonth} className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal">
               <ChevronLeft className="size-4" />
             </Button>
             <button
               onClick={onGoToToday}
-              className="text-sm font-black text-foreground hover:text-[#00B894] transition-colors"
+              className="text-sm font-black text-foreground hover:text-ink-teal transition-colors"
               title="回到今天"
             >
               {monthLabel}
             </button>
-            <Button variant="ghost" size="icon" onClick={onNextMonth} className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]">
+            <Button variant="ghost" size="icon" onClick={onNextMonth} className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal">
               <ChevronRight className="size-4" />
             </Button>
           </div>
@@ -114,7 +114,7 @@ function HistoryCalendarInner({
                       {entry.slice(0, 2).map((_, j) => (
                         <span key={j} className="size-1 rounded-full bg-[#00B894]" />
                       ))}
-                      {entry.length > 2 && <span className="text-[7px] font-black text-[#00B894]">+{entry.length - 2}</span>}
+                      {entry.length > 2 && <span className="text-[7px] font-black text-ink-teal">+{entry.length - 2}</span>}
                     </div>
                   )}
                 </div>

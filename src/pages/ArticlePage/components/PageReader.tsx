@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   X, ChevronLeft, ChevronRight, BookOpen, Heart, Globe,
-  Sparkles, Hash, Wand2, Loader2, Volume2, ChevronDown, ChevronUp, ListTree, Repeat, Copy, Type, Brain,
+  Sparkles, Hash, Wand2, Loader2, Volume2, ChevronDown, ChevronUp, ListTree, Repeat, Copy, Type, Brain, Languages,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +26,7 @@ import { lookupDictionary } from '@/data/dictionary';
 import { useWordLearning } from '@/lib/use-word-learning';
 import { fetchFullBook } from '@/data/book-fulltext';
 import { translateChapterByIndex, translateBook, getChapterTranslation, splitChapters } from '@/data/book-translation';
+import { translateWithLocalMt, isLocalMtReady, hasBundledMt, getTranslateEngine, setTranslateEngine, loadLocalMt, getLocalMtProgress, type TranslateEngine } from '@/lib/local-mt';
 import NovelReader from './NovelReader';
 import ReaderParagraph from './ReaderParagraph';
 import {
@@ -215,6 +216,24 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   // 小说模式进度（含每章位置）— ref 共享给 NovelReader，保存后立即可读
   const novelProgressRef = useRef<ReaderProgress | null>(null);
   if (novelProgressRef.current === null) novelProgressRef.current = loadProgress(content.id);
+  // ── 内置离线翻译模型：打包版内置，网页版可下载；就绪后翻译走本地（秒出、免费不限量） ──
+  const [localMtReady, setLocalMtReady] = useState(isLocalMtReady);
+  const [localMtBundled, setLocalMtBundled] = useState(false);
+  const [mtEngine, setMtEngine] = useState<TranslateEngine>(getTranslateEngine);
+  const [mtLoading, setMtLoading] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const bundled = await hasBundledMt();
+      if (!cancelled) setLocalMtBundled(bundled);
+      if (bundled && !isLocalMtReady() && getTranslateEngine() === 'auto') {
+        // 打包版内置模型 → 后台静默预热，首次翻译即可秒出
+        loadLocalMt().then(() => { if (!cancelled) setLocalMtReady(true); }).catch(() => {});
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // ── 书籍全文升级：内置版是压缩节选 — 打开后后台拉取完整原文，真章节目录可用 ──
   const [fullTextLoading, setFullTextLoading] = useState(false);
   const [fullTextDone, setFullTextDone] = useState(false);
@@ -885,11 +904,25 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     const key = `${pageNum}-${paraIdx}`;
     setParaTranslating(key);
     try {
-      const result = await aiChat([
-        { role: 'system', content: 'Translate the following English to natural Chinese. Return ONLY the Chinese translation, no extra text, no markdown.' },
-        { role: 'user', content: para.en.slice(0, 1500) },
-      ], { temperature: 0.3, maxTokens: 1024 });
-      const zh = result.trim();
+      let zh = '';
+      // 引擎策略：local = 只用本地模型；否则 AI 优先（更快更准），失败/断网时本地兜底
+      if (getTranslateEngine() === 'local' && isLocalMtReady()) {
+        const r = await translateWithLocalMt([para.en]);
+        zh = r[0] || '';
+      } else {
+        try {
+          const result = await aiChat([
+            { role: 'system', content: 'Translate the following English to natural Chinese. Return ONLY the Chinese translation, no extra text, no markdown.' },
+            { role: 'user', content: para.en.slice(0, 1500) },
+          ], { temperature: 0.3, maxTokens: 1024 });
+          zh = result.trim();
+        } catch { /* AI 失败 → 本地兜底 */ }
+        if (!zh && isLocalMtReady()) {
+          const r = await translateWithLocalMt([para.en]);
+          zh = r[0] || '';
+        }
+      }
+      if (!zh) throw new Error('empty');
       const updatedPages = [...validPages];
       updatedPages[pageNum] = {
         ...page,
@@ -989,11 +1022,11 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           <div className="flex-1 min-w-0 text-center px-1">
             <h2 className="text-sm font-black text-foreground truncate">
               {activeContent.zhTitle || activeContent.title}
-              {fullTextLoading && <Loader2 className="size-3 inline ml-1.5 animate-spin text-[#00B894]" />}
+              {fullTextLoading && <Loader2 className="size-3 inline ml-1.5 animate-spin text-ink-teal" />}
             </h2>
             <p className="text-[10px] font-medium text-muted-foreground truncate">
               {activeContent.author ? activeContent.author + ' · ' : ''}{activeContent.source}
-              {!fullTextLoading && fullTextDone && <span className="ml-1.5 text-[9px] font-black text-[#00B894]">完整版</span>}
+              {!fullTextLoading && fullTextDone && <span className="ml-1.5 text-[9px] font-black text-ink-teal">完整版</span>}
             </p>
           </div>
           {chapters.length > 0 && (
@@ -1028,7 +1061,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             className="absolute left-0 top-0 bottom-0 w-16 z-10 pointer-events-none"
             style={{ background: `linear-gradient(to right, rgba(0,184,148,${Math.min((swipeOffset - 20) / 80, 0.6)}), transparent)` }}
           >
-            <ChevronLeft className="absolute left-3 top-1/2 -translate-y-1/2 size-6 text-[#00B894]" style={{ opacity: Math.min((swipeOffset - 20) / 80, 0.6) }} />
+            <ChevronLeft className="absolute left-3 top-1/2 -translate-y-1/2 size-6 text-ink-teal" style={{ opacity: Math.min((swipeOffset - 20) / 80, 0.6) }} />
           </div>
         )}
         {swipeOffset < -20 && (
@@ -1036,7 +1069,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             className="absolute right-0 top-0 bottom-0 w-16 z-10 pointer-events-none"
             style={{ background: `linear-gradient(to left, rgba(0,184,148,${Math.min((-swipeOffset - 20) / 80, 0.6)}), transparent)` }}
           >
-            <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 size-6 text-[#00B894]" style={{ opacity: Math.min((-swipeOffset - 20) / 80, 0.6) }} />
+            <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 size-6 text-ink-teal" style={{ opacity: Math.min((-swipeOffset - 20) / 80, 0.6) }} />
           </div>
         )}
         {/* AI 翻译横条 — 双语/中文模式下当前页有未翻译段时显示 */}
@@ -1045,7 +1078,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             <button
               onClick={(e) => { e.stopPropagation(); translateCurrentPage(); }}
               disabled={transLoading || transAllLoading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-[#00B894]/10 border border-[#00B894]/30 hover:bg-[#00B894]/20 hover:border-[#00B894]/50 transition-all text-xs font-black text-[#00B894] disabled:opacity-60"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-[#00B894]/10 border border-[#00B894]/30 hover:bg-[#00B894]/20 hover:border-[#00B894]/50 transition-all text-xs font-black text-ink-teal disabled:opacity-60"
             >
               {transLoading || transAllLoading ? (
                 <>
@@ -1133,7 +1166,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 {([{ key: 'novel', label: '小说模式' }, { key: 'paged', label: '翻页模式' }] as { key: ReaderMode; label: string }[]).map(({ key, label }) => (
                   <button key={key} onClick={() => setReaderMode(key)}
                     className={cn('flex-1 py-1.5 rounded-lg text-xs font-bold transition-all',
-                      readerMode === key ? 'bg-background text-[#00B894] shadow-sm' : 'text-muted-foreground')}>{label}</button>
+                      readerMode === key ? 'bg-background text-ink-teal shadow-sm' : 'text-muted-foreground')}>{label}</button>
                 ))}
               </div>
               <p className="text-[10px] text-muted-foreground/70 mt-1.5">小说模式：章节目录 + 章内滚动阅读（起点式）；翻页模式：左右翻页</p>
@@ -1145,7 +1178,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 {([{ key: 'en', label: '原文' }, { key: 'bilingual', label: '对照' }, { key: 'zh', label: '译文' }] as { key: TransMode; label: string }[]).map(({ key, label }) => (
                   <button key={key} onClick={() => setTransMode(key)}
                     className={cn('flex-1 py-1.5 rounded-lg text-xs font-bold transition-all',
-                      transMode === key ? 'bg-background text-[#00B894] shadow-sm' : 'text-muted-foreground')}>{label}</button>
+                      transMode === key ? 'bg-background text-ink-teal shadow-sm' : 'text-muted-foreground')}>{label}</button>
                 ))}
               </div>
             </div>
@@ -1156,7 +1189,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 {(['sm', 'base', 'lg', 'xl'] as const).map((key, i) => (
                   <button key={key} onClick={() => setFontSize(key)}
                     className={cn('flex-1 h-9 rounded-xl font-black transition-all border',
-                      fontSize === key ? 'border-[#00B894] text-[#00B894] bg-[#00B894]/5' : 'border-border text-muted-foreground')}
+                      fontSize === key ? 'border-[#00B894] text-ink-teal bg-[#00B894]/5' : 'border-border text-muted-foreground')}
                     style={{ fontSize: 12 + i * 3 }}>A</button>
                 ))}
               </div>
@@ -1172,7 +1205,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                     <span className="w-full h-7 rounded-lg border border-black/5 flex items-center justify-center" style={{ background: bg }}>
                       <span className="text-[9px] font-bold" style={{ color: fg }}>Aa</span>
                     </span>
-                    <span className={cn('text-[10px] font-bold', readerTheme === key ? 'text-[#00B894]' : 'text-muted-foreground')}>{label}</span>
+                    <span className={cn('text-[10px] font-bold', readerTheme === key ? 'text-ink-teal' : 'text-muted-foreground')}>{label}</span>
                   </button>
                 ))}
               </div>
@@ -1190,6 +1223,47 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 </Button>
               </div>
             </div>
+            {/* 翻译引擎 */}
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">翻译引擎</p>
+              <div className="flex gap-2">
+                {([
+                  { k: 'auto' as const, label: 'AI 优先', hint: '更快更准' },
+                  { k: 'local' as const, label: '本地模型', hint: '离线不限量' },
+                  { k: 'ai' as const, label: '只用 AI', hint: '质量优先' },
+                ]).map(({ k, label, hint }) => (
+                  <button
+                    key={k}
+                    onClick={() => { setMtEngine(k); setTranslateEngine(k); }}
+                    className={cn(
+                      'flex-1 py-1.5 rounded-xl text-[10px] font-black transition-all border',
+                      mtEngine === k ? 'border-[#00B894] text-ink-teal bg-[#00B894]/5' : 'border-border text-muted-foreground',
+                    )}
+                  >
+                    {label}
+                    <span className="block text-[8px] font-bold opacity-60 mt-0.5">{hint}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[9px] text-muted-foreground/80 mt-1.5 leading-snug">
+                {localMtReady
+                  ? '本地翻译模型已就绪 — 断网也能翻译，AI 限流时自动用它兜底'
+                  : localMtBundled
+                    ? `本地模型已内置，首次使用时加载（${Math.max(0, getLocalMtProgress())}%）`
+                    : '安装桌面/手机版可内置离线翻译模型；网页版首次使用会下载约 110MB'}
+              </p>
+              {!localMtReady && (
+                <Button
+                  variant="outline" size="sm" disabled={mtLoading}
+                  onClick={async () => { setMtLoading(true); try { await loadLocalMt(); setLocalMtReady(true); toast.success('本地翻译模型已就绪'); } catch { toast.error('本地模型加载失败'); } finally { setMtLoading(false); } }}
+                  className="w-full mt-2 rounded-xl text-[10px] font-black gap-1"
+                >
+                  {mtLoading ? <Loader2 className="size-3 animate-spin" /> : <Languages className="size-3" />}
+                  {mtLoading ? '加载中…' : '加载本地翻译模型'}
+                </Button>
+              )}
+            </div>
+
             {/* AI 工具 */}
             {isConfigured && (
               <div>
@@ -1235,7 +1309,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         <SheetContent side="left" className="w-80 sm:w-96 rounded-r-[28px] p-0 overflow-hidden">
           <SheetHeader className="px-6 pt-6 pb-2">
             <SheetTitle className="text-lg font-black text-foreground flex items-center gap-2">
-              <ListTree className="size-5 text-[#00B894]" />
+              <ListTree className="size-5 text-ink-teal" />
               目录 · {chapters.length} 章
             </SheetTitle>
           </SheetHeader>
@@ -1257,7 +1331,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                   }}
                   className={cn(
                     'w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-muted',
-                    ch.page === currentPage ? 'text-[#00B894] bg-muted/60' : 'text-foreground/80',
+                    ch.page === currentPage ? 'text-ink-teal bg-muted/60' : 'text-foreground/80',
                   )}
                 >
                   <span className="text-[10px] text-muted-foreground mr-2 tabular-nums">P{ch.page + 1}</span>
@@ -1274,13 +1348,13 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         <DialogContent className="max-w-sm rounded-[28px] p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6 pb-2">
             <DialogTitle className="text-xl font-black text-foreground flex items-center gap-2">
-              <Hash className="size-5 text-[#00B894]" />
+              <Hash className="size-5 text-ink-teal" />
               {lookupWord_State}
               {lookupData?.phonetic && (
                 <span className="text-sm font-normal text-muted-foreground">{lookupData.phonetic}</span>
               )}
               {lookupData?.fromForm && (
-                <span className="text-[9px] font-bold text-[#00B894] bg-[#00B894]/10 px-1.5 py-0.5 rounded-full">
+                <span className="text-[9px] font-bold text-ink-teal bg-[#00B894]/10 px-1.5 py-0.5 rounded-full">
                   {lookupData.fromForm} → {lookupData.word}
                 </span>
               )}
@@ -1294,7 +1368,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 {lookupData?.zhMeaning && (
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">中文释义</p>
-                    <p className="text-sm font-bold text-[#00B894]">{lookupData.zhMeaning}</p>
+                    <p className="text-sm font-bold text-ink-teal">{lookupData.zhMeaning}</p>
                   </div>
                 )}
                 {lookupData?.meaning && (
@@ -1344,7 +1418,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                     <button
                       key={w}
                       onClick={(e) => handleWordClick(e, w)}
-                      className="px-2.5 py-1 rounded-full bg-muted text-[11px] font-bold text-muted-foreground hover:bg-[#00B894]/10 hover:text-[#00B894] transition-colors"
+                      className="px-2.5 py-1 rounded-full bg-muted text-[11px] font-bold text-muted-foreground hover:bg-[#00B894]/10 hover:text-ink-teal transition-colors"
                     >
                       {w}
                     </button>

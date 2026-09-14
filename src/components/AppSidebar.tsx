@@ -66,7 +66,7 @@ export default function AppSidebar() {
           </div>
           <div className="flex-1 min-w-0 group-data-[state=collapsed]:hidden">
             <div className="text-lg font-black italic tracking-tight text-foreground">
-              Native<span className="text-[#00B894] not-italic">Think</span>
+              Native<span className="text-ink-teal not-italic">Think</span>
             </div>
             <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
               母语思维英语训练

@@ -152,7 +152,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
             </button>
           </div>
           <div className="text-center mt-4">
-            <button onClick={onContinue} className="text-xs font-bold text-muted-foreground hover:text-[#00B894]">继续上次的选择 →</button>
+            <button onClick={onContinue} className="text-xs font-bold text-muted-foreground hover:text-ink-teal">继续上次的选择 →</button>
           </div>
         </div>
       )}
@@ -854,7 +854,7 @@ export default function DeepVocabularyPage() {
               variant="ghost"
               size="icon"
               onClick={() => setImmersed(false)}
-              className="rounded-xl size-9 text-muted-foreground hover:text-[#00B894]"
+              className="rounded-xl size-9 text-muted-foreground hover:text-ink-teal"
               title="返回模式选择"
             >
               <ArrowLeft className="size-5" />
@@ -868,7 +868,7 @@ export default function DeepVocabularyPage() {
             className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 border-2 border-[#00B894]/30 hover:border-[#00B894] transition-all duration-200 active:scale-[0.98]"
           >
             <span className="text-base">{BOOKS.find((b) => b.key === (selectedLevel === 'all' ? 'cet4' : selectedLevel))?.icon || '📖'}</span>
-            <span className="text-[10px] font-black text-[#00B894]">{LEVELS.find((l) => l.key === selectedLevel)?.label || '全部'}</span>
+            <span className="text-[10px] font-black text-ink-teal">{LEVELS.find((l) => l.key === selectedLevel)?.label || '全部'}</span>
           </button>
         </div>
       ) : (
@@ -883,14 +883,14 @@ export default function DeepVocabularyPage() {
         >
           <span className="text-lg">{BOOKS.find((b) => b.key === (selectedLevel === 'all' ? 'cet4' : selectedLevel))?.icon || '📖'}</span>
           <div className="text-left">
-            <p className="text-[10px] font-black uppercase tracking-wider text-[#00B894] leading-none">
+            <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal leading-none">
               {LEVELS.find((l) => l.key === selectedLevel)?.label || '全部'}
             </p>
             <p className="text-[9px] font-bold text-muted-foreground leading-none mt-0.5 group-hover:text-foreground transition-colors">
               点击切换词书
             </p>
           </div>
-          <Settings className="size-3 text-[#00B894] opacity-50 group-hover:opacity-100 transition-opacity" />
+          <Settings className="size-3 text-ink-teal opacity-50 group-hover:opacity-100 transition-opacity" />
         </button>
       </div>
       )}
@@ -922,14 +922,14 @@ export default function DeepVocabularyPage() {
           <span className="size-12 rounded-2xl bg-violet-50 dark:bg-violet-500/15 flex items-center justify-center text-2xl shrink-0">🔄</span>
           <span className="flex-1 min-w-0">
             <span className="flex items-center gap-2">
-              <span className="text-sm font-black text-foreground group-hover:text-[#6C5CE7] transition-colors">复习检测</span>
+              <span className="text-sm font-black text-foreground group-hover:text-ink-violet transition-colors">复习检测</span>
               {homeDue.length > 0 && (
                 <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 text-[10px] font-black">{homeDue.length} 个到期</span>
               )}
             </span>
             <span className="block text-[11px] text-muted-foreground mt-0.5">SM-2 闪卡 · 巩固记忆{homeDue.length > 0 ? ' · 有到期单词待复习' : ''}</span>
           </span>
-          <ChevronRight className="size-4 text-muted-foreground shrink-0 group-hover:text-[#6C5CE7] transition-colors" />
+          <ChevronRight className="size-4 text-muted-foreground shrink-0 group-hover:text-ink-violet transition-colors" />
         </button>
 
         {/* 其余模式 */}
@@ -941,10 +941,10 @@ export default function DeepVocabularyPage() {
           >
             <span className="size-12 rounded-2xl bg-muted flex items-center justify-center text-2xl shrink-0">{m.icon}</span>
             <span className="flex-1 min-w-0">
-              <span className="block text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors">{m.label}</span>
+              <span className="block text-sm font-black text-foreground group-hover:text-ink-teal transition-colors">{m.label}</span>
               <span className="block text-[11px] text-muted-foreground mt-0.5">{m.desc}</span>
             </span>
-            <ChevronRight className="size-4 text-muted-foreground shrink-0 group-hover:text-[#00B894] transition-colors" />
+            <ChevronRight className="size-4 text-muted-foreground shrink-0 group-hover:text-ink-teal transition-colors" />
           </button>
         ))}
       </div>
@@ -961,8 +961,8 @@ export default function DeepVocabularyPage() {
 
       {!showWizard && !dataReady && immersed && (
         <div className="flex items-center gap-2 px-4 py-2 mb-2 rounded-xl bg-[#00B894]/5 border border-[#00B894]/20">
-          <Loader2 className="size-4 text-[#00B894] animate-spin shrink-0" />
-          <span className="text-xs font-bold text-[#00B894]">词库加载中，部分功能暂不可用…</span>
+          <Loader2 className="size-4 text-ink-teal animate-spin shrink-0" />
+          <span className="text-xs font-bold text-ink-teal">词库加载中，部分功能暂不可用…</span>
         </div>
       )}
 
@@ -978,14 +978,14 @@ export default function DeepVocabularyPage() {
               {/* 词性 */}
               <select value={posFilter} onChange={(e) => setPosFilter(e.target.value)}
                 className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold border-none outline-none focus:ring-2 focus:ring-[#00B894]/30 transition-colors',
-                  posFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
+                  posFilter !== 'all' ? 'bg-[#00B894]/10 text-ink-teal' : 'bg-muted text-muted-foreground')}>
                 <option value="all">词性</option>
                 {allPartsOfSpeech.map((pos) => (<option key={pos} value={pos}>{pos}</option>))}
               </select>
               {/* 语域 */}
               <select value={registerFilter} onChange={(e) => setRegisterFilter(e.target.value)}
                 className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold border-none outline-none focus:ring-2 focus:ring-[#00B894]/30 transition-colors',
-                  registerFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
+                  registerFilter !== 'all' ? 'bg-[#00B894]/10 text-ink-teal' : 'bg-muted text-muted-foreground')}>
                 <option value="all">语域</option>
                 <option value="formal">正式</option>
                 <option value="neutral">中性</option>
@@ -994,7 +994,7 @@ export default function DeepVocabularyPage() {
               {/* 情感色彩 */}
               <select value={emotionFilter} onChange={(e) => setEmotionFilter(e.target.value)}
                 className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold border-none outline-none focus:ring-2 focus:ring-[#00B894]/30 transition-colors',
-                  emotionFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
+                  emotionFilter !== 'all' ? 'bg-[#00B894]/10 text-ink-teal' : 'bg-muted text-muted-foreground')}>
                 <option value="all">情感</option>
                 <option value="positive">积极</option>
                 <option value="neutral">中性</option>
@@ -1003,21 +1003,21 @@ export default function DeepVocabularyPage() {
               {/* 有搭配词 */}
               <button onClick={() => setCollocOnly(!collocOnly)}
                 className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all border-2',
-                  collocOnly ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' : 'border-border bg-muted text-muted-foreground hover:border-muted-foreground/30')}>
+                  collocOnly ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal' : 'border-border bg-muted text-muted-foreground hover:border-muted-foreground/30')}>
                 有搭配词
               </button>
               {/* 中文无对应 */}
               <button onClick={() => setNoChineseEquivOnly(!noChineseEquivOnly)}
                 className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all border-2',
-                  noChineseEquivOnly ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' : 'border-border bg-muted text-muted-foreground hover:border-muted-foreground/30')}>
+                  noChineseEquivOnly ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal' : 'border-border bg-muted text-muted-foreground hover:border-muted-foreground/30')}>
                 中文无对应
               </button>
               {/* 排序：A-Z → 序号 → 乱序 */}
               <button
                 onClick={() => setSortMode((p) => p === 'az' ? 'frequency' : p === 'frequency' ? 'random' : 'az')}
                 className={cn('px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all border-2',
-                  sortMode === 'az' ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' :
-                  sortMode === 'frequency' ? 'border-[#6C5CE7] bg-[#6C5CE7]/10 text-[#6C5CE7]' :
+                  sortMode === 'az' ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal' :
+                  sortMode === 'frequency' ? 'border-[#6C5CE7] bg-[#6C5CE7]/10 text-ink-violet' :
                   'border-amber-400 bg-amber-50 text-amber-500')}>
                 {sortMode === 'az' ? 'A-Z' : sortMode === 'frequency' ? '序号' : '乱序'}
               </button>
@@ -1034,7 +1034,7 @@ export default function DeepVocabularyPage() {
           )}
           {false && (<TabsList className="bg-muted p-1.5 rounded-3xl h-auto">
           <TabsTrigger value="daily" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-emerald-500 data-[state=active]:shadow-sm"><Brain className="size-4 mr-2" />学习</TabsTrigger>
-          <TabsTrigger value="flashcard" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#6C5CE7] data-[state=active]:shadow-sm"><RotateCw className="size-4 mr-2" />复习</TabsTrigger>
+          <TabsTrigger value="flashcard" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-violet data-[state=active]:shadow-sm"><RotateCw className="size-4 mr-2" />复习</TabsTrigger>
           <TabsTrigger value="browse" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-sky-500 data-[state=active]:shadow-sm"><BookOpen className="size-4 mr-2" />词库浏览</TabsTrigger>
           <TabsTrigger value="collocations" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-amber-500 data-[state=active]:shadow-sm"><Link2 className="size-4 mr-2" />搭配学习</TabsTrigger>
           <TabsTrigger value="vocabtest" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-rose-500 data-[state=active]:shadow-sm"><Target className="size-4 mr-2" />测词汇量</TabsTrigger>
@@ -1060,7 +1060,7 @@ export default function DeepVocabularyPage() {
               <Card className="rounded-[32px] border-border shadow-sm">
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="size-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] flex items-center justify-center">
+                    <div className="size-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center">
                       <BookOpen className="size-5" />
                     </div>
                     <div>
@@ -1073,7 +1073,7 @@ export default function DeepVocabularyPage() {
 
                   {/* Word count summary */}
                   <div className="flex items-center gap-1 flex-wrap mb-3 text-[9px] font-bold text-muted-foreground">
-                    <span className="text-[#00B894] font-black">全部{totalWordCount.toLocaleString()}</span>
+                    <span className="text-ink-teal font-black">全部{totalWordCount.toLocaleString()}</span>
                     {SUB_LEVELS.map((key) => (
                       <span key={key} className="ml-1" style={{ color: LEVEL_COLORS[key] }}>
                         {LEVEL_LABELS[key]}{(WORD_COUNTS as Record<string, number>)[key]?.toLocaleString()}
@@ -1084,13 +1084,13 @@ export default function DeepVocabularyPage() {
                   {/* Filter chips: 词性 语域 情感 有搭配词 中文无对应 乱序 */}
                   <div className="flex items-center gap-1 flex-wrap">
                     <Select value={posFilter} onValueChange={(v) => { setPosFilter(v); setMemory((p) => ({ ...p, posFilter: v })); }}>
-                      <SelectTrigger className={cn('h-7 rounded-xl text-[9px] font-bold border-0', posFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
+                      <SelectTrigger className={cn('h-7 rounded-xl text-[9px] font-bold border-0', posFilter !== 'all' ? 'bg-[#00B894]/10 text-ink-teal' : 'bg-muted text-muted-foreground')}>
                         <SelectValue placeholder="词性" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">{allPartsOfSpeech.map((p) => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}</SelectContent>
                     </Select>
                     <Select value={registerFilter} onValueChange={(v) => { setRegisterFilter(v); setMemory((p) => ({ ...p, registerFilter: v })); }}>
-                      <SelectTrigger className={cn('h-7 rounded-xl text-[9px] font-bold border-0', registerFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
+                      <SelectTrigger className={cn('h-7 rounded-xl text-[9px] font-bold border-0', registerFilter !== 'all' ? 'bg-[#00B894]/10 text-ink-teal' : 'bg-muted text-muted-foreground')}>
                         <SelectValue placeholder="语域" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
@@ -1101,7 +1101,7 @@ export default function DeepVocabularyPage() {
                       </SelectContent>
                     </Select>
                     <Select value={emotionFilter} onValueChange={setEmotionFilter}>
-                      <SelectTrigger className={cn('h-7 rounded-xl text-[9px] font-bold border-0', emotionFilter !== 'all' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground')}>
+                      <SelectTrigger className={cn('h-7 rounded-xl text-[9px] font-bold border-0', emotionFilter !== 'all' ? 'bg-[#00B894]/10 text-ink-teal' : 'bg-muted text-muted-foreground')}>
                         <SelectValue placeholder="情感" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
@@ -1113,19 +1113,19 @@ export default function DeepVocabularyPage() {
                     </Select>
                     <button
                       onClick={() => setCollocOnly(!collocOnly)}
-                      className={cn('px-2 h-7 rounded-xl text-[9px] font-bold transition-colors', collocOnly ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground hover:text-foreground')}
+                      className={cn('px-2 h-7 rounded-xl text-[9px] font-bold transition-colors', collocOnly ? 'bg-[#00B894]/10 text-ink-teal' : 'bg-muted text-muted-foreground hover:text-foreground')}
                     >
                       有搭配词
                     </button>
                     <button
                       onClick={() => setNoChineseEquivOnly(!noChineseEquivOnly)}
-                      className={cn('px-2 h-7 rounded-xl text-[9px] font-bold transition-colors', noChineseEquivOnly ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground hover:text-foreground')}
+                      className={cn('px-2 h-7 rounded-xl text-[9px] font-bold transition-colors', noChineseEquivOnly ? 'bg-[#00B894]/10 text-ink-teal' : 'bg-muted text-muted-foreground hover:text-foreground')}
                     >
                       中文无对应
                     </button>
                     <button
                       onClick={() => setSortMode(sortMode === 'random' ? 'az' : 'random')}
-                      className={cn('px-2 h-7 rounded-xl text-[9px] font-bold transition-colors', sortMode === 'random' ? 'bg-[#00B894]/10 text-[#00B894]' : 'bg-muted text-muted-foreground hover:text-foreground')}
+                      className={cn('px-2 h-7 rounded-xl text-[9px] font-bold transition-colors', sortMode === 'random' ? 'bg-[#00B894]/10 text-ink-teal' : 'bg-muted text-muted-foreground hover:text-foreground')}
                     >
                       乱序
                     </button>
@@ -1150,7 +1150,7 @@ export default function DeepVocabularyPage() {
                           className={cn(
                             'px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all',
                             browseMemoryFilter === key
-                              ? 'bg-white dark:bg-card text-[#00B894] shadow-sm'
+                              ? 'bg-white dark:bg-card text-ink-teal shadow-sm'
                               : 'text-muted-foreground hover:text-foreground',
                           )}
                         >
@@ -1207,13 +1207,13 @@ export default function DeepVocabularyPage() {
                                   <div className="flex items-center gap-1.5">
                                     <button
                                       onClick={(e) => { e.stopPropagation(); tts.speak(w.word, { rate: 0.85 }); }}
-                                      className="shrink-0 text-muted-foreground/40 hover:text-[#00B894] transition-colors"
+                                      className="shrink-0 text-muted-foreground/40 hover:text-ink-teal transition-colors"
                                       title={`朗读 "${w.word}"`}
                                     >
                                       <Volume2 className="size-3.5" />
                                     </button>
                                     <span className="text-sm font-black text-foreground">{w.word}</span>
-                                    <span className="text-[10px] font-bold text-[#6C5CE7]">{w.partOfSpeech}</span>
+                                    <span className="text-[10px] font-bold text-ink-violet">{w.partOfSpeech}</span>
                                   </div>
                                   <p className="text-[11px] text-muted-foreground font-medium mt-0.5 line-clamp-1">{w.meaning}</p>
                                 </div>
@@ -1223,7 +1223,7 @@ export default function DeepVocabularyPage() {
                                     title={memorized ? '取消记忆' : '标记为已记'}
                                     className={cn(
                                       'p-0.5 rounded-lg transition-colors',
-                                      memorized ? 'text-[#00B894] hover:text-[#00B894]/70' : 'text-muted-foreground/40 hover:text-[#00B894]',
+                                      memorized ? 'text-ink-teal hover:text-ink-teal/70' : 'text-muted-foreground/40 hover:text-ink-teal',
                                     )}
                                   >
                                     <Brain className={cn('size-3.5', memorized && 'fill-[#00B894]/20')} />
@@ -1252,7 +1252,7 @@ export default function DeepVocabularyPage() {
                               className={cn(
                                 'px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors',
                                 browsePageSize === size
-                                  ? 'bg-emerald-100 dark:bg-emerald-500/20 text-[#00B894]'
+                                  ? 'bg-emerald-100 dark:bg-emerald-500/20 text-ink-teal'
                                   : 'text-muted-foreground hover:text-foreground',
                               )}
                               title={`每页显示 ${size} 条`}
@@ -1270,7 +1270,7 @@ export default function DeepVocabularyPage() {
                             variant="ghost" size="sm"
                             onClick={() => setWordPage((p) => Math.max(0, p - 1))}
                             disabled={wordPage === 0}
-                            className="rounded-xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894] h-7 px-2"
+                            className="rounded-xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-ink-teal h-7 px-2"
                           >
                             <ChevronLeft className="size-3.5" />
                           </Button>
@@ -1279,7 +1279,7 @@ export default function DeepVocabularyPage() {
                             variant="ghost" size="sm"
                             onClick={() => setWordPage((p) => Math.min(totalWordPages - 1, p + 1))}
                             disabled={wordPage >= totalWordPages - 1}
-                            className="rounded-xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-[#00B894] h-7 px-2"
+                            className="rounded-xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-ink-teal h-7 px-2"
                           >
                             <ChevronRight className="size-3.5" />
                           </Button>
@@ -1311,13 +1311,13 @@ export default function DeepVocabularyPage() {
                                 }
                               }}
                               disabled={filteredWords.findIndex((w) => w.word === selectedWord.word) <= 0}
-                              className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+                              className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0"
                               title="上一个单词"
                             >
                               <ChevronLeft className="size-4" />
                             </Button>
                             <h2 className="text-4xl font-black italic text-foreground tracking-tight">{selectedWord.word}</h2>
-                            <Button variant="ghost" size="icon" onClick={() => tts.speak(selectedWord.word, { rate: 0.9 })} className="rounded-2xl bg-muted text-muted-foreground hover:text-[#00B894]"><Volume2 className="size-5" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => tts.speak(selectedWord.word, { rate: 0.9 })} className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal"><Volume2 className="size-5" /></Button>
                             <Button variant="ghost" size="icon"
                               onClick={() => {
                                 const idx = filteredWords.findIndex((w) => w.word === selectedWord.word);
@@ -1328,13 +1328,13 @@ export default function DeepVocabularyPage() {
                                 }
                               }}
                               disabled={filteredWords.findIndex((w) => w.word === selectedWord.word) >= filteredWords.length - 1}
-                              className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+                              className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0"
                               title="下一个单词"
                             >
                               <ChevronRight className="size-4" />
                             </Button>
                           </div>
-                          <p className="text-sm text-muted-foreground font-medium mb-1">{selectedWord.phonetic} · <span className="text-[#6C5CE7] font-bold text-sm">{selectedWord.partOfSpeech}</span></p>
+                          <p className="text-sm text-muted-foreground font-medium mb-1">{selectedWord.phonetic} · <span className="text-ink-violet font-bold text-sm">{selectedWord.partOfSpeech}</span></p>
                           <p className="text-lg text-foreground/80 font-medium">{selectedWord.meaning}</p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1343,11 +1343,11 @@ export default function DeepVocabularyPage() {
                             title={memorizedWords.has(selectedWord.word.toLowerCase()) ? '取消记忆' : '标记为已记'}
                             className={cn('rounded-2xl',
                               memorizedWords.has(selectedWord.word.toLowerCase())
-                                ? 'text-[#00B894] hover:text-[#00B894]/70'
-                                : 'text-muted-foreground hover:text-[#00B894]')}>
+                                ? 'text-ink-teal hover:text-ink-teal/70'
+                                : 'text-muted-foreground hover:text-ink-teal')}>
                             <Brain className={cn('size-5', memorizedWords.has(selectedWord.word.toLowerCase()) && 'fill-[#00B894]/20')} />
                           </Button>
-                          <Badge className="rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] border-none">{selectedWord.level.toUpperCase()}</Badge>
+                          <Badge className="rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal border-none">{selectedWord.level.toUpperCase()}</Badge>
                           <Button variant="ghost" size="icon" onClick={() => toggleFavorite(selectedWord)}
                             className={cn('rounded-2xl', isFavorited(selectedWord.word, 'vocabulary') ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')}>
                             <Heart className={cn('size-5', isFavorited(selectedWord.word, 'vocabulary') && 'fill-current')} />
@@ -1368,7 +1368,7 @@ export default function DeepVocabularyPage() {
                               <Badge
                                 key={i}
                                 onClick={(e) => { e.stopPropagation(); handleLookupCollocation(c); }}
-                                className="rounded-full px-3 py-1.5 text-xs font-medium bg-[#00B894]/10 text-[#00B894] border-none cursor-pointer hover:bg-[#00B894]/20 transition-colors"
+                                className="rounded-full px-3 py-1.5 text-xs font-medium bg-[#00B894]/10 text-ink-teal border-none cursor-pointer hover:bg-[#00B894]/20 transition-colors"
                               >
                                 {c}
                               </Badge>
@@ -1380,13 +1380,13 @@ export default function DeepVocabularyPage() {
                         <div className="grid sm:grid-cols-2 gap-3 mb-4">
                           {selectedWord.synonyms.length > 0 && (
                             <div className="p-3.5 rounded-2xl bg-[#00B894]/5 border border-[#00B894]/15">
-                              <span className="text-[10px] font-black uppercase tracking-wider text-[#00B894]">同义词 · 点击跳转</span>
+                              <span className="text-[10px] font-black uppercase tracking-wider text-ink-teal">同义词 · 点击跳转</span>
                               <div className="flex flex-wrap gap-1.5 mt-2">
                                 {selectedWord.synonyms.map((s, i) => (
                                   <Badge
                                     key={i}
                                     onClick={(e) => { e.stopPropagation(); jumpToWord(s); }}
-                                    className="rounded-full px-2.5 py-1 text-xs font-bold bg-white/80 dark:bg-card text-[#00B894] border border-[#00B894]/20 cursor-pointer hover:bg-[#00B894]/15 transition-colors"
+                                    className="rounded-full px-2.5 py-1 text-xs font-bold bg-white/80 dark:bg-card text-ink-teal border border-[#00B894]/20 cursor-pointer hover:bg-[#00B894]/15 transition-colors"
                                   >
                                     {s}
                                   </Badge>
@@ -1471,7 +1471,7 @@ export default function DeepVocabularyPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => tts.speak(ex.en)}
-                              className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]"
+                              className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal"
                             >
                               <Volume2 className="size-4" />
                             </Button>
@@ -1515,7 +1515,7 @@ export default function DeepVocabularyPage() {
                           variant="outline" size="sm"
                           onClick={() => handleGenerateWordSentences(selectedWord)}
                           disabled={genSentencesFor === wordKey(selectedWord)}
-                          className="rounded-xl border-dashed border-violet-300 text-violet-500 hover:bg-violet-100 text-[10px] font-black uppercase tracking-wider"
+                          className="rounded-xl border-dashed border-violet-300 dark:border-violet-500/40 text-ink-violet hover:bg-violet-100 dark:hover:bg-violet-500/15 text-[10px] font-black uppercase tracking-wider"
                         >
                           {genSentencesFor === wordKey(selectedWord) ? <Loader2 className="size-3 mr-1 animate-spin" /> : <Wand2 className="size-3 mr-1" />}
                           生成
@@ -1527,13 +1527,13 @@ export default function DeepVocabularyPage() {
                         </div>
                       )}
                       {aiWordData[wordKey(selectedWord)]?.sentences?.map((item, idx) => (
-                        <div key={idx} className="group p-3 rounded-2xl bg-white/60 border border-violet-100 flex items-start gap-2 mt-2">
+                        <div key={idx} className="group p-3 rounded-2xl bg-white/60 dark:bg-foreground/[0.07] border border-violet-100 dark:border-violet-500/20 flex items-start gap-2 mt-2">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-foreground/80 italic">「{item.en}」</p>
                             <p className="text-xs text-muted-foreground mt-1">{item.zh}</p>
                           </div>
                           <button onClick={() => tts.speak(item.en, { rate: 0.9 })}
-                            className="shrink-0 p-0.5 rounded-lg text-muted-foreground/50 hover:text-[#00B894] hover:bg-emerald-50 opacity-0 group-hover:opacity-100 transition-all"
+                            className="shrink-0 p-0.5 rounded-lg text-muted-foreground/50 hover:text-ink-teal hover:bg-emerald-50 opacity-0 group-hover:opacity-100 transition-all"
                             title="朗读">
                             <Volume2 className="size-3.5" />
                           </button>
@@ -1583,7 +1583,7 @@ export default function DeepVocabularyPage() {
                             variant="outline" size="sm"
                             onClick={() => handleGenerateDeepExplanation(selectedWord)}
                             disabled={genExplanationFor === wordKey(selectedWord)}
-                            className="rounded-xl border-dashed border-violet-300 text-violet-500 hover:bg-violet-100 text-[10px] font-black uppercase tracking-wider"
+                            className="rounded-xl border-dashed border-violet-300 dark:border-violet-500/40 text-ink-violet hover:bg-violet-100 dark:hover:bg-violet-500/15 text-[10px] font-black uppercase tracking-wider"
                           >
                             {genExplanationFor === wordKey(selectedWord) ? <Loader2 className="size-3 mr-1 animate-spin" /> : <Wand2 className="size-3 mr-1" />}
                             {aiWordData[wordKey(selectedWord)]?.explanation ? '重新生成' : '生成'}
@@ -1659,7 +1659,7 @@ export default function DeepVocabularyPage() {
           <div className="p-6 border-b border-border bg-gradient-to-r from-[#00B894]/10 to-emerald-50 dark:from-[#00B894]/20 dark:to-emerald-500/10">
             <DialogHeader>
               <DialogTitle className="text-xl font-black italic text-foreground flex items-center gap-2">
-                <BookOpen className="size-5 text-[#00B894]" />
+                <BookOpen className="size-5 text-ink-teal" />
                 搭配短语
               </DialogTitle>
             </DialogHeader>
@@ -1675,7 +1675,7 @@ export default function DeepVocabularyPage() {
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <h3 className="text-2xl font-black italic text-foreground">{collocDetail.phrase}</h3>
-                    <Button variant="ghost" size="icon" onClick={() => tts.speak(collocDetail.phrase)} className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]">
+                    <Button variant="ghost" size="icon" onClick={() => tts.speak(collocDetail.phrase)} className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal">
                       <Volume2 className="size-4.5" />
                     </Button>
                     <Button
@@ -1703,7 +1703,7 @@ export default function DeepVocabularyPage() {
                         <p className="text-sm text-foreground italic">「{cleanText(ex.en)}」</p>
                         <p className="text-xs text-muted-foreground mt-1">{ex.zh}</p>
                         <div className="flex items-center gap-1 mt-1.5">
-                          <Button variant="ghost" size="icon" onClick={() => tts.speak(ex.en, { rate: 0.9 })} className="rounded-lg size-6 text-muted-foreground hover:text-[#00B894]">
+                          <Button variant="ghost" size="icon" onClick={() => tts.speak(ex.en, { rate: 0.9 })} className="rounded-lg size-6 text-muted-foreground hover:text-ink-teal">
                             <Volume2 className="size-3" />
                           </Button>
                           <Button
@@ -1739,7 +1739,7 @@ export default function DeepVocabularyPage() {
               <div className="p-5 border-b border-border bg-gradient-to-r from-sky-50 to-cyan-50 dark:from-sky-500/10 dark:to-cyan-500/10">
                 <DialogHeader>
                   <DialogTitle className="text-xl font-black italic text-foreground flex items-center gap-2">
-                    <BookOpen className="size-5 text-[#00B894]" />
+                    <BookOpen className="size-5 text-ink-teal" />
                     {collocWordPopup.word}
                   </DialogTitle>
                 </DialogHeader>
@@ -1800,7 +1800,7 @@ export default function DeepVocabularyPage() {
                         setSelectedWord(w);
                       }
                     }}
-                    className="rounded-xl text-[10px] font-black uppercase tracking-wider gap-1 flex-1 border-[#00B894]/30 text-[#00B894] hover:bg-[#00B894]/5">
+                    className="rounded-xl text-[10px] font-black uppercase tracking-wider gap-1 flex-1 border-[#00B894]/30 text-ink-teal hover:bg-[#00B894]/5">
                     <ExternalLink className="size-3" />查看详情
                   </Button>
                 </div>

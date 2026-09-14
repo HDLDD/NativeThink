@@ -16,6 +16,9 @@
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(215 28% 17%);
   --primary: hsl(160 100% 36%);
+  /* 文字用品牌色（对比度调优）：亮色下加深保证白底可读，暗色下提亮保证深底可读 */
+  --ink-violet: #5A4BD1;
+  --ink-teal: #00846B;
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(210 20% 96%);
   --secondary-foreground: hsl(215 28% 17%);
@@ -104,6 +107,8 @@
   --popover: hsl(215 28% 12%);
   --popover-foreground: hsl(210 20% 98%);
   --primary: hsl(160 100% 40%);
+  --ink-violet: #A99BF5;
+  --ink-teal: #2ED3B0;
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(215 28% 15%);
   --secondary-foreground: hsl(210 20% 98%);

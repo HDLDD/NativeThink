@@ -31,7 +31,7 @@ function ProgressCardInner({ todayMinutes, dailyGoalMinutes, progressPercent }: 
           <div>
             <p className="text-4xl font-black italic text-white tracking-tight mb-1">
               {Math.round(todayMinutes)}
-              <span className="text-lg font-black text-[#00B894] ml-1">min</span>
+              <span className="text-lg font-black text-ink-teal ml-1">min</span>
             </p>
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
               / {dailyGoalMinutes} min 目标

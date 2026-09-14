@@ -776,31 +776,31 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
           <TabsList className="bg-muted p-1.5 rounded-3xl h-auto mb-6">
             <TabsTrigger
               value="all"
-              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
             >
               全部题目
             </TabsTrigger>
             <TabsTrigger
               value="narrative"
-              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
             >
               日常叙事
             </TabsTrigger>
             <TabsTrigger
               value="opinion"
-              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
             >
               观点表达
             </TabsTrigger>
             <TabsTrigger
               value="workplace"
-              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
             >
               职场写作
             </TabsTrigger>
             <TabsTrigger
               value="essay"
-              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
             >
               议论文
             </TabsTrigger>
@@ -884,7 +884,7 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
             variant="ghost"
             size="sm"
             onClick={reset}
-            className="rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-[#00B894]"
+            className="rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-ink-teal"
           >
             <RefreshCw className="size-4 mr-1.5" />
             换题目
@@ -899,7 +899,7 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
             {selectedPrompt.difficulty === 'beginner' ? '初级' : selectedPrompt.difficulty === 'intermediate' ? '中级' : '高级'}
           </Badge>
           <div className="flex items-center gap-2 bg-muted rounded-2xl px-4 py-2">
-            <Timer className="size-4 text-[#00B894]" />
+            <Timer className="size-4 text-ink-teal" />
             <span className="text-sm font-black italic text-foreground tabular-nums">{formatTime(timer)}</span>
           </div>
           <div className="flex items-center gap-2 bg-muted rounded-2xl px-4 py-2">
@@ -917,8 +917,8 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
           <Card className="rounded-[32px] border-border shadow-sm bg-gradient-to-br from-[#00B894]/5 to-emerald-50 dark:from-[#00B894]/10 dark:to-emerald-500/10 border-[#00B894]/10">
             <CardContent className="p-6">
               <div className="flex items-center gap-2 mb-3">
-                <Lightbulb className="size-4 text-[#00B894]" />
-                <span className="text-xs font-black uppercase tracking-wider text-[#00B894]">
+                <Lightbulb className="size-4 text-ink-teal" />
+                <span className="text-xs font-black uppercase tracking-wider text-ink-teal">
                   写作提示
                 </span>
               </div>
@@ -963,7 +963,7 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
                     size="sm"
                     disabled={!essay.trim()}
                     onClick={() => tts.speak(essay)}
-                    className="rounded-xl text-xs font-bold text-muted-foreground hover:text-[#00B894] gap-1"
+                    className="rounded-xl text-xs font-bold text-muted-foreground hover:text-ink-teal gap-1"
                   >
                     <Volume2 className="size-3.5" />
                     朗读我的作文
@@ -1082,7 +1082,7 @@ function PromptCard({
                 AI
               </Badge>
             )}
-            <h3 className="text-lg font-black text-foreground group-hover:text-[#00B894] transition-colors truncate">
+            <h3 className="text-lg font-black text-foreground group-hover:text-ink-teal transition-colors truncate">
               {prompt.title}
             </h3>
           </div>
@@ -1114,7 +1114,7 @@ function PromptCard({
           <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
             {prompt.wordLimit.max >= 9999 ? `≥${prompt.wordLimit.min} 词` : `${prompt.wordLimit.min}-${prompt.wordLimit.max} 词`} · {prompt.category}
           </span>
-          <div className="flex items-center gap-1 text-xs font-black uppercase tracking-wider text-[#00B894]">
+          <div className="flex items-center gap-1 text-xs font-black uppercase tracking-wider text-ink-teal">
             开始写作
             <PenLine className="size-3.5" />
           </div>

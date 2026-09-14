@@ -118,7 +118,7 @@ export function WordImage({ word, className, hideOnEmpty }: Props) {
       {/* 无图占位：首字母大卡 */}
       {urls !== null && (!src || broken) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10">
-          <span className="text-4xl font-black italic text-[#00B894]/40 uppercase">{word.charAt(0)}</span>
+          <span className="text-4xl font-black italic text-ink-teal/40 uppercase">{word.charAt(0)}</span>
           <span className="text-[10px] font-bold text-muted-foreground/50 flex items-center gap-1">
             <ImageOff className="size-3" />暂无插图
           </span>

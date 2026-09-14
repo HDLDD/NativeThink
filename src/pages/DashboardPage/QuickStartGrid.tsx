@@ -40,7 +40,7 @@ function QuickStartGridInner({ onNavigate }: QuickStartGridProps) {
                 </div>
                 <h4 className="text-base font-black text-foreground mb-1">{entry.label}</h4>
                 <p className="text-xs text-muted-foreground font-medium mb-3">{entry.desc}</p>
-                <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-[#00B894]">
+                <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-ink-teal">
                   开始学习
                   <ArrowUpRight className="size-3.5" />
                 </div>

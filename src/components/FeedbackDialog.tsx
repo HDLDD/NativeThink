@@ -145,7 +145,7 @@ export default function FeedbackDialog() {
           variant="ghost"
           size="icon"
           aria-label="反馈"
-          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894] transition-colors"
+          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
         >
           <MessageSquareHeart className="size-4.5" />
         </Button>
@@ -156,7 +156,7 @@ export default function FeedbackDialog() {
         <div className="p-6 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 shrink-0">
           <DialogHeader>
             <DialogTitle className="text-xl font-black italic text-foreground flex items-center gap-2">
-              <MessageSquareHeart className="size-5 text-[#00B894]" />
+              <MessageSquareHeart className="size-5 text-ink-teal" />
               用户反馈
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground font-medium pt-1">
@@ -197,7 +197,7 @@ export default function FeedbackDialog() {
                     'rounded-2xl font-bold text-xs gap-1.5 h-10',
                     type === value
                       ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30'
-                      : 'border-border hover:border-[#00B894] hover:text-[#00B894]',
+                      : 'border-border hover:border-[#00B894] hover:text-ink-teal',
                   )}
                 >
                   <Icon className="size-3.5" />

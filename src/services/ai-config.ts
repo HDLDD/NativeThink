@@ -67,10 +67,10 @@ export interface ProviderConfig {
 export const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
   factory: {
     name: '智谱免费 · 出厂',
-    description: '出厂内置 Key · 无需注册配置 · glm-4-flash（实测最快免费款，高峰自动换备用）',
+    description: '出厂内置 Key · 无需注册配置 · GLM-4-Flash-250414（实测最快免费款）',
     apiEndpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-    defaultModel: 'glm-4-flash',
-    freeModel: 'glm-4-flash',
+    defaultModel: 'glm-4-flash-250414',
+    freeModel: 'glm-4-flash-250414',
     registerUrl: 'https://open.bigmodel.cn',
     supportsStreaming: true,
   },

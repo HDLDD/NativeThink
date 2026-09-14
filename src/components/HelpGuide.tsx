@@ -259,7 +259,7 @@ export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
           variant="ghost"
           size="icon"
           aria-label="使用帮助"
-          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894] transition-colors"
+          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
         >
           <HelpCircle className="size-4.5" />
         </Button>
@@ -270,7 +270,7 @@ export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
         <div className="p-6 border-b border-border bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 dark:from-emerald-500/10 dark:via-teal-500/10 dark:to-cyan-500/10">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black italic text-foreground flex items-center gap-2.5">
-              <div className="size-10 rounded-2xl bg-[#00B894]/15 text-[#00B894] flex items-center justify-center">
+              <div className="size-10 rounded-2xl bg-[#00B894]/15 text-ink-teal flex items-center justify-center">
                 <Sparkles className="size-5.5" />
               </div>
               使用指南
@@ -284,13 +284,13 @@ export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <div className="px-6 pt-4">
             <TabsList className="bg-muted p-1.5 rounded-3xl h-auto w-full">
-              <TabsTrigger value="modules" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm flex-1">
+              <TabsTrigger value="modules" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-ink-teal data-[state=active]:shadow-sm flex-1">
                 <Zap className="size-3.5 mr-1.5" />功能介绍
               </TabsTrigger>
-              <TabsTrigger value="getting-started" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm flex-1">
+              <TabsTrigger value="getting-started" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-ink-teal data-[state=active]:shadow-sm flex-1">
                 <Target className="size-3.5 mr-1.5" />快速上手
               </TabsTrigger>
-              <TabsTrigger value="faq" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm flex-1">
+              <TabsTrigger value="faq" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-ink-teal data-[state=active]:shadow-sm flex-1">
                 <HelpCircle className="size-3.5 mr-1.5" />常见问题
               </TabsTrigger>
             </TabsList>
@@ -320,7 +320,7 @@ export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
                           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">核心功能</p>
                           {mod.features.map((f, idx) => (
                             <div key={idx} className="flex items-start gap-2.5 bg-white/70 dark:bg-white/10 rounded-2xl p-3">
-                              <span className="size-5 rounded-lg bg-[#00B894]/10 text-[#00B894] flex items-center justify-center shrink-0 mt-0.5">
+                              <span className="size-5 rounded-lg bg-[#00B894]/10 text-ink-teal flex items-center justify-center shrink-0 mt-0.5">
                                 <ChevronRight className="size-3" />
                               </span>
                               <div>
@@ -339,7 +339,7 @@ export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {mod.tips.map((tip, idx) => (
                               <div key={idx} className="flex items-start gap-2 bg-white/70 dark:bg-white/10 rounded-xl p-2.5">
-                                <CheckCircle2 className="size-3.5 text-[#00B894] shrink-0 mt-0.5" />
+                                <CheckCircle2 className="size-3.5 text-ink-teal shrink-0 mt-0.5" />
                                 <span className="text-xs text-foreground/80 font-medium leading-relaxed">{tip}</span>
                               </div>
                             ))}
@@ -370,7 +370,7 @@ export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
                           <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">API Key 获取链接</p>
                           <div className="grid grid-cols-2 gap-2">
                             {step.links.map((l) => (
-                              <a key={l.name} href={l.url} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-[#00B894] hover:underline flex items-center gap-1">
+                              <a key={l.name} href={l.url} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-ink-teal hover:underline flex items-center gap-1">
                                 {l.name}<ExternalLink className="size-3" />
                               </a>
                             ))}
@@ -402,7 +402,7 @@ export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
                   <Card key={idx} className="rounded-[24px] border-border shadow-sm overflow-hidden">
                     <div className="p-5">
                       <div className="flex items-start gap-3">
-                        <div className="size-8 rounded-xl bg-[#00B894]/10 text-[#00B894] flex items-center justify-center shrink-0 mt-0.5">
+                        <div className="size-8 rounded-xl bg-[#00B894]/10 text-ink-teal flex items-center justify-center shrink-0 mt-0.5">
                           <HelpCircle className="size-4" />
                         </div>
                         <div>
@@ -421,7 +421,7 @@ export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
         {/* Footer */}
         <div className="p-4 border-t border-border bg-muted/20 flex items-center justify-between sticky bottom-0 bg-background">
           <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">NativeThink — 用母语思维，说地道英语</p>
-          <a href="https://platform.deepseek.com" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[#00B894] hover:underline flex items-center gap-1">
+          <a href="https://platform.deepseek.com" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-ink-teal hover:underline flex items-center gap-1">
             <Key className="size-3" />获取 API Key<ExternalLink className="size-3" />
           </a>
         </div>

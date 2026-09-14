@@ -710,28 +710,28 @@ The chineseText should subtly embed English thinking patterns so learners discov
         <TabsList className="bg-muted p-1.5 rounded-3xl h-auto flex-wrap">
           <TabsTrigger
             value="detector"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <Search className="size-4 mr-2" />
             中式英语检测
           </TabsTrigger>
           <TabsTrigger
             value="translation"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <ArrowRight className="size-4 mr-2" />
             思维转译
           </TabsTrigger>
           <TabsTrigger
             value="backTranslation"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <Brain className="size-4 mr-2" />
             反翻译训练
           </TabsTrigger>
           <TabsTrigger
             value="nativeTranslate"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <Sparkles className="size-4 mr-2" />
             思维还原
@@ -743,7 +743,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
           <Card className="rounded-[40px] border-border shadow-sm">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
-                <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] flex items-center justify-center">
+                <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center">
                   <Search className="size-5.5" />
                 </div>
                 <div>
@@ -782,7 +782,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                           variant="ghost"
                           size="icon"
                           onClick={() => tts.speak(s)}
-                          className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+                          className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0"
                         >
                           <Volume2 className="size-3.5" />
                         </Button>
@@ -812,7 +812,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               {detectorResult && (
                 <Card className="rounded-[32px] border-emerald-200/50 bg-emerald-50/30 dark:bg-emerald-500/10">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-[#00B894]">
+                    <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-ink-teal">
                       <Lightbulb className="size-4.5" />
                       分析结果
                     </CardTitle>
@@ -836,7 +836,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                       key={s}
                       onClick={() => setDetectorInput(s)}
                       title={s}
-                      className="px-3 py-1.5 rounded-full bg-muted hover:bg-emerald-500/10 hover:text-[#00B894] text-xs font-bold text-muted-foreground max-w-[240px] truncate transition-colors"
+                      className="px-3 py-1.5 rounded-full bg-muted hover:bg-emerald-500/10 hover:text-ink-teal text-xs font-bold text-muted-foreground max-w-[240px] truncate transition-colors"
                     >
                       {s}
                     </button>
@@ -882,7 +882,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   variant="outline"
                   size="sm"
                   onClick={nextExercise}
-                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
                 >
                   <RefreshCw className="size-3.5" />
                   换一题
@@ -929,7 +929,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   {translationExercises[currentExerciseIdx].prompt}
                 </p>
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-4 flex items-center gap-2">
-                  <Sparkles className="size-3.5 text-[#00B894]" />
+                  <Sparkles className="size-3.5 text-ink-teal" />
                   提示：闭上眼睛想象画面，用英语直接描述你看到的场景
                 </p>
               </div>
@@ -946,7 +946,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                     type="button"
                     variant="outline"
                     onClick={() => setShowNativeRef(!showNativeRef)}
-                    className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+                    className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
                   >
                     {showNativeRef ? '隐藏参考' : '查看母语者表达'}
                   </Button>
@@ -983,7 +983,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                       variant="ghost"
                       size="icon"
                       onClick={() => tts.speak(translationExercises[currentExerciseIdx].nativeExpression)}
-                      className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] -mt-1"
+                      className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal -mt-1"
                     >
                       <Volume2 className="size-4" />
                     </Button>
@@ -997,7 +997,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               {translationResult && (
                 <Card className="rounded-[32px] border-[#00B894]/20 bg-[#00B894]/5 dark:border-[#00B894]/30 dark:bg-[#00B894]/10">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-[#00B894]">
+                    <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-ink-teal">
                       <Lightbulb className="size-4.5" />
                       AI 思维转译指导
                     </CardTitle>
@@ -1048,7 +1048,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   variant="outline"
                   size="sm"
                   onClick={nextBackExercise}
-                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
                 >
                   <RefreshCw className="size-3.5" />
                   换一题
@@ -1074,7 +1074,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
             <CardContent className="space-y-6">
               <div className="p-6 rounded-[32px] bg-gradient-to-br from-[#00B894]/5 to-emerald-50 dark:from-[#00B894]/10 dark:to-emerald-500/10 border border-[#00B894]/10">
                 <div className="flex items-center gap-2 mb-4">
-                  <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-[#00B894]/15 dark:bg-[#00B894]/25 text-[#00B894] border-none">
+                  <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-[#00B894]/15 dark:bg-[#00B894]/25 text-ink-teal border-none">
                     关键词
                   </Badge>
                   <Badge
@@ -1096,7 +1096,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                     variant="ghost"
                     size="icon"
                     onClick={() => tts.speak(backExercises[currentBackIdx].keyword)}
-                    className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+                    className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0"
                   >
                     <Volume2 className="size-4" />
                   </Button>
@@ -1121,7 +1121,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                     type="button"
                     variant="outline"
                     onClick={() => setShowBackRef(!showBackRef)}
-                    className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+                    className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
                   >
                     {showBackRef ? '隐藏参考' : '查看参考句子'}
                   </Button>
@@ -1159,7 +1159,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                         variant="ghost"
                         size="icon"
                         onClick={() => tts.speak(backExercises[currentBackIdx].referenceSentence)}
-                        className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+                        className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0"
                       >
                         <Volume2 className="size-4" />
                       </Button>
@@ -1174,7 +1174,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               {backResult && (
                 <Card className="rounded-[32px] border-[#00B894]/20 bg-[#00B894]/5 dark:border-[#00B894]/30 dark:bg-[#00B894]/10">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-[#00B894]">
+                    <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-ink-teal">
                       <Lightbulb className="size-4.5" />
                       AI 评价与建议
                     </CardTitle>
@@ -1225,7 +1225,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   variant="outline"
                   size="sm"
                   onClick={nextNativeExercise}
-                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
                 >
                   <RefreshCw className="size-3.5" />
                   换一题
@@ -1286,7 +1286,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                     type="button"
                     variant="outline"
                     onClick={() => setShowNativeThinkRef(!showNativeThinkRef)}
-                    className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+                    className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
                   >
                     {showNativeThinkRef ? '隐藏参考' : '查看母语者表达'}
                   </Button>
@@ -1324,7 +1324,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                         variant="ghost"
                         size="icon"
                         onClick={() => tts.speak(nativeExercises[currentNativeIdx].nativeEnglish)}
-                        className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0"
+                        className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0"
                       >
                         <Volume2 className="size-4" />
                       </Button>

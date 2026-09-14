@@ -24,7 +24,7 @@ const PROVIDER_DEFAULT_MODELS = {
   deepseek: 'deepseek-chat',
   doubao: 'doubao-lite-32k',
   qwen: 'qwen-turbo',
-  factory: 'glm-4-flash',
+  factory: 'glm-4-flash-250414',
   glm: 'glm-4-flash',
   siliconflow: 'Qwen/Qwen2.5-7B-Instruct',
   moonshot: 'moonshot-v1-8k',
@@ -82,7 +82,7 @@ async function handler(context) {
   };
 
   // GLM 免费档高峰期常返回 429（1305 访问量过大）— 自动按候选链降级重试
-  const glmChain = [modelId, 'glm-4.5-flash', 'glm-4-flash'].filter(
+  const glmChain = [modelId, 'glm-4-flash-250414', 'glm-4-flash', 'glm-4v-flash'].filter(
     (m, i, arr) => m && arr.indexOf(m) === i,
   );
   const candidates = (provider === 'glm' || provider === 'factory') ? glmChain : [modelId];

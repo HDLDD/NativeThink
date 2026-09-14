@@ -317,7 +317,7 @@ export default function ProgressPage() {
               variant="outline"
               size="sm"
               onClick={() => setShowResetDialog(true)}
-              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
             >
               <RotateCw className="size-3.5 mr-1.5" />
               管理学习记录
@@ -326,7 +326,7 @@ export default function ProgressPage() {
               variant="outline"
               size="sm"
               onClick={exportLearningData}
-              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
             >
               <Download className="size-3.5 mr-1.5" />
               导出学习数据
@@ -554,7 +554,7 @@ export default function ProgressPage() {
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
               连续天数
             </p>
-            <p className="text-2xl font-black text-foreground group-hover:text-[#00B894] transition-colors">
+            <p className="text-2xl font-black text-foreground group-hover:text-ink-teal transition-colors">
               {stats.streakDays} 天
             </p>
           </CardContent>
@@ -563,7 +563,7 @@ export default function ProgressPage() {
         <Card className="rounded-[32px] border-border shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Target className="size-5.5" />
               </div>
               <div className="text-[11px] font-black text-emerald-500">
@@ -573,7 +573,7 @@ export default function ProgressPage() {
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
               今日目标
             </p>
-            <p className="text-2xl font-black text-foreground group-hover:text-[#00B894] transition-colors">
+            <p className="text-2xl font-black text-foreground group-hover:text-ink-teal transition-colors">
               {Math.round(stats.todayMinutes)}/{stats.dailyGoalMinutes}m
             </p>
           </CardContent>
@@ -590,7 +590,7 @@ export default function ProgressPage() {
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
               累计学习
             </p>
-            <p className="text-2xl font-black text-foreground group-hover:text-[#00B894] transition-colors">
+            <p className="text-2xl font-black text-foreground group-hover:text-ink-teal transition-colors">
               {Math.round(calendar.reduce((sum, r) => sum + r.minutes, 0))} 分钟
             </p>
           </CardContent>
@@ -607,7 +607,7 @@ export default function ProgressPage() {
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
               地道表达
             </p>
-            <p className="text-2xl font-black text-foreground group-hover:text-[#00B894] transition-colors">
+            <p className="text-2xl font-black text-foreground group-hover:text-ink-teal transition-colors">
               {favorites.length} 条
             </p>
           </CardContent>
@@ -618,28 +618,28 @@ export default function ProgressPage() {
         <TabsList className="bg-muted p-1.5 rounded-3xl h-auto">
           <TabsTrigger
             value="calendar"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <Calendar className="size-4 mr-2" />
             日历打卡
           </TabsTrigger>
           <TabsTrigger
             value="stats"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <BarChart3 className="size-4 mr-2" />
             学习统计
           </TabsTrigger>
           <TabsTrigger
             value="favorites"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <Heart className="size-4 mr-2" />
             收藏本
           </TabsTrigger>
           <TabsTrigger
             value="achievements"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-[#00B894] data-[state=active]:shadow-sm"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <Sparkles className="size-4 mr-2" />
             成就徽章
@@ -652,7 +652,7 @@ export default function ProgressPage() {
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] flex items-center justify-center">
+                  <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center">
                     <Calendar className="size-5.5" />
                   </div>
                   <div>
@@ -669,7 +669,7 @@ export default function ProgressPage() {
                     variant="ghost"
                     size="icon"
                     onClick={prevMonth}
-                    className="rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-[#00B894]"
+                    className="rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-ink-teal"
                   >
                     <TrendingUp className="size-4 rotate-180" />
                   </Button>
@@ -677,7 +677,7 @@ export default function ProgressPage() {
                     variant="ghost"
                     size="icon"
                     onClick={nextMonth}
-                    className="rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-[#00B894]"
+                    className="rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-ink-teal"
                   >
                     <TrendingUp className="size-4" />
                   </Button>
@@ -819,7 +819,7 @@ export default function ProgressPage() {
                       'rounded-xl text-[10px] font-black uppercase tracking-wider',
                       favReviewMode
                         ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50'
-                        : 'border-border hover:border-[#00B894] hover:text-[#00B894]',
+                        : 'border-border hover:border-[#00B894] hover:text-ink-teal',
                     )}
                   >
                     {favReviewMode ? '浏览模式' : '开始回顾'}
@@ -841,7 +841,7 @@ export default function ProgressPage() {
                     >
                       <CardContent className="p-5">
                         <div className="flex items-start justify-between gap-3 mb-3">
-                          <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] border-none">
+                          <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal border-none">
                             {typeLabelMap[item.type] || item.type}
                           </Badge>
                           <Button
@@ -854,14 +854,14 @@ export default function ProgressPage() {
                           </Button>
                         </div>
                         <div className="flex items-center gap-2 mb-2">
-                          <h4 className="text-lg font-black text-foreground group-hover:text-[#00B894] transition-colors">
+                          <h4 className="text-lg font-black text-foreground group-hover:text-ink-teal transition-colors">
                             {item.content}
                           </h4>
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => tts.speak(item.content)}
-                            className="rounded-xl size-7 text-muted-foreground hover:text-[#00B894] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <Volume2 className="size-3.5" />
                           </Button>
@@ -876,7 +876,7 @@ export default function ProgressPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => tts.speak(cleanText(item.example))}
-                              className="rounded-lg size-6 text-muted-foreground hover:text-[#00B894] shrink-0 opacity-0 group-hover/example:opacity-100 transition-opacity"
+                              className="rounded-lg size-6 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover/example:opacity-100 transition-opacity"
                             >
                               <Volume2 className="size-3" />
                             </Button>
@@ -894,7 +894,7 @@ export default function ProgressPage() {
                             {getFavPortal(item.type) && (
                               <button
                                 onClick={() => navigate(getFavPortal(item.type)!)}
-                                className="shrink-0 text-[10px] font-bold text-[#00B894] hover:underline flex items-center gap-0.5"
+                                className="shrink-0 text-[10px] font-bold text-ink-teal hover:underline flex items-center gap-0.5"
                                 title={`前往${typeLabelMap[item.type] || item.type}`}
                               >
                                 <ExternalLink className="size-3" />传送

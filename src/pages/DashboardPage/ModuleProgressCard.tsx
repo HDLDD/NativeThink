@@ -26,7 +26,7 @@ function ModuleProgressCardInner({ moduleProgress, onViewDetails }: ModuleProgre
             <Button
               variant="ghost"
               size="sm"
-              className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894]"
+              className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal"
               onClick={onViewDetails}
             >
               <BarChart3 className="size-4 mr-2" />

@@ -282,14 +282,14 @@ export default function DashboardPage() {
           onClick={() => navigate(lastVisit.path)}
           className="w-full flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3 text-left hover:border-[#00B894]/40 hover:shadow-md transition-all group"
         >
-          <span className="size-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 text-[#00B894] flex items-center justify-center shrink-0">
+          <span className="size-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center shrink-0">
             <HistoryIcon className="size-4" />
           </span>
           <span className="flex-1 min-w-0">
             <span className="block text-[10px] font-black uppercase tracking-wider text-muted-foreground">继续上次学习</span>
-            <span className="block text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors truncate">{lastVisit.label}</span>
+            <span className="block text-sm font-black text-foreground group-hover:text-ink-teal transition-colors truncate">{lastVisit.label}</span>
           </span>
-          <span className="text-[10px] font-black uppercase tracking-wider text-[#00B894] opacity-0 group-hover:opacity-100 transition-opacity shrink-0">进入 →</span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-ink-teal opacity-0 group-hover:opacity-100 transition-opacity shrink-0">进入 →</span>
         </button>
       )}
 
@@ -368,7 +368,7 @@ export default function DashboardPage() {
           <div className="p-6 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10">
             <DialogHeader>
               <DialogTitle className="text-xl font-black italic text-foreground flex items-center gap-2">
-                <Brain className="size-5 text-[#00B894]" />
+                <Brain className="size-5 text-ink-teal" />
                 选择今日学习内容
               </DialogTitle>
             </DialogHeader>

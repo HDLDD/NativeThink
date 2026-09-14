@@ -571,7 +571,7 @@ export default function ArticlePage() {
           <Button variant="outline" size="sm" onClick={() => setShowHistory(!showHistory)} className="rounded-2xl text-[10px] font-bold gap-1">
             <Clock className="size-3.5" />历史
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setGenDialogOpen(true)} className="rounded-2xl text-[10px] font-bold gap-1 bg-[#00B894]/5 border-[#00B894]/30 text-[#00B894]">
+          <Button variant="outline" size="sm" onClick={() => setGenDialogOpen(true)} className="rounded-2xl text-[10px] font-bold gap-1 bg-[#00B894]/5 border-[#00B894]/30 text-ink-teal">
             <Wand2 className="size-3.5" />AI 生成
           </Button>
         </div>
@@ -622,7 +622,7 @@ export default function ArticlePage() {
               onClick={() => setMainTab(tab.key)}
               className={cn(
                 'flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all',
-                mainTab === tab.key ? 'bg-white dark:bg-card text-[#00B894] shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                mainTab === tab.key ? 'bg-white dark:bg-card text-ink-teal shadow-sm' : 'text-muted-foreground hover:text-foreground',
               )}
             >
               <Icon className="size-3.5" />{tab.label}
@@ -635,7 +635,7 @@ export default function ArticlePage() {
       {mainTab === 'books' && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Library className="size-5 text-[#00B894]" />
+            <Library className="size-5 text-ink-teal" />
             <span className="text-sm font-black">{books ? `${books.length} 本公版书籍` : '加载中...'} · 点击阅读</span>
           </div>
           {!books ? (
@@ -674,7 +674,7 @@ export default function ArticlePage() {
                       📖
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors line-clamp-2">
+                      <h3 className="text-sm font-black text-foreground group-hover:text-ink-teal transition-colors line-clamp-2">
                         {book.zhTitle}
                       </h3>
                       <p className="text-[10px] text-muted-foreground mt-0.5">{book.zhAuthor} · {book.title}</p>
@@ -687,7 +687,7 @@ export default function ArticlePage() {
                       {progress && progress.page > 0 && (
                         <div className="mt-2 space-y-1">
                           <div className="flex items-center justify-between text-[9px]">
-                            <span className="font-bold text-[#00B894]">继续阅读 (第{progress.page}页)</span>
+                            <span className="font-bold text-ink-teal">继续阅读 (第{progress.page}页)</span>
                             <span className="text-muted-foreground font-bold">{pct}%</span>
                           </div>
                           <div className="h-1 bg-muted rounded-full overflow-hidden">
@@ -710,7 +710,7 @@ export default function ArticlePage() {
       {mainTab === 'publications' && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Newspaper className="size-5 text-[#00B894]" />
+            <Newspaper className="size-5 text-ink-teal" />
             <span className="text-sm font-black">{PUBLICATIONS.length} 篇刊物文章</span>
           </div>
           <div className="stagger grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -726,7 +726,7 @@ export default function ArticlePage() {
                       📰
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors line-clamp-2">
+                      <h3 className="text-sm font-black text-foreground group-hover:text-ink-teal transition-colors line-clamp-2">
                         {pub.zhTitle}
                       </h3>
                       <p className="text-[10px] text-muted-foreground mt-0.5">{pub.author} · {pub.title?.slice(0, 60)}</p>
@@ -831,7 +831,7 @@ export default function ArticlePage() {
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors line-clamp-1">
+                          <h4 className="text-sm font-black text-foreground group-hover:text-ink-teal transition-colors line-clamp-1">
                             {a.zhTitle || a.title}
                           </h4>
                           <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -859,7 +859,7 @@ export default function ArticlePage() {
       {mainTab === 'speeches' && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Mic className="size-5 text-[#00B894]" />
+            <Mic className="size-5 text-ink-teal" />
             <span className="text-sm font-black">{speechMeta ? `${speechMeta.length} 篇演讲` : '加载中...'} · 点击阅读</span>
           </div>
           {!speechMeta ? (
@@ -894,7 +894,7 @@ export default function ArticlePage() {
                         <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">{speech.type}</Badge>
                         <span className="text-[10px] text-muted-foreground font-bold">{speech.year}</span>
                       </div>
-                      <h3 className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors line-clamp-2">
+                      <h3 className="text-sm font-black text-foreground group-hover:text-ink-teal transition-colors line-clamp-2">
                     {speech.zhTitle}
                   </h3>
                   <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">{speech.author}</p>
@@ -913,7 +913,7 @@ export default function ArticlePage() {
       {mainTab === 'wikipedia' && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Globe className="size-5 text-[#00B894]" />
+            <Globe className="size-5 text-ink-teal" />
             <span className="text-sm font-black">Wikipedia 英文百科 · 搜索并阅读条目</span>
           </div>
           <form
@@ -947,13 +947,13 @@ export default function ArticlePage() {
                   <CardContent className="p-4 flex items-center gap-3">
                     <div className="size-10 rounded-2xl bg-gradient-to-br from-slate-100 to-gray-200 dark:from-slate-500/10 dark:to-gray-500/20 flex items-center justify-center shrink-0">
                       {wikiLoadingTitle === r.title ? (
-                        <Loader2 className="size-4 animate-spin text-[#00B894]" />
+                        <Loader2 className="size-4 animate-spin text-ink-teal" />
                       ) : (
                         <span className="text-lg">🌐</span>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-black text-foreground group-hover:text-[#00B894] transition-colors truncate">
+                      <h3 className="text-sm font-black text-foreground group-hover:text-ink-teal transition-colors truncate">
                         {r.title}
                       </h3>
                       <p className="text-[10px] text-muted-foreground mt-0.5">{r.wordCount.toLocaleString()} 词 · 点击阅读</p>
@@ -984,7 +984,7 @@ export default function ArticlePage() {
                   <button
                     key={s}
                     onClick={() => { setWikiQuery(s); searchWiki(s); }}
-                    className="px-3 py-1.5 rounded-full bg-muted hover:bg-[#00B894]/10 hover:text-[#00B894] text-xs font-bold text-muted-foreground transition-colors"
+                    className="px-3 py-1.5 rounded-full bg-muted hover:bg-[#00B894]/10 hover:text-ink-teal text-xs font-bold text-muted-foreground transition-colors"
                   >
                     {s}
                   </button>
@@ -1001,7 +1001,7 @@ export default function ArticlePage() {
           <div className="p-6 border-b border-border bg-gradient-to-r from-[#00B894]/5 to-emerald-50 dark:to-emerald-500/10">
             <DialogHeader>
               <DialogTitle className="text-lg font-black flex items-center gap-2">
-                <Wand2 className="size-5 text-[#00B894]" />AI 生成内容
+                <Wand2 className="size-5 text-ink-teal" />AI 生成内容
               </DialogTitle>
             </DialogHeader>
           </div>
@@ -1020,7 +1020,7 @@ export default function ArticlePage() {
                     onClick={() => setGenType(t.key)}
                     className={cn(
                       'px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2',
-                      genType === t.key ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                      genType === t.key ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
                     )}
                   >{t.label}</button>
                 ))}
@@ -1041,7 +1041,7 @@ export default function ArticlePage() {
                     onClick={() => setGenLevel(l.key)}
                     className={cn(
                       'px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2',
-                      genLevel === l.key ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                      genLevel === l.key ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
                     )}
                   >{l.label}</button>
                 ))}
@@ -1057,7 +1057,7 @@ export default function ArticlePage() {
                     onClick={() => setGenWordCount(n)}
                     className={cn(
                       'px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2',
-                      genWordCount === n ? 'border-[#00B894] bg-[#00B894]/10 text-[#00B894]' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                      genWordCount === n ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
                     )}
                   >{n}</button>
                 ))}
@@ -1089,7 +1089,7 @@ export default function ArticlePage() {
       )}
       {readerVisible && readerContent && !PageReaderComp && (
         <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
-          <Loader2 className="size-8 animate-spin text-[#00B894]" />
+          <Loader2 className="size-8 animate-spin text-ink-teal" />
         </div>
       )}
 
@@ -1099,7 +1099,7 @@ export default function ArticlePage() {
           <div className="p-6 border-b border-border bg-gradient-to-r from-[#00B894]/5 to-emerald-50 dark:to-emerald-500/10">
             <DialogHeader>
               <DialogTitle className="text-lg font-black flex items-center gap-2">
-                <HelpCircle className="size-5 text-[#00B894]" />使用指南
+                <HelpCircle className="size-5 text-ink-teal" />使用指南
               </DialogTitle>
             </DialogHeader>
           </div>
@@ -1107,34 +1107,34 @@ export default function ArticlePage() {
             <div className="p-6 space-y-5 text-sm">
               {/* Books */}
               <div className="space-y-2">
-                <h3 className="font-black text-foreground flex items-center gap-2"><Library className="size-4 text-[#00B894]" />书籍</h3>
+                <h3 className="font-black text-foreground flex items-center gap-2"><Library className="size-4 text-ink-teal" />书籍</h3>
                 <p className="text-muted-foreground text-xs leading-relaxed">22 本公版英文经典，每本 1000-5000 词。点击即读，支持分页、翻译、朗读、单词收藏。</p>
                 <p className="text-amber-600 text-[11px] font-medium">⚠ 书籍中文翻译需手动点击"AI翻译"（逐段生成，首次较慢）。</p>
               </div>
 
               {/* Publications */}
               <div className="space-y-2">
-                <h3 className="font-black text-foreground flex items-center gap-2"><Newspaper className="size-4 text-[#00B894]" />刊物</h3>
+                <h3 className="font-black text-foreground flex items-center gap-2"><Newspaper className="size-4 text-ink-teal" />刊物</h3>
                 <p className="text-muted-foreground text-xs leading-relaxed">预置 5 篇刊物文章（经济学人、自然、哈佛商业评论等），含完整中英对照翻译。</p>
               </div>
 
               {/* AI */}
               <div className="space-y-2">
-                <h3 className="font-black text-foreground flex items-center gap-2"><Sparkles className="size-4 text-[#00B894]" />AI 生成</h3>
+                <h3 className="font-black text-foreground flex items-center gap-2"><Sparkles className="size-4 text-ink-teal" />AI 生成</h3>
                 <p className="text-muted-foreground text-xs leading-relaxed">按主题/等级生成文章或书籍章节。AI 自动附中文翻译。需先配置 AI API Key。</p>
                 <p className="text-amber-600 text-[11px] font-medium">⚠ AI 生成依赖网络和 API 可用性，偶有格式异常需重试。</p>
               </div>
 
               {/* Wikipedia */}
               <div className="space-y-2">
-                <h3 className="font-black text-foreground flex items-center gap-2"><Globe className="size-4 text-[#00B894]" />维基百科</h3>
+                <h3 className="font-black text-foreground flex items-center gap-2"><Globe className="size-4 text-ink-teal" />维基百科</h3>
                 <p className="text-muted-foreground text-xs leading-relaxed">搜索 Wikipedia 英文条目，阅读知识文章。支持精选条目浏览和搜索。</p>
                 <p className="text-amber-600 text-[11px] font-medium">⚠ Wikipedia API 在国内网络可能不稳定或无法访问。如加载失败，请尝试其他网络环境。</p>
               </div>
 
               {/* Speeches */}
               <div className="space-y-2">
-                <h3 className="font-black text-foreground flex items-center gap-2"><Mic className="size-4 text-[#00B894]" />演讲</h3>
+                <h3 className="font-black text-foreground flex items-center gap-2"><Mic className="size-4 text-ink-teal" />演讲</h3>
                 <p className="text-muted-foreground text-xs leading-relaxed">24 篇经典演讲（MLK、丘吉尔、TED 等），支持分页阅读（朗读根据文本可能存在问题）。</p>
                 <p className="text-amber-600 text-[11px] font-medium">⚠ 演讲中文翻译需手动点击"AI翻译"。</p>
               </div>

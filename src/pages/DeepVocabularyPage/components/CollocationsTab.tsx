@@ -490,7 +490,7 @@ export default function CollocationsTab({
                     className={cn(
                       'px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all',
                       memoryFilter === key
-                        ? 'bg-white dark:bg-card text-[#00B894] shadow-sm'
+                        ? 'bg-white dark:bg-card text-ink-teal shadow-sm'
                         : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
@@ -573,7 +573,7 @@ export default function CollocationsTab({
                             <div className="flex items-center gap-1.5">
                               <button
                                 onClick={(e) => { e.stopPropagation(); tts.speak(entry.phrase, { rate: 0.85 }); }}
-                                className="shrink-0 text-muted-foreground/40 hover:text-[#00B894] transition-colors"
+                                className="shrink-0 text-muted-foreground/40 hover:text-ink-teal transition-colors"
                                 title={`朗读 "${entry.phrase}"`}
                               >
                                 <Volume2 className="size-3.5" />
@@ -608,7 +608,7 @@ export default function CollocationsTab({
                                       title={wordMemorized ? '取消记忆' : '标记为已记'}
                                       className={cn(
                                         'p-0 rounded transition-colors',
-                                        wordMemorized ? 'text-[#00B894]' : 'text-muted-foreground/40 hover:text-[#00B894]',
+                                        wordMemorized ? 'text-ink-teal' : 'text-muted-foreground/40 hover:text-ink-teal',
                                       )}
                                     >
                                       <Brain className={cn('size-3', wordMemorized && 'fill-[#00B894]/20')} />
@@ -635,8 +635,8 @@ export default function CollocationsTab({
                               className={cn(
                                 'p-0.5 rounded-lg transition-colors',
                                 memorizedCollocs.has(entry.phrase.toLowerCase())
-                                  ? 'text-[#00B894] hover:text-[#00B894]/70'
-                                  : 'text-muted-foreground/30 hover:text-[#00B894]',
+                                  ? 'text-ink-teal hover:text-ink-teal/70'
+                                  : 'text-muted-foreground/30 hover:text-ink-teal',
                               )}
                             >
                               <Brain className={cn('size-3.5', memorizedCollocs.has(entry.phrase.toLowerCase()) && 'fill-[#00B894]/20')} />
@@ -743,7 +743,7 @@ export default function CollocationsTab({
                       <Button
                         variant="ghost" size="icon"
                         onClick={() => tts.speak(selectedEntry.phrase, { rate: 0.85 })}
-                        className="rounded-2xl bg-muted text-muted-foreground hover:text-[#00B894]"
+                        className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal"
                       >
                         <Volume2 className="size-5" />
                       </Button>
@@ -801,8 +801,8 @@ export default function CollocationsTab({
                       className={cn(
                         'rounded-2xl',
                         memorizedCollocs.has(selectedEntry.phrase.toLowerCase())
-                          ? 'text-[#00B894]'
-                          : 'text-muted-foreground hover:text-[#00B894]',
+                          ? 'text-ink-teal'
+                          : 'text-muted-foreground hover:text-ink-teal',
                       )}
                     >
                       <Brain className={cn('size-5', memorizedCollocs.has(selectedEntry.phrase.toLowerCase()) && 'fill-[#00B894]/20')} />
@@ -867,7 +867,7 @@ export default function CollocationsTab({
                               title={wordMemorized ? '取消记忆' : '标记为已记'}
                               className={cn(
                                 'p-0 rounded transition-colors',
-                                wordMemorized ? 'text-[#00B894]' : 'text-muted-foreground/40 hover:text-[#00B894]',
+                                wordMemorized ? 'text-ink-teal' : 'text-muted-foreground/40 hover:text-ink-teal',
                               )}
                             >
                               <Brain className={cn('size-3.5', wordMemorized && 'fill-[#00B894]/20')} />
@@ -877,13 +877,13 @@ export default function CollocationsTab({
                               className="flex items-center gap-1.5 text-left"
                               title={onSelectWord ? `点击跳转到 ${w.word} 详情` : undefined}
                             >
-                              <span className="text-xs font-bold text-foreground hover:text-[#00B894] transition-colors">{w.word}</span>
+                              <span className="text-xs font-bold text-foreground hover:text-ink-teal transition-colors">{w.word}</span>
                               <span className="text-[9px] text-muted-foreground">{w.partOfSpeech}</span>
                             </button>
                             <Button
                               variant="ghost" size="icon"
                               onClick={(e) => { e.stopPropagation(); tts.speak(w.word, { rate: 0.85 }); }}
-                              className="rounded-lg size-5 text-muted-foreground hover:text-[#00B894]"
+                              className="rounded-lg size-5 text-muted-foreground hover:text-ink-teal"
                             >
                               <Volume2 className="size-3" />
                             </Button>
@@ -918,7 +918,7 @@ export default function CollocationsTab({
                       <Button
                         variant="ghost" size="icon"
                         onClick={() => tts.speak(ex.en, { rate: 0.9 })}
-                        className="rounded-xl size-8 text-muted-foreground hover:text-[#00B894]"
+                        className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal"
                       >
                         <Volume2 className="size-4" />
                       </Button>

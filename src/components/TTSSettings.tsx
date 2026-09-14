@@ -144,7 +144,7 @@ export default function TTSSettings() {
           variant="ghost"
           size="icon"
           aria-label="TTS 朗读设置"
-          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-[#00B894] transition-colors"
+          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
         >
           <Volume2 className="size-4.5" />
         </Button>
@@ -156,7 +156,7 @@ export default function TTSSettings() {
       >
         <div className="p-5 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10">
           <h4 className="text-sm font-black text-foreground flex items-center gap-2">
-            <Volume2 className="size-4 text-[#00B894]" />
+            <Volume2 className="size-4 text-ink-teal" />
             TTS 朗读设置
           </h4>
         </div>
@@ -252,7 +252,7 @@ export default function TTSSettings() {
             variant="outline"
             size="sm"
             onClick={testVoice}
-            className="w-full rounded-xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-[#00B894]"
+            className="w-full rounded-xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
           >
             <Play className="size-3.5 mr-2" />
             测试声音
