@@ -20,6 +20,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useTTSSettings, getEnglishVoices } from '@/lib/tts-settings';
+import { previewTtsVoice } from '@/lib/use-tts';
 import { isSfxEnabled, setSfxEnabled, sfxTick } from '@/lib/sfx';
 import { toast } from 'sonner';
 import { EDGE_VOICE_CATALOG } from '@/lib/tts-voice-catalog';
@@ -63,6 +64,7 @@ export default function TTSSettings() {
   const [sfxOn, setSfxOn] = useState(isSfxEnabled);
   // 系统原生语音（Android）：WebView 的 speechSynthesis 列表为空，只能从原生插件取
   const [nativeVoices, setNativeVoices] = useState<INativeVoice[]>([]);
+  const [previewing, setPreviewing] = useState<string | null>(null);
   const [loadingNative, setLoadingNative] = useState(false);
   const isNative = isAndroidNative();
 
@@ -247,15 +249,16 @@ export default function TTSSettings() {
                 return (
                   <button
                     key={v.id}
-                    onClick={() => {
+                    onClick={async () => {
                       updateSettings({ selectedVoiceURI: v.id });
-                      // 立即用所选声音试听（走 Edge 通道）
-                      try {
-                        const base = (window as any).__API_BASE__ || '';
-                        const a = new Audio(`${base}/api/tts?text=${encodeURIComponent('Hello, this is a quick voice test.')}&rate=${settings.rate.toFixed(2)}&voice=${encodeURIComponent(v.id)}`);
-                        a.volume = settings.volume;
-                        a.play().catch(() => toast.info('已选择该声音，点「测试声音」可试听'));
-                      } catch { /* ignore */ }
+                      setPreviewing(v.id);
+                      const mode = await previewTtsVoice(v.id, settings.rate, settings.volume);
+                      setPreviewing(null);
+                      if (mode === 'accent') {
+                        toast.info('当前网络下该音色不可用，已按口音朗读（男女声需 Edge 通道）', { duration: 3000 });
+                      } else if (mode === 'failed') {
+                        toast.error('试听失败，请检查网络');
+                      }
                     }}
                     className={cn(
                       'px-2 py-1.5 rounded-xl text-[10px] font-bold text-left transition-all border',
@@ -266,7 +269,7 @@ export default function TTSSettings() {
                   >
                     <span className="block truncate">{v.name}</span>
                     <span className="block text-[8px] font-bold opacity-60">
-                      {v.accent} · {v.gender === 'female' ? '女声' : '男声'}{active ? ' · 已选' : ''}
+                      {previewing === v.id ? '试听中…' : `${v.accent} · ${v.gender === 'female' ? '女声' : '男声'}${active ? ' · 已选' : ''}`}
                     </span>
                   </button>
                 );

@@ -80,6 +80,10 @@
 
 
 
+
+## 2026-09-15
+- fix(tts): no voice to choose — ship a built-in online neural voice catalog (`6e3f607`)
+
 ## 2026-09-15
 - fix(tts): phone had no voice to pick — enumerate the native engine's voices (`d6937a4`)
 

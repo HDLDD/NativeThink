@@ -15,7 +15,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
 import { getNativeTts as getNativeTtsPlugin } from './native-tts';
-import { edgeVoiceNameOf, isEdgeCatalogVoice } from './tts-voice-catalog';
+import { edgeVoiceNameOf, isEdgeCatalogVoice, googleLangOf } from './tts-voice-catalog';
 import { useTTSSettings } from './tts-settings';
 import { cleanText } from './utils';
 
@@ -158,8 +158,8 @@ function edgeTTSBlob(text: string, rate: number, voiceName = 'en-US-AriaNeural')
 
 // ── Tier 3: Google Translate TTS URL ──
 
-function googleTTSUrl(text: string): string {
-  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=${encodeURIComponent(text)}`;
+function googleTTSUrl(text: string, lang = 'en'): string {
+  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(text)}`;
 }
 
 // ── Tier 0: 原生 TTS（Android APK 内置插件 — 系统语音引擎，离线零延迟不断流） ──
@@ -169,10 +169,12 @@ const getNativeTts = getNativeTtsPlugin;
 
 // ── Tier 2b: Local server TTS (Edge neural voices + Windows SAPI) ──
 
-function cfTtsUrl(text: string, rate: number, voice?: string | null): string {
+function cfTtsUrl(text: string, rate: number, voice?: string | null, lang?: string): string {
   const base = (typeof window !== 'undefined' && (window as any).__API_BASE__) || '';
   const v = voice ? `&voice=${encodeURIComponent(voice)}` : '';
-  return `${base}/api/tts?text=${encodeURIComponent(text)}&rate=${rate.toFixed(2)}${v}`;
+  // lang 用于口音兜底：Edge 不可达时，云端用 Google 的语言变体发音
+  const l = lang ? `&lang=${encodeURIComponent(lang)}` : '';
+  return `${base}/api/tts?text=${encodeURIComponent(text)}&rate=${rate.toFixed(2)}${v}${l}`;
 }
 
 // ── Cache API 层：合成过的语音本地永久缓存 — 手机端重复朗读零等待 ──
@@ -432,8 +434,8 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       if (engine === 'cf') {
         // 预取下一句到 Cache API；当前句优先走本地缓存（二次朗读零等待）
         const next = chunks[idx + 1];
-        if (next) warmTtsCache(cfTtsUrl(next, rate, settings.selectedVoiceURI)).catch(() => {});
-        const url = cfTtsUrl(chunks[idx], rate, settings.selectedVoiceURI);
+        if (next) warmTtsCache(cfTtsUrl(next, rate, settings.selectedVoiceURI, googleLangOf(settings.selectedVoiceURI))).catch(() => {});
+        const url = cfTtsUrl(chunks[idx], rate, settings.selectedVoiceURI, googleLangOf(settings.selectedVoiceURI));
         getCachedOrUrl(url)
           .then((u) => playUrl(u, { applyRate: !isServerVoice(settings.selectedVoiceURI) }))
           .catch(onFail);
@@ -443,7 +445,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
           .catch(onFail);
       } else {
         // google
-        playUrl(googleTTSUrl(chunks[idx]), { applyRate: true });
+        playUrl(googleTTSUrl(chunks[idx], googleLangOf(settings.selectedVoiceURI)), { applyRate: true });
       }
     },
     [settings.volume, settings.selectedVoiceURI],
@@ -576,7 +578,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     // speak() will request — a mismatched cache key makes prewarm useless.
     const rate = opts?.rate ?? settings.rate;
     try {
-      const url = cfTtsUrl(cleaned, rate, settings.selectedVoiceURI);
+      const url = cfTtsUrl(cleaned, rate, settings.selectedVoiceURI, googleLangOf(settings.selectedVoiceURI));
       // 写入 Cache API（比单纯 HTTP 缓存可靠）— speak() 命中后即时起播
       warmTtsCache(url).catch(() => {});
     } catch { /* */ }
@@ -611,7 +613,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         // finishes playing, later chunks are already cached (no gaps)
         chunks.slice(1, 9).forEach((c, i) => {
           setTimeout(() => {
-            warmTtsCache(cfTtsUrl(c, rate, settings.selectedVoiceURI)).catch(() => {});
+            warmTtsCache(cfTtsUrl(c, rate, settings.selectedVoiceURI, googleLangOf(settings.selectedVoiceURI))).catch(() => {});
           }, 60 * (i + 1));
         });
         playChunkWithFallback(chunks, 0, rate, 0);
@@ -681,4 +683,39 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   useEffect(() => () => { stopKeepAlive(); clearSafety(); stopAudio(); }, []);
 
   return { speak, prewarm, pause, resume, cancel, isSpeaking, isPaused, currentWordIndex, voices };
+}
+
+/**
+ * 试听某个语音 —— 走与真实朗读相同的链路：
+ * Edge 通道（能给出具体音色）→ 失败则云端 Google 通道（保留口音差异）。
+ * 试听结果能真实反映之后的朗读效果，不会出现"试听和实际不一致"。
+ */
+export async function previewTtsVoice(
+  voiceURI: string | null,
+  rate: number,
+  volume: number,
+): Promise<'edge' | 'accent' | 'failed'> {
+  const text = 'Hello, this is a quick voice test.';
+  // 1) Edge：可给出具体音色（男女声/自然音）
+  if (voiceURI) {
+    try {
+      const blob = await edgeTTSBlob(text, rate, edgeVoiceFor(voiceURI));
+      const url = URL.createObjectURL(blob);
+      const a = new Audio(url);
+      a.volume = volume;
+      await a.play();
+      a.onended = () => URL.revokeObjectURL(url);
+      return 'edge';
+    } catch { /* Edge 不可达 → 口音兜底 */ }
+  }
+  // 2) 云端 Google 通道（口音变体）
+  try {
+    const url = cfTtsUrl(text, rate, voiceURI, googleLangOf(voiceURI));
+    const a = new Audio(url);
+    a.volume = volume;
+    await a.play();
+    return 'accent';
+  } catch {
+    return 'failed';
+  }
 }

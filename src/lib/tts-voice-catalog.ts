@@ -18,26 +18,58 @@ export interface ICatalogVoice {
   gender: 'female' | 'male';
   /** 口音标签，便于用户选择 */
   accent: '美音' | '英音' | '澳音';
+  /**
+   * 口音兜底：当 Edge 通道不可达（如国内网络）时，用 Google TTS 的
+   * 语言变体保留口音差异（tl=en / en-GB / en-AU），避免"所有声音都一样"。
+   */
+  googleLang: string;
 }
 
-export const EDGE_VOICE_CATALOG: ICatalogVoice[] = [
-  { id: 'srv:edge:en-US-AvaNeural', name: 'Ava · 自然', lang: 'en-US', gender: 'female', accent: '美音' },
-  { id: 'srv:edge:en-US-AndrewNeural', name: 'Andrew · 自然', lang: 'en-US', gender: 'male', accent: '美音' },
-  { id: 'srv:edge:en-US-EmmaNeural', name: 'Emma · 自然', lang: 'en-US', gender: 'female', accent: '美音' },
-  { id: 'srv:edge:en-US-BrianNeural', name: 'Brian · 自然', lang: 'en-US', gender: 'male', accent: '美音' },
-  { id: 'srv:edge:en-US-AriaNeural', name: 'Aria', lang: 'en-US', gender: 'female', accent: '美音' },
-  { id: 'srv:edge:en-US-JennyNeural', name: 'Jenny', lang: 'en-US', gender: 'female', accent: '美音' },
-  { id: 'srv:edge:en-US-GuyNeural', name: 'Guy', lang: 'en-US', gender: 'male', accent: '美音' },
-  { id: 'srv:edge:en-US-AnaNeural', name: 'Ana · 童声', lang: 'en-US', gender: 'female', accent: '美音' },
-  { id: 'srv:edge:en-GB-SoniaNeural', name: 'Sonia', lang: 'en-GB', gender: 'female', accent: '英音' },
-  { id: 'srv:edge:en-GB-RyanNeural', name: 'Ryan', lang: 'en-GB', gender: 'male', accent: '英音' },
-  { id: 'srv:edge:en-GB-LibbyNeural', name: 'Libby', lang: 'en-GB', gender: 'female', accent: '英音' },
-  { id: 'srv:edge:en-AU-NatashaNeural', name: 'Natasha', lang: 'en-AU', gender: 'female', accent: '澳音' },
+interface IVoiceSeed {
+  /** Edge 语音名 */
+  n: string;
+  /** 显示名 */
+  label: string;
+  lang: string;
+  gender: 'female' | 'male';
+  accent: '美音' | '英音' | '澳音';
+  /** 口音兜底（Google TTS 语言变体） */
+  googleLang: string;
+}
+
+const SEED: IVoiceSeed[] = [
+  { n: 'en-US-AvaNeural', label: 'Ava · 自然', lang: 'en-US', gender: 'female', accent: '美音', googleLang: 'en' },
+  { n: 'en-US-AndrewNeural', label: 'Andrew · 自然', lang: 'en-US', gender: 'male', accent: '美音', googleLang: 'en' },
+  { n: 'en-US-EmmaNeural', label: 'Emma · 自然', lang: 'en-US', gender: 'female', accent: '美音', googleLang: 'en' },
+  { n: 'en-US-BrianNeural', label: 'Brian · 自然', lang: 'en-US', gender: 'male', accent: '美音', googleLang: 'en' },
+  { n: 'en-US-AriaNeural', label: 'Aria', lang: 'en-US', gender: 'female', accent: '美音', googleLang: 'en' },
+  { n: 'en-US-JennyNeural', label: 'Jenny', lang: 'en-US', gender: 'female', accent: '美音', googleLang: 'en' },
+  { n: 'en-US-GuyNeural', label: 'Guy', lang: 'en-US', gender: 'male', accent: '美音', googleLang: 'en' },
+  { n: 'en-US-AnaNeural', label: 'Ana · 童声', lang: 'en-US', gender: 'female', accent: '美音', googleLang: 'en' },
+  { n: 'en-GB-SoniaNeural', label: 'Sonia', lang: 'en-GB', gender: 'female', accent: '英音', googleLang: 'en-GB' },
+  { n: 'en-GB-RyanNeural', label: 'Ryan', lang: 'en-GB', gender: 'male', accent: '英音', googleLang: 'en-GB' },
+  { n: 'en-GB-LibbyNeural', label: 'Libby', lang: 'en-GB', gender: 'female', accent: '英音', googleLang: 'en-GB' },
+  { n: 'en-AU-NatashaNeural', label: 'Natasha', lang: 'en-AU', gender: 'female', accent: '澳音', googleLang: 'en-AU' },
 ];
+
+export const EDGE_VOICE_CATALOG: ICatalogVoice[] = SEED.map((v) => ({
+  id: `srv:edge:${v.n}`,
+  name: v.label,
+  lang: v.lang,
+  gender: v.gender,
+  accent: v.accent,
+  googleLang: v.googleLang,
+}));
 
 /** 是否为内置在线神经语音 id */
 export function isEdgeCatalogVoice(uri: string | null | undefined): boolean {
   return !!uri && uri.startsWith('srv:edge:');
+}
+
+/** 取该语音的 Google 口音兜底语言（非目录语音返回 'en'） */
+export function googleLangOf(uri: string | null | undefined): string {
+  const hit = EDGE_VOICE_CATALOG.find((v) => v.id === uri);
+  return hit?.googleLang || 'en';
 }
 
 /** 从 id 取出 Edge 语音名（如 srv:edge:en-US-AvaNeural → en-US-AvaNeural） */
