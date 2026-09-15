@@ -65,7 +65,7 @@ function notifyTtsFailure(): void {
   const now = Date.now();
   if (now - _lastTtsFailNotice < 5000) return;
   _lastTtsFailNotice = now;
-  try { toast.error('朗读暂时不可用，请点击重试'); } catch { /* ignore */ }
+  try { toast.error('朗读暂时不可用（可在设置里点「朗读自检」定位原因）', { duration: 5000 }); } catch { /* ignore */ }
 }
 
 /**
@@ -520,6 +520,11 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   const speakSS = useCallback(
     (text: string, rate: number, pitch: number, volume: number, lang: string, fallbackTimer?: ReturnType<typeof setTimeout>) => {
       if (!ttsSupported) return;
+      // 安卓 APK 上 WebView 的语音合成无声却会回报成功 → 绝不使用，直接交给降级定时器
+      if (IS_ANDROID_NATIVE) {
+        if (fallbackTimer) { /* 让它自然触发 → 走原生/网络引擎 */ }
+        return;
+      }
 
       genRef.current++;
       const gen = genRef.current;
@@ -659,9 +664,13 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
       // A server-provided voice (Edge neural / Windows SAPI) can only be
       // synthesized by the local server — skip SpeechSynthesis entirely
-      if (isIOS() || isElectron() || isServerVoice(settings.selectedVoiceURI)) {
-        // iOS: SpeechSynthesis broken. Electron: voices often missing/silent.
-        // Server voice: synthesized by /api/tts. All → network engines.
+      if (isIOS() || isElectron() || IS_ANDROID_NATIVE || isServerVoice(settings.selectedVoiceURI)) {
+        // iOS: SpeechSynthesis broken.
+        // Android WebView（APK）：speechSynthesis 是个"假 API"——会触发 onstart
+        //   让调用方以为播放成功（从而取消降级定时器），但完全不出声。
+        //   这就是"手机点了不朗读"的根因，必须完全绕开它。
+        // Electron: voices often missing/silent.
+        // Server voice: synthesized by /api/tts. All → native/network engines.
         // Pipeline warm-up: stagger-prefetch upcoming chunks in parallel —
         // the server synthesizes each independently, so by the time chunk 0
         // finishes playing, later chunks are already cached (no gaps)

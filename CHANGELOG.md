@@ -83,6 +83,10 @@
 
 
 
+
+## 2026-09-15
+- perf(tts): 几十毫秒级朗读 —— 全站提前预热 + 本地引擎引导 (`c008815`)
+
 ## 2026-09-15
 - fix(tts): reading aloud could stall forever on phones + slow preview (`5061fda`)
 
