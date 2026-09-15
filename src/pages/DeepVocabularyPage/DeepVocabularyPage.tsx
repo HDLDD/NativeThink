@@ -370,6 +370,14 @@ export default function DeepVocabularyPage() {
     preloadLevels(levels).then(() => { setDataReady(true); setDataVersion((v) => v + 1); });
   }, [selectedLevel]);
 
+  // 选中单词即预热（点击朗读/自动朗读命中缓存，首播 1.2s → ~10ms）
+  useEffect(() => {
+    const w = selectedWord?.word;
+    if (!w) return;
+    const t = setTimeout(() => { try { browseTtsRef.current.prewarm(w, { rate: 0.9 }); } catch { /* ignore */ } }, 80);
+    return () => clearTimeout(t);
+  }, [selectedWord?.word]);
+
   const markSetupDone = () => {
     try { safeStorage.setItem(SETUP_DONE_KEY, '1'); } catch { /* ignore */ }
     setSetupDone(true);
@@ -731,6 +739,7 @@ export default function DeepVocabularyPage() {
     const idx = filteredWords.findIndex((w) => w.word === selectedWord.word);
     const next = filteredWords[idx + 1];
     if (next) browseTtsRef.current.prewarm(next.word, { rate: 0.9 });
+
   }, [selectedWord, tab]);
 
   const switchLevel = (level: string) => {

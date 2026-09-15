@@ -8,6 +8,8 @@ import { useFocusMode } from '@/lib/focus-mode';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { safeStorage } from '@/lib/safe-storage';
+import { isAndroidNative, listNativeEnglishVoices, openNativeTtsInstall } from '@/lib/native-tts';
+import { toast } from 'sonner';
 
 function PageFallback() {
   return (
@@ -78,6 +80,28 @@ export function Layout() {
       } catch { /* ignore */ }
     }
   }, [location.pathname]);
+
+  // Android 启动检查：没有英语系统语音时引导安装 ——
+  // 只有本地引擎能做到"几十毫秒"级朗读延迟（在线通道首播约 1 秒）
+  useEffect(() => {
+    if (!isAndroidNative()) return;
+    const KEY = '__nativethink_native_voice_hint_at';
+    try {
+      const last = Number(safeStorage.getItem(KEY) || 0);
+      if (Date.now() - last < 3 * 24 * 3600 * 1000) return; // 3 天内不再打扰
+    } catch { /* ignore */ }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const voices = await listNativeEnglishVoices();
+      if (cancelled || voices.length > 0) return;
+      try { safeStorage.setItem(KEY, String(Date.now())); } catch { /* ignore */ }
+      toast.info('安装英语语音包可让朗读零延迟（离线、瞬间出声）', {
+        duration: 9000,
+        action: { label: '去安装', onClick: () => { void openNativeTtsInstall(); } },
+      });
+    }, 3500);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, []);
 
   return (
     <SidebarProvider>

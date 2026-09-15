@@ -302,7 +302,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setSessionWords(all);
     sessionStatsRef.current = { review: reviewWords.length, fresh: newOnes.length, startedAt: Date.now() };
     // 会话预热：预合成前 3 个词，首词朗读零等待
-    all.slice(0, 3).forEach((w, i) => {
+    all.slice(0, 5).forEach((w, i) => {
       setTimeout(() => ttsRef.current.prewarm(w.word, { rate: 0.85 }), 120 * i);
     });
     setCurrentIdx(0);

@@ -519,6 +519,13 @@ export default function SpellingPage() {
 
       // Cancel any lingering TTS, then auto-play
       tts.cancel();
+      // 提前合成：本句 + 下一句 —— 句子音频较长，首播原本要等 1s+；预热后命中缓存近乎瞬时
+      tts.prewarm(currentSentence.en, { rate: 0.85 });
+      const nx = sessionQueue[currentIndex + 1];
+      if (nx) {
+        const ns = sentences.find((x) => x.id === nx);
+        if (ns?.en) tts.prewarm(ns.en, { rate: 0.85 });
+      }
       const timer = setTimeout(() => {
         if (mode === 'dictation' && autoRead) tts.speak(currentSentence.en);
       }, 500);

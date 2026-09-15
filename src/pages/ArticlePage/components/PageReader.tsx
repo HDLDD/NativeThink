@@ -430,6 +430,23 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const goPrev = () => { if (currentPage > 0) turnTo(currentPage - 1, 'prev'); };
   const goNext = () => { if (currentPage < activePages - 1) turnTo(currentPage + 1, 'next'); };
 
+  const ttsRef = useRef(tts);
+  ttsRef.current = tts;
+
+  // 翻页/切页时预热本页段落音频 —— 用户点朗读时命中缓存（首播 1.2s → ~10ms）
+  const prewarmPage = useCallback(() => {
+    const page = validPages[currentPage];
+    if (!page) return;
+    page.paragraphs
+      .filter((pp) => !pp.en.startsWith('##CHAPTER##'))
+      .slice(0, 3)
+      .forEach((pp, i) => {
+        const text = cleanText(pp.en);
+        if (text) setTimeout(() => { try { ttsRef.current.prewarm(text, { rate: 0.85 }); } catch { /* ignore */ } }, 120 * i);
+      });
+  }, [currentPage, validPages]);
+  useEffect(() => { prewarmPage(); }, [prewarmPage]);
+
   // 翻页后内容从头显示（否则新页面带着上一页的滚动位置，像"还在滚动"）
   useEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = 0;

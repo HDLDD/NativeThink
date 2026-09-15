@@ -102,7 +102,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   // 会话预热：进入队列时预合成前 3 个词，首词朗读零等待
   useEffect(() => {
     if (!autoSpeak) return;
-    queue.slice(0, 3).forEach((w, i) => {
+    queue.slice(0, 5).forEach((w, i) => {
       setTimeout(() => ttsRef.current.prewarm(w.word, { rate: 0.85 }), 120 * i);
     });
   }, [queue]);

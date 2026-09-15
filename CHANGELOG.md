@@ -82,6 +82,10 @@
 
 
 
+
+## 2026-09-15
+- fix(tts): reading aloud could stall forever on phones + slow preview (`5061fda`)
+
 ## 2026-09-15
 - fix(tts): all voices sounded identical — Edge channel is unreachable here (`90660ce`)
 
