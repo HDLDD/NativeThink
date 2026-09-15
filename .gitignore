@@ -11,3 +11,5 @@ release/
 models-bundled/
 android/keystore.properties
 *.keystore
+.books-clean.cjs
+.split-chapters.cjs
