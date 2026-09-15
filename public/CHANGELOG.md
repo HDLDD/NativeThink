@@ -95,6 +95,10 @@
 
 
 
+
+## 2026-09-15
+- feat(ai): 免费模型按任务分工 + 回退链补 glm-4.7-flash (`de99479`)
+
 ## 2026-09-15
 - fix(dev): 用当前 node 直跑 vite bin，修复 Windows 下 spawn('npx') ENOENT (`6ee43a2`)
 

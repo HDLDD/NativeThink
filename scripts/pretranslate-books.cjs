@@ -28,9 +28,15 @@ const API_KEY = fs.existsSync(path.join(__dirname, '.apikey'))
   ? fs.readFileSync(path.join(__dirname, '.apikey'), 'utf8').trim()
   : '';
 const GLM_ENDPOINT = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
-const MODELS = ['glm-4-flash-250414', 'glm-4-flash'];
+/**
+ * 批量首选 glm-4-flash —— 实测免费档限流是按模型计的：打满 250414 时
+ * glm-4-flash 仍 6/6 成功。且 250414 是出厂 app 的对话默认档，批量让开它，
+ * 用户端就不会被批量任务限流。
+ * 不用 glm-4v-flash：它会复述格式指令（输出「第一段译文：」）、产生幻觉且慢一倍。
+ */
+const MODELS = ['glm-4-flash', 'glm-4-flash-250414'];
 const BATCH = 4;
-const CONCURRENCY = 2;
+const CONCURRENCY = 4;
 const PROXY = 'https://nativethink.pages.dev/api/gutenberg';
 
 /**
