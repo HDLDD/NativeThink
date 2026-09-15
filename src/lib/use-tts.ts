@@ -15,7 +15,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
 import { getNativeTts as getNativeTtsPlugin } from './native-tts';
-import { edgeVoiceNameOf, googleLangOf } from './tts-voice-catalog';
+import { edgeVoiceNameOf, googleLangOf, isEdgeCatalogVoice } from './tts-voice-catalog';
 import { useTTSSettings } from './tts-settings';
 import { cleanText } from './utils';
 
@@ -350,8 +350,10 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       // 云端通道经 Cloudflare 边缘访问 Google，是网络环境下的可靠通道）。
       // Android：原生引擎优先（离线、零延迟、不断流）→ 云端 → 其余
       // 其他平台：云端 → Edge → Google
+      // 用户显式选了在线语音 → 直接走云端（原生引擎发不出该音色，先试只会白等）
+      const wantsOnlineVoice = isEdgeCatalogVoice(settings.selectedVoiceURI);
       const engines: Array<'native' | 'cf' | 'edge' | 'google'> = IS_ANDROID_NATIVE
-        ? ['native', 'cf', 'edge', 'google']
+        ? (wantsOnlineVoice ? ['cf', 'native', 'edge', 'google'] : ['native', 'cf', 'edge', 'google'])
         : ['cf', 'edge', 'google'];
       const engine = engines[engineIdx];
       if (!engine || abortedRef.current || idx >= chunks.length) {
@@ -453,6 +455,11 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
               })).then((h: any) => { listenerHandle = h; }).catch(() => {});
             } catch { /* ignore */ }
 
+            const startedAt = Date.now();
+            // 预期朗读时长（粗略）：按词数估算，用于识别"瞬间返回但没出声"的假成功
+            const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+            const expectedMs = Math.max(500, (wordCount * 260) / Math.max(0.5, rate));
+
             plugin.speak({
               text,
               lang: 'en-US',
@@ -470,6 +477,14 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
                 settled = true;
                 teardown();
                 nativeActiveRef.current = false;
+                const elapsed = Date.now() - startedAt;
+                // 假成功识别：引擎立即 resolve、且从未触发 onRangeStart（真的没出声）
+                // → 不能当成播放完成，必须降级到网络引擎，否则就是"点了没声"
+                if (!spokeAtLeastOnce && elapsed < Math.min(expectedMs * 0.4, 1500)) {
+                  console.info('[tts] native resolved silently (' + elapsed + 'ms) → fallback');
+                  if (!abortedRef.current) onFail();
+                  return;
+                }
                 if (!abortedRef.current) onDone();
               })
               .catch(() => {

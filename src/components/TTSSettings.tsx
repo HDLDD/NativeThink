@@ -189,8 +189,8 @@ export default function TTSSettings() {
         </div>
 
         <div className="p-5 space-y-5">
-          {/* Voice selector */}
-          <div className="space-y-2">
+          {/* Voice selector —— 手机（Android WebView）没有浏览器语音，隐藏以免误导 */}
+          <div className={cn('space-y-2', isNative && 'hidden')}>
             <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
               朗读声音
             </label>
@@ -243,7 +243,7 @@ export default function TTSSettings() {
           {/* 内置在线神经语音 — 不依赖系统语音，所有平台都能选（需联网） */}
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-              内置在线语音 <span className="text-muted-foreground/60 normal-case font-bold">推荐 · 音质好 · 需联网</span>
+              朗读声音 · 内置在线语音 <span className="text-muted-foreground/60 normal-case font-bold">推荐 · 音质好 · 需联网</span>
             </label>
             <div className="grid grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-0.5">
               {EDGE_VOICE_CATALOG.map((v) => {
