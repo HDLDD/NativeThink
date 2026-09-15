@@ -9,3 +9,5 @@ Thumbs.db
 release/
 .local-data/
 models-bundled/
+android/keystore.properties
+*.keystore

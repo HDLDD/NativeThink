@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart3,
@@ -21,6 +21,7 @@ import {
   Volume2,
   RotateCw,
   Download,
+  Upload,
   AlertTriangle,
   CheckCircle2,
   ExternalLink,
@@ -46,6 +47,7 @@ import { useTTS } from '@/lib/use-tts';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { EmptyState } from '@/components/EmptyState';
 import { safeStorage } from '@/lib/safe-storage';
+import { exportBackup, importBackup, type IBackupFile } from '@/lib/backup';
 import { WORD_COUNTS } from '@/data/wordbank/meta';
 import { cn, cleanText } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -280,28 +282,34 @@ export default function ProgressPage() {
   }, [currentMonth, calendar]);
 
   // ── 导出学习数据（JSON 备份，可自行保存/迁移） ──
-  const exportLearningData = useCallback(() => {
+  /** 导出全部数据（学习记录 + 阅读翻译缓存）— 更新安装包前建议导出一次 */
+  const exportLearningData = useCallback(async () => {
     try {
-      const prefix = safeStorage.getPrefixedKey('');
-      const out: Record<string, string> = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (!key?.startsWith(prefix)) continue;
-        out[key.slice(prefix.length)] = localStorage.getItem(key) || '';
-      }
-      const blob = new Blob(
-        [JSON.stringify({ app: 'NativeThink', exportedAt: new Date().toISOString(), data: out }, null, 2)],
-        { type: 'application/json' },
-      );
+      const { file, localStorageCount, idbCount, idbSkipped } = await exportBackup();
+      const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `nativethink-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`已导出 ${Object.keys(out).length} 项学习数据`);
+      toast.success(`已导出 ${localStorageCount} 项数据${idbCount ? ` + ${idbCount} 份翻译缓存` : ''}${idbSkipped ? '（缓存过大已省略，可重新翻译）' : ''}`);
     } catch {
       toast.error('导出失败，请重试');
+    }
+  }, []);
+
+  /** 从备份文件恢复 — 重装/换设备后使用 */
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const handleImportFile = useCallback(async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as IBackupFile;
+      const { restored, restoredIdb } = await importBackup(parsed);
+      toast.success(`已恢复 ${restored} 项数据${restoredIdb ? ` + ${restoredIdb} 份翻译缓存` : ''}，页面即将刷新`);
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (e) {
+      toast.error(e instanceof Error && e.message.includes('格式') ? e.message : '恢复失败：文件无法解析');
     }
   }, []);
 
@@ -382,6 +390,26 @@ export default function ProgressPage() {
               <Download className="size-3.5 mr-1.5" />
               导出学习数据
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+            >
+              <Upload className="size-3.5 mr-1.5" />
+              从备份恢复
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleImportFile(f);
+                e.target.value = '';
+              }}
+            />
           </div>
         </div>
       </div>

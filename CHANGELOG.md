@@ -76,6 +76,10 @@
 
 
 
+
+## 2026-09-15
+- feat(dashboard,reset,mobile): refresh home, extend reset, fix clipped icons (`13a0e3e`)
+
 ## 2026-09-15
 - fix(flashcards): long words wrapped a stray letter to line 2 — fit-to-width instead (`819a007`)
 

@@ -23,11 +23,39 @@ function generateAnonId(): string {
   return `anon_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * 自愈：引导键（ANON_ID_KEY）丢失但前缀数据仍在时，从既有键名里恢复 anonId，
+ * 否则新生成的 ID 会让所有历史数据"隐身"（看起来像数据丢失）。
+ * 场景：用户清理了部分 localStorage、或导入备份后首次打开。
+ */
+function recoverAnonIdFromStorage(): string | null {
+  try {
+    const marker = '__miaoda___global____';
+    const suffix = '__:';
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(marker)) continue;
+      const rest = k.slice(marker.length);
+      const end = rest.indexOf(suffix);
+      if (end <= 0) continue;
+      const candidate = rest.slice(0, end);
+      if (candidate.startsWith('anon_')) return candidate;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 function getAnonId(): string {
   try {
     const existing = localStorage.getItem(ANON_ID_KEY);
     if (existing) return existing;
   } catch { /* ignore */ }
+  // 引导键丢失 → 先尝试从既有数据键恢复
+  const recovered = recoverAnonIdFromStorage();
+  if (recovered) {
+    try { localStorage.setItem(ANON_ID_KEY, recovered); } catch { /* ignore */ }
+    return recovered;
+  }
   const id = generateAnonId();
   try {
     localStorage.setItem(ANON_ID_KEY, id);
