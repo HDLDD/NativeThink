@@ -9,6 +9,7 @@ import { findWord, getWordCounts } from '@/data/wordbank';
 import { useWordLearning } from '@/lib/use-word-learning';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useImmersive } from '@/lib/focus-mode';
+import { FitWord } from '@/components/FitWord';
 import { cn, cleanText } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTTS } from '@/lib/use-tts';
@@ -326,11 +327,10 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                         </span>
                       )}
                     </Badge>
-                    <div className="flex items-center justify-center gap-3 mb-2 max-w-full">
-                      <h2 className={cn(
-                        'font-black italic text-foreground tracking-tight break-words min-w-0',
-                        cw.word.length > 14 ? 'text-2xl sm:text-3xl' : cw.word.length > 10 ? 'text-3xl sm:text-4xl' : 'text-4xl',
-                      )}>{cw.word}</h2>
+                                        <div data-fit-box className="flex items-center justify-center gap-2 mb-4 max-w-full">
+                      <h2 className="text-foreground min-w-0 max-w-full">
+                        <FitWord text={cw.word} maxPx={40} minPx={18} reservePx={52} />
+                      </h2>
                       <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(cw.word, { rate: 0.9 }); }}
                         className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-violet"><Volume2 className="size-5" /></Button>
                     </div>

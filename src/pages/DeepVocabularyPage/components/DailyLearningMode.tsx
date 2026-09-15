@@ -16,6 +16,7 @@ import { sfxCorrect, sfxWrong, sfxTick, sfxComplete } from '@/lib/sfx';
 import STATIC_COLLOC_TRANSLATIONS from '@/data/wordbank/collocation-translations';
 import { translateWithLocalMt, isLocalMtReady } from '@/lib/local-mt';
 import { useAI } from '@/hooks/use-ai';
+import { FitWord } from '@/components/FitWord';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -830,11 +831,10 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                             <Badge className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground mb-4">
                               {state.progress[currentWord.word.toLowerCase()] ? '复习' : '新学'}
                             </Badge>
-                            <div className="flex items-center justify-center gap-3 mb-3 max-w-full">
-                              <h2 className={cn(
-                                'font-black italic text-foreground tracking-tight break-words min-w-0',
-                                currentWord.word.length > 14 ? 'text-3xl' : currentWord.word.length > 10 ? 'text-4xl' : 'text-5xl',
-                              )}>{currentWord.word}</h2>
+                            <div data-fit-box className="flex items-center justify-center gap-3 mb-3 max-w-full">
+                              <h2 className="text-foreground min-w-0 max-w-full">
+                                <FitWord text={currentWord.word} maxPx={48} minPx={20} reservePx={56} />
+                              </h2>
                               <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(currentWord.word, { rate: 0.9 }); }} className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal">
                                 <Volume2 className="size-5" />
                               </Button>

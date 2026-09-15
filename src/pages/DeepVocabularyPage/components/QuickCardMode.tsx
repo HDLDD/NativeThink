@@ -22,6 +22,7 @@ import { useTTS } from '@/lib/use-tts';
 import { useImmersive } from '@/lib/focus-mode';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { sfxTick, sfxComplete } from '@/lib/sfx';
+import { FitWord } from '@/components/FitWord';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn } from '@/lib/utils';
 
@@ -269,11 +270,10 @@ export default function QuickCardMode({ level }: { level: string }) {
               revealed ? 'border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/10' : 'border-border bg-card',
             )}>
               <CardContent className="p-8 text-center space-y-3">
-                <div className="flex items-center justify-center gap-2 max-w-full">
-                  <h2 className={cn(
-                    'font-black italic text-foreground tracking-tight break-words min-w-0',
-                    cw.word.length > 14 ? 'text-3xl' : cw.word.length > 10 ? 'text-4xl' : 'text-5xl',
-                  )}>{cw.word}</h2>
+                <div data-fit-box className="flex items-center justify-center gap-2 max-w-full">
+                  <h2 className="text-foreground min-w-0 max-w-full">
+                    <FitWord text={cw.word} maxPx={48} minPx={20} reservePx={52} />
+                  </h2>
                   <Button
                     variant="ghost" size="icon"
                     onClick={() => tts.speak(cw.word, { rate: 0.9 })}

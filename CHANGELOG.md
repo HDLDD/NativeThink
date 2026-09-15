@@ -74,6 +74,10 @@
 
 
 
+
+## 2026-09-15
+- feat(spelling,vocab): typewriter caret + batched collocation translation (`cf4655b`)
+
 ## 2026-09-15
 - fix(dark): flashcard back had no dark variant — white text on pale lavender (`e63ab60`)
 
