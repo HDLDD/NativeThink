@@ -154,6 +154,8 @@ function DictationInput({
   correctWords: Record<number, boolean>;
   inputRefs: React.MutableRefObject<(HTMLInputElement | null)[]>;
 }) {
+  // 当前聚焦格子 → 光标只出现在该格文字末尾并闪烁
+  const [focusedIdx, setFocusedIdx] = useState<number | null>(null);
   return (
     <>
       {/* One sentence window — no word windows */}
@@ -169,13 +171,9 @@ function DictationInput({
             >
               {/* Text above underline — with focus indicator vertical bar */}
               <span className="relative flex items-center">
-                {/* Vertical bar — shows on focus */}
-                <span className="absolute -left-[3px] text-ink-teal font-black text-base leading-none select-none opacity-0 group-focus-within:opacity-100 transition-opacity duration-150">
-                  |
-                </span>
                 <span
                   className={cn(
-                    'text-sm font-mono leading-tight min-h-[1.3em] text-center transition-colors duration-150',
+                    'text-sm font-mono leading-tight min-h-[1.3em] text-center transition-colors duration-150 inline-flex items-center',
                     submitted
                       ? isCorrect
                         ? 'text-emerald-600 dark:text-emerald-400 font-bold'
@@ -186,7 +184,16 @@ function DictationInput({
                   {submitted && !userInputs[i] ? (
                     <span className="tracking-[0.2em] text-muted-foreground/40">——</span>
                   ) : (
-                    userInputs[i] || ' '
+                    <>
+                      <span>{userInputs[i]}</span>
+                      {/* 打字机式光标：跟在已输入文字之后并闪烁 */}
+                      {!submitted && focusedIdx === i && (
+                        <span
+                          aria-hidden="true"
+                          className="spelling-caret ml-px inline-block w-[2px] h-[1.05em] bg-[#00B894] rounded-full"
+                        />
+                      )}
+                    </>
                   )}
                 </span>
               </span>
@@ -226,9 +233,11 @@ function DictationInput({
                   }
                 }}
                 onFocus={() => {
+                  setFocusedIdx(i);
                   // Scroll the word into view if needed
                   inputRefs.current[i]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
                 }}
+                onBlur={() => setFocusedIdx((prev) => (prev === i ? null : prev))}
               />
             </div>
           );

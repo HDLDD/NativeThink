@@ -73,6 +73,10 @@
 
 
 
+
+## 2026-09-15
+- fix(dark): flashcard back had no dark variant — white text on pale lavender (`e63ab60`)
+
 ## 2026-09-15
 - feat(vocab): collocations on the daily-learning flashcard back (`7b4281b`)
 

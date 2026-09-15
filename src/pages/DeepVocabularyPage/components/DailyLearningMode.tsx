@@ -14,6 +14,7 @@ import { useImmersive } from '@/lib/focus-mode';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { sfxCorrect, sfxWrong, sfxTick, sfxComplete } from '@/lib/sfx';
 import STATIC_COLLOC_TRANSLATIONS from '@/data/wordbank/collocation-translations';
+import { translateWithLocalMt, isLocalMtReady } from '@/lib/local-mt';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn } from '@/lib/utils';
@@ -101,25 +102,64 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   const [collocTranslating, setCollocTranslating] = useState<string | null>(null);
   const collocZh = (phrase: string): string | null =>
     STATIC_COLLOC_TRANSLATIONS[phrase.toLowerCase()] || collocCache[phrase.toLowerCase()] || null;
-  const translateColloc = async (phrase: string) => {
-    const key = phrase.toLowerCase();
-    if (STATIC_COLLOC_TRANSLATIONS[key] || collocCache[key] || collocTranslating) return;
-    setCollocTranslating(key);
-    try {
-      const zh = await aiChat(
-        [
-          { role: 'system', content: 'Translate this English collocation/phrase into natural concise Chinese (max 12 chars). Return ONLY the Chinese, no pinyin, no explanation.' },
-          { role: 'user', content: phrase },
-        ],
-        { temperature: 0.2, maxTokens: 40 },
-      );
+  /**
+   * 批量翻译本词所有缺中文的搭配：
+   * 1) 本地离线模型（就绪时瞬时完成、不消耗额度）
+   * 2) 剩余的一次 AI 请求搞定（而不是每条约一次，3 条 15s → 1 次 ~3s）
+   */
+  const translateCollocBatch = async (phrases: string[]) => {
+    const missing = phrases.filter((p) => {
+      const k = p.toLowerCase();
+      return !STATIC_COLLOC_TRANSLATIONS[k] && !collocCache[k];
+    });
+    if (missing.length === 0 || collocTranslating) return;
+    setCollocTranslating('__batch__');
+    const got: Record<string, string> = {};
+
+    // 1) 本地模型
+    if (isLocalMtReady()) {
+      try {
+        const out = await translateWithLocalMt(missing);
+        missing.forEach((p, i) => { const t = (out[i] || '').trim(); if (t) got[p.toLowerCase()] = t; });
+      } catch { /* 继续走 AI */ }
+    }
+
+    // 2) 剩余的一次 AI 批量请求
+    const still = missing.filter((p) => !got[p.toLowerCase()]);
+    if (still.length > 0) {
+      try {
+        const res = await aiChat(
+          [
+            {
+              role: 'system',
+              content: 'Translate each numbered English collocation/phrase into concise natural Chinese (max 12 chars each). Output STRICT JSON only: {"t":[{"i":1,"zh":"..."}]}. No markdown, no explanation.',
+            },
+            { role: 'user', content: still.map((p, i) => `[${i + 1}] ${p}`).join(String.fromCharCode(10)) },
+          ],
+          { temperature: 0.2, maxTokens: 400 },
+        );
+        const m = res.match(/\{[\s\S]*\}/);
+        if (m) {
+          const parsed = JSON.parse(m[0]) as { t?: { i: number; zh: string }[] };
+          for (const item of parsed.t || []) {
+            const idx = Number(item.i) - 1;
+            const src = still[idx];
+            if (src && item.zh) got[src.toLowerCase()] = String(item.zh).trim();
+          }
+        }
+      } catch { /* 保持未翻译，用户可再点 */ }
+    }
+
+    if (Object.keys(got).length > 0) {
       setCollocCache((prev) => {
-        const next = { ...prev, [key]: zh.trim() };
+        const next = { ...prev, ...got };
         try { safeStorage.setItem(COLLOC_AI_CACHE_KEY, JSON.stringify(next)); } catch { /* quota */ }
         return next;
       });
-    } catch { toast.error('搭配翻译失败，请稍后重试'); }
-    finally { setCollocTranslating(null); }
+    } else {
+      toast.error('搭配翻译失败，请稍后重试');
+    }
+    setCollocTranslating(null);
   };
 
   // 会话完成庆祝（借鉴 Duolingo 完课页）
@@ -503,6 +543,20 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   const currentModeLabel = modeLabels.find((m) => m.key === reviewMode)?.label || '闪卡';
   // 学习中 → 隐藏概览（标题/KPI/进度/设置），只保留学习卡片 + 左上返回
   const inSession = sessionWords.length > 0 && !!currentWord;
+
+  /** 搭配区出现时自动补译（本地就绪则瞬时；否则一次批量请求） */
+  const collocAutoRef = useRef<string>('');
+  useEffect(() => {
+    if (!inSession || !isFlipped || !currentWord) return;
+    const list = currentWord.collocations.slice(0, 3);
+    if (list.length === 0) return;
+    if (collocAutoRef.current === currentWord.word) return;
+    const need = list.some((c) => !STATIC_COLLOC_TRANSLATIONS[c.toLowerCase()] && !collocCache[c.toLowerCase()]);
+    if (!need) return;
+    collocAutoRef.current = currentWord.word;
+    void translateCollocBatch(list);
+  }, [inSession, isFlipped, currentWord, collocCache]);
+
   useImmersive(inSession);
   const exitSession = () => {
     setSessionWords([]);
@@ -829,11 +883,11 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                                           <span className="text-xs text-muted-foreground">{zh}</span>
                                         ) : (
                                           <button
-                                            onClick={(e) => { e.stopPropagation(); translateColloc(c); }}
+                                            onClick={(e) => { e.stopPropagation(); translateCollocBatch(currentWord.collocations.slice(0, 3)); }}
                                             className="text-[9px] font-bold text-muted-foreground/60 hover:text-ink-teal transition-colors shrink-0"
                                             title="AI 翻译该搭配"
                                           >
-                                            {collocTranslating === c.toLowerCase() ? '翻译中…' : '译'}
+                                            {collocTranslating ? '翻译中…' : '译'}
                                           </button>
                                         )}
                                       </div>
