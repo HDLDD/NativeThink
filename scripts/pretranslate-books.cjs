@@ -29,14 +29,19 @@ const API_KEY = fs.existsSync(path.join(__dirname, '.apikey'))
   : '';
 const GLM_ENDPOINT = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
 /**
- * 批量首选 glm-4-flash —— 实测免费档限流是按模型计的：打满 250414 时
- * glm-4-flash 仍 6/6 成功。且 250414 是出厂 app 的对话默认档，批量让开它，
- * 用户端就不会被批量任务限流。
- * 不用 glm-4v-flash：它会复述格式指令（输出「第一段译文：」）、产生幻觉且慢一倍。
+ * 批量固定走 glm-4-flash。实测（真实长段落，每批 4 段、约 590 输出 token/请求）：
+ *   glm-4-flash        10 并发 54 段/分钟、20 并发 93 段/分钟（均 0 失败）、40 并发起 429
+ *   glm-4-flash-250414 4/8/16 并发都只有 2/24 成功 —— 额度已基本耗尽，打不了主力
+ * 故取 20 并发作甜点。250414 只作重试备用档：它单 token 更快（28ms vs 67ms），
+ * 额度若恢复能派上用场；同时它是出厂 app 的对话默认档，让开主力位用户端就不受批量影响。
+ * 不用 glm-4v-flash：会复述格式指令（输出「第一段译文：」）、产生幻觉且慢一倍。
+ *
+ * 注意：不要靠高频重试去「榨」已耗尽模型的额度 —— 那等于对免费接口刷被拒请求，会连累账号。
  */
 const MODELS = ['glm-4-flash', 'glm-4-flash-250414'];
 const BATCH = 4;
-const CONCURRENCY = 4;
+/** 实测甜点：20 并发零限流（40 并发开始 429），相比最初 2 并发吞吐提升约 4 倍 */
+const CONCURRENCY = 20;
 const PROXY = 'https://nativethink.pages.dev/api/gutenberg';
 
 /**
@@ -81,7 +86,10 @@ function bundle(entry, outfile) {
 async function requestTranslation(texts, attempt) {
   const model = MODELS[Math.min(attempt || 0, MODELS.length - 1)];
   const sys = 'Translate each numbered English paragraph into natural fluent Chinese. Output each translation right after its marker, e.g. [[1]]first translation [[2]]second translation. Rules: keep [[n]] markers exactly 1:1 with the input; one translation per paragraph; do NOT wrap translations in quotes; no JSON, no markdown, no explanations; drop "_italic_" markers.';
-  const user = texts.map((t, i) => `[${i + 1}] ${t.slice(0, 1500)}`).join('\n\n');
+  // 标记格式必须与系统提示、解析器一致都用 [[n]]。
+  // 实测（Dracula 长段落 12 批）：发单括号 [1] 时模型照抄输入格式回单括号，
+  // 解析器认不出 → 0/12 解析成功；改用 [[1]] 后 12/12 成功。
+  const user = texts.map((t, i) => `[[${i + 1}]] ${t.slice(0, 1500)}`).join('\n\n');
   const res = await fetch(GLM_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
@@ -109,6 +117,15 @@ async function requestTranslation(texts, attempt) {
     const idx = Number(mk[1]) - 1;
     const seg = mk[2].replace(/\s+/g, ' ').trim();
     if (idx >= 0 && idx < texts.length && seg) out[idx] = seg;
+  }
+
+  // 叠加兜底：模型偶尔镜像输入回单括号 [n]（历史上正是这个不一致吃掉了大量段落）。
+  // 用后行断言避免吃掉分隔符，且只补仍为空的槽位 —— 混合格式的响应也能救回来。
+  const singleRe = /(?<!\[)\[(\d+)\]\s*([^[]*)/g;
+  while ((mk = singleRe.exec(cleaned))) {
+    const idx = Number(mk[1]) - 1;
+    const seg = mk[2].replace(/\s+/g, ' ').trim();
+    if (idx >= 0 && idx < texts.length && seg && !out[idx]) out[idx] = seg;
   }
 
   // 兼容：若模型仍返回 JSON
@@ -170,7 +187,7 @@ async function translateSegments(texts) {
   if (args.length === 0 || args.includes('--list')) {
     console.log('可翻译的内置书籍：');
     books.forEach((b) => console.log(`  ${String(b.id).padStart(5)}  ${b.title}`));
-    console.log('\n用法: node scripts/pretranslate-books.cjs <id...> [--max-chapters N]  或  --all');
+    console.log('\n用法: node scripts/pretranslate-books.cjs <id...> [--max-chapters N] [--no-gaps|--gaps-only]  或  --all');
     return;
   }
   if (!API_KEY) { console.error('缺少 scripts/.apikey（出厂 API Key）'); process.exit(1); }
@@ -181,6 +198,15 @@ async function translateSegments(texts) {
   }
   const maxChaptersIdx = args.indexOf('--max-chapters');
   const maxChapters = maxChaptersIdx >= 0 ? parseInt(args[maxChaptersIdx + 1], 10) : Infinity;
+  /**
+   * 近满章的零星空段单独处理 —— 一章只差 1~2 段也要占掉一个请求，且这类碎片段
+   * 常让模型省掉 [[n]] 标记导致解析失败，再走「逐段兜底 + 3s 退避」，性价比极低，
+   * 会把整章未译的正经活拖住。
+   *   --no-gaps   只翻整章未译的章节，零星空段留到全部正文翻完后再统一回填
+   *   --gaps-only 反过来，只回填零星空段
+   */
+  const skipGaps = args.includes('--no-gaps');
+  const gapsOnly = args.includes('--gaps-only');
   const ids = args.includes('--all')
     ? books
         .map((b) => b.id)
@@ -224,6 +250,9 @@ async function translateSegments(texts) {
       const prev = existing[key] || [];
       const need = ch.paragraphs.map((p, i) => (p.trim() && !prev[i] ? i : -1)).filter((i) => i >= 0);
       if (need.length === 0) { processed++; continue; }
+      const isGap = need.length < ch.paragraphs.length;
+      if (skipGaps && isGap) { processed++; continue; }
+      if (gapsOnly && !isGap) { processed++; continue; }
       const titleShort = String(ch.title || '').slice(0, 24);
       console.log('  第 ' + (ch.index + 1) + ' 章「' + titleShort + '」待译 ' + need.length + '/' + ch.paragraphs.length + ' 段');
       const zh = await translateSegments(need.map((i) => ch.paragraphs[i]));
