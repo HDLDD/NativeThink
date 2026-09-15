@@ -87,10 +87,15 @@ function startProcess({ name, command, args, logFileName }) {
 
 killOrphansByPort(CLIENT_DEV_PORT);
 
+// 直接以当前 node 跑 vite 的 bin —— Windows 下 spawn('npx') 会 ENOENT（npx 实为 npx.cmd）
 startProcess({
   name: 'client',
-  command: 'npx',
-  args: ['vite', '--port', CLIENT_DEV_PORT, '--host', '0.0.0.0'],
+  command: process.execPath,
+  args: [
+    path.join('node_modules', 'vite', 'bin', 'vite.js'),
+    '--port', String(CLIENT_DEV_PORT),
+    '--host', '0.0.0.0',
+  ],
   logFileName: 'client.std.log',
 });
 

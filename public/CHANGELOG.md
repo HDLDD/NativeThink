@@ -93,6 +93,10 @@
 
 
 
+
+## 2026-09-15
+- feat(translate): 阶段 1 六本公版书全书离线译稿入库 (`de998c3`)
+
 ## 2026-09-15
 - chore: ignore pretranslate temp build artifacts (`8cd1c11`)
 
