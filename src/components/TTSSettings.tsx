@@ -21,6 +21,14 @@ import {
 } from '@/components/ui/popover';
 import { useTTSSettings, getEnglishVoices } from '@/lib/tts-settings';
 import { isSfxEnabled, setSfxEnabled, sfxTick } from '@/lib/sfx';
+import { toast } from 'sonner';
+import {
+  isAndroidNative,
+  listNativeEnglishVoices,
+  openNativeTtsInstall,
+  previewNativeVoice,
+  type INativeVoice,
+} from '@/lib/native-tts';
 import { cleanText, cn } from '@/lib/utils';
 
 /** Unified voice option: browser SpeechSynthesis voice OR local-server voice */
@@ -52,6 +60,20 @@ export default function TTSSettings() {
   const [open, setOpen] = useState(false);
   // 提示音效开关（答对/答错/拼写完成等反馈音）
   const [sfxOn, setSfxOn] = useState(isSfxEnabled);
+  // 系统原生语音（Android）：WebView 的 speechSynthesis 列表为空，只能从原生插件取
+  const [nativeVoices, setNativeVoices] = useState<INativeVoice[]>([]);
+  const [loadingNative, setLoadingNative] = useState(false);
+  const isNative = isAndroidNative();
+
+  useEffect(() => {
+    if (!open || !isNative) return;
+    let cancelled = false;
+    setLoadingNative(true);
+    listNativeEnglishVoices()
+      .then((list) => { if (!cancelled) setNativeVoices(list); })
+      .finally(() => { if (!cancelled) setLoadingNative(false); });
+    return () => { cancelled = true; };
+  }, [open, isNative]);
 
   const fromSystemVoices = (list: SpeechSynthesisVoice[]): VoiceOption[] =>
     list.map((v) => ({ uri: v.voiceURI, name: v.name, lang: v.lang, source: 'system' as const }));
@@ -182,9 +204,11 @@ export default function TTSSettings() {
                 </SelectItem>
                 {voices.length === 0 && (
                   <div className="px-2 py-3 text-[10px] text-muted-foreground text-center leading-relaxed">
-                    未检测到可用声音
+                    未检测到浏览器语音
                     <br />
-                    <span className="opacity-60">将自动使用在线语音引擎朗读（需联网）</span>
+                    <span className="opacity-60">
+                      {isNative ? '手机请用上方「系统语音引擎」选择声音' : '将自动使用在线语音引擎朗读（需联网）'}
+                    </span>
                   </div>
                 )}
                 {voices.filter((v) => v.source === 'server').length > 0 && (
@@ -210,6 +234,53 @@ export default function TTSSettings() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* 系统语音（Android）— WebView 无语音列表，这里枚举系统 TTS 引擎的英语语音 */}
+          {isNative && (
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                <span>系统语音引擎</span>
+                {loadingNative && <span className="text-[9px] font-bold text-muted-foreground/60">读取中…</span>}
+              </label>
+              {nativeVoices.length > 0 ? (
+                <Select
+                  value={settings.nativeVoiceIndex === null ? '__default__' : String(settings.nativeVoiceIndex)}
+                  onValueChange={(v) => {
+                    const idx = v === '__default__' ? null : Number(v);
+                    const name = idx === null ? null : (nativeVoices.find((nv) => nv.index === idx)?.name ?? null);
+                    updateSettings({ nativeVoiceIndex: idx, nativeVoiceName: name });
+                    previewNativeVoice(idx, settings.rate, settings.volume);
+                  }}
+                >
+                  <SelectTrigger className="w-full rounded-xl text-xs font-bold h-10 border-border bg-muted/50">
+                    <SelectValue placeholder="系统默认语音" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl max-h-64 [&_[data-slot=select-viewport]]:h-auto [&_[data-slot=select-viewport]]:max-h-60">
+                    <SelectItem value="__default__" className="text-xs font-bold">系统默认语音</SelectItem>
+                    {nativeVoices.map((nv) => (
+                      <SelectItem key={nv.index} value={String(nv.index)} className="text-xs font-medium">
+                        {nv.name} ({nv.lang}){nv.isDefault ? ' · 默认' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : !loadingNative ? (
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 space-y-2">
+                  <p className="text-[10px] font-bold text-amber-700 dark:text-amber-300 leading-relaxed">
+                    手机未检测到英语语音引擎 — 朗读会改用在线语音（需联网）。
+                    安装系统语音包后可离线朗读、音质更好。
+                  </p>
+                  <Button
+                    size="sm" variant="outline"
+                    onClick={async () => { const ok = await openNativeTtsInstall(); if (!ok) toast.info('请到 系统设置 → 更多设置 → 文字转语音 安装英语语音'); }}
+                    className="w-full rounded-xl text-[10px] font-black"
+                  >
+                    打开系统语音设置
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          )}
 
           {/* Rate slider */}
           <div className="space-y-2">

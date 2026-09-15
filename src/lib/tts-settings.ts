@@ -13,6 +13,13 @@ const TTS_SETTINGS_KEY = '__nativethink_tts_settings';
 export interface TTSSettings {
   /** SpeechSynthesisVoice.voiceURI — null means auto-select best voice */
   selectedVoiceURI: string | null;
+  /**
+   * 系统原生 TTS 引擎的语音索引（Android 用）— null = 系统默认语音。
+   * Android WebView 没有 speechSynthesis 语音列表，只能通过原生插件选择。
+   */
+  nativeVoiceIndex: number | null;
+  /** 原生语音的可读名（仅用于设置页回显，不参与合成） */
+  nativeVoiceName: string | null;
   /** Playback rate: 0.5 – 1.5 */
   rate: number;
   /** Pitch: 0.5 – 2.0 */
@@ -23,6 +30,8 @@ export interface TTSSettings {
 
 const DEFAULTS: TTSSettings = {
   selectedVoiceURI: null,
+  nativeVoiceIndex: null,
+  nativeVoiceName: null,
   rate: 0.9,
   pitch: 1.0,
   volume: 1.0,
@@ -35,6 +44,8 @@ function loadSettings(): TTSSettings {
     const parsed = JSON.parse(raw);
     return {
       selectedVoiceURI: parsed.selectedVoiceURI ?? DEFAULTS.selectedVoiceURI,
+      nativeVoiceIndex: typeof parsed.nativeVoiceIndex === 'number' ? parsed.nativeVoiceIndex : DEFAULTS.nativeVoiceIndex,
+      nativeVoiceName: typeof parsed.nativeVoiceName === 'string' ? parsed.nativeVoiceName : DEFAULTS.nativeVoiceName,
       rate: clamp(parsed.rate ?? DEFAULTS.rate, 0.5, 1.5),
       pitch: clamp(parsed.pitch ?? DEFAULTS.pitch, 0.5, 2.0),
       volume: clamp(parsed.volume ?? DEFAULTS.volume, 0.0, 1.0),

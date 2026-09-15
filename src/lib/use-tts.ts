@@ -14,6 +14,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
+import { getNativeTts as getNativeTtsPlugin } from './native-tts';
 import { useTTSSettings } from './tts-settings';
 import { cleanText } from './utils';
 
@@ -160,16 +161,7 @@ function googleTTSUrl(text: string): string {
 // ── Tier 0: 原生 TTS（Android APK 内置插件 — 系统语音引擎，离线零延迟不断流） ──
 const IS_ANDROID_NATIVE = Capacitor.isNativePlatform?.() && Capacitor.getPlatform?.() === 'android';
 
-let nativeTtsPlugin: any = undefined; // undefined = 未加载，null = 不可用
-async function getNativeTts(): Promise<any | null> {
-  if (nativeTtsPlugin !== undefined) return nativeTtsPlugin;
-  try {
-    if (!Capacitor.isPluginAvailable?.('TextToSpeech')) { nativeTtsPlugin = null; return null; }
-    const mod = await import('@capacitor-community/text-to-speech');
-    nativeTtsPlugin = (mod as any).TextToSpeech;
-  } catch { nativeTtsPlugin = null; }
-  return nativeTtsPlugin;
-}
+const getNativeTts = getNativeTtsPlugin;
 
 // ── Tier 2b: Local server TTS (Edge neural voices + Windows SAPI) ──
 
@@ -413,6 +405,10 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
               rate: Math.min(1.5, Math.max(0.5, rate)),
               pitch: 1,
               volume: typeof settings.volume === 'number' ? settings.volume : 1,
+              // 用户在设置里选定的系统语音（null = 系统默认）
+              ...(typeof settings.nativeVoiceIndex === 'number' && settings.nativeVoiceIndex >= 0
+                ? { voice: settings.nativeVoiceIndex }
+                : {}),
             })
               .then(() => {
                 nativeActiveRef.current = false;
