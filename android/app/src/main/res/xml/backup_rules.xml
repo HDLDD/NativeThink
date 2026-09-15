@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 自动备份规则（API < 31 用 fullBackupContent）。
+  目的：卸载重装 / 换机时由系统自动恢复学习数据，无需手动导出。
+  排除的都是可再生的大体积缓存（单词库缓存、GPU 缓存等），
+  避免超出 Android 25MB 备份配额导致整份备份失败。
+  localStorage（学习进度、收藏、批注）位于 app_webview/Default/Local Storage，默认包含。
+-->
+<full-backup-content>
+    <exclude domain="root" path="app_webview/Default/IndexedDB" />
+    <exclude domain="root" path="app_webview/Default/Service Worker" />
+    <exclude domain="root" path="app_webview/Default/GPUCache" />
+    <exclude domain="root" path="app_webview/Default/blob_storage" />
+    <exclude domain="root" path="app_webview/Default/DawnGraphiteCache" />
+    <exclude domain="root" path="app_webview/Default/DawnWebGPUCache" />
+    <exclude domain="root" path="app_webview/Default/Code Cache" />
+    <exclude domain="cache" path="." />
+    <exclude domain="no_backup" path="." />
+</full-backup-content>

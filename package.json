@@ -17,7 +17,8 @@
     "lint:eslint": "eslint src",
     "precommit": "npm run lint",
     "prepare": "node scripts/setup-git-hooks.mjs",
-    "android:apk": "npm run build:web && node node_modules/@capacitor/cli/bin/capacitor copy android && node scripts/android-copy-models.cjs && cd android && gradlew.bat assembleDebug && cd .. && node -e \"fs.copyFileSync('android/app/build/outputs/apk/debug/app-debug.apk', 'release/NativeThink-mobile-debug.apk')\""
+    "android:apk": "npm run version:apk-bump && npm run build:web && node node_modules/@capacitor/cli/bin/capacitor copy android && node scripts/android-copy-models.cjs && cd android && gradlew.bat assembleDebug && cd .. && node -e \"fs.copyFileSync('android/app/build/outputs/apk/debug/app-debug.apk', 'release/NativeThink-mobile-debug.apk')\"",
+    "version:apk-bump": "node scripts/bump-android-version.cjs"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "^8.0.2",

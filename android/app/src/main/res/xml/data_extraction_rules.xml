@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+（API 31+）的数据提取规则：区分"云备份"与"换机传输"。
+  两者都保留学习数据（localStorage / 数据库 / 偏好），排除可再生缓存。
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="app_webview/Default/IndexedDB" />
+        <exclude domain="root" path="app_webview/Default/Service Worker" />
+        <exclude domain="root" path="app_webview/Default/GPUCache" />
+        <exclude domain="root" path="app_webview/Default/blob_storage" />
+        <exclude domain="root" path="app_webview/Default/Code Cache" />
+        <exclude domain="cache" path="." />
+        <exclude domain="no_backup" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="app_webview/Default/GPUCache" />
+        <exclude domain="root" path="app_webview/Default/Code Cache" />
+        <exclude domain="cache" path="." />
+    </device-transfer>
+</data-extraction-rules>

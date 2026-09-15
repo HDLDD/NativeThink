@@ -77,6 +77,10 @@
 
 
 
+
+## 2026-09-15
+- feat(data): 防止安装包更新丢失数据的四层防护 (`284d37b`)
+
 ## 2026-09-15
 - feat(dashboard,reset,mobile): refresh home, extend reset, fix clipped icons (`13a0e3e`)
 

@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+// 版本号（android:apk 脚本每次自增写入 android/version.properties）
+// Android 只接受 versionCode 递增的升级安装，否则要求先卸载 → 丢数据
+def verProps = new Properties()
+def verFile = rootProject.file('version.properties')
+if (verFile.exists()) { verFile.withInputStream { verProps.load(it) } }
+def appVersionCode = Integer.parseInt(verProps.getProperty('versionCode', '1'))
+def appVersionName = verProps.getProperty('versionName', '1.0')
+
 android {
     namespace = "com.nativethink.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +15,8 @@ android {
         applicationId "com.nativethink.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
