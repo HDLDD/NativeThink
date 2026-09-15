@@ -85,7 +85,8 @@ export default function Header() {
             </span>
           </div>
 
-          <div className="flex items-center gap-1">
+          {/* 工具栏：手机端空间紧张时可横向滚动，避免最右侧图标被挤出屏幕 */}
+          <div className="flex items-center gap-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {/* Daily Goal Setting */}
             <Dialog open={goalOpen} onOpenChange={setGoalOpen}>
               <DialogTrigger asChild>

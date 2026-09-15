@@ -16,6 +16,10 @@ export interface ILearningStats {
     shadowing: number;
     vocabulary: number;
     writing: number;
+    /** 文章阅读 */
+    articles: number;
+    /** 句子拼写 */
+    spelling: number;
   };
   totalDays: number;
   lastStudyDate: string;
@@ -39,6 +43,8 @@ const DEFAULT_STATS: ILearningStats = {
     shadowing: 0,
     vocabulary: 0,
     writing: 0,
+    articles: 0,
+    spelling: 0,
   },
   totalDays: 0,
   lastStudyDate: formatDate(new Date()),

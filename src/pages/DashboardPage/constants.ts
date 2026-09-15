@@ -6,11 +6,30 @@ import {
   Mic,
   BookOpen,
   PenLine,
+  BookMarked,
+  SpellCheck,
+  MessagesSquare,
 } from 'lucide-react';
 
 export const WEEK_DAYS = ['日', '一', '二', '三', '四', '五', '六'] as const;
 
 export const QUICK_ENTRIES = [
+  {
+    path: '/vocabulary',
+    label: '词汇深度',
+    icon: BookOpen,
+    color: 'from-[#EC4899] to-pink-400',
+    bg: 'bg-pink-50 dark:bg-pink-500/15',
+    desc: '每日学习 · 快速闪卡',
+  },
+  {
+    path: '/articles',
+    label: '文章阅读',
+    icon: BookMarked,
+    color: 'from-[#0EA5E9] to-cyan-400',
+    bg: 'bg-sky-50 dark:bg-sky-500/15',
+    desc: '原著 · 对照翻译',
+  },
   {
     path: '/think',
     label: '母语思维训练',
@@ -18,14 +37,6 @@ export const QUICK_ENTRIES = [
     color: 'from-[#00B894] to-emerald-400',
     bg: 'bg-emerald-50 dark:bg-emerald-500/15',
     desc: '摆脱中式英语',
-  },
-  {
-    path: '/chunks',
-    label: '语块训练',
-    icon: Puzzle,
-    color: 'from-[#1F2937] to-gray-600',
-    bg: 'bg-gray-50 dark:bg-gray-800',
-    desc: '积累地道表达',
   },
   {
     path: '/conversation',
@@ -36,6 +47,14 @@ export const QUICK_ENTRIES = [
     desc: '角色扮演对话',
   },
   {
+    path: '/spelling',
+    label: '句子拼写',
+    icon: SpellCheck,
+    color: 'from-amber-500 to-orange-400',
+    bg: 'bg-amber-50 dark:bg-amber-500/15',
+    desc: '句子/单词拼写',
+  },
+  {
     path: '/shadowing',
     label: '影子跟读',
     icon: Mic,
@@ -44,12 +63,12 @@ export const QUICK_ENTRIES = [
     desc: '训练语音语调',
   },
   {
-    path: '/vocabulary',
-    label: '词汇深度',
-    icon: BookOpen,
-    color: 'from-[#EC4899] to-pink-400',
-    bg: 'bg-pink-50 dark:bg-pink-500/15',
-    desc: '四级/六级/雅思/托福',
+    path: '/chunks',
+    label: '语块训练',
+    icon: Puzzle,
+    color: 'from-[#1F2937] to-gray-600',
+    bg: 'bg-gray-50 dark:bg-gray-800',
+    desc: '积累地道表达',
   },
   {
     path: '/writing',
@@ -61,12 +80,19 @@ export const QUICK_ENTRIES = [
   },
 ];
 
+/** 后续要开发的模块（首页占位展示，暂不可点） */
+export const COMING_SOON = [
+  { label: '句子学习', icon: MessagesSquare, desc: '逐句精听 · 跟读 · 拆解', color: '#F59E0B' },
+];
+
 export const MODULES = [
+  { key: 'vocabulary', label: '词汇深度', icon: BookOpen, color: '#EC4899' },
+  { key: 'articles', label: '文章阅读', icon: BookMarked, color: '#0EA5E9' },
+  { key: 'spelling', label: '句子拼写', icon: SpellCheck, color: '#F59E0B' },
   { key: 'think', label: '思维训练', icon: Brain, color: '#00B894' },
   { key: 'chunks', label: '语块训练', icon: Puzzle, color: '#1F2937' },
   { key: 'conversation', label: '对话练习', icon: MessageSquare, color: '#6366F1' },
   { key: 'shadowing', label: '影子跟读', icon: Mic, color: '#F97316' },
-  { key: 'vocabulary', label: '词汇深度', icon: BookOpen, color: '#EC4899' },
   { key: 'writing', label: '写作练习', icon: PenLine, color: '#8B5CF6' },
 ] as const;
 

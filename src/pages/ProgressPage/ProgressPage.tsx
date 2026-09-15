@@ -4,6 +4,8 @@ import {
   BarChart3,
   Calendar,
   Heart,
+  SpellCheck,
+  BookMarked,
   TrendingUp,
   Flame,
   Target,
@@ -111,6 +113,55 @@ export default function ProgressPage() {
     toast.success('学习统计已重置');
     setShowResetDialog(false); setResetConfirm(null);
   };
+  /** 句子拼写：进度 + 已完成 + 出题记录 + 导入词书 */
+  const handleResetSpelling = () => {
+    for (const k of ['__nativethink_spelling_progress', '__nativethink_spelling_completed', '__nativethink_spelling_served', '__nativethink_spelling_sentences', '__nativethink_spelling_round_size']) {
+      safeStorage.removeItem(k);
+    }
+    toast.success('句子拼写进度已重置（刷新页面后生效）');
+    setShowResetDialog(false); setResetConfirm(null);
+  };
+
+  /** 阅读：每本书进度 + 对照翻译缓存 + 批注 + 最近查词 */
+  const handleResetReading = async () => {
+    // localStorage 中所有 reader 相关键
+    const keys: string[] = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (k.includes('__reader_progress_') || k.includes('__reader_trans_') || k.includes('__nativethink_reader_notes_') || k.endsWith('__reader_lookup_recent')) keys.push(k);
+      }
+    } catch { /* ignore */ }
+    keys.forEach((k) => { try { localStorage.removeItem(k); } catch { /* ignore */ } });
+    // IndexedDB 里的整书翻译缓存
+    try {
+      const books = (await import('@/data/books')).ALL_BOOKS;
+      const { clearBookTranslation } = await import('@/data/book-translation');
+      await Promise.all(books.map((b) => clearBookTranslation(b.id).catch(() => {})));
+    } catch { /* ignore */ }
+    toast.success(`阅读进度、批注与翻译缓存已清除（${keys.length} 项）`);
+    setShowResetDialog(false); setResetConfirm(null);
+  };
+
+  /** 生成内容缓存：单词 AI 例句/解析、搭配翻译、AI 题目、每日一句历史之外的缓存 */
+  const handleResetAiCaches = () => {
+    for (const k of ['__nativethink_word_ai_data', '__nativethink_colloc_ai_tranlations', '__nativethink_phrase_examples', '__nativethink_sentence_examples', '__nativethink_word_img_v2_', '__nativethink_writing_draft', '__nativethink_quickcard_pos', '__nativethink_browse_memorized']) {
+      safeStorage.removeItem(k);
+    }
+    // 单词插图缓存是前缀匹配
+    try {
+      const rm: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.includes('__nativethink_word_img_')) rm.push(k);
+      }
+      rm.forEach((k) => { try { localStorage.removeItem(k); } catch { /* ignore */ } });
+    } catch { /* ignore */ }
+    toast.success('AI 生成内容与缓存已清除（下次会重新生成）');
+    setShowResetDialog(false); setResetConfirm(null);
+  };
+
   const handleResetWordLearning = () => {
     // Clear all per-level word learning storage
     const LEVELS = ['all', 'zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
@@ -357,6 +408,9 @@ export default function ProgressPage() {
                   {[
                     { key: 'stats', label: '学习统计', desc: '连续天数、学习时长、各模块进度百分比', icon: BarChart3, color: 'text-emerald-500', action: handleResetStats },
                     { key: 'history', label: '每日一句历史', desc: '首页每日一句的30天历史记录', icon: Calendar, color: 'text-amber-500', action: handleResetDailyHistory },
+                    { key: 'spelling', label: '句子拼写进度', desc: '拼写练习记录、已完成标记、出题队列', icon: SpellCheck, color: 'text-orange-500', action: handleResetSpelling },
+                    { key: 'reading', label: '阅读进度与批注', desc: '每本书阅读位置、对照翻译缓存、段落批注', icon: BookMarked, color: 'text-sky-500', action: handleResetReading },
+                    { key: 'aicache', label: 'AI 生成内容缓存', desc: '单词例句/解析、搭配翻译、插图缓存', icon: Sparkles, color: 'text-violet-500', action: handleResetAiCaches },
                   ].map((item) => (
                     <div key={item.key} className="flex items-center justify-between p-3 rounded-2xl bg-muted/30">
                       <div className="flex items-center gap-3">
@@ -519,6 +573,9 @@ export default function ProgressPage() {
                         case 'stats': handleResetStats(); break;
                         case 'words': handleResetWordLearning(); break;
                         case 'history': handleResetDailyHistory(); break;
+                        case 'spelling': handleResetSpelling(); break;
+                        case 'reading': void handleResetReading(); break;
+                        case 'aicache': handleResetAiCaches(); break;
                         case 'zhongkao': case 'gaokao': case 'cet4': case 'cet6': case 'ielts': case 'toefl': case 'postgraduate': case 'professional': case 'advanced': handleResetWordLevel(resetConfirm); break;
                         case 'phrases': handleResetPhraseLearning(); break;
                         case 'ai': handleResetAIContent(); break;

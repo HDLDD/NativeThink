@@ -925,7 +925,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setMemory((p) => ({ ...p, tab: v })); }} className="w-full">
-        <TabsList className="bg-muted p-1.5 rounded-3xl h-auto">
+        <TabsList className="bg-muted p-1.5 rounded-3xl h-auto w-full max-w-full overflow-x-auto flex-nowrap justify-start [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <TabsTrigger
             value="library"
             className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"

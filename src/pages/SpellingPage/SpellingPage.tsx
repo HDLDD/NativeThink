@@ -1230,10 +1230,10 @@ export default function SpellingPage() {
           </div>
         )}
 
-        {/* Row 2: Progress + Action buttons */}
-        <div className="flex items-center justify-between">
+        {/* Row 2: Progress + Action buttons（手机端可换行，避免按钮被挤出屏幕） */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
           {/* Progress */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             <span className="text-sm font-bold text-foreground/80">
               {sessionQueue.length > 0 ? `${currentIndex + 1}/${sessionQueue.length}` : '0/0'}
             </span>

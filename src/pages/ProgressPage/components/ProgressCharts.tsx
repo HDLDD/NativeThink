@@ -28,13 +28,16 @@ interface ProgressChartsProps {
 }
 
 // ── Module config ──
-const MODULE_COLORS = ['#00B894', '#1F2937', '#6366F1', '#F97316', '#EC4899'];
+const MODULE_COLORS = ['#EC4899', '#0EA5E9', '#F59E0B', '#00B894', '#1F2937', '#6366F1', '#F97316', '#8B5CF6'];
 const MODULE_NAMES: Record<string, string> = {
+  vocabulary: '词汇深度',
+  articles: '文章阅读',
+  spelling: '句子拼写',
   think: '思维训练',
   chunks: '语块训练',
   conversation: '对话练习',
   shadowing: '影子跟读',
-  vocabulary: '词汇深度',
+  writing: '写作练习',
 };
 
 export default function ProgressCharts({ calendar, stats }: ProgressChartsProps) {

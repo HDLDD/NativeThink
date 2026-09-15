@@ -75,6 +75,10 @@
 
 
 
+
+## 2026-09-15
+- fix(flashcards): long words wrapped a stray letter to line 2 — fit-to-width instead (`819a007`)
+
 ## 2026-09-15
 - feat(spelling,vocab): typewriter caret + batched collocation translation (`cf4655b`)
 
