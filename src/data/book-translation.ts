@@ -337,7 +337,7 @@ async function requestBatchTranslation(
       { role: 'system', content: BATCH_SYSTEM_PROMPT },
       { role: 'user', content: userContent },
     ],
-    { temperature: 0.3, maxTokens: 4096, signal: o.signal },
+    { temperature: 0.3, maxTokens: 4096, signal: o.signal, task: 'translate' },
   );
   return parseBatchTranslation(raw, indices.length);
 }
@@ -357,7 +357,7 @@ async function translateSingle(
             { role: 'system', content: SINGLE_SYSTEM_PROMPT },
             { role: 'user', content: chapter.paragraphs[segIdx].slice(0, MAX_SEGMENT_CHARS) },
           ],
-          { temperature: 0.3, maxTokens: 1024, signal: o.signal },
+          { temperature: 0.3, maxTokens: 1024, signal: o.signal, task: 'translate' },
         ),
       o.retryDelaysMs,
       o.signal,

@@ -31,6 +31,26 @@ const PROVIDER_DEFAULT_MODELS = {
   groq: 'llama-3.1-8b-instant',
 };
 
+/**
+ * 免费档按任务分工：翻译译文长期留存、离线分发，重「准」；对话要即时反馈，重「快」。
+ * 仅在请求带 task 时生效，不会覆盖客户端显式指定的 model。
+ */
+const TASK_PRIMARY_MODEL = {
+  translate: 'glm-4.7-flash',
+  chat: 'glm-4-flash-250414',
+};
+
+/**
+ * 智谱免费档回退链 —— 前三档最快最稳，glm-4.7-flash（30B-A3B MoE，译文最准，
+ * 但免费档并发仅 1、高峰期常 429）压在最后兜底。
+ */
+const GLM_FREE_CHAIN = [
+  'glm-4-flash-250414',
+  'glm-4-flash',
+  'glm-4v-flash',
+  'glm-4.7-flash',
+];
+
 async function handler(context) {
   const { request, env } = context;
 
@@ -45,7 +65,7 @@ async function handler(context) {
     return Response.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { provider = 'deepseek', model, messages, max_tokens = 4096, temperature = 0.7, stream = true, apiKey: clientApiKey, thinking } = body;
+  const { provider = 'deepseek', model, messages, max_tokens = 4096, temperature = 0.7, stream = true, apiKey: clientApiKey, thinking, task } = body;
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return Response.json({ error: 'Messages array is required' }, { status: 400 });
@@ -81,10 +101,14 @@ async function handler(context) {
     return b;
   };
 
-  // GLM 免费档高峰期常返回 429（1305 访问量过大）— 自动按候选链降级重试
-  const glmChain = [modelId, 'glm-4-flash-250414', 'glm-4-flash', 'glm-4v-flash'].filter(
-    (m, i, arr) => m && arr.indexOf(m) === i,
-  );
+  // GLM 免费档高峰期常返回 429（1305 访问量过大）— 自动按候选链降级重试。
+  // 形如 task=translate → [glm-4.7-flash, glm-4-flash-250414, glm-4-flash, glm-4v-flash]
+  //      task 缺省     → [<modelId>, glm-4-flash-250414, glm-4-flash, glm-4v-flash, glm-4.7-flash]
+  const glmChain = [
+    task ? TASK_PRIMARY_MODEL[task] : null,
+    modelId,
+    ...GLM_FREE_CHAIN,
+  ].filter((m, i, arr) => m && arr.indexOf(m) === i);
   const candidates = (provider === 'glm' || provider === 'factory') ? glmChain : [modelId];
 
   try {

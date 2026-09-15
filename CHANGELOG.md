@@ -94,6 +94,10 @@
 
 
 
+
+## 2026-09-15
+- fix(dev): 用当前 node 直跑 vite bin，修复 Windows 下 spawn('npx') ENOENT (`6ee43a2`)
+
 ## 2026-09-15
 - feat(translate): 阶段 1 六本公版书全书离线译稿入库 (`de998c3`)
 

@@ -29,12 +29,41 @@ export interface StreamCallOptions {
   provider?: AIProvider;
   /** Override the default model */
   model?: string;
+  /**
+   * 任务类型 —— 免费模型按任务分工选档：
+   * `translate` 译文会长期留存并离线分发，选最准的；`chat` 要即时反馈，选最快的。
+   * 不传即按服务商默认免费模型。
+   */
+  task?: AITask;
   /** Max tokens for the response */
   maxTokens?: number;
   /** Temperature (0-2), default varies by use case */
   temperature?: number;
   /** AbortSignal for cancellation */
   signal?: AbortSignal;
+}
+
+export type AITask = 'chat' | 'translate';
+
+/**
+ * 免费档按任务的模型分工（仅覆盖出厂免费服务商，用户自配的其他服务商不受影响）。
+ * 智谱实测：glm-4.7-flash（30B-A3B MoE）译文最准但高峰期常 429；
+ * glm-4-flash-250414 最快最稳。故翻译走前者，对话走后者，
+ * 4.7 在服务端回退链里仍作为最后一档兜底。
+ */
+const TASK_MODEL: Partial<Record<AIProvider, Record<AITask, string>>> = {
+  factory: { chat: 'glm-4-flash-250414', translate: 'glm-4.7-flash' },
+  glm: { chat: 'glm-4-flash', translate: 'glm-4.7-flash' },
+};
+
+/** 显式 model 优先 → 按任务分工 → 服务商默认免费模型 */
+function resolveModel(
+  provider: AIProvider,
+  task?: AITask,
+  explicit?: string,
+): string {
+  if (explicit) return explicit;
+  return (task && TASK_MODEL[provider]?.[task]) || PROVIDER_CONFIGS[provider].freeModel;
 }
 
 export interface StreamChunk {
@@ -60,11 +89,12 @@ async function* apiStreamChat(
 
   const body = {
     provider,
-    model: options.model || config.freeModel,
+    model: resolveModel(provider, options.task, options.model),
     messages,
     max_tokens: options.maxTokens ?? 4096,
     temperature: options.temperature ?? 0.7,
     stream: true,
+    task: options.task,
     apiKey: getAPIKey(provider) || undefined,
   };
 
@@ -177,11 +207,12 @@ async function apiChat(
 
   const body = {
     provider,
-    model: options.model || config.freeModel,
+    model: resolveModel(provider, options.task, options.model),
     messages,
     max_tokens: options.maxTokens ?? 4096,
     temperature: options.temperature ?? 0.7,
     stream: false,
+    task: options.task,
     apiKey: getAPIKey(provider) || undefined,
   };
 
