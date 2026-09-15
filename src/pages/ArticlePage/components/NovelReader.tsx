@@ -81,6 +81,8 @@ interface NovelReaderProps {
   transProgress: { done: number; total: number } | null;
   /** 整书预翻译进度（null = 未在运行） */
   bookTranslation: { chaptersDone: number; chaptersTotal: number; chapterTitle: string; segDone: number; segTotal: number } | null;
+  /** 已落盘的翻译统计（用于显示"已翻译 X/Y 章"与补齐缺失） */
+  bookTranslationStats: { translatedChapters: number; totalChapters: number; translatedSegments: number } | null;
   onStartBookTranslation: () => void;
   onStopBookTranslation: () => void;
 }
@@ -111,9 +113,17 @@ export default function NovelReader({
   transProgress,
 
   bookTranslation,
+  bookTranslationStats,
   onStartBookTranslation,
   onStopBookTranslation,}: NovelReaderProps) {
   const { notes, saveNote, removeNote } = useReaderNotes(content.id);
+
+  // 本章尚未翻译的段数 —— 横条上直接显示，点一下就补齐
+  const untranslatedCount = useMemo(() => {
+    const ch = chapters[chapterIdx];
+    if (!ch) return 0;
+    return ch.items.filter((it) => !it.para.zh && !it.para.en.startsWith('##CHAPTER##')).length;
+  }, [chapters, chapterIdx]);
 
   const [view, setView] = useState<'catalog' | 'chapter'>('catalog');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -308,7 +318,9 @@ export default function NovelReader({
                     AI 对照翻译全书
                   </p>
                   <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
-                    后台批量翻译全部章节，阅读到哪章自动显示中文对照
+                    {bookTranslationStats && bookTranslationStats.translatedChapters > 0
+                      ? `已翻译 ${bookTranslationStats.translatedChapters}/${bookTranslationStats.totalChapters} 章 · ${bookTranslationStats.translatedSegments} 段（未完成的可继续补齐）`
+                      : '一键翻译全书（后台批量进行，阅读到哪章就有中文对照）'}
                   </p>
                 </div>
                 {bookTranslation ? (
@@ -317,7 +329,7 @@ export default function NovelReader({
                   </Button>
                 ) : (
                   <Button size="sm" onClick={onStartBookTranslation} className="rounded-xl bg-violet-500 hover:bg-violet-600 text-white text-[10px] font-black shrink-0">
-                    开始
+                    {bookTranslationStats && bookTranslationStats.translatedChapters > 0 ? '补齐缺失' : '翻译全书'}
                   </Button>
                 )}
               </div>
@@ -463,7 +475,7 @@ export default function NovelReader({
               ) : (
                 <>
                   <Globe className="size-4" />
-                  AI 对照翻译本章（约 10~60 秒）
+                  {untranslatedCount > 0 ? `AI 对照翻译本章（剩 ${untranslatedCount} 段）` : '本章已翻译完成'}
                 </>
               )}
             </button>

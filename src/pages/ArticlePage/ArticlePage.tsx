@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
+  Upload,
   FileText, Sparkles, Languages, BookOpen, Volume2, RefreshCw, Loader2,
   Search, ExternalLink, X, Globe, Library, Mic, Wand2, BookMarked,
   GraduationCap, Clock, RotateCw, History, Newspaper, ChevronLeft, ChevronRight, Play, HelpCircle,
@@ -20,6 +21,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { toast } from 'sonner';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import { buildPages } from '@/data/reading';
+import { loadImportedBooks, importBookFromText, deleteImportedBook, IMPORTED_ID_PREFIX } from '@/data/imported-books';
 import type { SpeechMeta } from '@/data/speeches';
 // ── Types ──
 type Level = 'beginner' | 'intermediate' | 'advanced';
@@ -194,12 +196,56 @@ export default function ArticlePage() {
   const [buildSpeechFn, setBuildSpeechFn] = useState<((id: string) => IReadingContent | null) | null>(null);
   const [speechesLoaded, setSpeechesLoaded] = useState(false);
 
+  // 导入的书籍（IndexedDB）—— 与内置书库合并展示，置顶
+  const [importedBooks, setImportedBooks] = useState<IReadingContent[]>([]);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importTitle, setImportTitle] = useState('');
+  const [importAuthor, setImportAuthor] = useState('');
+  const [importing, setImporting] = useState(false);
+
+  useEffect(() => { loadImportedBooks().then(setImportedBooks).catch(() => {}); }, []);
+
+  const handleImportFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      // 文件名（去扩展名）作为默认书名
+      setImportTitle((prev) => prev || file.name.replace(/\.(txt|md|text)$/i, ''));
+      setImportText(text);
+      toast.success(`已读取 ${file.name}（${Math.round(text.length / 1024)}KB），确认后导入`);
+    } catch { toast.error('文件读取失败'); }
+  };
+
+  const doImport = async () => {
+    if (!importText.trim()) { toast.error('请先选择文件或粘贴英文正文'); return; }
+    setImporting(true);
+    try {
+      const book = await importBookFromText({ title: importTitle || '未命名书籍', author: importAuthor, text: importText });
+      setImportedBooks((prev) => [book, ...prev]);
+      setImportOpen(false);
+      setImportText(''); setImportTitle(''); setImportAuthor('');
+      toast.success(`《${book.zhTitle}》已导入 · ${book.pages.length} 页 · ${book.totalWords.toLocaleString()} 词`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '导入失败');
+    } finally { setImporting(false); }
+  };
+
+  const removeImported = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    await deleteImportedBook(id).catch(() => {});
+    setImportedBooks((prev) => prev.filter((b) => b.id !== id));
+    toast.success('已删除该导入书籍');
+  };
+
   // Load books data when books tab is first selected
   useEffect(() => {
     if (mainTab !== 'books' || booksLoaded) return;
     setBooksLoaded(true);
     import('@/data/books').then((m) => setBooks(m.ALL_BOOKS)).catch(() => setBooks([]));
   }, [mainTab, booksLoaded]);
+
+  /** 内置书 + 导入书（导入的置顶） */
+  const allBooks = useMemo(() => [...importedBooks, ...(books || [])], [importedBooks, books]);
 
   // ── Wikipedia (proxied via /api/wikipedia to bypass CORS/GFW) ──
   // Declared before the auto-open effect below, which references loadWikiPage.
@@ -571,6 +617,9 @@ export default function ArticlePage() {
           <Button variant="outline" size="sm" onClick={() => setShowHistory(!showHistory)} className="rounded-2xl text-[10px] font-bold gap-1">
             <Clock className="size-3.5" />历史
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="rounded-2xl text-[10px] font-bold gap-1">
+            <Upload className="size-3.5" />导入书籍
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setGenDialogOpen(true)} className="rounded-2xl text-[10px] font-bold gap-1 bg-[#00B894]/5 border-[#00B894]/30 text-ink-teal">
             <Wand2 className="size-3.5" />AI 生成
           </Button>
@@ -658,7 +707,7 @@ export default function ArticlePage() {
             </div>
           ) : (
           <div className="stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {books.map((book) => {
+            {allBooks.map((book) => {
               const progress = getBookProgress(book.id);
               const totalPages = book.pages.length;
               const pct = progress && totalPages > 0 ? Math.round((progress.page / totalPages) * 100) : 0;
@@ -1078,6 +1127,63 @@ export default function ArticlePage() {
             >
               {aiLoading ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Wand2 className="size-4 mr-2" />}
               生成
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 导入书籍对话框 ── */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-w-lg rounded-[32px] p-0 overflow-hidden">
+          <div className="p-6 border-b border-border">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black italic text-foreground flex items-center gap-2">
+                <Upload className="size-5 text-ink-teal" />
+                导入英文书籍
+              </DialogTitle>
+              <p className="text-xs text-muted-foreground font-medium mt-1">
+                支持 .txt / .md 文件，或直接粘贴正文。导入后即可用阅读器全部功能（查词、对照翻译、批注、朗读）
+              </p>
+            </DialogHeader>
+          </div>
+          <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">选择文件</label>
+              <input
+                type="file"
+                accept=".txt,.md,.text,text/plain"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleImportFile(f); e.target.value = ''; }}
+                className="w-full text-xs file:mr-3 file:px-3 file:py-2 file:rounded-xl file:border-0 file:bg-muted file:text-foreground file:font-bold hover:file:bg-muted/80 cursor-pointer"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">书名</label>
+                <Input value={importTitle} onChange={(e) => setImportTitle(e.target.value)} placeholder="例如：The Old Man and the Sea" className="rounded-2xl" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">作者（可选）</label>
+                <Input value={importAuthor} onChange={(e) => setImportAuthor(e.target.value)} placeholder="Ernest Hemingway" className="rounded-2xl" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                正文内容 {importText ? `（已读取 ${Math.round(importText.length / 1024)}KB）` : '（或直接粘贴）'}
+              </label>
+              <textarea
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                placeholder="粘贴英文正文…&#10;&#10;有 Chapter 1 / 第1章 等标题会自动切分章节；没有则按约 2500 词自动分节"
+                rows={6}
+                className="w-full rounded-2xl border border-input bg-background px-4 py-3 text-xs resize-y focus:outline-none focus:ring-2 focus:ring-[#00B894]/20 focus:border-[#00B894]"
+              />
+            </div>
+          </div>
+          <div className="p-6 border-t border-border flex gap-3 justify-end">
+            <Button variant="outline" onClick={() => setImportOpen(false)} className="rounded-2xl">取消</Button>
+            <Button onClick={doImport} disabled={importing || !importText.trim()} className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black">
+              {importing ? <Loader2 className="size-4 mr-1.5 animate-spin" /> : <Upload className="size-4 mr-1.5" />}
+              {importing ? '导入中…' : '导入'}
             </Button>
           </div>
         </DialogContent>

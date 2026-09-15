@@ -829,6 +829,17 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
   // ── 整书预翻译（后台队列，结果落 IndexedDB，阅读到哪章哪章自动显示） ──
   const [bookTrans, setBookTrans] = useState<{ chaptersDone: number; chaptersTotal: number; chapterTitle: string; segDone: number; segTotal: number } | null>(null);
+  // 已落盘的全书翻译统计（显示"已翻译 X/Y 章"，并支持一步补齐缺失）
+  const [bookTransStats, setBookTransStats] = useState<{ translatedChapters: number; totalChapters: number; translatedSegments: number } | null>(null);
+  useEffect(() => {
+    if (readerMode !== 'novel') return;
+    let cancelled = false;
+    import('@/data/book-translation')
+      .then((m) => m.getBookTranslationStats(activeContent.id, activeContent))
+      .then((st) => { if (!cancelled) setBookTransStats(st); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [readerMode, activeContent, bookTrans]);
   const bookAbortRef = useRef<AbortController | null>(null);
   const startBookTranslation = () => {
     if (bookTrans) return;
@@ -1011,6 +1022,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           transLoading={transLoading}
           transProgress={transProgress}
           bookTranslation={bookTrans}
+          bookTranslationStats={bookTransStats}
           onStartBookTranslation={startBookTranslation}
           onStopBookTranslation={stopBookTranslation}
         />
