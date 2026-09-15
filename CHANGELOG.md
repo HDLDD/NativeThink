@@ -89,6 +89,10 @@
 
 
 
+
+## 2026-09-15
+- feat(translate): 预翻译流水线 —— 整本书只翻一次，随包分发（零等待/零额度） (`4b3700a`)
+
 ## 2026-09-15
 - chore: remove temporary diagnostic script (`3b63593`)
 

@@ -51,6 +51,12 @@ export const FAMOUS_SPEECHES_META: SpeechMeta[] = [
   { id: 'emma-heforshe', title: 'HeForShe Gender Equality', zhTitle: '他为她性别平等', author: 'Emma Watson', year: 2014, type: 'UN演讲', topic: 'culture', preview: 'Today we are launching a campaign...' },
   { id: 'malala-un', title: 'Education for All', zhTitle: '全民教育', author: 'Malala Yousafzai', year: 2013, type: 'UN演讲', topic: 'culture', preview: 'In the name of God...' },
   { id: 'reagan-challenger', title: 'The Challenger Disaster Speech', zhTitle: '挑战者号灾难演说', author: 'Ronald Reagan', year: 1986, type: '历史演讲', topic: 'history', preview: "Ladies and gentlemen, I'd planned to speak..." },
+  { id: 'lincoln-second', title: 'Second Inaugural Address', zhTitle: '第二次就职演说', author: 'Abraham Lincoln', year: 1865, type: '历史演讲', topic: 'history', preview: 'Fellow countrymen: At this second appearing...' },
+  { id: 'fdr-first', title: 'First Inaugural Address', zhTitle: '首次就职演说', author: 'Franklin D. Roosevelt', year: 1933, type: '历史演讲', topic: 'history', preview: 'I am certain that my fellow Americans expect...' },
+  { id: 'washington-farewell', title: 'Farewell Address', zhTitle: '告别演说', author: 'George Washington', year: 1796, type: '历史演讲', topic: 'history', preview: 'Friends and Citizens: The period for a new election...' },
+  { id: 'patrick-henry', title: 'Give Me Liberty or Give Me Death', zhTitle: '不自由毋宁死', author: 'Patrick Henry', year: 1775, type: '历史演讲', topic: 'history', preview: 'No man thinks more highly than I do of the patriotism...' },
+  { id: 'jefferson-first', title: 'First Inaugural Address', zhTitle: '首次就职演说', author: 'Thomas Jefferson', year: 1801, type: '历史演讲', topic: 'history', preview: 'Friends and Fellow-Citizens: Called upon to undertake...' },
+  { id: 'douglass-fourth', title: 'What to the Slave Is the Fourth of July?', zhTitle: '七月四日对奴隶意味着什么', author: 'Frederick Douglass', year: 1852, type: '历史演讲', topic: 'history', preview: 'Fellow-citizens, I shall not presume to dwell...' },
 ];
 
 // ── Speech full texts ──
@@ -408,6 +414,44 @@ Dear brothers and sisters, we want schools and education for every child's brigh
 Because we are all together, united for the cause of education. And if we want to achieve our goal, then let us empower ourselves with the weapon of knowledge and let us shield ourselves with unity and togetherness.
 
 Let us wage a glorious struggle against illiteracy, poverty and terrorism. Let us pick up our books and our pens. They are our most powerful weapons. One child, one teacher, one book and one pen can change the world. Education is the only solution. Education first. Thank you.`;
+
+SPEECH_TEXTS['lincoln-second'] = `Fellow countrymen: At this second appearing to take the oath of the presidential office there is less occasion for an extended address than there was at the first. The progress of our arms, upon which all else chiefly depends, is as well known to the public as to myself, and it is, I trust, reasonably satisfactory and encouraging to all. With high hope for the future, no prediction in regard to it is ventured.
+
+On the occasion corresponding to this four years ago all thoughts were anxiously directed to an impending civil war. All dreaded it, all sought to avert it. Both parties deprecated war, but one of them would make war rather than let the nation survive, and the other would accept war rather than let it perish, and the war came. Neither party expected for the war the magnitude or the duration which it has already attained.
+
+Fondly do we hope, fervently do we pray, that this mighty scourge of war may speedily pass away. With malice toward none, with charity for all, with firmness in the right as God gives us to see the right, let us strive on to finish the work we are in, to bind up the nation's wounds, to care for him who shall have borne the battle and for his widow and his orphan, to do all which may achieve and cherish a just and lasting peace among ourselves and with all nations.`;
+
+SPEECH_TEXTS['fdr-first'] = `I am certain that my fellow Americans expect that on my induction into the Presidency I will address them with a candor and a decision which the present situation of our Nation impels. This is preeminently the time to speak the truth, the whole truth, frankly and boldly. Nor need we shrink from honestly facing conditions in our country today. This great Nation will endure as it has endured, will revive and will prosper.
+
+So, first of all, let me assert my firm belief that the only thing we have to fear is fear itself — nameless, unreasoning, unjustified terror which paralyzes needed efforts to convert retreat into advance. In every dark hour of our national life a leadership of frankness and vigor has met with that understanding and support of the people themselves which is essential to victory.
+
+Happiness lies not in the mere possession of money; it lies in the joy of achievement, in the thrill of creative effort. The joy and moral stimulation of work no longer must be forgotten in the mad chase of evanescent profits. These dark days will be worth all they cost us if they teach us that our true destiny is not to be ministered unto but to minister to ourselves and to our fellow men.`;
+
+SPEECH_TEXTS['washington-farewell'] = `Friends and Citizens: The period for a new election of a citizen to administer the executive government of the United States being not far distant, it appears to me proper that I should now apprise you of the resolution I have formed, to decline being considered among the number of those out of whom a choice is to be made.
+
+I have already intimated to you the danger of parties in the State, with particular reference to the founding of them on geographical discriminations. Let me now take a more comprehensive view, and warn you in the most solemn manner against the baneful effects of the spirit of party generally. This spirit, unfortunately, is inseparable from our nature, having its root in the strongest passions of the human mind.
+
+Of all the dispositions and habits which lead to political prosperity, religion and morality are indispensable supports. In vain would that man claim the tribute of patriotism, who should labor to subvert these great pillars of human happiness, these firmest props of the duties of men and citizens. Observe good faith and justice towards all nations; cultivate peace and harmony with all.`;
+
+SPEECH_TEXTS['patrick-henry'] = `No man thinks more highly than I do of the patriotism, as well as abilities, of the very worthy gentlemen who have just addressed the House. But different men often see the same subject in different lights; and, therefore, I hope it will not be thought disrespectful to those gentlemen if, entertaining as I do opinions of a character very opposite to theirs, I shall speak forth my sentiments freely and without reserve.
+
+Mr. President, it is natural to man to indulge in the illusions of hope. We are apt to shut our eyes against a painful truth, and listen to the song of that siren till she transforms us into beasts. Is this the part of wise men, engaged in a great and arduous struggle for liberty?
+
+There is no retreat but in submission and slavery. Our chains are forged. Their clanking may be heard on the plains of Boston. The war is inevitable — and let it come. I repeat it, sir, let it come. Is life so dear, or peace so sweet, as to be purchased at the price of chains and slavery? Forbid it, Almighty God. I know not what course others may take; but as for me, give me liberty or give me death!`;
+
+SPEECH_TEXTS['jefferson-first'] = `Friends and Fellow-Citizens: Called upon to undertake the duties of the first executive office of our country, I avail myself of the presence of that portion of my fellow-citizens which is here assembled to express my grateful thanks for the favor with which they have been pleased to look toward me, to declare a sincere consciousness that the task is above my talents.
+
+Let us reflect that, having banished from our land that religious intolerance under which mankind so long bled and suffered, we have yet gained little if we countenance a political intolerance as despotic, as wicked, and capable of as bitter and bloody persecutions. Every difference of opinion is not a difference of principle. We have called by different names brethren of the same principle.
+
+Let us, then, with courage and confidence pursue our own Federal and Republican principles. Equal and exact justice to all men, of whatever state or persuasion, religious or political; peace, commerce, and honest friendship with all nations, entangling alliances with none.`;
+
+SPEECH_TEXTS['douglass-fourth'] = `Fellow-citizens, I shall not presume to dwell at length on the associations that cluster about this day. The simple story of it is that, seventy-six years ago, the people of this country were British subjects. The style and title of your sovereign people, in which you now glory, had not then been heard.
+
+Fellow-citizens, pardon me, allow me to ask, why am I called upon to speak here today? What have I, or those I represent, to do with your national independence? Are the great principles of political freedom and of natural justice, embodied in that Declaration of Independence, extended to us? I am not included within the pale of this glorious anniversary. Your high independence only reveals the immeasurable distance between us.
+
+What, to the American slave, is your Fourth of July? I answer: a day that reveals to him, more than all other days in the year, the gross injustice and cruelty to which he is the constant victim. To him, your celebration is a sham; your shouts of liberty and equality, hollow mockery. There is not a nation on the earth guilty of practices more shocking and bloody than are the people of these United States at this very hour.
+
+Allow me to say, in conclusion, notwithstanding the dark picture I have this day presented, I do not despair of this country. The fiat of the Almighty, Let there be light, has not yet spent its force. The arm of the Lord is not shortened, and the doom of slavery is certain.`;
 
 // Build speech IReadingContent objects
 export function buildSpeechContent(id: string): IReadingContent | null {

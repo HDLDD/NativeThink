@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import { buildPages } from '@/data/reading';
 import { loadImportedBooks, importBookFromText, deleteImportedBook, IMPORTED_ID_PREFIX } from '@/data/imported-books';
+import { EXTRA_PUBLICATIONS } from '@/data/publications-extra';
 import type { SpeechMeta } from '@/data/speeches';
 // ── Types ──
 type Level = 'beginner' | 'intermediate' | 'advanced';
@@ -53,7 +54,7 @@ const MAINTABS: { key: MainTab; label: string; icon: typeof BookOpen }[] = [
 ];
 
 // ── Curated Publications ──
-const PUBLICATIONS: IReadingContent[] = [
+const BASE_PUBLICATIONS: IReadingContent[] = [
   {
     id: 'pub-tech-ai', type: 'publication',
     title: 'How AI is Reshaping the Future of Work', zhTitle: 'AI如何重塑未来工作',
@@ -122,13 +123,16 @@ const PUBLICATIONS: IReadingContent[] = [
 ];
 
 // Fix total words for publications
-PUBLICATIONS.forEach((p) => {
+BASE_PUBLICATIONS.forEach((p) => {
   (p as any).totalWords = p.pages.reduce((sum, page) =>
     sum + page.paragraphs.reduce((s, para) => s + para.en.split(/\s+/).filter(Boolean).length, 0), 0);
 });
 
 
 
+
+/** 刊物总表：内置 5 篇 + 扩展 7 篇（src/data/publications-extra.ts） */
+const PUBLICATIONS: IReadingContent[] = [...BASE_PUBLICATIONS, ...EXTRA_PUBLICATIONS];
 
 export default function ArticlePage() {
   const { isConfigured, chat: aiChat } = useAI();
