@@ -22,6 +22,7 @@ import {
 import { useTTSSettings, getEnglishVoices } from '@/lib/tts-settings';
 import { isSfxEnabled, setSfxEnabled, sfxTick } from '@/lib/sfx';
 import { toast } from 'sonner';
+import { EDGE_VOICE_CATALOG } from '@/lib/tts-voice-catalog';
 import {
   isAndroidNative,
   listNativeEnglishVoices,
@@ -233,6 +234,52 @@ export default function TTSSettings() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* 内置在线神经语音 — 不依赖系统语音，所有平台都能选（需联网） */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+              内置在线语音 <span className="text-muted-foreground/60 normal-case font-bold">推荐 · 音质好 · 需联网</span>
+            </label>
+            <div className="grid grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-0.5">
+              {EDGE_VOICE_CATALOG.map((v) => {
+                const active = settings.selectedVoiceURI === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    onClick={() => {
+                      updateSettings({ selectedVoiceURI: v.id });
+                      // 立即用所选声音试听（走 Edge 通道）
+                      try {
+                        const base = (window as any).__API_BASE__ || '';
+                        const a = new Audio(`${base}/api/tts?text=${encodeURIComponent('Hello, this is a quick voice test.')}&rate=${settings.rate.toFixed(2)}&voice=${encodeURIComponent(v.id)}`);
+                        a.volume = settings.volume;
+                        a.play().catch(() => toast.info('已选择该声音，点「测试声音」可试听'));
+                      } catch { /* ignore */ }
+                    }}
+                    className={cn(
+                      'px-2 py-1.5 rounded-xl text-[10px] font-bold text-left transition-all border',
+                      active
+                        ? 'border-[#00B894] text-ink-teal bg-[#00B894]/5'
+                        : 'border-border text-muted-foreground hover:border-muted-foreground/30',
+                    )}
+                  >
+                    <span className="block truncate">{v.name}</span>
+                    <span className="block text-[8px] font-bold opacity-60">
+                      {v.accent} · {v.gender === 'female' ? '女声' : '男声'}{active ? ' · 已选' : ''}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {settings.selectedVoiceURI && EDGE_VOICE_CATALOG.some((v) => v.id === settings.selectedVoiceURI) && (
+              <button
+                onClick={() => updateSettings({ selectedVoiceURI: null })}
+                className="text-[9px] font-bold text-muted-foreground hover:text-ink-teal transition-colors"
+              >
+                取消选择，改回自动
+              </button>
+            )}
           </div>
 
           {/* 系统语音（Android）— WebView 无语音列表，这里枚举系统 TTS 引擎的英语语音 */}

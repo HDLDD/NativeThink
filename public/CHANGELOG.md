@@ -79,6 +79,10 @@
 
 
 
+
+## 2026-09-15
+- fix(tts): phone had no voice to pick — enumerate the native engine's voices (`d6937a4`)
+
 ## 2026-09-15
 - feat(android): 系统级自动备份 + 版本号自增 —— 更新不再需要导出/卸载 (`159c6cf`)
 

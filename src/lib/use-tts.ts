@@ -15,6 +15,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
 import { getNativeTts as getNativeTtsPlugin } from './native-tts';
+import { edgeVoiceNameOf, isEdgeCatalogVoice } from './tts-voice-catalog';
 import { useTTSSettings } from './tts-settings';
 import { cleanText } from './utils';
 
@@ -92,6 +93,9 @@ function rateToEdge(rate: number): string {
 /** Map a selected system voice to the closest Edge-TTS neural voice */
 function edgeVoiceFor(selectedURI: string | null | undefined): string {
   if (!selectedURI) return 'en-US-AriaNeural';
+  // 内置在线神经语音（目录选择）→ 直接用其语音名，不做模糊映射
+  const explicit = edgeVoiceNameOf(selectedURI);
+  if (explicit) return explicit;
   const n = selectedURI.toLowerCase();
   if (n.includes('zira')) return 'en-US-ZiraNeural';
   if (n.includes('david')) return 'en-US-DavidNeural';
@@ -329,9 +333,11 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     (chunks: string[], idx: number, rate: number, engineIdx: number) => {
       // Android APK：原生系统 TTS 引擎优先 — 离线、即时、不断流；
       // 失败（无语音引擎等）再走网络引擎链。桌面构建 /api/tts 走本地 SAPI。
-      const engines: Array<'native' | 'cf' | 'edge' | 'google'> = IS_ANDROID_NATIVE
-        ? ['native', 'cf', 'edge', 'google']
-        : ['cf', 'edge', 'google'];
+      // 用户显式选了在线神经语音 → Edge 通道优先，保证所选声音真正生效
+      const wantsEdge = isEdgeCatalogVoice(settings.selectedVoiceURI);
+      const engines: Array<'native' | 'cf' | 'edge' | 'google'> = wantsEdge
+        ? (IS_ANDROID_NATIVE ? ['edge', 'native', 'cf', 'google'] : ['edge', 'cf', 'google'])
+        : (IS_ANDROID_NATIVE ? ['native', 'cf', 'edge', 'google'] : ['cf', 'edge', 'google']);
       const engine = engines[engineIdx];
       if (!engine || abortedRef.current || idx >= chunks.length) {
         stopAudio();
