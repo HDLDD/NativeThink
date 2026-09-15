@@ -81,6 +81,10 @@
 
 
 
+
+## 2026-09-15
+- fix(tts): all voices sounded identical — Edge channel is unreachable here (`90660ce`)
+
 ## 2026-09-15
 - fix(tts): no voice to choose — ship a built-in online neural voice catalog (`6e3f607`)
 

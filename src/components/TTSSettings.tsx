@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Volume2, Gauge, Play } from 'lucide-react';
+import { Volume2, Gauge, Play, Activity, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -20,7 +20,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useTTSSettings, getEnglishVoices } from '@/lib/tts-settings';
-import { previewTtsVoice } from '@/lib/use-tts';
+import { previewTtsVoice, probeTtsEngines, type ITtsEngineProbe } from '@/lib/use-tts';
 import { isSfxEnabled, setSfxEnabled, sfxTick } from '@/lib/sfx';
 import { toast } from 'sonner';
 import { EDGE_VOICE_CATALOG } from '@/lib/tts-voice-catalog';
@@ -65,6 +65,8 @@ export default function TTSSettings() {
   // 系统原生语音（Android）：WebView 的 speechSynthesis 列表为空，只能从原生插件取
   const [nativeVoices, setNativeVoices] = useState<INativeVoice[]>([]);
   const [previewing, setPreviewing] = useState<string | null>(null);
+  const [probing, setProbing] = useState(false);
+  const [probeResults, setProbeResults] = useState<ITtsEngineProbe[] | null>(null);
   const [loadingNative, setLoadingNative] = useState(false);
   const isNative = isAndroidNative();
 
@@ -378,6 +380,43 @@ export default function TTSSettings() {
             <Play className="size-3.5 mr-2" />
             测试声音
           </Button>
+
+          {/* 朗读自检：手机"点了不朗读"时用来定位是哪条通道的问题 */}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={probing}
+            onClick={async () => {
+              setProbing(true);
+              setProbeResults(null);
+              try { setProbeResults(await probeTtsEngines(settings.rate)); }
+              finally { setProbing(false); }
+            }}
+            className="w-full rounded-xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+          >
+            {probing ? <Loader2 className="size-3.5 mr-2 animate-spin" /> : <Activity className="size-3.5 mr-2" />}
+            {probing ? '自检中…' : '朗读自检'}
+          </Button>
+          {probeResults && (
+            <div className="rounded-xl border border-border bg-muted/30 p-2.5 space-y-1">
+              {probeResults.map((r) => (
+                <div key={r.engine} className="flex items-center justify-between gap-2 text-[10px] font-bold">
+                  <span className="flex items-center gap-1.5">
+                    <span className={r.ok ? 'text-emerald-500' : 'text-rose-500'}>{r.ok ? '✓' : '✗'}</span>
+                    <span className="text-foreground">
+                      {{ native: '系统语音引擎', cloud: '云端语音', edge: 'Edge 直连', google: 'Google 直连', webspeech: '浏览器语音' }[r.engine]}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground tabular-nums shrink-0">
+                    {r.ms}ms{r.note ? ` · ${r.note}` : ''}
+                  </span>
+                </div>
+              ))}
+              <p className="text-[9px] text-muted-foreground/70 pt-1 leading-relaxed">
+                只要有任一项 ✓ 即可朗读；全 ✗ 说明当前网络与设备都不具备条件
+              </p>
+            </div>
+          )}
 
           {/* 提示音效开关（答题正误 / 拼写完成等） */}
           <div className="flex items-center justify-between gap-2 pt-3 border-t border-border">

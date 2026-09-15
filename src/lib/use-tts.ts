@@ -15,7 +15,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
 import { getNativeTts as getNativeTtsPlugin } from './native-tts';
-import { edgeVoiceNameOf, isEdgeCatalogVoice, googleLangOf } from './tts-voice-catalog';
+import { edgeVoiceNameOf, googleLangOf } from './tts-voice-catalog';
 import { useTTSSettings } from './tts-settings';
 import { cleanText } from './utils';
 
@@ -111,18 +111,29 @@ function edgeVoiceFor(selectedURI: string | null | undefined): string {
 
 function edgeTTSBlob(text: string, rate: number, voiceName = 'en-US-AriaNeural'): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(EDGE_WSS);
-    ws.binaryType = 'arraybuffer';
     const parts: Uint8Array[] = [];
     let settled = false;
+    let ws: WebSocket;
+    // 连接看门狗：Edge 通道在部分网络被墙，浏览器默认要等十几秒才报错 ——
+    // 这里 1.5s 内没连上就直接放弃，让调用方立刻降级到云端通道，避免朗读"卡住不动"
+    const connectTimer = setTimeout(() => finish(new Error('edge-connect-timeout')), 1500);
     const finish = (err?: Error) => {
       if (settled) return;
       settled = true;
-      try { ws.close(); } catch { /* */ }
+      clearTimeout(connectTimer);
+      try { ws?.close(); } catch { /* */ }
       if (err) reject(err);
       else if (parts.length === 0) reject(new Error('empty'));
       else resolve(new Blob(parts as BlobPart[], { type: 'audio/mpeg' }));
     };
+
+    try {
+      ws = new WebSocket(EDGE_WSS);
+    } catch {
+      finish(new Error('edge-unavailable'));
+      return;
+    }
+    ws.binaryType = 'arraybuffer';
 
     ws.onopen = () => {
       ws.send(
@@ -335,11 +346,13 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     (chunks: string[], idx: number, rate: number, engineIdx: number) => {
       // Android APK：原生系统 TTS 引擎优先 — 离线、即时、不断流；
       // 失败（无语音引擎等）再走网络引擎链。桌面构建 /api/tts 走本地 SAPI。
-      // 用户显式选了在线神经语音 → Edge 通道优先，保证所选声音真正生效
-      const wantsEdge = isEdgeCatalogVoice(settings.selectedVoiceURI);
-      const engines: Array<'native' | 'cf' | 'edge' | 'google'> = wantsEdge
-        ? (IS_ANDROID_NATIVE ? ['edge', 'native', 'cf', 'google'] : ['edge', 'cf', 'google'])
-        : (IS_ANDROID_NATIVE ? ['native', 'cf', 'edge', 'google'] : ['cf', 'edge', 'google']);
+      // 引擎顺序（实测：Edge 直连在国内网络不可达，故不作为首选；
+      // 云端通道经 Cloudflare 边缘访问 Google，是网络环境下的可靠通道）。
+      // Android：原生引擎优先（离线、零延迟、不断流）→ 云端 → 其余
+      // 其他平台：云端 → Edge → Google
+      const engines: Array<'native' | 'cf' | 'edge' | 'google'> = IS_ANDROID_NATIVE
+        ? ['native', 'cf', 'edge', 'google']
+        : ['cf', 'edge', 'google'];
       const engine = engines[engineIdx];
       if (!engine || abortedRef.current || idx >= chunks.length) {
         stopAudio();
@@ -407,8 +420,41 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
             nativeActiveRef.current = true;
             nativeReplayRef.current = () => playChunkWithFallback(chunks, idx, rate, 0);
             setIsSpeaking(true); setIsPaused(false);
+
+            const text = chunks[idx];
+            let settled = false;
+            let spokeAtLeastOnce = false;
+            let listenerHandle: any = null;
+
+            const clearWatchdog = () => { if (nativeWatchdog) { clearTimeout(nativeWatchdog); nativeWatchdog = null; } };
+            const teardown = () => {
+              clearWatchdog();
+              try { listenerHandle?.remove?.(); } catch { /* ignore */ }
+              listenerHandle = null;
+            };
+            // 关键看门狗：系统引擎缺英语语音包时 speak() 既不成功也不失败，
+            // 会无声地挂住整个降级链（用户感知＝"点了不朗读"）。
+            // 因此只要 2.5s 内没有任何"开始发声"的证据，就放弃原生、降级到网络引擎。
+            let nativeWatchdog: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+              if (settled || spokeAtLeastOnce) return;
+              settled = true;
+              teardown();
+              try { plugin.stop?.(); } catch { /* ignore */ }
+              nativeActiveRef.current = false;
+              console.info('[tts] native engine silent → falling back to network engines');
+              if (!abortedRef.current) onFail();
+            }, 2500);
+
+            // onRangeStart = 引擎真的开始读了（不同 Android 版本触发时机略有差异）
+            try {
+              Promise.resolve(plugin.addListener?.('onRangeStart', () => {
+                spokeAtLeastOnce = true;
+                clearWatchdog();
+              })).then((h: any) => { listenerHandle = h; }).catch(() => {});
+            } catch { /* ignore */ }
+
             plugin.speak({
-              text: chunks[idx],
+              text,
               lang: 'en-US',
               rate: Math.min(1.5, Math.max(0.5, rate)),
               pitch: 1,
@@ -419,10 +465,18 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
                 : {}),
             })
               .then(() => {
+                clearWatchdog();
+                if (settled) return; // 看门狗已降级，忽略迟到回调
+                settled = true;
+                teardown();
                 nativeActiveRef.current = false;
                 if (!abortedRef.current) onDone();
               })
               .catch(() => {
+                clearWatchdog();
+                if (settled) return;
+                settled = true;
+                teardown();
                 nativeActiveRef.current = false;
                 if (!abortedRef.current) onFail();
               });
@@ -718,4 +772,73 @@ export async function previewTtsVoice(
   } catch {
     return 'failed';
   }
+}
+
+export interface ITtsEngineProbe {
+  engine: 'native' | 'cloud' | 'edge' | 'google' | 'webspeech';
+  ok: boolean;
+  ms: number;
+  note?: string;
+}
+
+/**
+ * 朗读自检 —— 依次探测各通道能否真正发声，返回每个通道的结果与耗时。
+ * 用途：手机上"点了不朗读"时，一眼看出是哪条链路的问题。
+ */
+export async function probeTtsEngines(rate = 0.9): Promise<ITtsEngineProbe[]> {
+  const text = 'Hello';
+  const out: ITtsEngineProbe[] = [];
+
+  // 1) 原生系统引擎
+  const t0 = Date.now();
+  const plugin = await getNativeTts();
+  if (plugin) {
+    const ok = await new Promise<boolean>((resolve) => {
+      let done = false;
+      let alive = false;
+      const timer = setTimeout(() => { if (!done) { done = true; try { plugin.stop?.(); } catch { /* */ } resolve(alive); } }, 2500);
+      try {
+        Promise.resolve(plugin.addListener?.('onRangeStart', () => { alive = true; })).catch(() => {});
+      } catch { /* ignore */ }
+      plugin.speak({ text, lang: 'en-US', rate, pitch: 1, volume: 1 })
+        .then(() => { if (!done) { done = true; clearTimeout(timer); resolve(true); } })
+        .catch(() => { if (!done) { done = true; clearTimeout(timer); resolve(false); } });
+    });
+    out.push({ engine: 'native', ok, ms: Date.now() - t0, note: ok ? undefined : '系统无英语语音包或无引擎' });
+  } else {
+    out.push({ engine: 'native', ok: false, ms: 0, note: '非手机端 / 插件不可用' });
+  }
+
+  // 2) 云端通道（Cloudflare → Google）
+  {
+    const t1 = Date.now();
+    try {
+      const url = cfTtsUrl(text, rate, null, 'en');
+      const r = await fetch(url, { method: 'GET' });
+      const blob = r.ok ? await r.blob() : null;
+      out.push({ engine: 'cloud', ok: !!(blob && blob.size > 500), ms: Date.now() - t1, note: blob ? `${blob.size} B` : `HTTP ${r.status}` });
+    } catch (e) {
+      out.push({ engine: 'cloud', ok: false, ms: Date.now() - t1, note: String(e).slice(0, 40) });
+    }
+  }
+
+  // 3) Edge 直连通道
+  {
+    const t2 = Date.now();
+    try {
+      const blob = await edgeTTSBlob(text, rate, 'en-US-AriaNeural');
+      out.push({ engine: 'edge', ok: blob.size > 500, ms: Date.now() - t2, note: `${blob.size} B` });
+    } catch (e) {
+      out.push({ engine: 'edge', ok: false, ms: Date.now() - t2, note: String(e).slice(0, 40) });
+    }
+  }
+
+  // 4) 浏览器语音合成
+  {
+    const t3 = Date.now();
+    const has = 'speechSynthesis' in window && window.speechSynthesis.getVoices().length > 0;
+    out.push({ engine: 'webspeech', ok: has, ms: Date.now() - t3, note: has ? `${window.speechSynthesis.getVoices().length} 个语音` : '无可用语音' });
+  }
+
+  return out;
 }
