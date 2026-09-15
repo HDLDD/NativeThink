@@ -32,6 +32,17 @@ const MODELS = ['glm-4-flash-250414', 'glm-4-flash'];
 const BATCH = 4;
 const CONCURRENCY = 2;
 const PROXY = 'https://nativethink.pages.dev/api/gutenberg';
+
+/**
+ * 各书体量（实测段落数）—— 用于 --all 时按升序排，让中小体量的书先翻完，
+ * 巨著排最后（否则用户要等 20+ 小时才看到第一本完整的中文对照）。
+ */
+const BOOK_SIZE_HINT = {
+  '1635': 203, '43': 368, '1232': 408, '244': 836, '84': 826, '11': 834,
+  '1228': 1328, '174': 1551, '768': 1984, '345': 2223, '3300': 2259,
+  '76': 2281, '1342': 2515, '1661': 2563, '98': 3375, '730': 3933,
+  '1400': 3979, '1260': 4122, '3600': 5573, '2600': 12115, '1184': 15104,
+};
 const EXTERNALS = '--external:@huggingface/transformers --external:onnxruntime-node --external:@capacitor/core --external:sharp';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -165,7 +176,9 @@ async function translateSegments(texts) {
   const maxChaptersIdx = args.indexOf('--max-chapters');
   const maxChapters = maxChaptersIdx >= 0 ? parseInt(args[maxChaptersIdx + 1], 10) : Infinity;
   const ids = args.includes('--all')
-    ? books.map((b) => b.id)
+    ? books
+        .map((b) => b.id)
+        .sort((a, b) => (BOOK_SIZE_HINT[a] || 99999) - (BOOK_SIZE_HINT[b] || 99999))
     : args.filter((a) => /^\d+$/.test(a) && !flagValues.has(a));
   if (ids.length === 0) { console.error('未指定书籍 id'); process.exit(1); }
 

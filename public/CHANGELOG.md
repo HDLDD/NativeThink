@@ -92,6 +92,10 @@
 
 
 
+
+## 2026-09-15
+- chore: ignore pretranslate temp build artifacts (`8cd1c11`)
+
 ## 2026-09-15
 - feat(tts): 「只用系统引擎」开关 —— 锁定几十毫秒延迟 (`99318a6`)
 
