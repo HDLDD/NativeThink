@@ -295,6 +295,7 @@ export default function TTSSettings() {
                 {loadingNative && <span className="text-[9px] font-bold text-muted-foreground/60">读取中…</span>}
               </label>
               {nativeVoices.length > 0 ? (
+                <>
                 <Select
                   value={settings.nativeVoiceIndex === null ? '__default__' : String(settings.nativeVoiceIndex)}
                   onValueChange={(v) => {
@@ -316,6 +317,26 @@ export default function TTSSettings() {
                     ))}
                   </SelectContent>
                 </Select>
+                <label className="flex items-center justify-between gap-2 pt-1 cursor-pointer">
+                  <span className="text-[10px] font-bold text-muted-foreground leading-snug">
+                    只用系统引擎<span className="block text-[9px] opacity-70">离线、几十毫秒；不走网络</span>
+                  </span>
+                  <button
+                    role="switch"
+                    aria-checked={settings.preferNative}
+                    onClick={() => updateSettings({ preferNative: !settings.preferNative })}
+                    className={cn(
+                      'relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0',
+                      settings.preferNative ? 'bg-[#00B894]' : 'bg-muted-foreground/30',
+                    )}
+                  >
+                    <span className={cn(
+                      'absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform duration-200',
+                      settings.preferNative ? 'translate-x-[18px]' : 'translate-x-0.5',
+                    )} />
+                  </button>
+                </label>
+                </>
               ) : !loadingNative ? (
                 <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 space-y-2">
                   <p className="text-[10px] font-bold text-amber-700 dark:text-amber-300 leading-relaxed">

@@ -353,7 +353,10 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       // 用户显式选了在线语音 → 直接走云端（原生引擎发不出该音色，先试只会白等）
       const wantsOnlineVoice = isEdgeCatalogVoice(settings.selectedVoiceURI);
       const engines: Array<'native' | 'cf' | 'edge' | 'google'> = IS_ANDROID_NATIVE
-        ? (wantsOnlineVoice ? ['cf', 'native', 'edge', 'google'] : ['native', 'cf', 'edge', 'google'])
+        ? (settings.preferNative
+          // 用户要求"只用系统引擎"：不做网络降级，失败直接提示（保证延迟与音色可控）
+          ? ['native']
+          : (wantsOnlineVoice ? ['cf', 'native', 'edge', 'google'] : ['native', 'cf', 'edge', 'google']))
         : ['cf', 'edge', 'google'];
       const engine = engines[engineIdx];
       if (!engine || abortedRef.current || idx >= chunks.length) {
