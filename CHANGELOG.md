@@ -88,6 +88,10 @@
 
 
 
+
+## 2026-09-15
+- chore: remove temporary diagnostic script (`3b63593`)
+
 ## 2026-09-15
 - fix(reader): 章节识别大修 —— 10 本公版书此前完全没有章节 (`869d139`)
 

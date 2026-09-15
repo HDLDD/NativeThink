@@ -487,7 +487,43 @@ function buildBatches(indices: number[], batchSize: number): number[][] {
 
 // ─────────────────────────── IDB 缓存 ───────────────────────────
 
+/**
+ * 预翻译包：public/translations/<bookId>.json
+ * 由 scripts/pretranslate-books.cjs 生成并随包分发 —— 打开书籍即得中文对照，
+ * 零等待、零 API 消耗、断网可用。首次访问后写入 IndexedDB，之后完全离线。
+ */
+const prebakedLoaded = new Set<string>();
+async function tryLoadPrebaked(bookId: string, chapterIdx: number): Promise<string[] | null> {
+  if (prebakedLoaded.has(bookId)) return null;
+  prebakedLoaded.add(bookId);
+  try {
+    const res = await fetch(`/translations/${bookId}.json`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as Record<string, string[]>;
+    const entries = Object.entries(data);
+    if (entries.length === 0) return null;
+    // 整本写入本地缓存（断网后依然可用）
+    await Promise.all(entries.map(async ([k, arr]) => {
+      const idx = Number(k);
+      if (Number.isInteger(idx) && Array.isArray(arr)) {
+        await idbSet(chapterKeyOf(bookId, idx), arr).catch(() => {});
+      }
+    }));
+    const hit = data[String(chapterIdx)];
+    return Array.isArray(hit) ? hit : null;
+  } catch { return null; }
+}
+
 async function loadChapterCache(bookId: string, chapterIdx: number): Promise<string[] | null> {
+  // 本地缓存未命中 → 尝试随包分发的预翻译
+  const cached0 = await loadChapterCacheRaw(bookId, chapterIdx);
+  if (cached0 && cached0.some(Boolean)) return cached0;
+  const prebaked = await tryLoadPrebaked(bookId, chapterIdx);
+  if (prebaked && prebaked.some(Boolean)) return prebaked;
+  return cached0;
+}
+
+async function loadChapterCacheRaw(bookId: string, chapterIdx: number): Promise<string[] | null> {
   const raw = await idbGet<unknown>(chapterKeyOf(bookId, chapterIdx));
   if (!Array.isArray(raw)) return null;
   return raw.map((s) => (typeof s === 'string' ? s : ''));
@@ -718,8 +754,14 @@ export async function getChapterTranslation(
   chapterIdx: number,
 ): Promise<string[] | null> {
   const raw = await idbGet<unknown>(chapterKeyOf(bookId, chapterIdx));
-  if (!Array.isArray(raw)) return null;
-  return raw.map((s) => (typeof s === 'string' ? s : ''));
+  if (Array.isArray(raw) && raw.some((v) => typeof v === 'string' && v)) {
+    return raw.map((s) => (typeof s === 'string' ? s : ''));
+  }
+  // 本地没有 → 尝试随包分发的预翻译（阅读器切章即显示中文，零 API 消耗）
+  const prebaked = await tryLoadPrebaked(bookId, chapterIdx);
+  if (prebaked && prebaked.some(Boolean)) return prebaked;
+  if (Array.isArray(raw)) return raw.map((s) => (typeof s === 'string' ? s : ''));
+  return null;
 }
 
 /** 读取全书缓存：{ [chapterIdx]: string[] }（仅包含已落盘的章节） */
