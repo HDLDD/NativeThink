@@ -12,9 +12,29 @@ export interface INativeVoice {
   /** 传给插件 speak({ voice }) 的索引 */
   index: number;
   name: string;
+  /** 引擎内部的真实音色名（插件把它放在 voiceURI），形如 en-us-x-sfg#female_1-local */
+  uri: string;
   lang: string;
   localService: boolean;
   isDefault: boolean;
+}
+
+/**
+ * 可区分的音色标签。
+ *
+ * 插件把显示名按「语言+地区」拼（`locale.getDisplayLanguage() + locale.getDisplayCountry()`），
+ * 于是所有 en-US 音色在界面上都叫同一个「English United States」—— 用户看到的就是
+ * 「前 10 个声音都是同一个」。真实音色名在 voiceURI 里，用它区分。
+ */
+export function nativeVoiceLabel(v: Pick<INativeVoice, 'uri' | 'lang' | 'localService'>): string {
+  const tail = v.uri.includes('#') ? v.uri.split('#').pop() || v.uri : v.uri;
+  const cleaned = tail
+    .replace(/-(local|network)$/i, '')
+    .replace(/_(\d)/g, ' $1')
+    .replace(/_/g, ' ')
+    .trim();
+  const region = (v.lang || '').replace('-', ' ').toUpperCase();
+  return `${cleaned || v.uri} · ${region} · ${v.localService ? '本地' : '网络'}`;
 }
 
 export function isNativePlatform(): boolean {
@@ -51,6 +71,7 @@ export async function listNativeVoices(): Promise<INativeVoice[]> {
     return raw.map((v, i) => ({
       index: i,
       name: String(v?.name || `语音 ${i + 1}`),
+      uri: String(v?.voiceURI || v?.name || ''),
       lang: String(v?.lang || ''),
       localService: !!v?.localService,
       isDefault: !!v?.default,
@@ -61,8 +82,17 @@ export async function listNativeVoices(): Promise<INativeVoice[]> {
 /** 仅英语语音（本地音色靠前；插件把 default 恒置为 false，故不作为排序依据） */
 export async function listNativeEnglishVoices(): Promise<INativeVoice[]> {
   const all = await listNativeVoices();
+  const seen = new Set<string>();
   return all
     .filter((v) => v.lang.toLowerCase().startsWith('en'))
+    // 同一音色可能被引擎登记多次（不同 locale 变体）—— 按真实音色名去重，避免列表里一堆重复项。
+    // 保留首次出现的那条，index 仍是引擎里的原始下标，setVoice 才不会选错。
+    .filter((v) => {
+      const key = v.uri || `${v.name}|${v.lang}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .sort((a, b) => {
       const sa = (a.isDefault ? 4 : 0) + (a.localService ? 2 : 0) + (a.lang.toLowerCase() === 'en-us' ? 1 : 0);
       const sb = (b.isDefault ? 4 : 0) + (b.localService ? 2 : 0) + (b.lang.toLowerCase() === 'en-us' ? 1 : 0);

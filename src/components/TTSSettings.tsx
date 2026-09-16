@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/popover';
 import { useTTSSettings, getEnglishVoices } from '@/lib/tts-settings';
 import { previewTtsVoice, probeTtsEngines, getLastTtsReport, type ITtsEngineProbe, type ITtsPlaybackReport } from '@/lib/use-tts';
+import { getSherpaStatus, warmSherpa, type ISherpaStatus } from '@/lib/sherpa-tts';
 import { isSfxEnabled, setSfxEnabled, sfxTick } from '@/lib/sfx';
 import { toast } from 'sonner';
 import { EDGE_VOICE_CATALOG } from '@/lib/tts-voice-catalog';
@@ -29,6 +30,7 @@ import {
   listNativeEnglishVoices,
   openNativeTtsInstall,
   pickPreferredEnglishVoice,
+  nativeVoiceLabel,
   previewNativeVoice,
   type INativeVoice,
 } from '@/lib/native-tts';
@@ -73,6 +75,8 @@ export default function TTSSettings() {
   const [loadingNative, setLoadingNative] = useState(false);
   /** 上次朗读实测（引擎 + 起播耗时）—— 判断慢在离线引擎还是联网合成 */
   const [lastReport, setLastReport] = useState<ITtsPlaybackReport | null>(null);
+  /** 内置离线引擎状态 */
+  const [sherpa, setSherpa] = useState<ISherpaStatus | null>(null);
   const isNative = isAndroidNative();
 
   useEffect(() => {
@@ -81,6 +85,15 @@ export default function TTSSettings() {
     const t = setInterval(() => setLastReport(getLastTtsReport()), 1000);
     return () => clearInterval(t);
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !isNative) return;
+    let cancelled = false;
+    const tick = () => { getSherpaStatus().then((s) => { if (!cancelled) setSherpa(s); }); };
+    tick();
+    const t = setInterval(tick, 1500);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [open, isNative]);
 
   useEffect(() => {
     if (!open || !isNative) return;
@@ -327,6 +340,39 @@ export default function TTSSettings() {
             )}
           </div>
 
+          {/* 内置离线朗读引擎（安卓）—— 设备内合成、不联网；装没装好一眼可见 */}
+          {isNative && (
+            <div className="p-2.5 rounded-xl bg-muted/50 border border-border space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">内置离线引擎</span>
+                <span className={cn(
+                  'text-[9px] font-black px-2 py-0.5 rounded-full',
+                  sherpa?.status === 'ready' ? 'bg-[#00B894]/10 text-[#00B894]'
+                    : sherpa?.status === 'error' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400'
+                      : 'bg-muted text-muted-foreground',
+                )}>
+                  {sherpa?.status === 'ready' ? '已就绪' : sherpa?.status === 'loading' ? '加载中…' : sherpa?.status === 'error' ? '加载失败' : '未加载'}
+                </span>
+              </div>
+              <p className="text-[9px] font-bold text-muted-foreground leading-snug">
+                {sherpa?.status === 'ready'
+                  ? `设备内合成，不走网络 · 采样率 ${sherpa.sampleRate}Hz · 已缓存 ${sherpa.cached} 段`
+                  : sherpa?.status === 'error'
+                    ? `失败原因：${sherpa.error || '未知'}`
+                    : '未选择在线音色时，朗读会用这个引擎（首次加载约 1~2 秒）'}
+              </p>
+              {sherpa?.status !== 'ready' && (
+                <Button
+                  size="sm" variant="outline"
+                  onClick={() => { void warmSherpa(); toast.info('正在加载内置朗读引擎…'); }}
+                  className="w-full rounded-xl text-[10px] font-black"
+                >
+                  立即加载内置引擎
+                </Button>
+              )}
+            </div>
+          )}
+
           {/* 系统语音（Android）— WebView 无语音列表，这里枚举系统 TTS 引擎的英语语音 */}
           {isNative && (
             <div className="space-y-2">
@@ -352,7 +398,7 @@ export default function TTSSettings() {
                     <SelectItem value="__default__" className="text-xs font-bold">系统默认语音</SelectItem>
                     {nativeVoices.map((nv) => (
                       <SelectItem key={nv.index} value={String(nv.index)} className="text-xs font-medium">
-                        {nv.name} ({nv.lang}){nv.localService ? ' · 本地' : ' · 网络'}
+                        {nativeVoiceLabel(nv)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -412,7 +458,12 @@ export default function TTSSettings() {
             <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">上次朗读实测</p>
             {lastReport ? (
               <p className="text-[10px] font-bold text-foreground leading-relaxed">
-                {lastReport.engine === 'native' ? (
+                {lastReport.engine === 'piper' ? (
+                  <>
+                    内置离线引擎（<span className="text-[#00B894]">设备内合成，与网速无关</span>）· 起播 {lastReport.firstAudioMs}ms
+                    {lastReport.firstAudioMs > 400 && ' — 首次朗读含模型加载，之后会更快'}
+                  </>
+                ) : lastReport.engine === 'native' ? (
                   <>
                     系统引擎（<span className="text-[#00B894]">离线，与网速无关</span>）· 起播 {lastReport.firstAudioMs}ms
                     {lastReport.firstAudioMs > 600 && ' — 偏慢，多半是所选音色为网络音色'}

@@ -15,6 +15,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
 import { getNativeTts as getNativeTtsPlugin, pickPreferredEnglishVoice } from './native-tts';
+import { isSherpaAvailable, sherpaPrewarm, sherpaSpeak, warmSherpa } from './sherpa-tts';
 import { edgeVoiceNameOf, googleLangOf, isEdgeCatalogVoice } from './tts-voice-catalog';
 import { useTTSSettings } from './tts-settings';
 import { cleanText } from './utils';
@@ -184,7 +185,7 @@ const getNativeTts = getNativeTtsPlugin;
  * 手机上没法开控制台，这个回显就是唯一的现场证据。
  */
 export interface ITtsPlaybackReport {
-  engine: 'native' | 'cf' | 'edge' | 'google';
+  engine: 'piper' | 'native' | 'cf' | 'edge' | 'google';
   /** 从发起合成到实际起播的毫秒数 */
   firstAudioMs: number;
   /** 是否降级来的（前一个引擎失败） */
@@ -377,11 +378,13 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       // 其他平台：云端 → Edge → Google
       // 用户显式选了在线语音 → 直接走云端（原生引擎发不出该音色，先试只会白等）
       const wantsOnlineVoice = isEdgeCatalogVoice(settings.selectedVoiceURI);
-      const engines: Array<'native' | 'cf' | 'edge' | 'google'> = IS_ANDROID_NATIVE
+      // 安卓：内置离线引擎（Piper）优先 —— 设备内合成、起播几十毫秒、与网速无关。
+      // 用户显式选了在线音色则尊重其选择（clound 优先），但把内置引擎排在第二位，
+      // 网络不可用时仍能出声。开着「只用系统引擎」时只走离线通道。
+      const engines: Array<'piper' | 'native' | 'cf' | 'edge' | 'google'> = IS_ANDROID_NATIVE
         ? (settings.preferNative
-          // 用户要求"只用系统引擎"：不做网络降级，失败直接提示（保证延迟与音色可控）
-          ? ['native']
-          : (wantsOnlineVoice ? ['cf', 'native', 'edge', 'google'] : ['native', 'cf', 'edge', 'google']))
+          ? ['piper', 'native']
+          : (wantsOnlineVoice ? ['cf', 'piper', 'native', 'edge', 'google'] : ['piper', 'native', 'cf', 'edge', 'google']))
         : ['cf', 'edge', 'google'];
       const engine = engines[engineIdx];
       if (!engine || abortedRef.current || idx >= chunks.length) {
@@ -419,7 +422,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         }
       };
 
-      const playUrl = (url: string, opts?: { applyRate?: boolean; engine?: 'cf' | 'edge' | 'google'; t0?: number }) => {
+      const playUrl = (url: string, opts?: { applyRate?: boolean; engine?: 'piper' | 'cf' | 'edge' | 'google'; t0?: number }) => {
         if (abortedRef.current) { onDone(); return; }
         stopAudio();
         const a = new Audio(url);
@@ -545,6 +548,17 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
               });
           })
           .catch(() => onFail());
+        return;
+      }
+
+      if (engine === 'piper') {
+        // 内置离线引擎：设备内合成（不联网），起播几十毫秒；下一段顺手预合成
+        const t0 = Date.now();
+        const next = chunks[idx + 1];
+        if (next) sherpaPrewarm(next, rate);
+        sherpaSpeak(chunks[idx], rate)
+          .then(({ url }) => playUrl(url, { engine: 'piper', t0 }))
+          .catch(onFail);
         return;
       }
 
@@ -699,9 +713,16 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   const prewarm = useCallback((text: string, opts?: { rate?: number }) => {
     const cleaned = cleanText(text);
     if (!cleaned) return;
+    const rate = opts?.rate ?? settings.rate;
+    // 安卓未选在线音色时朗读走内置离线引擎 —— 预热它才有意义，
+    // 此时再往云端拉合成纯属浪费流量，直接跳过。
+    if (IS_ANDROID_NATIVE && isSherpaAvailable() && !isEdgeCatalogVoice(settings.selectedVoiceURI)) {
+      warmSherpa(); // 首次触发即开始加载模型（1~2 秒），别等用户点了才加载
+      sherpaPrewarm(cleaned, rate);
+      return;
+    }
     // Fill the local server synth cache with the SAME rate/voice the actual
     // speak() will request — a mismatched cache key makes prewarm useless.
-    const rate = opts?.rate ?? settings.rate;
     try {
       const url = cfTtsUrl(cleaned, rate, settings.selectedVoiceURI, googleLangOf(settings.selectedVoiceURI));
       // 写入 Cache API（比单纯 HTTP 缓存可靠）— speak() 命中后即时起播
@@ -740,11 +761,17 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         // Pipeline warm-up: stagger-prefetch upcoming chunks in parallel —
         // the server synthesizes each independently, so by the time chunk 0
         // finishes playing, later chunks are already cached (no gaps)
-        chunks.slice(1, 9).forEach((c, i) => {
-          setTimeout(() => {
-            warmTtsCache(cfTtsUrl(c, rate, settings.selectedVoiceURI, googleLangOf(settings.selectedVoiceURI))).catch(() => {});
-          }, 60 * (i + 1));
-        });
+        // 安卓走内置离线引擎时改为在 piper 分支里预合成，不必再拉云端音频。
+        const usingBundledEngine = IS_ANDROID_NATIVE && isSherpaAvailable() && !isEdgeCatalogVoice(settings.selectedVoiceURI);
+        if (!usingBundledEngine) {
+          chunks.slice(1, 9).forEach((c, i) => {
+            setTimeout(() => {
+              warmTtsCache(cfTtsUrl(c, rate, settings.selectedVoiceURI, googleLangOf(settings.selectedVoiceURI))).catch(() => {});
+            }, 60 * (i + 1));
+          });
+        } else {
+          warmSherpa();
+        }
         playChunkWithFallback(chunks, 0, rate, 0);
         return;
       }
