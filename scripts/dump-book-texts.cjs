@@ -54,9 +54,17 @@ function loadBooks() {
       .filter((p) => p.length > 1);
   }
 
+  /** 与阅读器 fetchFullBook 的口径一致（含章节标记段），保证界面数字对得上 */
+  function countWords(paragraphs) {
+    return paragraphs.reduce((sum, p) => sum + p.en.split(/\s+/).filter(Boolean).length, 0);
+  }
+
   fs.mkdirSync(OUT_DIR, { recursive: true });
   let total = 0;
   let ok = 0;
+  /** 全书真实词数/章数 —— books.ts 里的 totalWords 是压缩节选的（每本约 4800 词），
+   *  书单据此显示就会全都差不多，所以这里按全文算一份清单随包发布 */
+  const stats = {};
 
   for (const b of targets) {
     const outFile = path.join(OUT_DIR, b.id + '.txt');
@@ -64,7 +72,12 @@ function loadBooks() {
       const sz = fs.statSync(outFile).size;
       total += sz;
       ok++;
-      console.log(`  跳过 ${b.id.padStart(5)} ${b.title.slice(0, 28).padEnd(30)} 已存在 ${(sz / 1024 / 1024).toFixed(2)}MB`);
+      // 已存在的也要补算词数，否则跳过时清单会缺项
+      const text = fs.readFileSync(outFile, 'utf8');
+      const paragraphs = cleanBookParagraphs(splitParagraphs(text));
+      const chapters = splitChapters({ pages: [{ pageNumber: 1, paragraphs, words: 0 }] });
+      stats[b.id] = { words: countWords(paragraphs), chapters: chapters.length };
+      console.log(`  跳过 ${b.id.padStart(5)} ${b.title.slice(0, 28).padEnd(30)} 已存在 ${(sz / 1024 / 1024).toFixed(2)}MB · ${stats[b.id].words.toLocaleString()} 词 / ${chapters.length} 章`);
       continue;
     }
     try {
@@ -73,8 +86,9 @@ function loadBooks() {
       const text = (await r.json()).text;
       if (!text || text.length < 5000) { console.error(`  ✗ ${b.id} 正文过短（${text ? text.length : 0} 字符）`); continue; }
 
+      const paragraphs = cleanBookParagraphs(splitParagraphs(text));
       // 校验：这份文本切出的章节要与已入库译稿对得上，否则说明取到了不同的版本
-      const chapters = splitChapters({ pages: [{ pageNumber: 1, paragraphs: cleanBookParagraphs(splitParagraphs(text)), words: 0 }] });
+      const chapters = splitChapters({ pages: [{ pageNumber: 1, paragraphs, words: 0 }] });
       const prePath = path.join(ROOT, 'public', 'translations', b.id + '.json');
       let warn = '';
       if (fs.existsSync(prePath)) {
@@ -89,11 +103,14 @@ function loadBooks() {
       fs.writeFileSync(outFile, text, 'utf8');
       total += Buffer.byteLength(text, 'utf8');
       ok++;
-      console.log(`  ✓ ${b.id.padStart(5)} ${b.title.slice(0, 28).padEnd(30)} ${chapters.length} 章 / ${(Buffer.byteLength(text, 'utf8') / 1024 / 1024).toFixed(2)}MB${warn}`);
+      stats[b.id] = { words: countWords(paragraphs), chapters: chapters.length };
+      console.log(`  ✓ ${b.id.padStart(5)} ${b.title.slice(0, 28).padEnd(30)} ${chapters.length} 章 · ${stats[b.id].words.toLocaleString()} 词 · ${(Buffer.byteLength(text, 'utf8') / 1024 / 1024).toFixed(2)}MB${warn}`);
     } catch (e) {
       console.error(`  ✗ ${b.id} 失败: ${e.message}`);
     }
   }
+
+  fs.writeFileSync(path.join(OUT_DIR, 'index.json'), JSON.stringify(stats), 'utf8');
 
   for (const f of ['.dump-books.cjs', '.dump-split.cjs']) {
     try { fs.unlinkSync(path.join(ROOT, f)); } catch { /* ignore */ }

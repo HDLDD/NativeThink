@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import { buildPages } from '@/data/reading';
 import { loadImportedBooks, importBookFromText, deleteImportedBook, IMPORTED_ID_PREFIX } from '@/data/imported-books';
+import { loadBookStats, type IBookStat } from '@/data/book-stats';
 import { EXTRA_PUBLICATIONS } from '@/data/publications-extra';
 import type { SpeechMeta } from '@/data/speeches';
 // ── Types ──
@@ -196,6 +197,8 @@ export default function ArticlePage() {
   // ── Lazy-loaded data (books & speeches are large, load on tab switch) ──
   const [books, setBooks] = useState<IReadingContent[] | null>(null);
   const [booksLoaded, setBooksLoaded] = useState(false);
+  /** 内置书真实规模（全文词数/章数），随全文一起发布 */
+  const [bookStats, setBookStats] = useState<Record<string, IBookStat>>({});
   const [speechMeta, setSpeechMeta] = useState<SpeechMeta[] | null>(null);
   const [buildSpeechFn, setBuildSpeechFn] = useState<((id: string) => IReadingContent | null) | null>(null);
   const [speechesLoaded, setSpeechesLoaded] = useState(false);
@@ -247,6 +250,9 @@ export default function ArticlePage() {
     setBooksLoaded(true);
     import('@/data/books').then((m) => setBooks(m.ALL_BOOKS)).catch(() => setBooks([]));
   }, [mainTab, booksLoaded]);
+
+  // 真实规模清单：books.ts 的 totalWords 是压缩节选词数，书单要用全文词数
+  useEffect(() => { loadBookStats().then(setBookStats); }, []);
 
   /** 内置书 + 导入书（导入的置顶） */
   const allBooks = useMemo(() => [...importedBooks, ...(books || [])], [importedBooks, books]);
@@ -734,7 +740,7 @@ export default function ArticlePage() {
                       <div className="flex items-center gap-2 mt-2">
                         <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">{book.difficulty}</Badge>
                         <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400">{book.topic}</Badge>
-                        <span className="text-[9px] text-muted-foreground ml-auto">{book.totalWords.toLocaleString()} 词</span>
+                        <span className="text-[9px] text-muted-foreground ml-auto">{(bookStats[book.id]?.words ?? book.totalWords).toLocaleString()} 词</span>
                       </div>
                       {/* Reading progress */}
                       {progress && progress.page > 0 && (
