@@ -99,6 +99,10 @@
 
 
 
+
+## 2026-09-16
+- fix(dev): vite 监听器排除 android/release/dist —— 修复每次打包后 dev server 猝死 (`bced95e`)
+
 ## 2026-09-16
 - feat(translate): 译稿推进到 20 本 / 42,796 段 (`25ad6a5`)
 
