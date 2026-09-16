@@ -58,16 +58,35 @@ export async function listNativeVoices(): Promise<INativeVoice[]> {
   } catch { return []; }
 }
 
-/** 仅英语语音（优先本地引擎、默认语音靠前） */
+/** 仅英语语音（本地音色靠前；插件把 default 恒置为 false，故不作为排序依据） */
 export async function listNativeEnglishVoices(): Promise<INativeVoice[]> {
   const all = await listNativeVoices();
   return all
     .filter((v) => v.lang.toLowerCase().startsWith('en'))
     .sort((a, b) => {
-      const sa = (a.isDefault ? 4 : 0) + (a.localService ? 2 : 0);
-      const sb = (b.isDefault ? 4 : 0) + (b.localService ? 2 : 0);
+      const sa = (a.isDefault ? 4 : 0) + (a.localService ? 2 : 0) + (a.lang.toLowerCase() === 'en-us' ? 1 : 0);
+      const sb = (b.isDefault ? 4 : 0) + (b.localService ? 2 : 0) + (b.lang.toLowerCase() === 'en-us' ? 1 : 0);
       return sb - sa;
     });
+}
+
+let preferredVoicePromise: Promise<INativeVoice | null> | null = null;
+
+/**
+ * 挑一个「本地」英语音色 —— 结果缓存。
+ *
+ * 为什么必须挑：本地音色离线合成、起播几十毫秒；网络音色每次朗读都要把文本发到
+ * 服务器合成（500~2000ms），这正是「手机朗读要等两秒」的主因。而用户没在设置里
+ * 手动选语音时，我们此前不传 voice，交给系统默认 —— 那个默认很可能是网络音色。
+ * 系统里没有任何本地英语音色时返回 null，仍交由系统默认，不硬塞。
+ */
+export function pickPreferredEnglishVoice(): Promise<INativeVoice | null> {
+  if (!preferredVoicePromise) {
+    preferredVoicePromise = listNativeEnglishVoices()
+      .then((list) => list.find((v) => v.localService) ?? null)
+      .catch(() => null);
+  }
+  return preferredVoicePromise;
 }
 
 /** 打开系统 TTS 安装/设置页（缺语音包时引导用户安装） */

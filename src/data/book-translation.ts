@@ -748,19 +748,37 @@ export async function translateChapterByIndex(
 
 // ─────────────────────────── 查询接口 ───────────────────────────
 
-/** 读取某章缓存译文（下标 = splitChapters 该章非标题段顺序）；无记录返回 null */
+/**
+ * 读取某章缓存译文（下标 = splitChapters 该章非标题段顺序）；无记录返回 null。
+ *
+ * expectedLen：该章在「当前正文」里的段数。传入即做长度校验 —— 段数对不上说明这份
+ * 译文是按另一份正文（例如 books.ts 的压缩节选、或旧版切分）生成的，照贴就会把别章
+ * 的中文写在正文旁边，因此判定为无译文。
+ */
 export async function getChapterTranslation(
   bookId: string,
   chapterIdx: number,
+  expectedLen?: number,
 ): Promise<string[] | null> {
-  const raw = await idbGet<unknown>(chapterKeyOf(bookId, chapterIdx));
-  if (Array.isArray(raw) && raw.some((v) => typeof v === 'string' && v)) {
-    return raw.map((s) => (typeof s === 'string' ? s : ''));
-  }
+  const accept = (arr: unknown): string[] | null => {
+    if (!Array.isArray(arr)) return null;
+    const s = arr.map((v) => (typeof v === 'string' ? v : ''));
+    if (!s.some(Boolean)) return null;
+    if (typeof expectedLen === 'number' && expectedLen > 0 && s.length !== expectedLen) {
+      console.warn(
+        `[book-translation] ${bookId} 第 ${chapterIdx} 章译文 ${s.length} 段 ≠ 正文 ${expectedLen} 段，` +
+        `判定为错位，忽略这份译文`,
+      );
+      return null;
+    }
+    return s;
+  };
+
+  const raw = accept(await idbGet<unknown>(chapterKeyOf(bookId, chapterIdx)));
+  if (raw) return raw;
   // 本地没有 → 尝试随包分发的预翻译（阅读器切章即显示中文，零 API 消耗）
-  const prebaked = await tryLoadPrebaked(bookId, chapterIdx);
-  if (prebaked && prebaked.some(Boolean)) return prebaked;
-  if (Array.isArray(raw)) return raw.map((s) => (typeof s === 'string' ? s : ''));
+  const prebaked = accept(await tryLoadPrebaked(bookId, chapterIdx));
+  if (prebaked) return prebaked;
   return null;
 }
 

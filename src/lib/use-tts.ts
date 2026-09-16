@@ -14,7 +14,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
-import { getNativeTts as getNativeTtsPlugin } from './native-tts';
+import { getNativeTts as getNativeTtsPlugin, pickPreferredEnglishVoice } from './native-tts';
 import { edgeVoiceNameOf, googleLangOf, isEdgeCatalogVoice } from './tts-voice-catalog';
 import { useTTSSettings } from './tts-settings';
 import { cleanText } from './utils';
@@ -419,8 +419,19 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
       if (engine === 'native') {
         getNativeTts()
-          .then((plugin) => {
+          .then(async (plugin) => {
             if (!plugin) { onFail(); return; }
+            // 语音选择：用户选过就用用户的；没选过则自动挑一个「本地」音色 ——
+            // 网络音色每次朗读都要把文本发到服务器合成（500~2000ms），
+            // 而系统默认很可能就是网络音色，这正是「朗读要等两秒」的主因。
+            let voiceIdx: number | null = null;
+            if (typeof settings.nativeVoiceIndex === 'number' && settings.nativeVoiceIndex >= 0) {
+              voiceIdx = settings.nativeVoiceIndex;
+            } else {
+              const preferred = await pickPreferredEnglishVoice();
+              voiceIdx = preferred ? preferred.index : null;
+            }
+            if (abortedRef.current) return;
             stopAudio();
             nativeActiveRef.current = true;
             nativeReplayRef.current = () => playChunkWithFallback(chunks, idx, rate, 0);
@@ -470,9 +481,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
               pitch: 1,
               volume: typeof settings.volume === 'number' ? settings.volume : 1,
               // 用户在设置里选定的系统语音（null = 系统默认）
-              ...(typeof settings.nativeVoiceIndex === 'number' && settings.nativeVoiceIndex >= 0
-                ? { voice: settings.nativeVoiceIndex }
-                : {}),
+              ...(voiceIdx !== null && voiceIdx >= 0 ? { voice: voiceIdx } : {}),
             })
               .then(() => {
                 clearWatchdog();

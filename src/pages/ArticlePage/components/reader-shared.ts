@@ -49,8 +49,14 @@ export interface NovelChapter {
   isFrontMatter: boolean;
 }
 
+/** 章内正文段数（章节标记本身不计）—— 判断空章用 */
+function bodyItemCount(c: NovelChapter): number {
+  return c.isFrontMatter ? c.items.length : Math.max(0, c.items.length - 1);
+}
+
 /** 把分页段落流切分成章节（小说模式的数据骨架）。
- *  无章节标记的内容（刊物/AI 文章/维基条目）→ 整体作为单章"全文"。 */
+ *  无章节标记的内容（刊物/AI 文章/维基条目）→ 整体作为单章"全文"。
+ *  章节划分必须与 book-translation 的 splitChapters 一致（见 closeCurrent 注释）。 */
 export function buildNovelChapters(pages: IPage[], fallbackTitle: string): NovelChapter[] {
   const valid = (pages || []).filter((pg) => pg && Array.isArray(pg.paragraphs));
   const chapters: NovelChapter[] = [];
@@ -58,7 +64,11 @@ export function buildNovelChapters(pages: IPage[], fallbackTitle: string): Novel
   let seenMarker = false;
 
   const closeCurrent = () => {
-    if (current) chapters.push(current);
+    // 与 splitChapters 严格对齐：标记后没有任何正文的「空章」不收录。
+    // splitChapters 会丢弃这类空章并重新连续编号，而译文正是按它的章号索引的
+    // （实测基督山伯爵：两边分别是 244 章 / 124 章）。这里若保留空章，
+    // 界面章号与译文章号就会整体错开 —— 表现为中文对不上、章节像是缺了。
+    if (current && bodyItemCount(current) > 0) chapters.push(current);
   };
 
   valid.forEach((pg, pageIdx) => {

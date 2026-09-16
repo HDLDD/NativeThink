@@ -28,6 +28,7 @@ import {
   isAndroidNative,
   listNativeEnglishVoices,
   openNativeTtsInstall,
+  pickPreferredEnglishVoice,
   previewNativeVoice,
   type INativeVoice,
 } from '@/lib/native-tts';
@@ -64,6 +65,8 @@ export default function TTSSettings() {
   const [sfxOn, setSfxOn] = useState(isSfxEnabled);
   // 系统原生语音（Android）：WebView 的 speechSynthesis 列表为空，只能从原生插件取
   const [nativeVoices, setNativeVoices] = useState<INativeVoice[]>([]);
+  /** 未手动选语音时，朗读实际会自动使用的本地音色（用于设置页如实回显） */
+  const [autoVoice, setAutoVoice] = useState<INativeVoice | null>(null);
   const [previewing, setPreviewing] = useState<string | null>(null);
   const [probing, setProbing] = useState(false);
   const [probeResults, setProbeResults] = useState<ITtsEngineProbe[] | null>(null);
@@ -77,6 +80,8 @@ export default function TTSSettings() {
     listNativeEnglishVoices()
       .then((list) => { if (!cancelled) setNativeVoices(list); })
       .finally(() => { if (!cancelled) setLoadingNative(false); });
+    pickPreferredEnglishVoice()
+      .then((v) => { if (!cancelled) setAutoVoice(v); });
     return () => { cancelled = true; };
   }, [open, isNative]);
 
@@ -312,11 +317,23 @@ export default function TTSSettings() {
                     <SelectItem value="__default__" className="text-xs font-bold">系统默认语音</SelectItem>
                     {nativeVoices.map((nv) => (
                       <SelectItem key={nv.index} value={String(nv.index)} className="text-xs font-medium">
-                        {nv.name} ({nv.lang}){nv.isDefault ? ' · 默认' : ''}
+                        {nv.name} ({nv.lang}){nv.localService ? ' · 本地' : ' · 网络'}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {/* 未手动选语音时，朗读会自动改用本地音色 —— 网络音色每次合成都要联网（约 2 秒） */}
+                {settings.nativeVoiceIndex === null && autoVoice && (
+                  <p className="text-[9px] font-bold text-[#00B894] leading-snug">
+                    未手动选择 · 朗读时自动使用本地音色「{autoVoice.name}」(离线 · 低延迟)
+                  </p>
+                )}
+                {settings.nativeVoiceIndex === null && !autoVoice && (
+                  <p className="text-[9px] font-bold text-amber-600 dark:text-amber-400 leading-snug">
+                    未找到本地英语音色 —— 当前只能走网络音色，每次朗读需联网（约 2 秒）。
+                    装上英语语音包后可离线朗读、起播几十毫秒。
+                  </p>
+                )}
                 <label className="flex items-center justify-between gap-2 pt-1 cursor-pointer">
                   <span className="text-[10px] font-bold text-muted-foreground leading-snug">
                     只用系统引擎<span className="block text-[9px] opacity-70">离线、几十毫秒；不走网络</span>

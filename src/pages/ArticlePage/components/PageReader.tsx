@@ -867,11 +867,13 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     const bookId = activeContent.id;
     if (!bookId) return;
     let cancelled = false;
-    getChapterTranslation(bookId, novelChapterIdx).then((zh) => {
+    // 先算出该章在「当前正文」里的段数，交给 getChapterTranslation 做长度校验：
+    // 段数对不上说明这份译文不是按当前正文生成的，宁可不显示也不能贴错章的中文
+    const chapters = splitChapters(activeContent);
+    const ch = chapters[novelChapterIdx];
+    if (!ch) return;
+    getChapterTranslation(bookId, novelChapterIdx, ch.paragraphs.length).then((zh) => {
       if (cancelled || !zh) return;
-      const chapters = splitChapters(activeContent);
-      const ch = chapters[novelChapterIdx];
-      if (!ch) return;
       const zhMap = new Map<string, string>();
       ch.paragraphs.forEach((en, i) => { if (zh[i] && en.trim()) zhMap.set(en, zh[i]); });
       if (zhMap.size === 0) return;
