@@ -51,6 +51,8 @@ public class SherpaTtsPlugin extends Plugin {
 
     private volatile String state = STATE_IDLE;
     private volatile String lastError = null;
+    /** 初始化实际走通的路线：assets / files */
+    private volatile String route = null;
 
     private OfflineTts tts;
     private File modelDir;
@@ -74,6 +76,13 @@ public class SherpaTtsPlugin extends Plugin {
         o.put("error", lastError);
         o.put("sampleRate", tts != null ? tts.sampleRate() : 0);
         o.put("cached", wavDir != null && wavDir.exists() ? wavDir.list().length : 0);
+        o.put("route", route);
+        try {
+            File model = new File(modelDir, MODEL_NAME);
+            o.put("modelBytes", model.exists() ? model.length() : 0);
+            File espeak = new File(modelDir, "espeak-ng-data");
+            o.put("espeakFiles", espeak.isDirectory() && espeak.list() != null ? espeak.list().length : 0);
+        } catch (Throwable ignored) { /* 仅诊断用 */ }
         return o;
     }
 
@@ -84,7 +93,14 @@ public class SherpaTtsPlugin extends Plugin {
         call.resolve(stateObject());
     }
 
-    /** 加载引擎（幂等；耗时较长，故放后台线程）。JS 端可提前调用预热。 */
+    /**
+     * 加载引擎（幂等；耗时较长，故放后台线程）。JS 端可提前调用预热。
+     *
+     * 两条路线，先走更稳的那条：
+     *  1) assets 直读 —— sherpa-onnx 的 Java API 本来就接受 AssetManager + 相对 assets 的路径，
+     *     不用拷贝、不占额外磁盘，也少一步出错机会；
+     *  2) 摊到 filesDir 再走真实文件路径 —— 个别 ROM 对 assets 处理不一致时兜底。
+     */
     @PluginMethod
     public void init(PluginCall call) {
         ensureDirs();
@@ -95,36 +111,71 @@ public class SherpaTtsPlugin extends Plugin {
         state = STATE_LOADING;
         lastError = null;
         new Thread(() -> {
+            // 路线 1：直接在 assets 上初始化
+            try {
+                long t0 = System.currentTimeMillis();
+                OfflineTts engine = new OfflineTts(getContext().getAssets(), buildConfig(
+                        ASSET_VOICE_DIR + "/" + MODEL_NAME,
+                        ASSET_VOICE_DIR + "/tokens.txt",
+                        ASSET_VOICE_DIR + "/espeak-ng-data"));
+                tts = engine;
+                route = "assets";
+                state = STATE_READY;
+                System.out.println("[SherpaTts] ready(assets) in " + (System.currentTimeMillis() - t0) + "ms, sampleRate=" + engine.sampleRate());
+                return;
+            } catch (Throwable t) {
+                lastError = "assets: " + describe(t);
+                System.out.println("[SherpaTts] assets route failed: " + lastError);
+            }
+            // 路线 2：摊到内部存储后走真实文件路径
             try {
                 long t0 = System.currentTimeMillis();
                 copyAssets(ASSET_VOICE_DIR, modelDir);
-                OfflineTtsVitsModelConfig vits = new OfflineTtsVitsModelConfig(
-                        new File(modelDir, MODEL_NAME).getAbsolutePath(),   // model
-                        null,                                               // lexicon
-                        new File(modelDir, "tokens.txt").getAbsolutePath(), // tokens
-                        new File(modelDir, "espeak-ng-data").getAbsolutePath(), // dataDir
-                        null,                                               // dictDir
-                        0.667f,                                             // noiseScale
-                        0.8f,                                               // noiseScaleW
-                        1.0f);                                              // lengthScale
-                OfflineTtsModelConfig model = new OfflineTtsModelConfig(
-                        vits, null, null, null,
-                        Math.max(2, Runtime.getRuntime().availableProcessors() / 2), // numThreads
-                        false,                                              // debug
-                        "cpu");                                             // provider
-                OfflineTtsConfig config = new OfflineTtsConfig(model, null, null, 1, 0.2f);
-                OfflineTts engine = new OfflineTts(getContext().getAssets(), config);
+                OfflineTts engine = new OfflineTts(getContext().getAssets(), buildConfig(
+                        new File(modelDir, MODEL_NAME).getAbsolutePath(),
+                        new File(modelDir, "tokens.txt").getAbsolutePath(),
+                        new File(modelDir, "espeak-ng-data").getAbsolutePath()));
                 tts = engine;
+                route = "files";
                 state = STATE_READY;
                 lastError = null;
-                System.out.println("[SherpaTts] ready in " + (System.currentTimeMillis() - t0) + "ms, sampleRate=" + engine.sampleRate());
+                System.out.println("[SherpaTts] ready(files) in " + (System.currentTimeMillis() - t0) + "ms, sampleRate=" + engine.sampleRate());
             } catch (Throwable t) {
                 state = STATE_ERROR;
-                lastError = t.getClass().getSimpleName() + ": " + t.getMessage();
+                lastError = (lastError != null ? lastError + " | " : "") + "files: " + describe(t);
                 System.out.println("[SherpaTts] init failed: " + lastError);
             }
         }).start();
         call.resolve(stateObject());
+    }
+
+    private OfflineTtsConfig buildConfig(String modelPath, String tokensPath, String dataDir) {
+        OfflineTtsVitsModelConfig vits = new OfflineTtsVitsModelConfig(
+                modelPath,
+                null,       // lexicon
+                tokensPath,
+                dataDir,
+                null,       // dictDir
+                0.667f,     // noiseScale
+                0.8f,       // noiseScaleW
+                1.0f);      // lengthScale
+        OfflineTtsModelConfig model = new OfflineTtsModelConfig(
+                vits, null, null, null,
+                Math.max(2, Runtime.getRuntime().availableProcessors() / 2), // numThreads
+                false,      // debug
+                "cpu");     // provider
+        return new OfflineTtsConfig(model, null, null, 1, 0.2f);
+    }
+
+    /** 异常 → 可读文本（带首个栈帧，便于定位原生还是资源问题） */
+    private static String describe(Throwable t) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(t.getClass().getSimpleName());
+        if (t.getMessage() != null) sb.append(": ").append(t.getMessage());
+        StackTraceElement[] st = t.getStackTrace();
+        if (st != null && st.length > 0) sb.append(" @").append(st[0].toString());
+        String s = sb.toString();
+        return s.length() > 300 ? s.substring(0, 300) : s;
     }
 
     /**

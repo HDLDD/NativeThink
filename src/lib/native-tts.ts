@@ -17,6 +17,8 @@ export interface INativeVoice {
   lang: string;
   localService: boolean;
   isDefault: boolean;
+  /** 用于界面的可区分标签（由 listNativeEnglishVoices 统一生成，保证不重名） */
+  label?: string;
 }
 
 /**
@@ -83,6 +85,7 @@ export async function listNativeVoices(): Promise<INativeVoice[]> {
 export async function listNativeEnglishVoices(): Promise<INativeVoice[]> {
   const all = await listNativeVoices();
   const seen = new Set<string>();
+  const labelCount = new Map<string, number>();
   return all
     .filter((v) => v.lang.toLowerCase().startsWith('en'))
     // 同一音色可能被引擎登记多次（不同 locale 变体）—— 按真实音色名去重，避免列表里一堆重复项。
@@ -97,6 +100,14 @@ export async function listNativeEnglishVoices(): Promise<INativeVoice[]> {
       const sa = (a.isDefault ? 4 : 0) + (a.localService ? 2 : 0) + (a.lang.toLowerCase() === 'en-us' ? 1 : 0);
       const sb = (b.isDefault ? 4 : 0) + (b.localService ? 2 : 0) + (b.lang.toLowerCase() === 'en-us' ? 1 : 0);
       return sb - sa;
+    })
+    // 兜底保证可区分：个别引擎给多个音色返回同一个名字，此时补上引擎内编号，
+    // 免得用户又看到一排看起来一模一样的声音。
+    .map((v) => {
+      const base = nativeVoiceLabel(v);
+      const n = (labelCount.get(base) || 0) + 1;
+      labelCount.set(base, n);
+      return n > 1 ? { ...v, label: `${base} · #${v.index}` } : { ...v, label: base };
     });
 }
 

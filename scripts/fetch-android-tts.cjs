@@ -40,6 +40,43 @@ async function head(url) {
   return { ok: r.ok, len: Number(r.headers.get('content-length') || 0) };
 }
 
+/** 在目录里找 .onnx 模型文件 */
+function findOnnx(dir) {
+  if (!fs.existsSync(dir)) return null;
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      const inner = findOnnx(p);
+      if (inner) return inner;
+    } else if (e.name.endsWith('.onnx')) {
+      return p;
+    }
+  }
+  return null;
+}
+
+/** 离线判定音色是否已完整（模型够大 + 文件数够多 + espeak 数据在） */
+function voiceLooksComplete(dir) {
+  try {
+    const onnx = findOnnx(dir);
+    if (!onnx || fs.statSync(onnx).size < 50 * 1024 * 1024) return false;
+    if (!fs.existsSync(path.join(dir, 'tokens.txt'))) return false;
+    const espeak = path.join(dir, 'espeak-ng-data');
+    if (!fs.existsSync(espeak) || fs.readdirSync(espeak).length < 50) return false;
+    let count = 0;
+    const walk = (d) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        if (e.isDirectory()) walk(path.join(d, e.name));
+        else count++;
+      }
+    };
+    walk(dir);
+    return count > 300;
+  } catch {
+    return false;
+  }
+}
+
 async function download(url, dest) {
   const tmp = dest + '.part';
   const r = await fetch(url, { signal: AbortSignal.timeout(600000) });
@@ -75,10 +112,20 @@ async function listRepo(repo) {
   }
 
   // ── 2) 音色 ──
-  const files = await listRepo(voiceRepo);
-  const total = files.reduce((s, f) => s + f.size, 0);
   const voiceName = voiceRepo.split('/')[1];
   const voiceDir = path.join(ASSETS_DIR, voiceName);
+
+  // 资源已就位就完全离线跳过 —— 构建不该因为网络抖动而失败
+  // （用户网络本来就差，之前这里每次都要列远端目录，一抖就挂）。用 --refresh 强制更新。
+  if (!FORCE && voiceLooksComplete(voiceDir)) {
+    const onnx = findOnnx(voiceDir);
+    console.log(`  跳过音色 ${voiceName}（已就位 ${mb(fs.statSync(onnx).size)} 模型）`);
+    console.log(`\n完成：AAR + 音色 ${voiceName} 均已就位（离线校验通过）`);
+    return;
+  }
+
+  const files = await listRepo(voiceRepo);
+  const total = files.reduce((s, f) => s + f.size, 0);
   console.log(`  音色 ${voiceName}：${files.length} 个文件 / ${mb(total)} → assets/piper/${voiceName}/`);
 
   let done = 0;

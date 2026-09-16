@@ -16,6 +16,12 @@ export interface ISherpaStatus {
   error: string | null;
   sampleRate: number;
   cached: number;
+  /** 初始化走通的路线：assets（直读）或 files（摊到内部存储） */
+  route?: string | null;
+  /** 已摊出的模型字节数（诊断用） */
+  modelBytes?: number;
+  /** espeak 音素数据文件数（诊断用） */
+  espeakFiles?: number;
 }
 
 export interface ISherpaSpeakResult {

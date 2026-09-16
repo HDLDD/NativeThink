@@ -356,11 +356,17 @@ export default function TTSSettings() {
               </div>
               <p className="text-[9px] font-bold text-muted-foreground leading-snug">
                 {sherpa?.status === 'ready'
-                  ? `设备内合成，不走网络 · 采样率 ${sherpa.sampleRate}Hz · 已缓存 ${sherpa.cached} 段`
+                  ? `设备内合成，不走网络 · 采样率 ${sherpa.sampleRate}Hz · 已缓存 ${sherpa.cached} 段 · 加载方式 ${sherpa.route || 'assets'}`
                   : sherpa?.status === 'error'
                     ? `失败原因：${sherpa.error || '未知'}`
                     : '未选择在线音色时，朗读会用这个引擎（首次加载约 1~2 秒）'}
               </p>
+              {sherpa?.status === 'error' && (
+                <p className="text-[9px] font-bold text-muted-foreground/70 leading-snug">
+                  诊断：模型 {Math.round((sherpa.modelBytes || 0) / 1024 / 1024)}MB ·
+                  espeak 数据 {sherpa.espeakFiles || 0} 个文件（正常应为约 60MB 与 120 项）
+                </p>
+              )}
               {sherpa?.status !== 'ready' && (
                 <Button
                   size="sm" variant="outline"
@@ -398,7 +404,7 @@ export default function TTSSettings() {
                     <SelectItem value="__default__" className="text-xs font-bold">系统默认语音</SelectItem>
                     {nativeVoices.map((nv) => (
                       <SelectItem key={nv.index} value={String(nv.index)} className="text-xs font-medium">
-                        {nativeVoiceLabel(nv)}
+                        {nv.label || nativeVoiceLabel(nv)}
                       </SelectItem>
                     ))}
                   </SelectContent>
