@@ -60,6 +60,8 @@ public class SherpaTtsPlugin extends Plugin {
     private OfflineTts tts;
     private File modelDir;
     private File wavDir;
+    /** 初始化进度日志 —— 原生崩溃接不住，只能靠它定位崩在哪一步 */
+    private File progressLog;
     /** sherpa-onnx 的 generate 不是线程安全的，串行化 */
     private final Object synthLock = new Object();
 
@@ -71,6 +73,41 @@ public class SherpaTtsPlugin extends Plugin {
             wavDir = new File(getContext().getCacheDir(), "sherpa-tts");
             if (!wavDir.exists()) wavDir.mkdirs();
         }
+        if (progressLog == null) {
+            progressLog = new File(getContext().getFilesDir(), "sherpa-init.log");
+        }
+    }
+
+    /** 追加一行进度（崩溃后靠它定位卡在哪一步） */
+    private void step(String msg) {
+        try {
+            String line = System.currentTimeMillis() + "  " + msg + System.lineSeparator();
+            try (FileOutputStream fos = new FileOutputStream(progressLog, true)) {
+                fos.write(line.getBytes("UTF-8"));
+            }
+            System.out.println("[SherpaTts] " + msg);
+        } catch (Throwable ignored) { /* 日志失败不影响主流程 */ }
+    }
+
+    /** 读取初始化日志（诊断用） */
+    @PluginMethod
+    public void readLog(PluginCall call) {
+        ensureDirs();
+        JSObject r = new JSObject();
+        try {
+            if (progressLog.exists() && progressLog.length() < 64 * 1024) {
+                byte[] buf = new byte[(int) progressLog.length()];
+                try (InputStream in = new java.io.FileInputStream(progressLog)) {
+                    int n = in.read(buf);
+                    r.put("log", new String(buf, 0, Math.max(0, n), "UTF-8"));
+                }
+            } else {
+                r.put("log", "");
+            }
+        } catch (Throwable t) {
+            r.put("log", "read_failed: " + t.getMessage());
+        }
+        call.resolve(r);
     }
 
     private JSObject stateObject() {
@@ -115,28 +152,38 @@ public class SherpaTtsPlugin extends Plugin {
         }
         state = STATE_LOADING;
         lastError = null;
+        try { if (progressLog != null && progressLog.exists()) progressLog.delete(); } catch (Throwable ignored) { /* ignore */ }
         new Thread(() -> {
             try {
                 long t0 = System.currentTimeMillis();
+                step("init start; modelDir=" + modelDir);
                 copyAssets(ASSET_VOICE_DIR, modelDir);
+                step("assets copied; modelBytes=" + new File(modelDir, MODEL_NAME).length() + " espeak=" + new File(modelDir, "espeak-ng-data").list().length);
                 // eSpeak 优先读这个环境变量；不是所有 ROM 都允许设置，失败不影响主路径
                 try {
                     android.system.Os.setenv("ESPEAK_DATA_PATH", modelDir.getAbsolutePath(), true);
                 } catch (Throwable ignored) { /* ignore */ }
-                OfflineTts engine = new OfflineTts(getContext().getAssets(), buildConfig(
-                        new File(modelDir, MODEL_NAME).getAbsolutePath(),
-                        new File(modelDir, "tokens.txt").getAbsolutePath(),
-                        modelDir.getAbsolutePath()));   // ← espeak-ng-data 的父目录
+                step("creating engine (newFromFile, cpu)");
+                OfflineTts engine = new OfflineTts(
+                        // 关键：必须传 null！OfflineTts 的构造函数有这个分支：
+                        //   assetManager == null → newFromFile（按真实文件系统路径）
+                        //   assetManager != null → newFromAsset（把路径当 assets 里的名字解析）
+                        // 前面几版一直传 getAssets()，于是 filesDir 的绝对路径被当成 assets 名
+                        // 去查 → 找不到 → 原生层直接崩。这就是「内置引擎崩溃」的真凶。
+                        (AssetManager) null,
+                        buildConfig(
+                                new File(modelDir, MODEL_NAME).getAbsolutePath(),
+                                new File(modelDir, "tokens.txt").getAbsolutePath(),
+                                modelDir.getAbsolutePath()));   // ← espeak-ng-data 的父目录
                 tts = engine;
                 route = "files";
                 state = STATE_READY;
                 lastError = null;
-                System.out.println("[SherpaTts] ready in " + (System.currentTimeMillis() - t0)
-                        + "ms, sampleRate=" + engine.sampleRate() + ", dir=" + modelDir);
+                step("ready in " + (System.currentTimeMillis() - t0) + "ms, sampleRate=" + engine.sampleRate());
             } catch (Throwable t) {
                 state = STATE_ERROR;
                 lastError = describe(t);
-                System.out.println("[SherpaTts] init failed: " + lastError);
+                step("failed: " + lastError);
             }
         }).start();
         call.resolve(stateObject());

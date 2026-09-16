@@ -76,6 +76,7 @@ interface ISherpaTtsPlugin {
   init(): Promise<ISherpaStatus>;
   speak(options: { text: string; speed?: number }): Promise<ISherpaSpeakResult>;
   purge(): Promise<{ removed: number }>;
+  readLog(): Promise<{ log: string }>;
 }
 
 const SherpaTts = registerPlugin<ISherpaTtsPlugin>('SherpaTts');
@@ -115,6 +116,12 @@ export function warmSherpa(): Promise<ISherpaStatus | null> {
 export async function getSherpaStatus(): Promise<ISherpaStatus | null> {
   if (!isSherpaAvailable()) return null;
   try { return await SherpaTts.status(); } catch { return null; }
+}
+
+/** 读取原生初始化日志 —— 原生崩溃接不住，这是唯一能定位「崩在哪一步」的线索 */
+export async function getSherpaInitLog(): Promise<string> {
+  if (!isSherpaAvailable()) return '';
+  try { return (await SherpaTts.readLog()).log || ''; } catch { return ''; }
 }
 
 export async function purgeSherpaCache(): Promise<number> {

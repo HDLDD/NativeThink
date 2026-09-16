@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/popover';
 import { useTTSSettings, getEnglishVoices } from '@/lib/tts-settings';
 import { previewTtsVoice, probeTtsEngines, getLastTtsReport, type ITtsEngineProbe, type ITtsPlaybackReport } from '@/lib/use-tts';
-import { getSherpaStatus, isBundledEngineDisabled, reenableBundledEngine, warmSherpa, type ISherpaStatus } from '@/lib/sherpa-tts';
+import { getSherpaInitLog, getSherpaStatus, isBundledEngineDisabled, reenableBundledEngine, warmSherpa, type ISherpaStatus } from '@/lib/sherpa-tts';
 import { isSfxEnabled, setSfxEnabled, sfxTick } from '@/lib/sfx';
 import { toast } from 'sonner';
 import { EDGE_VOICE_CATALOG } from '@/lib/tts-voice-catalog';
@@ -79,6 +79,8 @@ export default function TTSSettings() {
   const [sherpa, setSherpa] = useState<ISherpaStatus | null>(null);
   /** 内置引擎是否被闪退护栏自动停用 */
   const [sherpaDisabled, setSherpaDisabled] = useState(false);
+  /** 原生初始化日志（崩溃时定位用） */
+  const [sherpaLog, setSherpaLog] = useState('');
   const isNative = isAndroidNative();
 
   useEffect(() => {
@@ -94,7 +96,11 @@ export default function TTSSettings() {
     setSherpaDisabled(isBundledEngineDisabled());
     const tick = () => {
       setSherpaDisabled(isBundledEngineDisabled());
-      getSherpaStatus().then((s) => { if (!cancelled) setSherpa(s); });
+      getSherpaStatus().then((s) => {
+        if (cancelled) return;
+        setSherpa(s);
+        if (s && s.status !== 'ready') getSherpaInitLog().then((l) => { if (!cancelled) setSherpaLog(l); });
+      });
     };
     tick();
     const t = setInterval(tick, 1500);
@@ -378,6 +384,11 @@ export default function TTSSettings() {
                   诊断：模型 {Math.round((sherpa.modelBytes || 0) / 1024 / 1024)}MB ·
                   espeak 数据 {sherpa.espeakFiles || 0} 个文件（正常应为约 60MB 与 120 项）
                 </p>
+              )}
+              {(sherpaDisabled || sherpa?.status === 'error') && sherpaLog && (
+                <pre className="text-[8px] leading-tight text-muted-foreground/80 bg-background/60 rounded-lg p-2 max-h-32 overflow-auto whitespace-pre-wrap break-all">
+                  {sherpaLog.trim().split(/\r?\n/).slice(-8).join('\n')}
+                </pre>
               )}
               {sherpaDisabled && (
                 <Button
