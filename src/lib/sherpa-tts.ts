@@ -31,14 +31,18 @@ export function reenableBundledEngine(): void {
 
 /**
  * 启动时调用：内置引擎是原生代码，崩起来是直接杀进程（Java 接不住），
- * 所以用「加载前打标记、成功才清除」判断上一次是不是崩的 ——
- * 是的话自动停用，保证 app 还能正常用（朗读回退到系统/云端），而不是反复闪退。
+ * 所以用「加载前打标记、成功才清除」来判定上一次是否走完 —— 没走完就自动停用，
+ * 保证 app 还能正常用（朗读回退到系统/云端），而不是反复闪退。
+ *
+ * 注意不能用「标记有多旧」来判断：每次加载都会重设标记时间，真崩了再打开时
+ * 标记永远是新的，按时间判就永远不触发。这里只问「上次有没有走完」。
+ * 代价是「用户在加载途中手动关掉 app」也会被当成异常而停用 —— 有手动重启用按钮兜底。
  */
 export function checkBundledEngineHealth(): void {
   try {
     if (safeStorage.getItem(OFF_KEY) === '1') return;
     const t = Number(safeStorage.getItem(TRY_KEY) || 0);
-    if (t > 0 && Date.now() - t > 15000) {
+    if (t > 0) {
       safeStorage.setItem(OFF_KEY, '1');
       safeStorage.removeItem(TRY_KEY);
     }

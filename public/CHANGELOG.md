@@ -110,6 +110,10 @@
 
 
 
+
+## 2026-09-17
+- fix(tts): 修掉内置引擎闪退 —— espeak 数据目录约定搞错 + 加闪退护栏 (`98649de`)
+
 ## 2026-09-17
 - fix(tts): 修掉内置引擎的 NullPointerException —— Kotlin 配置类不接受 null (`2ab4b80`)
 
