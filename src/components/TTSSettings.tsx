@@ -20,7 +20,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useTTSSettings, getEnglishVoices } from '@/lib/tts-settings';
-import { previewTtsVoice, probeTtsEngines, type ITtsEngineProbe } from '@/lib/use-tts';
+import { previewTtsVoice, probeTtsEngines, getLastTtsReport, type ITtsEngineProbe, type ITtsPlaybackReport } from '@/lib/use-tts';
 import { isSfxEnabled, setSfxEnabled, sfxTick } from '@/lib/sfx';
 import { toast } from 'sonner';
 import { EDGE_VOICE_CATALOG } from '@/lib/tts-voice-catalog';
@@ -71,7 +71,16 @@ export default function TTSSettings() {
   const [probing, setProbing] = useState(false);
   const [probeResults, setProbeResults] = useState<ITtsEngineProbe[] | null>(null);
   const [loadingNative, setLoadingNative] = useState(false);
+  /** 上次朗读实测（引擎 + 起播耗时）—— 判断慢在离线引擎还是联网合成 */
+  const [lastReport, setLastReport] = useState<ITtsPlaybackReport | null>(null);
   const isNative = isAndroidNative();
+
+  useEffect(() => {
+    if (!open) return;
+    setLastReport(getLastTtsReport());
+    const t = setInterval(() => setLastReport(getLastTtsReport()), 1000);
+    return () => clearInterval(t);
+  }, [open]);
 
   useEffect(() => {
     if (!open || !isNative) return;
@@ -283,12 +292,38 @@ export default function TTSSettings() {
               })}
             </div>
             {settings.selectedVoiceURI && EDGE_VOICE_CATALOG.some((v) => v.id === settings.selectedVoiceURI) && (
-              <button
-                onClick={() => updateSettings({ selectedVoiceURI: null })}
-                className="text-[9px] font-bold text-muted-foreground hover:text-ink-teal transition-colors"
-              >
-                取消选择，改回自动
-              </button>
+              <>
+                {/* 在线音色每次朗读都要联网把文本发去合成 —— 网速差时等待会明显变长，
+                    而系统本地音色是设备内合成、起播几十毫秒、与网速无关。 */}
+                <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 space-y-1.5">
+                  <p className="text-[9px] font-bold text-amber-700 dark:text-amber-300 leading-relaxed">
+                    当前用的是<b>在线音色</b>，每次朗读都要联网合成音频 —— 网速慢时等待会明显拉长
+                    （已读过的句子会缓存，首次朗读最慢）。
+                  </p>
+                  {isNative && autoVoice && (
+                    <Button
+                      size="sm" variant="outline"
+                      onClick={() => {
+                        updateSettings({
+                          selectedVoiceURI: null,
+                          nativeVoiceIndex: autoVoice.index,
+                          nativeVoiceName: autoVoice.name,
+                        });
+                        toast.success(`已改用本地音色「${autoVoice.name}」· 离线、起播几十毫秒`);
+                      }}
+                      className="w-full rounded-xl text-[10px] font-black"
+                    >
+                      改用本地音色「{autoVoice.name}」· 不受网速影响
+                    </Button>
+                  )}
+                </div>
+                <button
+                  onClick={() => updateSettings({ selectedVoiceURI: null })}
+                  className="text-[9px] font-bold text-muted-foreground hover:text-ink-teal transition-colors"
+                >
+                  取消选择，改回自动
+                </button>
+              </>
             )}
           </div>
 
@@ -371,6 +406,39 @@ export default function TTSSettings() {
               ) : null}
             </div>
           )}
+
+          {/* 上次朗读实测 —— 手机上没法开控制台，这条回显就是判断"慢在哪一段"的现场证据 */}
+          <div className="p-2.5 rounded-xl bg-muted/50 border border-border space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">上次朗读实测</p>
+            {lastReport ? (
+              <p className="text-[10px] font-bold text-foreground leading-relaxed">
+                {lastReport.engine === 'native' ? (
+                  <>
+                    系统引擎（<span className="text-[#00B894]">离线，与网速无关</span>）· 起播 {lastReport.firstAudioMs}ms
+                    {lastReport.firstAudioMs > 600 && ' — 偏慢，多半是所选音色为网络音色'}
+                  </>
+                ) : (
+                  <>
+                    <span className="text-amber-600 dark:text-amber-400">
+                      {lastReport.engine === 'cf' ? '云端' : lastReport.engine === 'edge' ? 'Edge 直连' : 'Google 直连'}
+                      （需联网）
+                    </span>
+                    · 起播 {lastReport.firstAudioMs}ms
+                    {lastReport.firstAudioMs > 800 && ' — 慢在联网合成，与网速相关'}
+                  </>
+                )}
+                {lastReport.fellBack && '（上一档引擎失败后降级到此）'}
+              </p>
+            ) : (
+              <p className="text-[10px] font-bold text-muted-foreground leading-relaxed">
+                还没有记录 —— 点一次「试听」或朗读一句，这里就会显示实际走的是离线引擎还是联网合成。
+              </p>
+            )}
+            <p className="text-[9px] font-bold text-muted-foreground/70 leading-snug">
+              刚读过的句子会命中缓存、起播极快（几毫秒），所以要看真实速度请<b>读一句没读过的</b>：
+              起播几十毫秒＝离线引擎（与网速无关）；几百毫秒以上＝联网合成（会随网速波动）。
+            </p>
+          </div>
 
           {/* Rate slider */}
           <div className="space-y-2">

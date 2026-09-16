@@ -178,6 +178,31 @@ const IS_ANDROID_NATIVE = Capacitor.isNativePlatform?.() && Capacitor.getPlatfor
 
 const getNativeTts = getNativeTtsPlugin;
 
+/**
+ * 上一次朗读的实测报告 —— 设置页直接回显，用来判断「慢」到底慢在哪一段：
+ * 系统引擎（离线，与网速无关）还是云端（每次都要联网合成）。
+ * 手机上没法开控制台，这个回显就是唯一的现场证据。
+ */
+export interface ITtsPlaybackReport {
+  engine: 'native' | 'cf' | 'edge' | 'google';
+  /** 从发起合成到实际起播的毫秒数 */
+  firstAudioMs: number;
+  /** 是否降级来的（前一个引擎失败） */
+  fellBack: boolean;
+  at: number;
+}
+
+let lastPlaybackReport: ITtsPlaybackReport | null = null;
+
+function reportPlayback(r: Omit<ITtsPlaybackReport, 'at'>): void {
+  lastPlaybackReport = { ...r, at: Date.now() };
+}
+
+/** 读取上次朗读报告（无则 null）—— 供设置页回显 */
+export function getLastTtsReport(): ITtsPlaybackReport | null {
+  return lastPlaybackReport;
+}
+
 // ── Tier 2b: Local server TTS (Edge neural voices + Windows SAPI) ──
 
 function cfTtsUrl(text: string, rate: number, voice?: string | null, lang?: string): string {
@@ -394,7 +419,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         }
       };
 
-      const playUrl = (url: string, opts?: { applyRate?: boolean }) => {
+      const playUrl = (url: string, opts?: { applyRate?: boolean; engine?: 'cf' | 'edge' | 'google'; t0?: number }) => {
         if (abortedRef.current) { onDone(); return; }
         stopAudio();
         const a = new Audio(url);
@@ -404,7 +429,12 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         // cf/google engines have no server-side rate control — compensate via
         // playbackRate (preserves pitch). Edge engine already encodes rate in SSML.
         if (opts?.applyRate) a.playbackRate = Math.min(2, Math.max(0.5, rate));
-        a.onplay = () => { if (!abortedRef.current) { setIsSpeaking(true); setIsPaused(false); } };
+        a.onplay = () => {
+          if (!abortedRef.current) { setIsSpeaking(true); setIsPaused(false); }
+          if (opts?.engine && opts.t0) {
+            reportPlayback({ engine: opts.engine, firstAudioMs: Date.now() - opts.t0, fellBack: engineIdx > 0 });
+          }
+        };
         a.onended = () => { if (audioRef.current === a) audioRef.current = null; onDone(); };
         a.onerror = () => { if (audioRef.current === a) audioRef.current = null; onFail(); };
         safetyRef.current = setTimeout(() => {
@@ -461,15 +491,21 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
               if (!abortedRef.current) onFail();
             }, 2500);
 
+            const startedAt = Date.now();
+
             // onRangeStart = 引擎真的开始读了（不同 Android 版本触发时机略有差异）
             try {
               Promise.resolve(plugin.addListener?.('onRangeStart', () => {
+                // 每读一个词都会触发一次，只取第一次 —— 那就是起播时刻，
+                // 也是判断「慢在离线引擎还是慢在联网合成」的直接证据
+                if (!spokeAtLeastOnce) {
+                  reportPlayback({ engine: 'native', firstAudioMs: Date.now() - startedAt, fellBack: engineIdx > 0 });
+                }
                 spokeAtLeastOnce = true;
                 clearWatchdog();
               })).then((h: any) => { listenerHandle = h; }).catch(() => {});
             } catch { /* ignore */ }
 
-            const startedAt = Date.now();
             // 预期朗读时长（粗略）：按词数估算，用于识别"瞬间返回但没出声"的假成功
             const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
             const expectedMs = Math.max(500, (wordCount * 260) / Math.max(0.5, rate));
@@ -517,16 +553,19 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         const next = chunks[idx + 1];
         if (next) warmTtsCache(cfTtsUrl(next, rate, settings.selectedVoiceURI, googleLangOf(settings.selectedVoiceURI))).catch(() => {});
         const url = cfTtsUrl(chunks[idx], rate, settings.selectedVoiceURI, googleLangOf(settings.selectedVoiceURI));
+        const t0 = Date.now();
         getCachedOrUrl(url)
-          .then((u) => playUrl(u, { applyRate: !isServerVoice(settings.selectedVoiceURI) }))
+          .then((u) => playUrl(u, { applyRate: !isServerVoice(settings.selectedVoiceURI), engine: 'cf', t0 }))
           .catch(onFail);
       } else if (engine === 'edge') {
+        const t0 = Date.now();
         edgeTTSBlob(chunks[idx], rate, edgeVoiceFor(settings.selectedVoiceURI))
-          .then((blob) => playUrl(URL.createObjectURL(blob)))
+          .then((blob) => playUrl(URL.createObjectURL(blob), { engine: 'edge', t0 }))
           .catch(onFail);
       } else {
         // google
-        playUrl(googleTTSUrl(chunks[idx], googleLangOf(settings.selectedVoiceURI)), { applyRate: true });
+        const t0 = Date.now();
+        playUrl(googleTTSUrl(chunks[idx], googleLangOf(settings.selectedVoiceURI)), { applyRate: true, engine: 'google', t0 });
       }
     },
     [settings.volume, settings.selectedVoiceURI],
@@ -788,21 +827,25 @@ export async function previewTtsVoice(
   const text = 'Hello, this is a quick voice test.';
   // 1) Edge：可给出具体音色（男女声/自然音）
   if (voiceURI) {
+    const t0 = Date.now();
     try {
       const blob = await edgeTTSBlob(text, rate, edgeVoiceFor(voiceURI));
       const url = URL.createObjectURL(blob);
       const a = new Audio(url);
       a.volume = volume;
+      a.onplay = () => reportPlayback({ engine: 'edge', firstAudioMs: Date.now() - t0, fellBack: false });
       await a.play();
       a.onended = () => URL.revokeObjectURL(url);
       return 'edge';
     } catch { /* Edge 不可达 → 口音兜底 */ }
   }
   // 2) 云端 Google 通道（口音变体）
+  const t1 = Date.now();
   try {
     const url = cfTtsUrl(text, rate, voiceURI, googleLangOf(voiceURI));
     const a = new Audio(url);
     a.volume = volume;
+    a.onplay = () => reportPlayback({ engine: 'cf', firstAudioMs: Date.now() - t1, fellBack: false });
     await a.play();
     return 'accent';
   } catch {
