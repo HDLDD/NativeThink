@@ -100,6 +100,10 @@
 
 
 
+
+## 2026-09-16
+- chore(scripts): 新增走 GitHub API 的推送通道 (`ac1cb6e`)
+
 ## 2026-09-16
 - fix(dev): vite 监听器排除 android/release/dist —— 修复每次打包后 dev server 猝死 (`bced95e`)
 

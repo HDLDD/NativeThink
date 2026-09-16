@@ -20,6 +20,8 @@ const AUTHOR = { name: 'HDLDD', email: '3103721463@qq.com' };
 
 const git = (...args) => execFileSync('git', args, { maxBuffer: 64 * 1024 * 1024 }).toString('binary');
 const gitText = (...args) => execFileSync('git', args, { maxBuffer: 64 * 1024 * 1024 }).toString('utf8').trim();
+/** 取原始字节 —— 绝不能先转成字符串再转回 utf8，中文会被来回编码搞坏 */
+const gitBuf = (...args) => execFileSync('git', args, { maxBuffer: 64 * 1024 * 1024 });
 const gh = (args, input) =>
   JSON.parse(execFileSync('gh', ['api', ...args], { maxBuffer: 64 * 1024 * 1024, input }).toString());
 
@@ -30,7 +32,9 @@ function die(msg) {
 
 /** 按 GitHub 的存储规则把提交对象重建成字节一致的形式，返回 { sha, payload } */
 function rebuildCommit(sha) {
-  const raw = git('cat-file', 'commit', sha);
+  // 必须按 UTF-8 读提交对象：先 latin1 再转 utf8 会把中文信息写坏
+  // （这是真实踩过的坑 —— 曾经把远端提交信息推成乱码）
+  const raw = execFileSync('git', ['cat-file', 'commit', sha], { maxBuffer: 64 * 1024 * 1024 }).toString('utf8');
   const tree = gitText('show', '-s', '--format=%T', sha);
   const parent = gitText('rev-parse', `${sha}~1`);
   const ts = Number(gitText('show', '-s', '--format=%at', sha));
@@ -69,6 +73,19 @@ const ref = gh([`repos/${REPO}/git/ref/heads/${BRANCH}`]);
 const remoteSha = ref.object.sha;
 console.log(`本地 HEAD   ${head}`);
 console.log(`远端 ${BRANCH}   ${remoteSha}`);
+
+// 自检：拿 HEAD 走一遍「重建 + 远端建对象」，确认两边算出的 sha 仍然一致。
+// 只建游离对象、不动任何 ref，用来在真推之前发现 API 元数据规则变化。
+if (process.argv.includes('--selftest')) {
+  const probe = rebuildCommit(head);
+  const created = gh([`repos/${REPO}/git/commits`, '--input', '-'],
+    JSON.stringify({ ...probe.payload, tree: probe.tree }));
+  console.log(`\n自检 ${head.slice(0, 12)} → 本地重建 ${probe.localSha.slice(0, 12)} / 远端 ${created.sha.slice(0, 12)}`);
+  console.log(probe.localSha === created.sha
+    ? '✓ 规则一致，可以安全推送'
+    : '✗ 两边不一致 —— GitHub 的元数据规范化规则可能变了，请先核对');
+  process.exit(probe.localSha === created.sha ? 0 : 1);
+}
 
 if (head === remoteSha) {
   console.log('\n✓ 已同步，无需推送');
@@ -113,11 +130,11 @@ for (const c of unpushed) {
       continue;
     }
     if (code === 'R' || code === 'C') die(`暂不支持重命名/复制：${path}，请手工处理`);
-    const content = git('cat-file', '-p', `${c.localSha}:${path}`);
+    const content = gitBuf('cat-file', '-p', `${c.localSha}:${path}`);
     const mode = gitText('ls-tree', c.localSha, path).split(/\s+/)[0];
     const localBlob = gitText('rev-parse', `${c.localSha}:${path}`);
     const blob = gh([`repos/${REPO}/git/blobs`, '--input', '-'],
-      JSON.stringify({ content: Buffer.from(content, 'utf8').toString('base64'), encoding: 'base64' }));
+      JSON.stringify({ content: content.toString('base64'), encoding: 'base64' }));
     if (blob.sha !== localBlob) die(`blob 与本地不一致：${path}`);
     console.log(`   ${code === 'A' ? '新增' : '修改'} ${path}  blob ${blob.sha.slice(0, 12)} ✓`);
     entries.push({ path, mode, type: 'blob', sha: blob.sha });
