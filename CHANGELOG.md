@@ -109,6 +109,10 @@
 
 
 
+
+## 2026-09-17
+- fix(tts): 修掉内置引擎的 NullPointerException —— Kotlin 配置类不接受 null (`2ab4b80`)
+
 ## 2026-09-17
 - fix(tts): 内置引擎改用 assets 直读（去掉最可能失败的一步）+ 错误可诊断 + 语音名保证可区分 (`c35f058`)
 

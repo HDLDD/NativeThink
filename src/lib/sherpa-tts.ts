@@ -10,6 +10,40 @@
  * 这样暂停/续读/队列/语速微调都复用现有逻辑。
  */
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { safeStorage } from './safe-storage';
+
+/** 加载中标记：成功才清除。若下次启动发现它还挂着，说明上次把 app 崩掉了。 */
+const TRY_KEY = '__nativethink_sherpa_try';
+/** 被护栏自动停用的标记 */
+const OFF_KEY = '__nativethink_sherpa_off';
+
+export function isBundledEngineDisabled(): boolean {
+  try { return safeStorage.getItem(OFF_KEY) === '1'; } catch { return false; }
+}
+
+/** 用户手动重新启用（设置页按钮） */
+export function reenableBundledEngine(): void {
+  try {
+    safeStorage.removeItem(OFF_KEY);
+    safeStorage.removeItem(TRY_KEY);
+  } catch { /* ignore */ }
+}
+
+/**
+ * 启动时调用：内置引擎是原生代码，崩起来是直接杀进程（Java 接不住），
+ * 所以用「加载前打标记、成功才清除」判断上一次是不是崩的 ——
+ * 是的话自动停用，保证 app 还能正常用（朗读回退到系统/云端），而不是反复闪退。
+ */
+export function checkBundledEngineHealth(): void {
+  try {
+    if (safeStorage.getItem(OFF_KEY) === '1') return;
+    const t = Number(safeStorage.getItem(TRY_KEY) || 0);
+    if (t > 0 && Date.now() - t > 15000) {
+      safeStorage.setItem(OFF_KEY, '1');
+      safeStorage.removeItem(TRY_KEY);
+    }
+  } catch { /* ignore */ }
+}
 
 export interface ISherpaStatus {
   status: 'idle' | 'loading' | 'ready' | 'error';
@@ -53,11 +87,23 @@ let initPromise: Promise<ISherpaStatus | null> | null = null;
 /** 预热引擎（幂等）。模型 60MB，首次加载约 1~2 秒，宜在进入阅读/学习页时提前调用。 */
 export function warmSherpa(): Promise<ISherpaStatus | null> {
   if (!isSherpaAvailable()) return Promise.resolve(null);
+  // 上次加载把 app 崩过 → 已被护栏停用，除非用户手动再启用
+  if (isBundledEngineDisabled()) return Promise.resolve(null);
   if (!initPromise) {
-    initPromise = SherpaTts.init().catch(() => {
-      initPromise = null; // 失败允许下次重试
-      return null;
-    });
+    try { safeStorage.setItem(TRY_KEY, String(Date.now())); } catch { /* ignore */ }
+    initPromise = SherpaTts.init()
+      .then((s) => {
+        // 到了 ready 才算这次加载真的走完，可以撤掉「加载中」标记
+        if (s?.status === 'ready') {
+          try { safeStorage.removeItem(TRY_KEY); } catch { /* ignore */ }
+        }
+        return s;
+      })
+      .catch(() => {
+        initPromise = null; // 失败允许下次重试
+        try { safeStorage.removeItem(TRY_KEY); } catch { /* ignore */ }
+        return null;
+      });
   }
   return initPromise;
 }

@@ -7,6 +7,11 @@ import CloudSyncProvider from "./components/CloudSyncProvider";
 import { FocusModeProvider } from "./lib/focus-mode";
 import App from "./app";
 import "./index.css";
+import { checkBundledEngineHealth } from "./lib/sherpa-tts";
+
+// 内置朗读引擎是原生代码，崩起来直接杀进程 —— 启动时检查上次是否崩过，
+// 崩过就自动停用它（朗读回退到系统/云端），避免反复闪退。
+checkBundledEngineHealth();
 
 /** Simple error fallback — works on all platforms without Lark dependencies */
 function GlobalErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {

@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/popover';
 import { useTTSSettings, getEnglishVoices } from '@/lib/tts-settings';
 import { previewTtsVoice, probeTtsEngines, getLastTtsReport, type ITtsEngineProbe, type ITtsPlaybackReport } from '@/lib/use-tts';
-import { getSherpaStatus, warmSherpa, type ISherpaStatus } from '@/lib/sherpa-tts';
+import { getSherpaStatus, isBundledEngineDisabled, reenableBundledEngine, warmSherpa, type ISherpaStatus } from '@/lib/sherpa-tts';
 import { isSfxEnabled, setSfxEnabled, sfxTick } from '@/lib/sfx';
 import { toast } from 'sonner';
 import { EDGE_VOICE_CATALOG } from '@/lib/tts-voice-catalog';
@@ -77,6 +77,8 @@ export default function TTSSettings() {
   const [lastReport, setLastReport] = useState<ITtsPlaybackReport | null>(null);
   /** 内置离线引擎状态 */
   const [sherpa, setSherpa] = useState<ISherpaStatus | null>(null);
+  /** 内置引擎是否被闪退护栏自动停用 */
+  const [sherpaDisabled, setSherpaDisabled] = useState(false);
   const isNative = isAndroidNative();
 
   useEffect(() => {
@@ -89,7 +91,11 @@ export default function TTSSettings() {
   useEffect(() => {
     if (!open || !isNative) return;
     let cancelled = false;
-    const tick = () => { getSherpaStatus().then((s) => { if (!cancelled) setSherpa(s); }); };
+    setSherpaDisabled(isBundledEngineDisabled());
+    const tick = () => {
+      setSherpaDisabled(isBundledEngineDisabled());
+      getSherpaStatus().then((s) => { if (!cancelled) setSherpa(s); });
+    };
     tick();
     const t = setInterval(tick, 1500);
     return () => { cancelled = true; clearInterval(t); };
@@ -347,15 +353,21 @@ export default function TTSSettings() {
                 <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">内置离线引擎</span>
                 <span className={cn(
                   'text-[9px] font-black px-2 py-0.5 rounded-full',
-                  sherpa?.status === 'ready' ? 'bg-[#00B894]/10 text-[#00B894]'
+                  sherpaDisabled ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
+                    : sherpa?.status === 'ready' ? 'bg-[#00B894]/10 text-[#00B894]'
                     : sherpa?.status === 'error' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400'
                       : 'bg-muted text-muted-foreground',
                 )}>
-                  {sherpa?.status === 'ready' ? '已就绪' : sherpa?.status === 'loading' ? '加载中…' : sherpa?.status === 'error' ? '加载失败' : '未加载'}
+                  {sherpaDisabled ? '已停用'
+                    : sherpa?.status === 'ready' ? '已就绪'
+                      : sherpa?.status === 'loading' ? '加载中…'
+                        : sherpa?.status === 'error' ? '加载失败' : '未加载'}
                 </span>
               </div>
               <p className="text-[9px] font-bold text-muted-foreground leading-snug">
-                {sherpa?.status === 'ready'
+                {sherpaDisabled
+                  ? '上次加载导致闪退，已自动停用 —— 朗读回退到系统引擎/云端，功能不受影响。修好后可点下面重新启用。'
+                  : sherpa?.status === 'ready'
                   ? `设备内合成，不走网络 · 采样率 ${sherpa.sampleRate}Hz · 已缓存 ${sherpa.cached} 段 · 加载方式 ${sherpa.route || 'assets'}`
                   : sherpa?.status === 'error'
                     ? `失败原因：${sherpa.error || '未知'}`
@@ -367,7 +379,16 @@ export default function TTSSettings() {
                   espeak 数据 {sherpa.espeakFiles || 0} 个文件（正常应为约 60MB 与 120 项）
                 </p>
               )}
-              {sherpa?.status !== 'ready' && (
+              {sherpaDisabled && (
+                <Button
+                  size="sm" variant="outline"
+                  onClick={() => { reenableBundledEngine(); setSherpaDisabled(false); toast.info('已重新启用，正在加载内置引擎…'); void warmSherpa(); }}
+                  className="w-full rounded-xl text-[10px] font-black"
+                >
+                  重新尝试启用内置引擎
+                </Button>
+              )}
+              {!sherpaDisabled && sherpa?.status !== 'ready' && (
                 <Button
                   size="sm" variant="outline"
                   onClick={() => { void warmSherpa(); toast.info('正在加载内置朗读引擎…'); }}

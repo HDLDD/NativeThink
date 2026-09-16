@@ -99,10 +99,12 @@ public class SherpaTtsPlugin extends Plugin {
     /**
      * 加载引擎（幂等；耗时较长，故放后台线程）。JS 端可提前调用预热。
      *
-     * 两条路线，先走更稳的那条：
-     *  1) assets 直读 —— sherpa-onnx 的 Java API 本来就接受 AssetManager + 相对 assets 的路径，
-     *     不用拷贝、不占额外磁盘，也少一步出错机会；
-     *  2) 摊到 filesDir 再走真实文件路径 —— 个别 ROM 对 assets 处理不一致时兜底。
+     * 只能走「摊到内部存储 + 真实文件路径」，原因两条：
+     *  1) espeak-ng 用 fopen 读音素数据，assets 里的它读不到 —— 之前试过 assets 直读，
+     *     真机实测直接闪退；
+     *  2) dataDir 的约定是 espeak-ng-data 的**父目录**：原生库里有 %s/espeak-ng-data
+     *     这个格式串，说明它内部还会再拼一层。传 espeak-ng-data 本身会找不到数据。
+     * 另外把 ESPEAK_DATA_PATH 也设上，兜住不同构建的路径约定差异。
      */
     @PluginMethod
     public void init(PluginCall call) {
@@ -114,38 +116,26 @@ public class SherpaTtsPlugin extends Plugin {
         state = STATE_LOADING;
         lastError = null;
         new Thread(() -> {
-            // 路线 1：直接在 assets 上初始化
-            try {
-                long t0 = System.currentTimeMillis();
-                OfflineTts engine = new OfflineTts(getContext().getAssets(), buildConfig(
-                        ASSET_VOICE_DIR + "/" + MODEL_NAME,
-                        ASSET_VOICE_DIR + "/tokens.txt",
-                        ASSET_VOICE_DIR + "/espeak-ng-data"));
-                tts = engine;
-                route = "assets";
-                state = STATE_READY;
-                System.out.println("[SherpaTts] ready(assets) in " + (System.currentTimeMillis() - t0) + "ms, sampleRate=" + engine.sampleRate());
-                return;
-            } catch (Throwable t) {
-                lastError = "assets: " + describe(t);
-                System.out.println("[SherpaTts] assets route failed: " + lastError);
-            }
-            // 路线 2：摊到内部存储后走真实文件路径
             try {
                 long t0 = System.currentTimeMillis();
                 copyAssets(ASSET_VOICE_DIR, modelDir);
+                // eSpeak 优先读这个环境变量；不是所有 ROM 都允许设置，失败不影响主路径
+                try {
+                    android.system.Os.setenv("ESPEAK_DATA_PATH", modelDir.getAbsolutePath(), true);
+                } catch (Throwable ignored) { /* ignore */ }
                 OfflineTts engine = new OfflineTts(getContext().getAssets(), buildConfig(
                         new File(modelDir, MODEL_NAME).getAbsolutePath(),
                         new File(modelDir, "tokens.txt").getAbsolutePath(),
-                        new File(modelDir, "espeak-ng-data").getAbsolutePath()));
+                        modelDir.getAbsolutePath()));   // ← espeak-ng-data 的父目录
                 tts = engine;
                 route = "files";
                 state = STATE_READY;
                 lastError = null;
-                System.out.println("[SherpaTts] ready(files) in " + (System.currentTimeMillis() - t0) + "ms, sampleRate=" + engine.sampleRate());
+                System.out.println("[SherpaTts] ready in " + (System.currentTimeMillis() - t0)
+                        + "ms, sampleRate=" + engine.sampleRate() + ", dir=" + modelDir);
             } catch (Throwable t) {
                 state = STATE_ERROR;
-                lastError = (lastError != null ? lastError + " | " : "") + "files: " + describe(t);
+                lastError = describe(t);
                 System.out.println("[SherpaTts] init failed: " + lastError);
             }
         }).start();

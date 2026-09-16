@@ -15,7 +15,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
 import { getNativeTts as getNativeTtsPlugin, pickPreferredEnglishVoice } from './native-tts';
-import { isSherpaAvailable, sherpaPrewarm, sherpaSpeak, warmSherpa } from './sherpa-tts';
+import { isBundledEngineDisabled, isSherpaAvailable, sherpaPrewarm, sherpaSpeak, warmSherpa } from './sherpa-tts';
 import { edgeVoiceNameOf, googleLangOf, isEdgeCatalogVoice } from './tts-voice-catalog';
 import { useTTSSettings } from './tts-settings';
 import { cleanText } from './utils';
@@ -381,10 +381,14 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       // 安卓：内置离线引擎（Piper）优先 —— 设备内合成、起播几十毫秒、与网速无关。
       // 用户显式选了在线音色则尊重其选择（clound 优先），但把内置引擎排在第二位，
       // 网络不可用时仍能出声。开着「只用系统引擎」时只走离线通道。
+      // 内置引擎被闪退护栏停用时，不把它排进候选（否则每次都白试一遍）
+      const piperOk = isSherpaAvailable() && !isBundledEngineDisabled();
       const engines: Array<'piper' | 'native' | 'cf' | 'edge' | 'google'> = IS_ANDROID_NATIVE
         ? (settings.preferNative
-          ? ['piper', 'native']
-          : (wantsOnlineVoice ? ['cf', 'piper', 'native', 'edge', 'google'] : ['piper', 'native', 'cf', 'edge', 'google']))
+          ? (piperOk ? ['piper', 'native'] : ['native'])
+          : (wantsOnlineVoice
+            ? (piperOk ? ['cf', 'piper', 'native', 'edge', 'google'] : ['cf', 'native', 'edge', 'google'])
+            : (piperOk ? ['piper', 'native', 'cf', 'edge', 'google'] : ['native', 'cf', 'edge', 'google'])))
         : ['cf', 'edge', 'google'];
       const engine = engines[engineIdx];
       if (!engine || abortedRef.current || idx >= chunks.length) {
@@ -716,7 +720,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     const rate = opts?.rate ?? settings.rate;
     // 安卓未选在线音色时朗读走内置离线引擎 —— 预热它才有意义，
     // 此时再往云端拉合成纯属浪费流量，直接跳过。
-    if (IS_ANDROID_NATIVE && isSherpaAvailable() && !isEdgeCatalogVoice(settings.selectedVoiceURI)) {
+    if (IS_ANDROID_NATIVE && isSherpaAvailable() && !isBundledEngineDisabled() && !isEdgeCatalogVoice(settings.selectedVoiceURI)) {
       warmSherpa(); // 首次触发即开始加载模型（1~2 秒），别等用户点了才加载
       sherpaPrewarm(cleaned, rate);
       return;
@@ -762,7 +766,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         // the server synthesizes each independently, so by the time chunk 0
         // finishes playing, later chunks are already cached (no gaps)
         // 安卓走内置离线引擎时改为在 piper 分支里预合成，不必再拉云端音频。
-        const usingBundledEngine = IS_ANDROID_NATIVE && isSherpaAvailable() && !isEdgeCatalogVoice(settings.selectedVoiceURI);
+        const usingBundledEngine = IS_ANDROID_NATIVE && isSherpaAvailable() && !isBundledEngineDisabled() && !isEdgeCatalogVoice(settings.selectedVoiceURI);
         if (!usingBundledEngine) {
           chunks.slice(1, 9).forEach((c, i) => {
             setTimeout(() => {
