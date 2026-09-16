@@ -11,6 +11,9 @@ import com.k2fsa.sherpa.onnx.GeneratedAudio;
 import com.k2fsa.sherpa.onnx.OfflineTts;
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig;
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig;
+import com.k2fsa.sherpa.onnx.OfflineTtsMatchaModelConfig;
+import com.k2fsa.sherpa.onnx.OfflineTtsKittenModelConfig;
+import com.k2fsa.sherpa.onnx.OfflineTtsKokoroModelConfig;
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig;
 
 import java.io.File;
@@ -149,22 +152,33 @@ public class SherpaTtsPlugin extends Plugin {
         call.resolve(stateObject());
     }
 
+    /**
+     * 组装 sherpa-onnx 配置。
+     *
+     * 注意：这些配置类由 Kotlin 生成，字符串参数全是**非空类型**，
+     * 构造函数里有 Intrinsics.checkNotNullParameter —— 传 null 会立刻抛
+     * NullPointerException（前几版「内置引擎加载失败」就是踩了这个：
+     * lexicon/dictDir/matcha/kokoro/kitten/ruleFsts/ruleFars 一律要传空值或空实例）。
+     */
     private OfflineTtsConfig buildConfig(String modelPath, String tokensPath, String dataDir) {
         OfflineTtsVitsModelConfig vits = new OfflineTtsVitsModelConfig(
-                modelPath,
-                null,       // lexicon
-                tokensPath,
-                dataDir,
-                null,       // dictDir
+                modelPath,  // model
+                "",         // lexicon —— 非空，无词典时给空串
+                tokensPath, // tokens
+                dataDir,    // dataDir
+                "",         // dictDir —— 非空，同上
                 0.667f,     // noiseScale
                 0.8f,       // noiseScaleW
                 1.0f);      // lengthScale
         OfflineTtsModelConfig model = new OfflineTtsModelConfig(
-                vits, null, null, null,
+                vits,
+                new OfflineTtsMatchaModelConfig(),   // 未使用，但必须给空实例
+                new OfflineTtsKokoroModelConfig(),   // 同上
+                new OfflineTtsKittenModelConfig(),   // 同上
                 Math.max(2, Runtime.getRuntime().availableProcessors() / 2), // numThreads
                 false,      // debug
                 "cpu");     // provider
-        return new OfflineTtsConfig(model, null, null, 1, 0.2f);
+        return new OfflineTtsConfig(model, "", "", 1, 0.2f);
     }
 
     /** 异常 → 可读文本（带首个栈帧，便于定位原生还是资源问题） */
