@@ -111,6 +111,19 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',
     },
+    watch: {
+      // 别去 watch 这些目录：android/ 下有打包时拷进去的 880MB 模型，
+      // 构建过程中正在写的 .onnx 会回报 EBUSY，未捕获的 error 事件会直接杀掉 dev server
+      // （表现为「每次打完包开发服务器就死」）。release/dist/logs 同理无监听价值。
+      ignored: [
+        '**/android/**',
+        '**/release/**',
+        '**/dist/**',
+        '**/models-bundled/**',
+        '**/logs/**',
+        '**/*.apk',
+      ],
+    },
     proxy: {
       '/api/tts': {
         target: 'https://nativethink.pages.dev',
