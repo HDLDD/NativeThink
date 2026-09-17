@@ -11,6 +11,8 @@
  */
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { safeStorage } from './safe-storage';
+import { toast } from 'sonner';
+import { DEFAULT_LOCAL_VOICE_ID, FALLBACK_VOICE, findLocalVoice } from './tts-voice-catalog';
 
 /** 加载中标记：成功才清除。若下次启动发现它还挂着，说明上次把 app 崩掉了。 */
 const TRY_KEY = '__nativethink_sherpa_try';
@@ -49,6 +51,13 @@ export function checkBundledEngineHealth(): void {
   } catch { /* ignore */ }
 }
 
+/** 已加载的模型与各自能力（多音色后新增，设置页据此显示真实可用音色数） */
+export interface ISherpaLoadedModel {
+  modelId: string;
+  sampleRate: number;
+  numSpeakers: number;
+}
+
 export interface ISherpaStatus {
   status: 'idle' | 'loading' | 'ready' | 'error';
   error: string | null;
@@ -60,6 +69,10 @@ export interface ISherpaStatus {
   modelBytes?: number;
   /** espeak 音素数据文件数（诊断用） */
   espeakFiles?: number;
+  /** 已加载的模型与各自能力 */
+  loadedModels?: ISherpaLoadedModel[];
+  /** 按模型记失败原因 —— Kokoro 失败不影响 lessac 可用 */
+  errorByModel?: Record<string, string>;
 }
 
 export interface ISherpaSpeakResult {
@@ -74,7 +87,12 @@ export interface ISherpaSpeakResult {
 interface ISherpaTtsPlugin {
   status(): Promise<ISherpaStatus>;
   init(): Promise<ISherpaStatus>;
-  speak(options: { text: string; speed?: number }): Promise<ISherpaSpeakResult>;
+  speak(options: {
+    text: string;
+    modelId: string;
+    speakerId: number;
+    speed?: number;
+  }): Promise<ISherpaSpeakResult>;
   purge(): Promise<{ removed: number }>;
   readLog(): Promise<{ log: string }>;
 }
@@ -129,40 +147,100 @@ export async function purgeSherpaCache(): Promise<number> {
   try { return (await SherpaTts.purge()).removed; } catch { return 0; }
 }
 
-/** 文本+语速 → 可播放 URL 的缓存，省掉重复的跨端调用（插件侧另有一层文件缓存） */
+/** 文本+音色+语速 → 可播放 URL 的缓存，省掉重复的跨端调用（插件侧另有一层文件缓存） */
 const urlCache = new Map<string, { url: string; durationMs: number }>();
 const MAX_CACHE = 120;
 
-function keyOf(text: string, speed: number): string {
-  return `${speed.toFixed(2)}|${text}`;
+/** 合成选项。voiceId 省略时用默认音色；第二参数传数字视为 speed（兼容历史签名） */
+export interface ISherpaSpeakOptions {
+  voiceId?: string | null;
+  speed?: number;
+}
+
+function normalizeOpts(opts?: ISherpaSpeakOptions | number): { voiceId: string; speed: number } {
+  if (typeof opts === 'number') return { voiceId: DEFAULT_LOCAL_VOICE_ID, speed: opts };
+  return {
+    voiceId: opts?.voiceId || DEFAULT_LOCAL_VOICE_ID,
+    speed: typeof opts?.speed === 'number' ? opts.speed : 1,
+  };
+}
+
+/** 缓存 key 必须含音色 —— 只按文本+语速缓存会让换音色时播出上一个音色的音频 */
+function keyOf(voiceId: string, text: string, speed: number): string {
+  return `${voiceId}|${speed.toFixed(2)}|${text}`;
+}
+
+/** 音色回退只提示一次（5 秒内不重复，避免刷屏） */
+let _lastVoiceFallbackAt = 0;
+function notifyVoiceFallback(from: string, to: string): void {
+  const now = Date.now();
+  if (now - _lastVoiceFallbackAt < 5000) return;
+  _lastVoiceFallbackAt = now;
+  try {
+    toast.info(`音色「${from}」暂不可用，已改用「${to}」`, { duration: 4000 });
+  } catch { /* 通知失败不影响朗读 */ }
 }
 
 /**
  * 合成并返回可播放 URL（设备内合成，不联网）。
  * speed：1.0 原速，越大越快（与全站 rate 语义一致）。
+ *
+ * 音色加载失败时自动回退到 lessac 兜底音色并提示用户；两者都不行才抛错，
+ * 交由 use-tts 降级到系统/云端引擎。
  */
-export async function sherpaSpeak(text: string, speed = 1): Promise<{ url: string; durationMs: number; cached: boolean; ms: number }> {
+export async function sherpaSpeak(
+  text: string,
+  opts?: ISherpaSpeakOptions | number,
+): Promise<{ url: string; durationMs: number; cached: boolean; ms: number }> {
   const clean = text.trim();
   if (!clean) throw new Error('empty_text');
-  const key = keyOf(clean, speed);
-  const hit = urlCache.get(key);
+  const { voiceId, speed } = normalizeOpts(opts);
+
+  const hit = urlCache.get(keyOf(voiceId, clean, speed));
   if (hit) return { ...hit, cached: true, ms: 0 };
 
   await warmSherpa();
-  const res = await SherpaTts.speak({ text: clean, speed });
+
+  const requested = findLocalVoice(voiceId) ?? FALLBACK_VOICE;
+  let voice = requested;
+  let res: ISherpaSpeakResult;
+  try {
+    res = await SherpaTts.speak({
+      text: clean, modelId: voice.modelId, speakerId: voice.speakerId, speed,
+    });
+  } catch (e) {
+    // 请求的音色失败 → 回退兜底音色；兜底也失败就把错误抛给上层
+    if (voice.id === FALLBACK_VOICE.id) throw e;
+    voice = FALLBACK_VOICE;
+    const fbKey = keyOf(voice.id, clean, speed);
+    const fbHit = urlCache.get(fbKey);
+    if (fbHit) {
+      notifyVoiceFallback(requested.name, FALLBACK_VOICE.name);
+      return { ...fbHit, cached: true, ms: 0 };
+    }
+    res = await SherpaTts.speak({
+      text: clean, modelId: voice.modelId, speakerId: voice.speakerId, speed,
+    });
+    notifyVoiceFallback(requested.name, FALLBACK_VOICE.name);
+  }
+
   const url = Capacitor.convertFileSrc(res.path);
   if (urlCache.size >= MAX_CACHE) {
     const oldest = urlCache.keys().next().value;
     if (oldest !== undefined) urlCache.delete(oldest);
   }
-  urlCache.set(key, { url, durationMs: res.durationMs });
+  urlCache.set(keyOf(voice.id, clean, speed), { url, durationMs: res.durationMs });
   return { url, durationMs: res.durationMs, cached: res.cached, ms: res.ms };
 }
 
 /** 只预热不播放（供阅读器/学习页提前合成下一段） */
-export function sherpaPrewarm(text: string, speed = 1): void {
+export function sherpaPrewarm(text: string, opts?: ISherpaSpeakOptions | number): void {
   if (!isSherpaAvailable() || !text.trim()) return;
-  const key = keyOf(text.trim(), speed);
-  if (urlCache.has(key)) return;
-  void sherpaSpeak(text, speed).catch(() => {});
+  const { voiceId, speed } = normalizeOpts(opts);
+  if (urlCache.has(keyOf(voiceId, text.trim(), speed))) return;
+  void sherpaSpeak(text, { voiceId, speed }).catch(() => {});
 }
+
+/** 本地离线音色列表（转发自音色目录，省得设置页多引一个模块） */
+export { listLocalVoices, KOKORO_VOICES } from './tts-voice-catalog';
+export type { ILocalVoice } from './tts-voice-catalog';

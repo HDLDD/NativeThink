@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
 import { getNativeTts as getNativeTtsPlugin, pickPreferredEnglishVoice } from './native-tts';
 import { isBundledEngineDisabled, isSherpaAvailable, sherpaPrewarm, sherpaSpeak, warmSherpa } from './sherpa-tts';
+import { DEFAULT_LOCAL_VOICE_ID, findLocalVoice, isLocalVoiceId } from './tts-voice-catalog';
 import { edgeVoiceNameOf, googleLangOf, isEdgeCatalogVoice } from './tts-voice-catalog';
 import { useTTSSettings } from './tts-settings';
 import { cleanText } from './utils';
@@ -106,6 +107,17 @@ function edgeVoiceFor(selectedURI: string | null | undefined): string {
   if (n.includes('aria')) return 'en-US-AriaNeural';
   if (n.includes('ana')) return 'en-US-AnaNeural';
   return 'en-US-AriaNeural';
+}
+
+/**
+ * 内置离线引擎该用哪个音色。
+ * 用户显式选了本地音色 → 用它；选了在线/系统音色 → 内置引擎用默认音色
+ * （那时用户要的声音由在线通道负责，内置引擎只是网络不可用时的兜底）。
+ */
+function localVoiceIdFor(selectedURI: string | null | undefined): string {
+  return isLocalVoiceId(selectedURI) && findLocalVoice(selectedURI)
+    ? (selectedURI as string)
+    : DEFAULT_LOCAL_VOICE_ID;
 }
 
 // ── Tier 2: Edge-TTS via WebSocket → Blob ──
@@ -558,9 +570,10 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       if (engine === 'piper') {
         // 内置离线引擎：设备内合成（不联网），起播几十毫秒；下一段顺手预合成
         const t0 = Date.now();
+        const voiceId = localVoiceIdFor(settings.selectedVoiceURI);
         const next = chunks[idx + 1];
-        if (next) sherpaPrewarm(next, rate);
-        sherpaSpeak(chunks[idx], rate)
+        if (next) sherpaPrewarm(next, { voiceId, speed: rate });
+        sherpaSpeak(chunks[idx], { voiceId, speed: rate })
           .then(({ url }) => playUrl(url, { engine: 'piper', t0 }))
           .catch(onFail);
         return;
@@ -721,8 +734,8 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     // 安卓未选在线音色时朗读走内置离线引擎 —— 预热它才有意义，
     // 此时再往云端拉合成纯属浪费流量，直接跳过。
     if (IS_ANDROID_NATIVE && isSherpaAvailable() && !isBundledEngineDisabled() && !isEdgeCatalogVoice(settings.selectedVoiceURI)) {
-      warmSherpa(); // 首次触发即开始加载模型（1~2 秒），别等用户点了才加载
-      sherpaPrewarm(cleaned, rate);
+      warmSherpa(); // 首次触发即开始加载模型（Kokoro 109MB，别等用户点了才加载）
+      sherpaPrewarm(cleaned, { voiceId: localVoiceIdFor(settings.selectedVoiceURI), speed: rate });
       return;
     }
     // Fill the local server synth cache with the SAME rate/voice the actual

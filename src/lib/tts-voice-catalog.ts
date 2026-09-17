@@ -77,3 +77,70 @@ export function edgeVoiceNameOf(uri: string | null | undefined): string | null {
   if (!isEdgeCatalogVoice(uri)) return null;
   return uri.slice('srv:edge:'.length);
 }
+
+// ── 本地离线音色（sherpa-onnx + Kokoro int8）──
+//
+// 与上面 Edge 在线目录的区别：这些音色在设备内合成，不联网。
+// speakerId 是 voices.bin 里的数组下标，**写错不会报错、只会读成别人的声音**，
+// 故改动后须真机试听确认（见 docs/superpowers/specs/2026-09-18-offline-tts-multivoice-design.md §6.2）。
+// 越界由 scripts/check-tts-voices.cjs 在打包前静态拦截。
+
+export interface ILocalVoice {
+  /** 传给 sherpaSpeak 的 voiceId，形如 kokoro:af_sarah */
+  id: string;
+  name: string;
+  gender: 'female' | 'male';
+  accent: '美音' | '英音';
+  /** 原生侧模型注册表的 key —— 必须与 SherpaTtsPlugin.java 的 MODEL_* 常量一致 */
+  modelId: 'kokoro-v1_1' | 'piper-lessac';
+  /** voices.bin 里的数组下标 */
+  speakerId: number;
+  /** 一句定位描述，设置页显示 */
+  note: string;
+}
+
+/**
+ * Kokoro int8 多语模型的 11 个英文音色。
+ *
+ * speakerId 初始值取自 sherpa 官方文档的 v1_0 speaker 表 —— v1.1 无公开表，
+ * 且两版音色嵌入经字节比对确认并非同一套，故此表须真机试听校准。
+ * 若名不符实，改这里的数字即可，不必改原生代码。
+ */
+export const KOKORO_VOICES: ILocalVoice[] = [
+  { id: 'kokoro:af_bella', name: 'Bella', gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 2, note: '温暖亲切' },
+  { id: 'kokoro:af_heart', name: 'Heart', gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 3, note: '柔和自然' },
+  { id: 'kokoro:af_nicole', name: 'Nicole', gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 6, note: '轻柔低语' },
+  { id: 'kokoro:af_sarah', name: 'Sarah', gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 9, note: '清晰标准' },
+  { id: 'kokoro:af_sky', name: 'Sky', gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 10, note: '年轻活泼' },
+  { id: 'kokoro:am_adam', name: 'Adam', gender: 'male', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 11, note: '沉稳' },
+  { id: 'kokoro:am_michael', name: 'Michael', gender: 'male', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 16, note: '自然' },
+  { id: 'kokoro:am_puck', name: 'Puck', gender: 'male', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 18, note: '活泼' },
+  { id: 'kokoro:am_santa', name: 'Santa', gender: 'male', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 19, note: '低沉厚重' },
+  { id: 'kokoro:bf_emma', name: 'Emma', gender: 'female', accent: '英音', modelId: 'kokoro-v1_1', speakerId: 21, note: '标准英音' },
+  { id: 'kokoro:bm_george', name: 'George', gender: 'male', accent: '英音', modelId: 'kokoro-v1_1', speakerId: 26, note: '沉稳英音' },
+];
+
+/** 兜底音色 —— Kokoro 不可用时自动回退（22050Hz，真机已验证可跑） */
+export const FALLBACK_VOICE: ILocalVoice = {
+  id: 'piper:lessac', name: 'Lessac', gender: 'female', accent: '美音',
+  modelId: 'piper-lessac', speakerId: 0, note: '经典音色',
+};
+
+/** 未选择音色时使用 */
+export const DEFAULT_LOCAL_VOICE_ID = 'kokoro:af_sarah';
+
+/** 本地音色全集（Kokoro 11 个 + 兜底 1 个） */
+export function listLocalVoices(): ILocalVoice[] {
+  return [...KOKORO_VOICES, FALLBACK_VOICE];
+}
+
+/** 是否为本地离线音色 id */
+export function isLocalVoiceId(uri: string | null | undefined): boolean {
+  return !!uri && (uri.startsWith('kokoro:') || uri.startsWith('piper:'));
+}
+
+/** 按 id 取本地音色；找不到返回 null（调用方自行决定是否回退） */
+export function findLocalVoice(uri: string | null | undefined): ILocalVoice | null {
+  if (!uri) return null;
+  return listLocalVoices().find((v) => v.id === uri) ?? null;
+}
