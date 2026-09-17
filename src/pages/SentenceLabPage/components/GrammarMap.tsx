@@ -29,6 +29,15 @@ export function GrammarMap({ onJumpToPattern }: { onJumpToPattern?: (patternId: 
 
   return (
     <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+      {/* 分工说明：语法讲「为什么这样组织」，句型讲「照着怎么造」 */}
+      <div className="lg:col-span-2 rounded-3xl border border-border/60 bg-card p-4">
+        <p className="text-[11px] font-bold text-muted-foreground leading-relaxed">
+          <span className="font-black text-foreground">语法地图</span>讲「为什么英语这样组织」（按中文思维差异编排，共 {GRAMMAR_TOPICS.length} 条）；
+          <span className="font-black text-foreground">句型</span>讲「照着怎么造」（{SENTENCE_PATTERNS.length} 个骨架）。
+          两者互补：先在这里弄清机制，再去句型库动手造句。每条的底部有「去句型库练」直达对应句型。
+        </p>
+      </div>
+
       {/* 左：分组 + 条目 */}
       <div className="space-y-3">
         <div className="flex flex-wrap gap-1.5">
