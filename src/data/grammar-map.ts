@@ -1,3 +1,5 @@
+import { GRAMMAR_EXTRA } from './grammar-map-extra';
+
 // EXPORTS: IGrammarTopic, GRAMMAR_GROUPS, GRAMMAR_TOPICS
 //
 // 语法地图 —— 不按语法书的顺序讲，按「中文思维与英语结构的差异」组织。
@@ -37,7 +39,7 @@ export const GRAMMAR_GROUPS = [
   '中文没有的词类',
 ] as const;
 
-export const GRAMMAR_TOPICS: IGrammarTopic[] = [
+const GRAMMAR_BASE: IGrammarTopic[] = [
   // ═══════════════ 句子骨架 ═══════════════
   {
     id: 'g01',
@@ -331,3 +333,6 @@ export const GRAMMAR_TOPICS: IGrammarTopic[] = [
     relatedPatterns: ['p04'],
   },
 ];
+
+/** 基础 16 条 + 补篇 14 条（按中文思维差异组织，非语法书顺序） */
+export const GRAMMAR_TOPICS: IGrammarTopic[] = [...GRAMMAR_BASE, ...GRAMMAR_EXTRA];

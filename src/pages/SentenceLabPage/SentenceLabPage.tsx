@@ -42,7 +42,7 @@ export default function SentenceLabPage() {
             <span className="text-sm font-black text-foreground">看懂句子</span>
           </div>
           <p className="text-[11px] font-bold text-muted-foreground leading-relaxed">
-            {SENTENCE_LAB.length} 句真实语料（公版书 + 30 篇演讲，逐句核验原文），练「找动词 → 定主干 → 切意群」；错句自动进复习队列。
+            {SENTENCE_LAB.length} 句真实语料（22 本公版书 + 30 篇演讲 + 站内刊物），练「找动词 → 定主干 → 切意群」；错句自动进复习队列。
           </p>
         </div>
         <div className="rounded-3xl border border-border/60 bg-card p-4">

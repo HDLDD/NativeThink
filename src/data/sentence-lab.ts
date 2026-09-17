@@ -1,4 +1,5 @@
 import { SENTENCE_LAB_EXTRA } from './sentence-lab-extra';
+import { SENTENCE_LAB_AUTO } from './sentence-lab-auto';
 
 // EXPORTS: ISentenceSegment, ISentenceLabItem, SENTENCE_LAB, READ_STEPS
 //
@@ -33,6 +34,8 @@ export interface ISentenceLabItem {
   tip: string;
   /** 只读主干会得到什么（把长句压成一句简单句） */
   backboneGloss: string;
+  /** 自动标注（脚本生成 + 结构校验）；未标则为人工编写 */
+  auto?: boolean;
   segments: ISentenceSegment[];
 }
 
@@ -438,5 +441,12 @@ const SENTENCE_LAB_BOOKS: ISentenceLabItem[] = [
   },
 ];
 
-/** 书籍语料 + 演讲语料（按来源分文件，便于继续扩） */
-export const SENTENCE_LAB: ISentenceLabItem[] = [...SENTENCE_LAB_BOOKS, ...SENTENCE_LAB_EXTRA];
+/**
+ * 全部语料：书籍（手写标注）+ 演讲（手写标注）+ 自动标注（刊物/演讲/书籍，见 sentence-lab-auto.ts）。
+ * 按来源分文件，便于继续扩；自动标注那批由脚本生成并经结构校验。
+ */
+export const SENTENCE_LAB: ISentenceLabItem[] = [
+  ...SENTENCE_LAB_BOOKS,
+  ...SENTENCE_LAB_EXTRA,
+  ...SENTENCE_LAB_AUTO,
+];
