@@ -24,7 +24,7 @@ import { previewTtsVoice, probeTtsEngines, getLastTtsReport, type ITtsEngineProb
 import { getSherpaInitLog, getSherpaStatus, isBundledEngineDisabled, reenableBundledEngine, warmSherpa, type ISherpaStatus } from '@/lib/sherpa-tts';
 import { isSfxEnabled, setSfxEnabled, sfxTick } from '@/lib/sfx';
 import { toast } from 'sonner';
-import { EDGE_VOICE_CATALOG } from '@/lib/tts-voice-catalog';
+import { EDGE_VOICE_CATALOG, KOKORO_VOICES } from '@/lib/tts-voice-catalog';
 import {
   isAndroidNative,
   listNativeEnglishVoices,
@@ -43,6 +43,9 @@ interface VoiceOption {
   lang: string;
   source: 'system' | 'server';
 }
+
+/** 本地音色试听用的句子 —— 含常见音素，便于分辨音色差异 */
+const SAMPLE_SENTENCE = 'This is how I sound when reading English.';
 
 /** Merge voice lists by uri, keeping first occurrence; English first */
 function mergeVoices(prev: VoiceOption[], next: VoiceOption[]): VoiceOption[] {
@@ -351,6 +354,59 @@ export default function TTSSettings() {
               </>
             )}
           </div>
+
+          {/* 本地离线音色（安卓）—— 设备内合成、不联网，点一下即设备内试听 */}
+          {isNative && (
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                朗读声音 · 内置离线音色{' '}
+                <span className="text-muted-foreground/60 normal-case font-bold">不联网 · 起播快 · 含英音</span>
+              </label>
+              <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
+                {KOKORO_VOICES.map((v) => {
+                  const active = settings.selectedVoiceURI === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={async () => {
+                        updateSettings({ selectedVoiceURI: v.id });
+                        setPreviewing(v.id);
+                        try {
+                          const { sherpaSpeak } = await import('@/lib/sherpa-tts');
+                          const { url } = await sherpaSpeak(SAMPLE_SENTENCE, { voiceId: v.id, speed: settings.rate });
+                          const audio = new Audio(url);
+                          audio.volume = settings.volume;
+                          audio.onended = () => setPreviewing(null);
+                          await audio.play();
+                        } catch {
+                          setPreviewing(null);
+                          toast.error('试听失败，请确认内置离线引擎已就绪');
+                        }
+                      }}
+                      className={cn(
+                        'px-2 py-1.5 rounded-xl text-[10px] font-bold text-left transition-all border',
+                        active
+                          ? 'border-[#00B894] text-ink-teal bg-[#00B894]/5'
+                          : 'border-border text-muted-foreground hover:border-muted-foreground/30',
+                      )}
+                    >
+                      <span className="block truncate">{v.name}</span>
+                      <span className="block text-[8px] font-bold opacity-60">
+                        {previewing === v.id
+                          ? '试听中…'
+                          : `${v.accent} · ${v.gender === 'female' ? '女声' : '男声'}${active ? ' · 已选' : ''}`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[9px] text-muted-foreground leading-relaxed">
+                {previewing
+                  ? '首次试听需加载模型（约 109MB），请稍候…'
+                  : '全部设备内合成。带「英音」的音色适合练英式听力；点任意音色即切换并试听。'}
+              </p>
+            </div>
+          )}
 
           {/* 内置离线朗读引擎（安卓）—— 设备内合成、不联网；装没装好一眼可见 */}
           {isNative && (
