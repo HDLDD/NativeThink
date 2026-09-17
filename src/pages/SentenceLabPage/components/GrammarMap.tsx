@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, BookMarked, Lightbulb, Volume2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,7 @@ import { SENTENCE_PATTERNS } from '@/data/sentence-patterns';
  * 规则细节与中式错例放在后面。因为中国学生的语法错处往往不是记不住的规则，
  * 而是中文里根本不存在的机制（时态变形、冠词、从句后置）。
  */
-export function GrammarMap({ onJumpToPattern }: { onJumpToPattern?: (patternId: string) => void }) {
+export function GrammarMap({ onJumpToPattern, jumpToTopic }: { onJumpToPattern?: (patternId: string) => void; jumpToTopic?: string | null }) {
   const [group, setGroup] = useState<string>('全部');
   const [activeId, setActiveId] = useState(GRAMMAR_TOPICS[0].id);
   const { speak } = useTTS();
@@ -23,6 +23,14 @@ export function GrammarMap({ onJumpToPattern }: { onJumpToPattern?: (patternId: 
     () => (group === '全部' ? GRAMMAR_TOPICS : GRAMMAR_TOPICS.filter((t) => t.group === group)),
     [group],
   );
+  // 从句子精讲跳进来时，直接打开对应语法条目
+  useEffect(() => {
+    if (jumpToTopic && GRAMMAR_TOPICS.some((t) => t.id === jumpToTopic)) {
+      setActiveId(jumpToTopic);
+      setGroup('全部');
+    }
+  }, [jumpToTopic]);
+
   const active: IGrammarTopic = GRAMMAR_TOPICS.find((t) => t.id === activeId) ?? list[0];
 
   const patternName = (pid: string) => SENTENCE_PATTERNS.find((p) => p.id === pid)?.name;
