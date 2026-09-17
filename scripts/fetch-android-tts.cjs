@@ -27,6 +27,16 @@ const AAR_FILE = `android/aar/${AAR_VERSION}/sherpa-onnx-static-link-onnxruntime
 const VOICE = 'vits-piper-en_US-lessac-medium';
 const VOICE_REPO = `csukuangfj/${VOICE}`;
 
+// ── Kokoro 多音色模型（int8 量化）──
+// 主模型 109MB，单模型含 103 个音色，输出 24000Hz —— 一个模型顶 11 个 Piper 音色。
+// espeak-ng-data 不在此拉取：与 Piper 音色自带的那份实测逐文件 SHA-1 相同（355 个文件），
+// 只保留一份，Kokoro 在原生侧通过 dataDir 指向 Piper 音色目录复用。
+const KOKORO_REPO = 'csukuangfj/kokoro-int8-multi-lang-v1_1';
+const KOKORO_DIR_NAME = 'kokoro-int8-multi-lang-v1_1';
+/** 白名单：只取英文所需。dict/ 是中文分词，lexicon-zh / lexicon-gb-en / *zh.fst 本项目用不到 */
+const KOKORO_FILES = ['model.int8.onnx', 'voices.bin', 'tokens.txt', 'lexicon-us-en.txt'];
+const KOKORO_MIN_BYTES = 100 * 1024 * 1024;
+
 const args = process.argv.slice(2);
 const FORCE = args.includes('--force');
 const voiceArg = args.indexOf('--voice');
@@ -96,6 +106,89 @@ async function listRepo(repo) {
   return j.filter((x) => x.type === 'file').map((x) => ({ path: x.path, size: x.size || 0 }));
 }
 
+/**
+ * 流式下载 —— 109MB 的模型不能先 arrayBuffer() 全量读进内存。
+ * 现有的 download() 供小文件与并发场景使用，这里专供大模型。
+ */
+async function downloadStream(url, dest, label) {
+  const tmp = dest + '.part';
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  const r = await fetch(url, { signal: AbortSignal.timeout(1800000) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const total = Number(r.headers.get('content-length') || 0);
+  let got = 0;
+  let lastPct = -1;
+  const { Readable } = require('stream');
+  const { pipeline } = require('stream/promises');
+  const body = Readable.fromWeb(r.body);
+  body.on('data', (c) => {
+    got += c.length;
+    if (total > 0) {
+      const pct = Math.floor((got / total) * 100);
+      if (pct !== lastPct && pct % 10 === 0) {
+        lastPct = pct;
+        process.stdout.write(`\r    ${label} ${pct}%  ${mb(got)}/${mb(total)}`);
+      }
+    }
+  });
+  await pipeline(body, fs.createWriteStream(tmp));
+  process.stdout.write('\r' + ' '.repeat(64) + '\r');
+  fs.renameSync(tmp, dest);
+  return got;
+}
+
+/** 拉取 Kokoro 多音色模型（幂等：已就位且大小相符则跳过） */
+async function fetchKokoro(assetsDir) {
+  const dir = path.join(assetsDir, '..', 'tts', KOKORO_DIR_NAME);
+
+  if (!FORCE) {
+    try {
+      const model = path.join(dir, 'model.int8.onnx');
+      if (fs.statSync(model).size >= KOKORO_MIN_BYTES
+        && KOKORO_FILES.every((f) => fs.existsSync(path.join(dir, f)))) {
+        console.log(`  跳过 Kokoro（已就位 ${mb(fs.statSync(model).size)} 模型）`);
+        return dir;
+      }
+    } catch { /* 未就位，继续拉取 */ }
+  }
+
+  console.log(`  拉取 Kokoro ${KOKORO_DIR_NAME} → assets/tts/${KOKORO_DIR_NAME}/`);
+  const all = await listRepo(KOKORO_REPO);
+  const wanted = KOKORO_FILES.map((name) => {
+    const hit = all.find((x) => x.path === name);
+    if (!hit) throw new Error(`仓库里找不到 ${name}`);
+    return hit;
+  });
+  for (const f of wanted) {
+    const dest = path.join(dir, f.path);
+    if (!FORCE && fs.existsSync(dest) && f.size > 0 && fs.statSync(dest).size === f.size) {
+      console.log(`    ${f.path} 已就位（${mb(f.size)}）`);
+      continue;
+    }
+    const n = await downloadStream(`${MIRROR}/${KOKORO_REPO}/resolve/main/${encodeURIComponent(f.path)}`, dest, f.path);
+    console.log(`  ✓ ${f.path}  ${mb(n)}`);
+  }
+  return dir;
+}
+
+/** Kokoro 资产校验报告 */
+function reportKokoro(dir) {
+  console.log('');
+  for (const f of KOKORO_FILES) {
+    const p = path.join(dir, f);
+    const ok = fs.existsSync(p) && fs.statSync(p).size > 0;
+    console.log(`  ${ok ? '✓' : '✗'} kokoro/${f}  ${ok ? mb(fs.statSync(p).size) : '缺失'}`);
+  }
+  let sum = 0;
+  if (fs.existsSync(dir)) {
+    for (const f of fs.readdirSync(dir)) {
+      const p = path.join(dir, f);
+      if (fs.statSync(p).isFile()) sum += fs.statSync(p).size;
+    }
+  }
+  console.log(`  Kokoro 资产合计 ${mb(sum)}（espeak 数据复用 Piper 那份，不重复打包）`);
+}
+
 (async () => {
   fs.mkdirSync(LIBS_DIR, { recursive: true });
 
@@ -117,10 +210,13 @@ async function listRepo(repo) {
 
   // 资源已就位就完全离线跳过 —— 构建不该因为网络抖动而失败
   // （用户网络本来就差，之前这里每次都要列远端目录，一抖就挂）。用 --refresh 强制更新。
+  // 注意：Kokoro 的拉取必须在下面这个 return 之前，否则 Piper 已就位时永远拉不到它。
   if (!FORCE && voiceLooksComplete(voiceDir)) {
     const onnx = findOnnx(voiceDir);
     console.log(`  跳过音色 ${voiceName}（已就位 ${mb(fs.statSync(onnx).size)} 模型）`);
-    console.log(`\n完成：AAR + 音色 ${voiceName} 均已就位（离线校验通过）`);
+    const kokoroDir = await fetchKokoro(ASSETS_DIR);
+    reportKokoro(kokoroDir);
+    console.log(`\n完成：AAR + 音色 ${voiceName} + Kokoro 均已就位（离线校验通过）`);
     return;
   }
 
@@ -166,6 +262,11 @@ async function listRepo(repo) {
   }
   console.log(`  ${tokens && fs.existsSync(path.join(voiceDir, 'tokens.txt')) ? '✓' : '✗'} tokens.txt`);
   console.log(`  ${espeak ? '✓' : '✗'} espeak-ng-data/`);
+
+  // ── 4) Kokoro 多音色模型 ──
+  const kokoroDir = await fetchKokoro(ASSETS_DIR);
+  reportKokoro(kokoroDir);
+
   console.log(`\n完成：AAR + 音色 ${voiceName}，合计新增约 ${mb(fs.statSync(aarDest).size + bytes)}`);
 })().catch((e) => {
   console.error('拉取失败:', e);
