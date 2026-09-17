@@ -18,3 +18,6 @@ android/keystore.properties
 android/app/libs/*.aar
 android/app/src/main/assets/piper/
 android/app/src/main/assets/tts/
+
+# 句料扩量脚本的断点状态（本地用，不入库）
+.sentence-auto-state.json
