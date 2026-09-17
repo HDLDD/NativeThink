@@ -15,6 +15,14 @@ export const WEEK_DAYS = ['日', '一', '二', '三', '四', '五', '六'] as co
 
 export const QUICK_ENTRIES = [
   {
+    path: '/sentences',
+    label: '句子学习',
+    icon: MessagesSquare,
+    color: 'from-[#F59E0B] to-amber-400',
+    bg: 'bg-amber-50 dark:bg-amber-500/15',
+    desc: '拆句 · 句型 · 造句',
+  },
+  {
     path: '/vocabulary',
     label: '词汇深度',
     icon: BookOpen,
@@ -81,11 +89,10 @@ export const QUICK_ENTRIES = [
 ];
 
 /** 后续要开发的模块（首页占位展示，暂不可点） */
-export const COMING_SOON = [
-  { label: '句子学习', icon: MessagesSquare, desc: '逐句精听 · 跟读 · 拆解', color: '#F59E0B' },
-];
+export const COMING_SOON: { label: string; icon: typeof MessagesSquare; desc: string; color: string }[] = [];
 
 export const MODULES = [
+  { key: 'sentences', label: '句子学习', icon: MessagesSquare, color: '#F59E0B' },
   { key: 'vocabulary', label: '词汇深度', icon: BookOpen, color: '#EC4899' },
   { key: 'articles', label: '文章阅读', icon: BookMarked, color: '#0EA5E9' },
   { key: 'spelling', label: '句子拼写', icon: SpellCheck, color: '#F59E0B' },

@@ -1,4 +1,5 @@
 import {
+  MessagesSquare,
   LayoutDashboard,
   Brain,
   Puzzle,
@@ -50,6 +51,7 @@ const NAV_ITEMS = [
   { path: '/vocabulary', label: '词汇深度', icon: BookOpen },
   { path: '/favorites', label: '我的收藏', icon: Heart },
   { path: '/writing', label: 'AI 写作练习', icon: PenLine },
+  { path: '/sentences', label: '句子学习', icon: MessagesSquare },
   { path: '/spelling', label: '句子拼写', icon: SpellCheck },
   { path: '/progress', label: '学习记录', icon: BarChart3 },
 ];

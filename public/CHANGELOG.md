@@ -113,6 +113,10 @@
 
 
 
+
+## 2026-09-17
+- perf(pack): 拆分打包流程 —— 9 分钟降到 45 秒 (`bc5e4ee`)
+
 ## 2026-09-17
 - fix(tts): 内置引擎崩溃真凶 —— OfflineTts 的 assetManager 传了非 null，导致走 assets 分支解析文件路径 (`841eaf2`)
 
