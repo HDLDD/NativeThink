@@ -34,4 +34,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 跟读评价需要录音；Capacitor 的 BridgeWebChromeClient 会在网页请求麦克风时
+         运行时申请这两项权限（AUDIO_CAPTURE 分支），前提是清单里声明了 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 </manifest>

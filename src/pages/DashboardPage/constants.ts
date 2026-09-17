@@ -9,6 +9,7 @@ import {
   BookMarked,
   SpellCheck,
   MessagesSquare,
+  GraduationCap,
 } from 'lucide-react';
 
 export const WEEK_DAYS = ['日', '一', '二', '三', '四', '五', '六'] as const;
@@ -86,6 +87,14 @@ export const QUICK_ENTRIES = [
     bg: 'bg-violet-50 dark:bg-violet-500/15',
     desc: 'AI 批改提升写作',
   },
+  {
+    path: '/cet',
+    label: '四六级备考',
+    icon: GraduationCap,
+    color: 'from-teal-500 to-cyan-500',
+    bg: 'bg-teal-50 dark:bg-teal-500/15',
+    desc: '模考 · 听力 · 错题本',
+  },
 ];
 
 /** 后续要开发的模块（首页占位展示，暂不可点） */
@@ -101,6 +110,7 @@ export const MODULES = [
   { key: 'conversation', label: '对话练习', icon: MessageSquare, color: '#6366F1' },
   { key: 'shadowing', label: '影子跟读', icon: Mic, color: '#F97316' },
   { key: 'writing', label: '写作练习', icon: PenLine, color: '#8B5CF6' },
+  { key: 'cet', label: '四六级备考', icon: GraduationCap, color: '#14B8A6' },
 ] as const;
 
 export const LEARNING_OPTIONS = [

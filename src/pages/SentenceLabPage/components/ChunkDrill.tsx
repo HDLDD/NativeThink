@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  BookOpen, ChevronLeft, ChevronRight, Eye, EyeOff, Heart, Lightbulb,
-  RotateCcw, Scissors, Target, Volume2,
+  BookOpen, ChevronLeft, ChevronRight, Eye, EyeOff, Heart, Lightbulb, Loader2,
+  Mic, RotateCcw, Scissors, Search, Target, Volume2, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useTTS } from '@/lib/use-tts';
 import { useFavorites } from '@/lib/use-favorites';
+import { useSentenceReview } from '@/lib/use-sentence-review';
+import { lookupWord, type IWordLookup } from '@/lib/word-lookup';
 import { cn } from '@/lib/utils';
 import { SENTENCE_LAB, READ_STEPS, type ISentenceLabItem } from '@/data/sentence-lab';
 import { resolveSegments, standardBreaks, tokenize, splitByBreaks } from '@/lib/sentence-parse';
+import { SpeakBack } from './SpeakBack';
 
 type Phase = 'split' | 'backbone' | 'reveal';
 
@@ -23,8 +26,13 @@ const ROLE_STYLE: Record<string, { chip: string; label: string }> = {
 /**
  * 拆句训练 —— 三步读句法：找动词 → 定主干 → 切意群。
  *
- * 交互设计：先让用户**预测**再揭晓，而不是直接展示标注。预测结果分「漏切/多切」统计，
- * 这样「读得快又读得准」才有可测量的抓手。
+ * 先让用户**预测**再揭晓，而不是直接展示标注；预测结果分「漏切/多切」统计，
+ * 让「读得快又读得准」有可测量的抓手。
+ *
+ * 三种闭环：
+ *   点词查词 —— 训练中遇到生词即刻查（离线词典优先）
+ *   复习队列 —— 漏切/多切或主干选错即入队，SM-2 安排下次出现
+ *   跟读评价 —— 录音后评「语速 + 停顿落点」：停顿是否落在意群边界是朗读的核心
  */
 export function ChunkDrill() {
   const [idx, setIdx] = useState(0);
@@ -32,11 +40,22 @@ export function ChunkDrill() {
   const [userBreaks, setUserBreaks] = useState<Set<number>>(new Set());
   const [backbonePick, setBackbonePick] = useState<number | null>(null);
   const [showZh, setShowZh] = useState(false);
+  const [showSpeak, setShowSpeak] = useState(false);
   const [score, setScore] = useState<{ hit: number; missed: number; wrong: number } | null>(null);
+  const [reviewMode, setReviewMode] = useState(false);
+  const [lookup, setLookup] = useState<{ word: string; data: IWordLookup | null; loading: boolean } | null>(null);
   const { speak } = useTTS();
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
+  const { grade, dueIds, stats } = useSentenceReview();
 
-  const item: ISentenceLabItem = SENTENCE_LAB[idx];
+  // 复习模式只走到期句子
+  const dueSet = useMemo(() => new Set(dueIds), [dueIds]);
+  const deck = useMemo(
+    () => (reviewMode ? SENTENCE_LAB.filter((s) => dueSet.has(s.id)) : SENTENCE_LAB),
+    [reviewMode, dueSet],
+  );
+  const item: ISentenceLabItem = deck[idx] ?? SENTENCE_LAB[0];
+
   const tokens = useMemo(() => tokenize(item.en), [item]);
   const breaks = useMemo(() => standardBreaks(item), [item]);
   const resolved = useMemo(() => resolveSegments(item), [item]);
@@ -50,9 +69,16 @@ export function ChunkDrill() {
     setBackbonePick(null);
     setScore(null);
     setShowZh(false);
+    setShowSpeak(false);
+    setLookup(null);
   }, []);
 
   useEffect(() => { reset(); }, [idx, reset]);
+
+  // 队列清空后自动退出复习模式，避免停在空列表
+  useEffect(() => {
+    if (reviewMode && deck.length === 0) setReviewMode(false);
+  }, [reviewMode, deck.length]);
 
   const toggleBreak = (wordIdx: number) => {
     if (phase !== 'split') return;
@@ -73,6 +99,24 @@ export function ChunkDrill() {
     setPhase('backbone');
     if (missed === 0 && wrong === 0) toast.success(`断句完全正确 · ${breaks.size} 处断点全中`);
     else toast.info(`命中 ${hit}/${breaks.size} · 漏切 ${missed} · 多切 ${wrong}`);
+  };
+
+  /** 揭晓即结账：把这次表现折算成 SM-2 的 quality 记入复习队列 */
+  const reveal = () => {
+    setPhase('reveal');
+    const splitPerfect = !!score && score.missed === 0 && score.wrong === 0;
+    const backboneRight = backbonePick !== null && item.segments[backbonePick]?.r === 'core';
+    const quality = splitPerfect && backboneRight ? 5 : backboneRight ? 3 : 2;
+    grade(item.id, quality);
+    if (quality < 3) toast.info('这句已加入复习队列', { duration: 1800 });
+  };
+
+  const openLookup = async (word: string) => {
+    const clean = word.replace(/[^a-zA-Z'-]/g, '');
+    if (clean.length < 2) return;
+    setLookup({ word: clean, data: null, loading: true });
+    const data = await lookupWord(clean);
+    setLookup((cur) => (cur && cur.word === clean ? { word: clean, data, loading: false } : cur));
   };
 
   const toggleFav = () => {
@@ -107,7 +151,7 @@ export function ChunkDrill() {
       </div>
 
       <div className="rounded-3xl border border-border/60 bg-card p-5 space-y-4">
-        {/* 头部：来源 + 工具 */}
+        {/* 头部 */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 min-w-0">
             <Badge className="rounded-full text-[10px] font-black shrink-0" variant="secondary">
@@ -126,9 +170,44 @@ export function ChunkDrill() {
               <Heart className={cn('size-3.5', faved && 'fill-rose-500 text-rose-500')} />
             </Button>
             <span className="text-[10px] font-black text-muted-foreground tabular-nums ml-1">
-              {idx + 1}/{SENTENCE_LAB.length}
+              {idx + 1}/{deck.length}
             </span>
           </div>
+        </div>
+
+        {/* 复习队列入口 */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => { setReviewMode(false); setIdx(0); }}
+            className={cn(
+              'px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all',
+              !reviewMode ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40',
+            )}
+          >
+            全部语料 · {SENTENCE_LAB.length}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setReviewMode(true); setIdx(0); toast.info(stats.due ? `复习 ${stats.due} 句待巩固` : '暂无待复习'); }}
+            className={cn(
+              'px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all flex items-center gap-1.5',
+              reviewMode ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40',
+            )}
+          >
+            复习队列
+            <span className={cn(
+              'px-1.5 py-0.5 rounded-full text-[9px] font-black',
+              stats.due > 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-muted text-muted-foreground',
+            )}>
+              {stats.due}
+            </span>
+          </button>
+          {stats.tracked > 0 && (
+            <span className="text-[10px] font-bold text-muted-foreground">
+              已掌握 {stats.mastered} · 学习中 {stats.learning} · 今日已练 {stats.reviewedToday}
+            </span>
+          )}
         </div>
 
         {/* 句子本体 */}
@@ -152,7 +231,14 @@ export function ChunkDrill() {
                         )}
                       />
                     )}
-                    <span>{tk.text}</span>
+                    <button
+                      type="button"
+                      onClick={() => openLookup(tk.text)}
+                      className="hover:text-ink-teal transition-colors"
+                      aria-label={`查词 ${tk.text}`}
+                    >
+                      {tk.text}
+                    </button>
                   </span>
                 );
               })}
@@ -165,7 +251,6 @@ export function ChunkDrill() {
           </div>
         ) : (
           <div className="space-y-3">
-            {/* 标准切分对照 */}
             <div className="rounded-2xl bg-muted/40 p-4">
               <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
                 <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
@@ -192,7 +277,6 @@ export function ChunkDrill() {
               )}
             </div>
 
-            {/* 找主干 */}
             {phase === 'backbone' && (
               <div className="space-y-2">
                 <p className="text-[11px] font-black text-foreground flex items-center gap-2">
@@ -217,13 +301,12 @@ export function ChunkDrill() {
                   ))}
                 </div>
                 <Button size="sm" className="rounded-xl text-[10px] font-black bg-[#00B894] hover:bg-[#00A383]"
-                  onClick={() => setPhase('reveal')}>
+                  onClick={reveal}>
                   <BookOpen className="size-3.5" /> 揭晓拆解
                 </Button>
               </div>
             )}
 
-            {/* 揭晓 */}
             {phase === 'reveal' && resolved && (
               <div className="space-y-3">
                 <div className="rounded-2xl bg-[#00B894]/5 border border-[#00B894]/20 p-3">
@@ -260,25 +343,32 @@ export function ChunkDrill() {
                 </div>
                 <p className="text-[10px] font-bold text-muted-foreground">
                   主干 {coreCount} 块 · 修饰 {item.segments.length - coreCount} 块
-                  {backbonePick !== null && (coreCount > 0 && item.segments[backbonePick]?.r === 'core'
+                  {backbonePick !== null && (item.segments[backbonePick]?.r === 'core'
                     ? ' · 你选对了 ✓'
-                    : ' · 主干通常只有一块，再读一遍 backbone 那句体会一下')}
+                    : ' · 主干通常只有一块，再体会一下 backbone 那句')}
                 </p>
+
+                {/* 跟读评价 */}
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <Button size="sm" variant="ghost" className="rounded-xl text-[10px] font-black" onClick={reset}>
-                    <RotateCcw className="size-3.5" /> 重做本句
+                  <Button size="sm" variant="outline" className="rounded-xl text-[10px] font-black"
+                    onClick={() => setShowSpeak((v) => !v)}>
+                    <Mic className="size-3.5" /> {showSpeak ? '收起跟读' : '跟读评价'}
                   </Button>
                   <div className="flex gap-2">
+                    <Button size="sm" variant="ghost" className="rounded-xl text-[10px] font-black" onClick={reset}>
+                      <RotateCcw className="size-3.5" /> 重做本句
+                    </Button>
                     <Button size="sm" variant="outline" className="rounded-xl text-[10px] font-black"
                       disabled={idx <= 0} onClick={() => setIdx((i) => i - 1)}>
                       <ChevronLeft className="size-3.5" /> 上一句
                     </Button>
                     <Button size="sm" className="rounded-xl text-[10px] font-black bg-[#00B894] hover:bg-[#00A383]"
-                      disabled={idx >= SENTENCE_LAB.length - 1} onClick={() => setIdx((i) => i + 1)}>
+                      disabled={idx >= deck.length - 1} onClick={() => setIdx((i) => i + 1)}>
                       下一句 <ChevronRight className="size-3.5" />
                     </Button>
                   </div>
                 </div>
+                {showSpeak && <SpeakBack item={item} />}
               </div>
             )}
           </div>
@@ -290,11 +380,10 @@ export function ChunkDrill() {
           <p className="text-[11px] font-bold text-foreground/80 leading-relaxed">{item.tip}</p>
         </div>
 
-        {/* 切分阶段的操作 */}
         {phase === 'split' && (
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <p className="text-[10px] font-bold text-muted-foreground">
-              点击词与词之间的竖线，切出你认为的意群（已切 {userBreaks.size} 处）
+            <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1.5">
+              <Search className="size-3" /> 点单词可查词 · 点词间竖线切意群（已切 {userBreaks.size} 处）
             </p>
             <div className="flex gap-2">
               <Button size="sm" variant="ghost" className="rounded-xl text-[10px] font-black"
@@ -312,6 +401,65 @@ export function ChunkDrill() {
           </div>
         )}
       </div>
+
+      {/* 查词浮层 */}
+      {lookup && (
+        <div
+          className="fixed inset-x-3 bottom-3 sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-96 z-50 rounded-3xl border border-border bg-card shadow-xl p-4 space-y-2"
+          role="dialog"
+          aria-label="查词"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-base font-black text-foreground truncate">{lookup.word}</p>
+              {lookup.data?.phonetic && (
+                <p className="text-[11px] font-bold text-muted-foreground">/{lookup.data.phonetic}/</p>
+              )}
+              {lookup.data?.fromForm && (
+                <p className="text-[10px] font-bold text-muted-foreground">原形：{lookup.data.fromForm}</p>
+              )}
+            </div>
+            <Button size="sm" variant="ghost" className="rounded-xl h-7 px-1.5 shrink-0" onClick={() => setLookup(null)} aria-label="关闭">
+              <X className="size-4" />
+            </Button>
+          </div>
+          {lookup.loading ? (
+            <p className="text-[11px] font-bold text-muted-foreground flex items-center gap-1.5">
+              <Loader2 className="size-3.5 animate-spin" /> 查询中…
+            </p>
+          ) : (
+            <div className="space-y-1.5 max-h-56 overflow-y-auto">
+              {lookup.data?.zhMeaning && (
+                <p className="text-[12px] font-bold text-foreground leading-snug">{lookup.data.zhMeaning}</p>
+              )}
+              {lookup.data?.meaning && lookup.data.meaning !== lookup.data.zhMeaning && (
+                <p className="text-[11px] font-medium text-muted-foreground leading-snug">{lookup.data.meaning}</p>
+              )}
+            </div>
+          )}
+          <div className="flex gap-2 pt-1">
+            <Button size="sm" variant="outline" className="rounded-xl text-[10px] font-black"
+              onClick={() => speak(lookup.word)}>
+              <Volume2 className="size-3.5" /> 朗读
+            </Button>
+            <Button size="sm" variant="ghost" className="rounded-xl text-[10px] font-black"
+              onClick={() => {
+                const w = lookup.word;
+                setLookup(null);
+                const hit = SENTENCE_LAB.find((s) => new RegExp(`\\b${w}\\b`, 'i').test(s.en));
+                if (hit) {
+                  setReviewMode(false);
+                  setIdx(SENTENCE_LAB.findIndex((s) => s.id === hit.id));
+                  toast.info(`已切到含「${w}」的句子`);
+                } else {
+                  toast.info('内置语料里没有其他含这个词的句子');
+                }
+              }}>
+              找含此词的句子
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -35,7 +35,7 @@ export default function SentenceLabPage() {
             <span className="text-sm font-black text-foreground">看懂句子</span>
           </div>
           <p className="text-[11px] font-bold text-muted-foreground leading-relaxed">
-            {SENTENCE_LAB.length} 句真实语料（取自站内公版书，逐句核验原文），练「找动词 → 定主干 → 切意群」。
+            {SENTENCE_LAB.length} 句真实语料（公版书 + 30 篇演讲，逐句核验原文），练「找动词 → 定主干 → 切意群」；错句自动进复习队列。
           </p>
         </div>
         <div className="rounded-3xl border border-border/60 bg-card p-4">
@@ -44,7 +44,7 @@ export default function SentenceLabPage() {
             <span className="text-sm font-black text-foreground">学会造句</span>
           </div>
           <p className="text-[11px] font-bold text-muted-foreground leading-relaxed">
-            {SENTENCE_PATTERNS.length} 个高频句型骨架 + AI 逐句批改，从「看得懂」走到「写得出」。
+            {SENTENCE_PATTERNS.length} 个高频句型骨架 + AI 逐句批改；拆句页还可录音跟读，评「语速 + 停顿落点」。
           </p>
         </div>
       </div>

@@ -12,6 +12,7 @@ import {
   Sparkles,
   PenLine,
   SpellCheck,
+  GraduationCap,
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -39,6 +40,7 @@ const ROUTE_PREFETCH: Record<string, () => Promise<unknown>> = {
   '/writing': () => import('@/pages/WritingPage/WritingPage'),
   '/progress': () => import('@/pages/ProgressPage/ProgressPage'),
   '/spelling': () => import('@/pages/SpellingPage/SpellingPage'),
+  '/cet': () => import('@/pages/CetExamPage/CetExamPage'),
 };
 
 const NAV_ITEMS = [
@@ -53,6 +55,7 @@ const NAV_ITEMS = [
   { path: '/writing', label: 'AI 写作练习', icon: PenLine },
   { path: '/sentences', label: '句子学习', icon: MessagesSquare },
   { path: '/spelling', label: '句子拼写', icon: SpellCheck },
+  { path: '/cet', label: '四六级 App', icon: GraduationCap },
   { path: '/progress', label: '学习记录', icon: BarChart3 },
 ];
 

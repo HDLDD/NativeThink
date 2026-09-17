@@ -1,3 +1,5 @@
+import { SENTENCE_LAB_EXTRA } from './sentence-lab-extra';
+
 // EXPORTS: ISentenceSegment, ISentenceLabItem, SENTENCE_LAB, READ_STEPS
 //
 // 拆句语料 —— 全部取自站内已有的公版书全文（public/books/*.txt），逐句核验过原文，
@@ -41,7 +43,7 @@ export const READ_STEPS = [
   { n: 3, name: '切意群', desc: '按语块边界（介词短语 / 从句 / 非谓语）切开，一块一块理解' },
 ] as const;
 
-export const SENTENCE_LAB: ISentenceLabItem[] = [
+const SENTENCE_LAB_BOOKS: ISentenceLabItem[] = [
   // ═══════════════ 入门：主干清晰，只有一层修饰 ═══════════════
   {
     id: 's01',
@@ -435,3 +437,6 @@ export const SENTENCE_LAB: ISentenceLabItem[] = [
     ],
   },
 ];
+
+/** 书籍语料 + 演讲语料（按来源分文件，便于继续扩） */
+export const SENTENCE_LAB: ISentenceLabItem[] = [...SENTENCE_LAB_BOOKS, ...SENTENCE_LAB_EXTRA];

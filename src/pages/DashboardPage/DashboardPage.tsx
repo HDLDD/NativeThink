@@ -248,6 +248,7 @@ export default function DashboardPage() {
         '/favorites': '我的收藏',
         '/writing': 'AI 写作练习',
         '/spelling': '句子拼写',
+        '/cet': '四六级备考',
         '/progress': '学习记录',
       };
       if (parsed?.path && labels[parsed.path] && Date.now() - (parsed.ts || 0) < 14 * 24 * 3600 * 1000) {
