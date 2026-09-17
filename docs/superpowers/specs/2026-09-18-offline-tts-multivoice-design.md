@@ -44,41 +44,54 @@ App 已内置离线朗读引擎（sherpa-onnx + Piper VITS），但因三层硬�
 
 ## 2. 模型与音色选型（已实测验证）
 
-### 选定：`csukuangfj/kokoro-multi-lang-v1_0`
+### 选定：`csukuangfj/kokoro-int8-multi-lang-v1_1`（int8 量化）
 
 | 文件 | 体积 | 用途 |
 |---|---|---|
-| `model.onnx` | 310.5MB | 主模型 |
-| `voices.bin` | 26.9MB | 音色嵌入表（54 个音色） |
+| `model.int8.onnx` | 109.0MB | 主模型（int8 量化） |
+| `voices.bin` | 51.3MB | 音色嵌入表（103 个音色） |
 | `lexicon-us-en.txt` | 5.7MB | 美音发音词典 |
-| `espeak-ng-data/` | 17.2MB | 音素化数据（363 个文件） |
-| `tokens.txt` | ~0.7KB | 词表 |
-| **合计（仅英文）** | **360.6MB** | 剥离中文资产后 |
+| `tokens.txt` | ~0.5KB | 词表 |
+| `espeak-ng-data/` | **0** | 与 Piper 自带的那份逐文件相同，复用 |
+| **合计新增** | **166.0MB** | |
 
-输出采样率 **24000Hz**，单模型含 54 个音色。
+输出采样率 **24000Hz**。
 
-### 为什么不用 int8 版（v1.1）
+### 体积预算的约束（决定了选型）
 
-镜像上有体积更小的 `kokoro-int8-multi-lang-v1_1`（int8，全量 205MB），但**已排除**，理由是实测得出的：
+主模型占新增体积的 **86%**，是唯一有意义的杠杆。**降低音色数量省不下任何空间**——`voices.bin` 与模型大小无关，speakerId 只是数组下标，砍到 3 个音色仍是 360.6MB。所以只能换更小的模型。
 
-speakerId 是 `voices.bin` 里的数组下标，映射错了会读成别人的声音。为验证能否沿用 v1.0 的映射，下载了两个版本做字节比对：
+espeak-ng-data 复用产生额外节省：实测 Kokoro 的 `espeak-ng-data/` 与 Piper 自带的那份**逐文件 SHA-1 完全一致**（355 个文件全部匹配，`phondata`/`phontab`/`phonindex` 逐字节相同），故只保留一份。这是从 187.7MB 降到 166.0MB 的关键。
 
-| 版本 | voices.bin 体积 | 音色数 | 每音色 522240 字节 |
+### 体积对照
+
+| 方案 | 主模型 | 新增体积 | 相对 |
 |---|---|---|---|
-| v1.0 | 28200960 | 54 | 54 × 522240 = 28200960 ✓ |
-| v1.1 | 53790720 | 103 | 103 × 522240 = 53790720 ✓ |
+| ~~kokoro-multi-lang-v1_0（fp32）~~ | 310.5MB | 360.6MB | 基准 |
+| **kokoro-int8-multi-lang-v1_1** | **109.0MB** | **166.0MB** | **−54%** |
 
-比对结果：**v1.0 的 54 个音色嵌入在 v1.1 中一个都找不到**（按 SHA-1 指纹逐块比对）。两版是**独立训练的音色库**，v1.1 并非在 v1.0 基础上追加或重排。
+### 为什么接受 int8 带来的代价
 
-v1.1 的 103 个音色顺序没有可靠公开来源（其仓库 README 仅一句介绍，sherpa 文档也未给出配置与 speaker 表），无法静态确定映射。而 v1.0 的音色表由 sherpa 官方脚本 `generate_voices_bin.py` 从 `Kokoro-82M/voices` 生成，ID 映射在 sherpa 文档中公开，可信。
+int8 量化会与 fp32 存在轻微音质差异（本方案选 int8 纯粹出于体积约束）。取舍如下：
 
-**取舍**：多付 175MB，换取映射可信。若日后 v1.1 映射得到确认，可切过去省下这笔体积。
+| 维度 | fp32 v1.0 | int8 v1.1 |
+|---|---|---|
+| speakerId 映射来源 | sherpa 官方文档公开的 speaker 表 | **无可靠公开来源**（v1.1 仓库 README 仅一句介绍） |
+| 音色嵌入 | 与 v1.1 非同一套（见下） | 需真机试听确定 |
+| 音质 | 基准 | 量化，待真机确认 |
+| 新增体积 | 360.6MB | 166.0MB |
+
+**两版音色库互不相同**：为验证能否沿用 v1.0 的映射，下载两版 `voices.bin` 做字节比对（每音色 522240 字节，v1.0 = 54 × 522240 = 28200960，v1.1 = 103 × 522240 = 53790720，均整除吻合）。按 SHA-1 逐块比对，**v1.0 的 54 个音色嵌入在 v1.1 中一个都找不到**——两版是独立训练的音色库，非追加或重排。
+
+因此 v1.1 的 11 个英文音色 speakerId **必须在真机上逐个试听确认**（见 §6.2）。这是本方案唯一的未验证假设，已明确记录。
+
+> 音色命名沿用 Kokoro 官方规范 `<语种><性别>_<名字>`：`af_bella` = American English / female / bella。故 v1.1 的英文音色命名与 v1.0 相同，只是数组下标可能不同。
 
 ### 音色清单（11 个）
 
-speakerId 来自 sherpa-onnx 官方文档的 v1_0 speaker 表：
+speakerId 取自 v1.0 公开表作为**初始猜测值**，待真机试听校准（§6.2）。若试听发现名不符实，改 `manifest.json` 的 `speakerId` 即可，无需改代码。
 
-| speakerId | 音色名 | 性别 | 口音 | 定位 |
+| 初始 speakerId | 音色名 | 性别 | 口音 | 定位 |
 |---|---|---|---|---|
 | 2 | af_bella | 女 | 美音 | 温暖亲切 |
 | 3 | af_heart | 女 | 美音 | 柔和自然 |
@@ -94,13 +107,13 @@ speakerId 来自 sherpa-onnx 官方文档的 v1_0 speaker 表：
 
 **英音价值**：`src/lib/tts-voice-catalog.ts` 的 Edge 在线目录已在区分美音/英音/澳音，但**本地音色此前一个英音都没有**。这两个填补空白。
 
-**默认音色** `af_sarah`（清晰标准，适合学习场景）。
+**默认音色** `af_sarah`。
 
-> `af` 单名音色属于 `kokoro-en-v0_19` 模型（11 音色，另一套 ID），本方案的 v1_0 多语模型中不存在，故不列。
+> `af` 单名音色属于 `kokoro-en-v0_19` 模型（另一套 ID），本方案的多语模型中不存在，故不列。
 
 ### 兜底音色
 
-保留现有 `vits-piper-en_US-lessac-medium`（22050Hz，已验证真机可跑），作为 Kokoro 不可用时的自动回退。不增加包体积（本来就在包里）。
+保留现有 `vits-piper-en_US-lessac-medium`（22050Hz，已验证真机可跑），作为 Kokoro 不可用时的自动回退。不增加包体积（本来就在包里），且其 espeak 数据被 Kokoro 复用。
 
 ## 3. 架构
 
@@ -134,17 +147,18 @@ speakerId 来自 sherpa-onnx 官方文档的 v1_0 speaker 表：
   "version": 1,
   "models": [
     {
-      "id": "kokoro-v1_0",
+      "id": "kokoro-v1_1",
       "kind": "kokoro",
-      "dir": "tts/kokoro-multi-lang-v1_0",
-      "model": "model.onnx",
+      "dir": "tts/kokoro-int8-multi-lang-v1_1",
+      "model": "model.int8.onnx",
       "voices": "voices.bin",
       "tokens": "tokens.txt",
-      "dataDir": "espeak-ng-data",
+      "dataDir": "piper/vits-piper-en_US-lessac-medium",
+      "comment-dataDir": "espeak-ng-data 的父目录 —— 与 lessac 共享同一份，不重复打包",
       "lexicon": "lexicon-us-en.txt",
       "lang": "en-us",
       "sampleRate": 24000,
-      "numSpeakers": 54,
+      "numSpeakers": 103,
       "bundled": true
     },
     {
@@ -161,27 +175,27 @@ speakerId 来自 sherpa-onnx 官方文档的 v1_0 speaker 表：
   ],
   "voices": [
     { "id": "kokoro:af_bella", "name": "Bella", "gender": "female", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 2, "note": "温暖亲切" },
+      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 2, "note": "温暖亲切" },
     { "id": "kokoro:af_heart", "name": "Heart", "gender": "female", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 3, "note": "柔和自然" },
+      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 3, "note": "柔和自然" },
     { "id": "kokoro:af_nicole", "name": "Nicole", "gender": "female", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 6, "note": "轻柔低语" },
+      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 6, "note": "轻柔低语" },
     { "id": "kokoro:af_sarah", "name": "Sarah", "gender": "female", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 9, "note": "清晰标准" },
+      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 9, "note": "清晰标准" },
     { "id": "kokoro:af_sky", "name": "Sky", "gender": "female", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 10, "note": "年轻活泼" },
+      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 10, "note": "年轻活泼" },
     { "id": "kokoro:am_adam", "name": "Adam", "gender": "male", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 11, "note": "沉稳" },
+      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 11, "note": "沉稳" },
     { "id": "kokoro:am_michael", "name": "Michael", "gender": "male", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 16, "note": "自然" },
+      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 16, "note": "自然" },
     { "id": "kokoro:am_puck", "name": "Puck", "gender": "male", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 18, "note": "活泼" },
+      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 18, "note": "活泼" },
     { "id": "kokoro:am_santa", "name": "Santa", "gender": "male", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 19, "note": "低沉厚重" },
+      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 19, "note": "低沉厚重" },
     { "id": "kokoro:bf_emma", "name": "Emma", "gender": "female", "accent": "英音",
-      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 21, "note": "标准英音" },
+      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 21, "note": "标准英音" },
     { "id": "kokoro:bm_george", "name": "George", "gender": "male", "accent": "英音",
-      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 26, "note": "沉稳英音" },
+      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 26, "note": "沉稳英音" },
     { "id": "piper:lessac", "name": "Lessac", "gender": "female", "accent": "美音",
       "tier": "local", "modelId": "piper-lessac", "speakerId": 0, "note": "经典音色" }
   ]
@@ -255,20 +269,31 @@ getSherpaStatus(): ISherpaStatus        // 扩展返回 numSpeakers / loadedMode
 新增 Kokoro 拉取，**按白名单只取英文所需文件**：
 
 ```
-model.onnx, voices.bin, tokens.txt, lexicon-us-en.txt, espeak-ng-data/**
+model.int8.onnx, voices.bin, tokens.txt, lexicon-us-en.txt
 ```
 
-剥离（省 31.3MB，英语学习用不到）：`dict/`（13.9MB）、`lexicon-zh.txt`（2.3MB）、`lexicon-gb-en.txt`（6.1MB）、`*zh.fst`（0.3MB）。
+不取（各有理由）：
 
-> 注意：v1.0 的 `espeak-ng-data/` 与 Piper 音色自带的是同一份数据。若校验一致，可只保留一份（省 17.2MB）；不一致则各自保留。此项在实现时实测决定。
+| 不取的文件 | 体积 | 理由 |
+|---|---|---|
+| `espeak-ng-data/` | 17.2MB | 与 Piper 自带那份逐文件 SHA-1 相同（已实测 355 个文件全部匹配），共享同一份 |
+| `dict/` | 13.9MB | 中文分词，英文用不到 |
+| `lexicon-gb-en.txt` | 6.1MB | 英音词典，espeak 可接管；若真机发现英音不标准再加回 |
+| `lexicon-zh.txt` + `*zh.fst` | 2.3MB | 中文，用不到 |
+
+> 共享 espeak 的实现方式：manifest 里 Kokoro 的 `dataDir` 指向 `piper/vits-piper-en_US-lessac-medium`（espeak-ng-data 的父目录），与 lessac 音色复用同一份数据。前提是 Piper 音色已就位 —— 拉取顺序须保证 Piper 在前。
+
+`model.int8.onnx` 有 109MB，下载需用流式写入（`Readable.fromWeb`）而非先 `arrayBuffer()` 全量读进内存；现有脚本对 63MB 模型用的是后者，这里要改。
 
 ### 4.2 APK 体积
 
-| 项 | 体积 |
-|---|---|
-| 现有 APK | 720MB |
-| 新增 Kokoro（仅英文） | +360.6MB |
-| **预计合计** | **约 1080MB** |
+| 项 | 体积 | 说明 |
+|---|---|---|
+| 现有 APK | 720MB | |
+| 新增 Kokoro | +166.0MB | 原方案 360.6MB，砍 54% |
+| **预计合计** | **约 886MB** | |
+
+体积构成：`model.int8.onnx` 109.0MB + `voices.bin` 51.3MB + `lexicon-us-en.txt` 5.7MB + `tokens.txt` ≈0。
 
 已在 `android/app/build.gradle` 限制 `abiFilters 'arm64-v8a', 'armeabi-v7a'`（省约 42MB），继续沿用。
 
@@ -276,7 +301,7 @@ model.onnx, voices.bin, tokens.txt, lexicon-us-en.txt, espeak-ng-data/**
 
 Play 渠道的 APK 体积上限是 200MB，本方案远超，故**这条路只适用于本地直装**（现有 APK 已有 720MB，同样如此，不改变分发方式）。
 
-运行时额外占用：模型摊到 `filesDir` 约 361MB，加上已有的 878MB 书籍模型，内部存储需预留约 1.3GB。
+运行时额外占用：模型摊到 `filesDir` 约 166MB，加上已有的 878MB 书籍模型，内部存储需预留约 1.1GB。
 
 ## 5. 错误处理
 
@@ -301,14 +326,26 @@ Play 渠道的 APK 体积上限是 200MB，本方案远超，故**这条路只�
 
 本环境无法运行安卓，故以下为交付给用户的步骤：
 
-1. **音色映射人工确认（关键）**：设置页逐个试听 11 个音色，确认标注与实际听感一致（如 `af_bella` 确实是女声、`bm_george` 确实是英音男声）。这是唯一无法静态验证的点——字节比对已排除版本错误，但"ID 9 听起来确实是清晰女声"只能靠耳朵。
-2. **采样率核验**：设置页应显示 24000Hz
-3. **长文本连续朗读**：确认换音色后不串音（验证缓存 key 修复）
-4. **冷启动加载耗时**：Kokoro 310MB 模型首次加载，记录耗时是否可接受
+1. **音色映射人工确认（最关键）**：设置页逐个试听 11 个音色，确认标注与实际听感一致（如 `af_bella` 确实是女声、`bm_george` 确实是英音男声）。这是本方案唯一的未验证假设——v1.0 与 v1.1 音色库非同一套（已实测），初始 speakerId 取自 v1.0 公开表，需靠耳朵校准。
+2. **int8 音质确认**：与 lessac（未量化，22050Hz）对比同一句，确认清晰度可接受、无明显机械感或杂音。若不可接受，退回 fp32 v1.0（+194.6MB）或只保留 lessac。
+3. **采样率核验**：设置页应显示 24000Hz
+4. **换音色不串音**：同一句话用不同音色播，确认音频未命中错误缓存（验证缓存 key 修复）
+5. **长文本连续朗读**：整段/整章连续朗读不断流
+6. **冷启动加载耗时**：109MB 模型首次加载，记录耗时是否可接受
 
 ### 6.3 若映射不符的处理
 
-若试听发现某 speakerId 名不符实：改 manifest 的 `speakerId` 后重装即可，无需改代码。若整体错位，说明 v1.0 文档表与实际 `voices.bin` 有偏差，则退回"只启用听感确认过的音色"，并把其余标注为待验证。
+若试听发现某 speakerId 名不符实：改 `manifest.json` 的 `speakerId` 后重装即可，**无需改代码**。
+
+若大面积错位（说明 v1.1 音色顺序与 v1.0 表差异很大），处理顺序：
+
+1. 先按听感重新标定：11 个音色逐个试听，把"实际听到的性别/口音"与名字对齐后改 `speakerId`
+2. 若某个期望的音色（如英音）在 103 个音色中找不到对应，则把音色数减到已确认的那些
+3. 兜底：**lessac 始终可用**，即使 Kokoro 全部音色都标不准，朗读功能不受影响
+
+### 6.4 回退到 fp32 的路径
+
+若 int8 音质或映射问题无法接受，切回 `kokoro-multi-lang-v1_0` 只需改两处：`fetch-android-tts.cjs` 的仓库名与 `manifest.json` 的 `model` / `dir` / `numSpeakers`。代价是新增体积从 166.0MB 回到 360.6MB（APK 约 1080MB）。
 
 ## 7. 影响文件
 
@@ -320,13 +357,15 @@ Play 渠道的 APK 体积上限是 200MB，本方案远超，故**这条路只�
 | `src/lib/tts-voice-catalog.ts` | 增补 `KOKORO_VOICES` |
 | `src/lib/use-tts.ts` | piper 档位传 voiceId |
 | `src/components/TTSSettings.tsx` | 音色分组下拉 + 试听 |
-| `scripts/fetch-android-tts.cjs` | Kokoro 拉取 + 白名单 |
-| `android/app/src/main/assets/tts/kokoro-multi-lang-v1_0/**` | 新增（构建产物，gitignore） |
+| `scripts/fetch-android-tts.cjs` | Kokoro 拉取 + 白名单 + 流式下载大文件 |
+| `android/app/src/main/assets/tts/kokoro-int8-multi-lang-v1_1/**` | 新增（构建产物，gitignore） |
 | `ROADMAP.md` | 更新朗读引擎现状 |
 
 ## 8. 参考
 
-- [sherpa-onnx Kokoro 模型文档](https://k2-fsa.github.io/sherpa/onnx/tts/pretrained_models/kokoro.html) —— 音色 ID 表与配置参数来源
+- [sherpa-onnx Kokoro 模型文档](https://k2-fsa.github.io/sherpa/onnx/tts/pretrained_models/kokoro.html) —— speaker 表与配置参数来源（v1_0 部分；v1_1 无对应文档）
 - [sherpa-onnx tts-models 发布页](https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models)
 - [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) —— 上游模型
-- `csukuangfj/kokoro-multi-lang-v1_0`（hf-mirror）—— 本方案采用的仓库
+- [hexgrad/Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh) —— v1.1 上游
+- `csukuangfj/kokoro-int8-multi-lang-v1_1`（hf-mirror）—— **本方案采用的仓库**
+- `csukuangfj/kokoro-multi-lang-v1_0`（hf-mirror）—— 回退备选（fp32，官方有文档）
