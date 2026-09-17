@@ -13,6 +13,13 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+
+// 硬链接式复制：Electron 运行时 ~200MB、离线模型 ~750MB，真拷贝占掉大部分打包时间
+const require_ = createRequire(import.meta.url);
+const { copyTree } = require_('./lib/link-copy.cjs');
+// --skip-web：web 产物已由外部构建好（拆分打包时避免重复构建一遍）
+const SKIP_WEB = process.argv.includes('--skip-web');
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const OUT = path.join(root, 'release', 'NativeThink-win32-x64');
@@ -58,15 +65,19 @@ function collectDeps(entries) {
   return [...resolved];
 }
 
-console.log('[1/6] building web app...');
-run('npm run build:web');
+if (SKIP_WEB) {
+  console.log('[1/6] 跳过 web 构建（--skip-web，复用已有 dist/client）');
+} else {
+  console.log('[1/6] building web app...');
+  run('npm run build:web');
+}
 
 console.log('[2/6] preparing output directory...');
 rmrf(OUT);
 fs.mkdirSync(APP, { recursive: true });
 
 console.log('[3/6] copying Electron runtime...');
-copy(path.join(root, 'node_modules', 'electron', 'dist'), OUT);
+copyTree(path.join(root, 'node_modules', 'electron', 'dist'), OUT, { label: 'Electron 运行时' });
 fs.renameSync(path.join(OUT, 'electron.exe'), path.join(OUT, `${APP_NAME}.exe`));
 
 console.log('[4/6] copying app bundle...');
@@ -77,12 +88,12 @@ if (fs.existsSync(path.join(root, 'icon.ico'))) {
 for (const dir of ['electron', 'server', 'functions']) {
   copy(path.join(root, dir), path.join(APP, dir));
 }
-copy(path.join(root, 'dist', 'client'), path.join(APP, 'dist', 'client'));
+copyTree(path.join(root, 'dist', 'client'), path.join(APP, 'dist', 'client'), { label: 'web 产物 → 桌面版' });
 
 // 离线小模型（可选 — 存在时才打包，APK/桌面内置后零下载）
 if (fs.existsSync(path.join(root, 'models-bundled'))) {
-  console.log('[4.5/6] copying bundled offline model (~750MB)...');
-  copy(path.join(root, 'models-bundled'), path.join(APP, 'models-bundled'));
+  console.log('[4.5/6] linking bundled offline model (~750MB)...');
+  copyTree(path.join(root, 'models-bundled'), path.join(APP, 'models-bundled'), { label: '离线模型 → 桌面版' });
 }
 
 console.log('[5/6] copying production dependencies...');

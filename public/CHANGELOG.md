@@ -112,6 +112,10 @@
 
 
 
+
+## 2026-09-17
+- fix(tts): 内置引擎崩溃真凶 —— OfflineTts 的 assetManager 传了非 null，导致走 assets 分支解析文件路径 (`841eaf2`)
+
 ## 2026-09-17
 - fix(tts): 修掉闪退护栏自身的漏洞 + 新增开发路线文档 (`503b6fa`)
 
