@@ -325,17 +325,31 @@ model.int8.onnx, voices.bin, tokens.txt, lexicon-us-en.txt
 
 `model.int8.onnx` 有 109MB，下载需用流式写入（`Readable.fromWeb`）而非先 `arrayBuffer()` 全量读进内存；现有脚本对 63MB 模型用的是后者，这里要改。
 
-### 4.2 APK 体积
+### 4.2 APK 体积（实测）
 
 | 项 | 体积 | 说明 |
 |---|---|---|
-| 现有 APK | 720MB | |
-| 新增 Kokoro | +166.0MB | 原方案 360.6MB，砍 54% |
-| **预计合计** | **约 886MB** | |
+| 上一版 APK（实测） | 687MB | `ls` 实测 719947994 字节 |
+| **本版 APK（实测）** | **813MB** | |
+| 新增 | **+126MB** | |
 
-体积构成：`model.int8.onnx` 109.0MB + `voices.bin` 51.3MB + `lexicon-us-en.txt` 5.7MB + `tokens.txt` ≈0。
+**关键：不能用磁盘上的文件体积估算 APK 涨幅。** 资产在 APK 内会被压缩，Kokoro 的 166.0MB 在包内只占 **126.3MB**。按未压缩体积估会偏高约 40MB。
+
+包内构成（`node scripts/report-apk-size.cjs` 实测）：
+
+| 目录 | 未压缩 | 包内占用 |
+|---|---|---|
+| `assets/public/models`（离线小模型） | 877.9MB | 541.3MB |
+| `assets/tts/`（Kokoro 多音色） | 166.0MB | 126.3MB |
+| `assets/piper/`（Piper 音色） | 77.4MB | 65.1MB |
+| `assets/public/`其它（web 产物） | 121.4MB | 46.5MB |
+| `lib/`（原生库） | 29.3MB | 29.3MB |
+| 其它 | 9.8MB | 4.2MB |
+| **合计** | **1281.7MB** | **812.8MB** |
 
 已在 `android/app/build.gradle` 限制 `abiFilters 'arm64-v8a', 'armeabi-v7a'`（省约 42MB），继续沿用。
+
+> 附带发现（不在本次范围）：`public/CetThink-mobile.apk`（6.8MB）被当作 web 静态资源打进了 NativeThink 的 APK。这是既有状况，可另做清理。
 
 ### 4.3 存储影响
 
