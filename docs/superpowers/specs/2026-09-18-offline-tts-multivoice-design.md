@@ -89,7 +89,7 @@ int8 量化会与 fp32 存在轻微音质差异（本方案选 int8 纯粹出于
 
 ### 音色清单（11 个）
 
-speakerId 取自 v1.0 公开表作为**初始猜测值**，待真机试听校准（§6.2）。若试听发现名不符实，改 `manifest.json` 的 `speakerId` 即可，无需改代码。
+speakerId 取自 v1.0 公开表作为**初始猜测值**，待真机试听校准（§6.2）。若试听发现名不符实，改 `tts-voice-catalog.ts` 里该音色的 `speakerId` 即可，无需改原生代码。
 
 | 初始 speakerId | 音色名 | 性别 | 口音 | 定位 |
 |---|---|---|---|---|
@@ -138,82 +138,76 @@ speakerId 取自 v1.0 公开表作为**初始猜测值**，待真机试听校准
 └────────────────────────────────────────────────────┘
 ```
 
-### 3.2 音色清单：单一事实来源
+### 3.2 音色清单的归属
 
-新增 `assets/tts/manifest.json`，原生与 JS 都从它读，避免两处各写一份：
+**不引入 manifest.json。** 模型定义硬编码在 Java（2 条），音色元数据归 JS 的音色目录。理由：
 
-```json
-{
-  "version": 1,
-  "models": [
-    {
-      "id": "kokoro-v1_1",
-      "kind": "kokoro",
-      "dir": "tts/kokoro-int8-multi-lang-v1_1",
-      "model": "model.int8.onnx",
-      "voices": "voices.bin",
-      "tokens": "tokens.txt",
-      "dataDir": "piper/vits-piper-en_US-lessac-medium",
-      "comment-dataDir": "espeak-ng-data 的父目录 —— 与 lessac 共享同一份，不重复打包",
-      "lexicon": "lexicon-us-en.txt",
-      "lang": "en-us",
-      "sampleRate": 24000,
-      "numSpeakers": 103,
-      "bundled": true
-    },
-    {
-      "id": "piper-lessac",
-      "kind": "vits",
-      "dir": "piper/vits-piper-en_US-lessac-medium",
-      "model": "en_US-lessac-medium.onnx",
-      "tokens": "tokens.txt",
-      "dataDir": ".",
-      "sampleRate": 22050,
-      "numSpeakers": 1,
-      "bundled": true
-    }
-  ],
-  "voices": [
-    { "id": "kokoro:af_bella", "name": "Bella", "gender": "female", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 2, "note": "温暖亲切" },
-    { "id": "kokoro:af_heart", "name": "Heart", "gender": "female", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 3, "note": "柔和自然" },
-    { "id": "kokoro:af_nicole", "name": "Nicole", "gender": "female", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 6, "note": "轻柔低语" },
-    { "id": "kokoro:af_sarah", "name": "Sarah", "gender": "female", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 9, "note": "清晰标准" },
-    { "id": "kokoro:af_sky", "name": "Sky", "gender": "female", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 10, "note": "年轻活泼" },
-    { "id": "kokoro:am_adam", "name": "Adam", "gender": "male", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 11, "note": "沉稳" },
-    { "id": "kokoro:am_michael", "name": "Michael", "gender": "male", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 16, "note": "自然" },
-    { "id": "kokoro:am_puck", "name": "Puck", "gender": "male", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 18, "note": "活泼" },
-    { "id": "kokoro:am_santa", "name": "Santa", "gender": "male", "accent": "美音",
-      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 19, "note": "低沉厚重" },
-    { "id": "kokoro:bf_emma", "name": "Emma", "gender": "female", "accent": "英音",
-      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 21, "note": "标准英音" },
-    { "id": "kokoro:bm_george", "name": "George", "gender": "male", "accent": "英音",
-      "tier": "local", "modelId": "kokoro-v1_1", "speakerId": 26, "note": "沉稳英音" },
-    { "id": "piper:lessac", "name": "Lessac", "gender": "female", "accent": "美音",
-      "tier": "local", "modelId": "piper-lessac", "speakerId": 0, "note": "经典音色" }
-  ]
+- speakerId 本来就要由 JS 跨端传给原生（一次调用一个音色，不是批量解析），原生无需知道完整音色表
+- 引入 manifest 要新增 JSON schema、Java 侧解析、一个新资产文件——这些复杂度换不到减少一处真实重复
+- 每个事实各居一处，不存在漂移：模型路径只在 Java，音色→speakerId 只在 JS 目录
+- 与项目现有约定一致：`tts-voice-catalog.ts` 已经在承担"音色目录"这个职责（Edge 音色就在里面），本地音色是同一职责的自然延伸
+
+**JS 侧**（`src/lib/tts-voice-catalog.ts`）新增 `KOKORO_VOICES`，每条含 `voiceId` / 显示名 / 性别 / 口音 / `modelId` / `speakerId`：
+
+```ts
+export interface ILocalVoice {
+  /** 传给 sherpaSpeak 的 voiceId，形如 kokoro:af_sarah */
+  id: string;
+  name: string;
+  gender: 'female' | 'male';
+  accent: '美音' | '英音';
+  /** 原生侧模型注册表的 key */
+  modelId: 'kokoro-v1_1' | 'piper-lessac';
+  /** voices.bin 里的数组下标 */
+  speakerId: number;
+  /** 一句定位描述，设置页显示 */
+  note: string;
 }
+
+export const KOKORO_VOICES: ILocalVoice[] = [
+  { id: 'kokoro:af_bella',  name: 'Bella',  gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 2,  note: '温暖亲切' },
+  { id: 'kokoro:af_heart',  name: 'Heart',  gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 3,  note: '柔和自然' },
+  { id: 'kokoro:af_nicole', name: 'Nicole', gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 6,  note: '轻柔低语' },
+  { id: 'kokoro:af_sarah',  name: 'Sarah',  gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 9,  note: '清晰标准' },
+  { id: 'kokoro:af_sky',    name: 'Sky',    gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 10, note: '年轻活泼' },
+  { id: 'kokoro:am_adam',   name: 'Adam',   gender: 'male',   accent: '美音', modelId: 'kokoro-v1_1', speakerId: 11, note: '沉稳' },
+  { id: 'kokoro:am_michael',name: 'Michael',gender: 'male',   accent: '美音', modelId: 'kokoro-v1_1', speakerId: 16, note: '自然' },
+  { id: 'kokoro:am_puck',   name: 'Puck',   gender: 'male',   accent: '美音', modelId: 'kokoro-v1_1', speakerId: 18, note: '活泼' },
+  { id: 'kokoro:am_santa',  name: 'Santa',  gender: 'male',   accent: '美音', modelId: 'kokoro-v1_1', speakerId: 19, note: '低沉厚重' },
+  { id: 'kokoro:bf_emma',   name: 'Emma',   gender: 'female', accent: '英音', modelId: 'kokoro-v1_1', speakerId: 21, note: '标准英音' },
+  { id: 'kokoro:bm_george', name: 'George', gender: 'male',   accent: '英音', modelId: 'kokoro-v1_1', speakerId: 26, note: '沉稳英音' },
+];
+
+/** 兜底音色 —— Kokoro 不可用时自动回退 */
+export const FALLBACK_VOICE: ILocalVoice = {
+  id: 'piper:lessac', name: 'Lessac', gender: 'female', accent: '美音',
+  modelId: 'piper-lessac', speakerId: 0, note: '经典音色',
+};
+
+/** 默认音色（未选择时使用） */
+export const DEFAULT_LOCAL_VOICE_ID = 'kokoro:af_sarah';
 ```
 
-表中 11 个 `kokoro:*` 音色对应 §2 音色清单，另加 1 个 `piper:lessac` 兜底音色（不计入 11 个）。默认音色 `kokoro:af_sarah`。
+**原生侧**（`SherpaTtsPlugin.java`）模型注册表，2 条硬编码：
 
-JS 侧 `src/lib/tts-voice-catalog.ts` 增补 `KOKORO_VOICES`，id 形如 `kokoro:af_sarah`，与既有 `srv:edge:*` 命名风格一致，可并存于同一个 `<Select>`。
+```java
+// 模型 key → 配置。kind 决定走哪个 OfflineTtsXxxModelConfig
+private static final String MODEL_KOKORO = "kokoro-v1_1";
+private static final String MODEL_LESSAC = "piper-lessac";
+```
+
+`speak` 接收 `voiceId` 对应的 `modelId` + `speakerId`，按 `modelId` 懒加载对应引擎。
+
+> 跨端传的是 `modelId` 字符串而非数组下标，避免两侧枚举顺序差异导致加载错模型；未知 `modelId` 直接拒绝。
 
 ### 3.3 原生插件改造
 
 | 改动 | 说明 |
 |---|---|
-| 模型注册表 | 由 manifest 驱动，取代 `ASSET_VOICE_DIR` 常量；每个模型持有独立 `OfflineTts` 实例 |
+| 模型注册表 | 取代 `ASSET_VOICE_DIR` 常量：`modelId` → 配置的映射，每个模型持有独立 `OfflineTts` 实例 |
 | 摊包路径 | `filesDir/<model.dir>`，沿用现有 `copyAssets` 逻辑与"已存在且大小一致则跳过"判断 |
 | 懒加载 | 首次用到某模型才加载，避免冷启动同时加载两个引擎吃内存 |
-| `speak` 参数 | 新增 `voiceId`，插件由 manifest 解析出 `modelId` + `speakerId` |
+| `speak` 参数 | 新增 `modelId` + `speakerId`（由 JS 侧的 voiceId 解析后传入） |
 | 缓存 key | 现为 `sha1(text + "\|" + speed)` → 改为 `sha1(voiceId + "\|" + text + "\|" + speed)`。**现有代码换音色会串音，这是必须修的 bug** |
 | `status` | 增加 `numSpeakers`、`loadedModels`，让设置页能显示真实可用音色数 |
 | 引擎配置 | Kokoro 走 `OfflineTtsKokoroModelConfig`；注意其 8 个字符串参数均为 Kotlin 非空类型，无值须传 `""` 而非 `null`（此前踩过 NPE 坑） |
@@ -232,19 +226,65 @@ OfflineTtsKokoroModelConfig(model, voices, tokens, dataDir, lexicon, lang, dictD
 
 Kokoro 参数取值：`model` / `voices` / `tokens` 为绝对路径；`dataDir` 为 `espeak-ng-data` 的**父目录**（与 VITS 的 dataDir 约定一致，见现有注释）；`lexicon` 为 `lexicon-us-en.txt` 绝对路径；`lang` 为 `"en-us"`；`dictDir` 传 `""`（英文不需要 jieba 词典，且非空类型不能传 null）；`lengthScale` 传 `1.0`（语速由 `generate` 的 speed 参数实时控制，不走这里）。
 
+**跨端请求形状**（`speak` 的入参）：
+
+```
+{ text: String, modelId: String, speakerId: Int, speed: Double }
+```
+
+原生按 `modelId` 查注册表取配置并懒加载引擎，把 `speakerId` 原样交给 `tts.generate(text, speakerId, speed)`。未知 `modelId` 直接 `reject`，不静默回退到别的模型——否则会读出错误音色且难以察觉。
+
 ### 3.4 JS API
 
 ```ts
-// 向后兼容：voiceId 省略时用默认音色，旧调用点无需改动
-sherpaSpeak(text: string, opts?: { voiceId?: string; speed?: number })
-sherpaPrewarm(text: string, opts?: { voiceId?: string; speed?: number })
+// 向后兼容：opts 省略时用默认音色，旧调用点无需改动
+// 兼容数字形式的第二参数（历史签名是 speed）
+sherpaSpeak(text: string, opts?: { voiceId?: string; speed?: number } | number)
+  : Promise<{ url: string; durationMs: number; cached: boolean; ms: number }>
+sherpaPrewarm(text: string, opts?: { voiceId?: string; speed?: number } | number): void
 
-// 新增
-listLocalVoices(): ILocalVoice[]        // 从 catalog 读，含 speakerId
-getSherpaStatus(): ISherpaStatus        // 扩展返回 numSpeakers / loadedModels
+// 新增（定义在 tts-voice-catalog.ts；sherpa-tts.ts 转发，避免设置页多引一个模块）
+listLocalVoices(): ILocalVoice[]
+getSherpaStatus(): ISherpaStatus
+```
+
+```ts
+export interface ISherpaSpeakResult {
+  path: string;
+  bytes: number;
+  durationMs: number;
+  cached: boolean;
+  ms: number;
+}
+
+export interface ISherpaLoadedModel {
+  modelId: string;
+  sampleRate: number;
+  numSpeakers: number;
+}
+
+export interface ISherpaStatus {
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  error: string | null;
+  sampleRate: number;
+  cached: number;
+  route?: string | null;
+  loadedModels?: ISherpaLoadedModel[];   // 新增：已加载的模型与各自能力
+  errorByModel?: Record<string, string>; // 新增：按模型记失败原因（Kokoro 失败不影响 lessac）
+}
 ```
 
 `src/lib/use-tts.ts` 的 piper 档位改为携带 `voiceId`（由 `TTSSettings.selectedVoiceURI` 提供），`sherpaPrewarm` 调用点同步传音色。
+
+**音色回退链**（`sherpa-tts.ts` 内实现）：
+
+```
+请求的音色可用        → 用它
+该音色模型加载失败    → 换 FALLBACK_VOICE（lessac）
+lessac 也失败/被护栏停用 → 抛错，交给 use-tts 降级到系统/云端引擎
+```
+
+回退时通过既有 `notifyTtsFailure` 同类的 toast 告知用户，不静默降级换声音。
 
 ### 3.5 数据流
 
@@ -254,7 +294,7 @@ getSherpaStatus(): ISherpaStatus        // 扩展返回 numSpeakers / loadedMode
   → tts-settings 持久化（safeStorage）
   → use-tts 的 speak() 读设置，piper 档位调用 sherpaSpeak(text, {voiceId, speed})
   → sherpa-tts 查 catalog 得 {modelId, speakerId}
-  → 插件 ensureModel(modelId)（懒加载，首次摊包+建引擎）
+  → 插件 ensureModel(modelId)（懒加载，首次摊包 + 建引擎）
   → tts.generate(text, speakerId, speed)
   → WAV 落盘 cacheDir，路径经 convertFileSrc 返回
   → WebView <audio> 播放（播放队列/暂停/续读全部复用现有逻辑）
@@ -281,7 +321,7 @@ model.int8.onnx, voices.bin, tokens.txt, lexicon-us-en.txt
 | `lexicon-gb-en.txt` | 6.1MB | 英音词典，espeak 可接管；若真机发现英音不标准再加回 |
 | `lexicon-zh.txt` + `*zh.fst` | 2.3MB | 中文，用不到 |
 
-> 共享 espeak 的实现方式：manifest 里 Kokoro 的 `dataDir` 指向 `piper/vits-piper-en_US-lessac-medium`（espeak-ng-data 的父目录），与 lessac 音色复用同一份数据。前提是 Piper 音色已就位 —— 拉取顺序须保证 Piper 在前。
+> 共享 espeak 的实现方式：Java 里 Kokoro 的 `dataDir` 指向 `piper/vits-piper-en_US-lessac-medium`（espeak-ng-data 的父目录），与 lessac 音色复用同一份数据。前提是 Piper 音色已就位 —— 拉取顺序须保证 Piper 在前。
 
 `model.int8.onnx` 有 109MB，下载需用流式写入（`Readable.fromWeb`）而非先 `arrayBuffer()` 全量读进内存；现有脚本对 63MB 模型用的是后者，这里要改。
 
@@ -318,7 +358,7 @@ Play 渠道的 APK 体积上限是 200MB，本方案远超，故**这条路只�
 ### 6.1 构建期（本机可执行）
 
 1. `node scripts/fetch-android-tts.cjs` 拉全模型，校验文件数与体积
-2. manifest.json 与 `tts-voice-catalog.ts` 的音色表一致性校验（11 条 id 与 speakerId 逐条比对）
+2. 校验脚本 `scripts/check-tts-voices.cjs` 通过：确认 11 个英文音色的 speakerId 均在 `0..numSpeakers-1` 内、模型资产文件齐全、`modelId` 与 Java 注册表一致
 3. `npm run typecheck` 通过
 4. `npm run package:apk` 出包，确认 APK 体积符合预期
 
@@ -335,7 +375,7 @@ Play 渠道的 APK 体积上限是 200MB，本方案远超，故**这条路只�
 
 ### 6.3 若映射不符的处理
 
-若试听发现某 speakerId 名不符实：改 `manifest.json` 的 `speakerId` 后重装即可，**无需改代码**。
+若试听发现某 speakerId 名不符实：改 `src/lib/tts-voice-catalog.ts` 里该音色的 `speakerId` 后重新打包即可，**无需改原生代码**。
 
 若大面积错位（说明 v1.1 音色顺序与 v1.0 表差异很大），处理顺序：
 
@@ -345,13 +385,13 @@ Play 渠道的 APK 体积上限是 200MB，本方案远超，故**这条路只�
 
 ### 6.4 回退到 fp32 的路径
 
-若 int8 音质或映射问题无法接受，切回 `kokoro-multi-lang-v1_0` 只需改两处：`fetch-android-tts.cjs` 的仓库名与 `manifest.json` 的 `model` / `dir` / `numSpeakers`。代价是新增体积从 166.0MB 回到 360.6MB（APK 约 1080MB）。
+若 int8 音质或映射问题无法接受，切回 `kokoro-multi-lang-v1_0` 只需改三处：`fetch-android-tts.cjs` 的仓库名与白名单、`SherpaTtsPlugin.java` 的模型配置（`model.onnx` + `espeak-ng-data` 路径）、`scripts/check-tts-voices.cjs` 的预期文件清单。代价是新增体积从 166.0MB 回到 360.6MB（APK 约 1080MB）。
 
 ## 7. 影响文件
 
 | 文件 | 改动 |
 |---|---|
-| `android/app/src/main/assets/tts/manifest.json` | 新增 |
+| `scripts/check-tts-voices.cjs` | 新增（音色与资产校验） |
 | `android/app/src/main/java/com/nativethink/app/SherpaTtsPlugin.java` | 模型注册表、speakerId、缓存 key、Kokoro 配置 |
 | `src/lib/sherpa-tts.ts` | 多音色 API，保持旧签名兼容 |
 | `src/lib/tts-voice-catalog.ts` | 增补 `KOKORO_VOICES` |
