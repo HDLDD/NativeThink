@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Heart, Lightbulb, Volume2, Wand2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,12 +24,19 @@ function buildSentence(p: ISentencePattern, values: Record<string, string>): str
  * 句型库 —— 造句的骨架。
  * 左侧选句型，右侧看结构、读思维差异、照着造一句。
  */
-export function PatternLibrary() {
+export function PatternLibrary({ initialPatternId }: { initialPatternId?: string | null }) {
   const [cat, setCat] = useState<string>('全部');
-  const [activeId, setActiveId] = useState(SENTENCE_PATTERNS[0].id);
+  const [activeId, setActiveId] = useState(initialPatternId || SENTENCE_PATTERNS[0].id);
   const [values, setValues] = useState<Record<string, string>>({});
   const { speak } = useTTS();
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
+
+  // 从语法页跳进来时，直接打开对应句型
+  useEffect(() => {
+    if (initialPatternId && SENTENCE_PATTERNS.some((p) => p.id === initialPatternId)) {
+      setActiveId(initialPatternId);
+    }
+  }, [initialPatternId]);
 
   const list = useMemo(
     () => (cat === '全部' ? SENTENCE_PATTERNS : SENTENCE_PATTERNS.filter((p) => p.category === cat)),
