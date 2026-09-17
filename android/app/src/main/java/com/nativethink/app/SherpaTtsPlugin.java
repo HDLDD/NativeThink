@@ -2,6 +2,7 @@ package com.nativethink.app;
 
 import android.content.res.AssetManager;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -24,28 +25,46 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.security.MessageDigest;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 内置离线朗读引擎（sherpa-onnx + Piper VITS 音色）。
+ * 内置离线朗读引擎（sherpa-onnx）。
  *
  * 存在的理由：安卓系统自带的 TTS 引擎在很多机器上「没有安装本地音色」，只能联网合成，
  * 表现为起播慢、随网速波动、偶尔读不出来或只读一半，而且刚读过的句子因为缓存才变快。
  * 本插件把合成完全放在设备内完成（同方案实测 RTF≈0.08，3 秒语音约 250ms 合成完），
  * 与网速彻底无关。
  *
+ * 支持多音色：一个 Kokoro 模型内含 103 个音色，由 JS 侧传 speakerId 选择。
+ * 音色元数据（名字/口音/speakerId 映射）归前端 src/lib/tts-voice-catalog.ts，
+ * 本插件只认 modelId → 配置，不维护音色表。
+ *
  * 设计取舍：
  *  - 只负责「合成」，不负责播放。合成结果落成 WAV 文件返回路径，播放仍由 WebView 端的
  *    <audio> 负责 —— 这样播放队列、暂停/续读、语速微调都能复用现有逻辑。
- *  - 结果按 (文本+语速) 哈希缓存到 cacheDir，重复朗读与预取都直接命中文件。
- *  - 模型与音色放在 assets，首次使用时摊到 filesDir：sherpa-onnx 走真实文件路径最稳，
+ *  - 结果按 (模型+音色+文本+语速) 哈希缓存到 cacheDir，重复朗读与预取都直接命中文件。
+ *    缓存 key 必须含音色，否则换音色会播出上一个音色的音频。
+ *  - 模型放在 assets，首次使用时摊到 filesDir：sherpa-onnx 走真实文件路径最稳，
  *    避免各家 ROM 对 asset 路径处理不一致。
+ *  - 引擎按需加载（Kokoro 109MB，开机即载会拖慢冷启动），已加载的常驻不释放。
  */
 @CapacitorPlugin(name = "SherpaTts")
 public class SherpaTtsPlugin extends Plugin {
 
-    /** assets 下的音色目录（由 scripts/fetch-android-tts.cjs 拉取） */
-    private static final String ASSET_VOICE_DIR = "piper/vits-piper-en_US-lessac-medium";
-    private static final String MODEL_NAME = "en_US-lessac-medium.onnx";
+    // ── 模型注册表 ──
+    // 新增模型时同步更新 scripts/check-tts-voices.cjs 的 MODELS 表，二者必须一致。
+    private static final String MODEL_KOKORO = "kokoro-v1_1";
+    private static final String MODEL_LESSAC = "piper-lessac";
+
+    /** Kokoro：assets/tts/ 下的多音色模型（int8 量化，103 个音色，24000Hz） */
+    private static final String KOKORO_ASSET_DIR = "tts/kokoro-int8-multi-lang-v1_1";
+    /** Piper 兜底音色：assets/piper/ 下（22050Hz，单音色，真机已验证可跑） */
+    private static final String LESSAC_ASSET_DIR = "piper/vits-piper-en_US-lessac-medium";
+
+    /** espeak-ng-data 的父目录 —— Kokoro 复用 Piper 这份数据（实测 355 个文件完全一致），不重复打包 */
+    private static final String SHARED_ESPEAK_PARENT = LESSAC_ASSET_DIR;
 
     private static final String STATE_IDLE = "idle";
     private static final String STATE_LOADING = "loading";
@@ -54,11 +73,16 @@ public class SherpaTtsPlugin extends Plugin {
 
     private volatile String state = STATE_IDLE;
     private volatile String lastError = null;
-    /** 初始化实际走通的路线：assets / files */
+    /** 初始化实际走通的路线（始终为 files：assets 直读曾导致原生层崩溃） */
     private volatile String route = null;
 
-    private OfflineTts tts;
-    private File modelDir;
+    /** 已加载的引擎，按 modelId 索引 */
+    private final Map<String, OfflineTts> engines = new ConcurrentHashMap<>();
+    /** 各模型加载失败原因 —— Kokoro 失败不应掩盖 lessac 的可用性 */
+    private final Map<String, String> modelErrors = new ConcurrentHashMap<>();
+    /** 各模型摊包后的目录（诊断用） */
+    private final Map<String, File> modelDirs = new ConcurrentHashMap<>();
+
     private File wavDir;
     /** 初始化进度日志 —— 原生崩溃接不住，只能靠它定位崩在哪一步 */
     private File progressLog;
@@ -66,9 +90,6 @@ public class SherpaTtsPlugin extends Plugin {
     private final Object synthLock = new Object();
 
     private void ensureDirs() {
-        if (modelDir == null) {
-            modelDir = new File(getContext().getFilesDir(), ASSET_VOICE_DIR);
-        }
         if (wavDir == null) {
             wavDir = new File(getContext().getCacheDir(), "sherpa-tts");
             if (!wavDir.exists()) wavDir.mkdirs();
@@ -112,15 +133,37 @@ public class SherpaTtsPlugin extends Plugin {
 
     private JSObject stateObject() {
         JSObject o = new JSObject();
+        OfflineTts main = engines.get(MODEL_KOKORO);
         o.put("status", state);
         o.put("error", lastError);
-        o.put("sampleRate", tts != null ? tts.sampleRate() : 0);
+        o.put("sampleRate", main != null ? main.sampleRate() : 0);
         o.put("cached", wavDir != null && wavDir.exists() ? wavDir.list().length : 0);
         o.put("route", route);
+
+        // 已加载的模型与各自能力 —— 设置页据此显示「已载 N 个音色 / 采样率」
+        JSArray loaded = new JSArray();
+        for (Map.Entry<String, OfflineTts> e : engines.entrySet()) {
+            JSObject m = new JSObject();
+            m.put("modelId", e.getKey());
+            m.put("sampleRate", e.getValue().sampleRate());
+            m.put("numSpeakers", e.getValue().numSpeakers());
+            loaded.put(m);
+        }
+        o.put("loadedModels", loaded);
+
+        JSObject errs = new JSObject();
+        for (Map.Entry<String, String> e : modelErrors.entrySet()) {
+            errs.put(e.getKey(), e.getValue());
+        }
+        o.put("errorByModel", errs);
+
         try {
-            File model = new File(modelDir, MODEL_NAME);
-            o.put("modelBytes", model.exists() ? model.length() : 0);
-            File espeak = new File(modelDir, "espeak-ng-data");
+            File dir = modelDirs.get(MODEL_KOKORO);
+            if (dir != null) {
+                File model = new File(dir, "model.int8.onnx");
+                o.put("modelBytes", model.exists() ? model.length() : 0);
+            }
+            File espeak = new File(new File(getContext().getFilesDir(), SHARED_ESPEAK_PARENT), "espeak-ng-data");
             o.put("espeakFiles", espeak.isDirectory() && espeak.list() != null ? espeak.list().length : 0);
         } catch (Throwable ignored) { /* 仅诊断用 */ }
         return o;
@@ -134,13 +177,13 @@ public class SherpaTtsPlugin extends Plugin {
     }
 
     /**
-     * 加载引擎（幂等；耗时较长，故放后台线程）。JS 端可提前调用预热。
+     * 预热默认模型（Kokoro）。前端进入阅读/学习页时提前调用。
      *
      * 只能走「摊到内部存储 + 真实文件路径」，原因两条：
      *  1) espeak-ng 用 fopen 读音素数据，assets 里的它读不到 —— 之前试过 assets 直读，
      *     真机实测直接闪退；
      *  2) dataDir 的约定是 espeak-ng-data 的**父目录**：原生库里有 %s/espeak-ng-data
-     *     这个格式串，说明它内部还会再拼一层。传 espeak-ng-data 本身会找不到数据。
+     *     这个格式串，说明它内部还会再拼一层。
      * 另外把 ESPEAK_DATA_PATH 也设上，兜住不同构建的路径约定差异。
      */
     @PluginMethod
@@ -155,38 +198,116 @@ public class SherpaTtsPlugin extends Plugin {
         try { if (progressLog != null && progressLog.exists()) progressLog.delete(); } catch (Throwable ignored) { /* ignore */ }
         new Thread(() -> {
             try {
-                long t0 = System.currentTimeMillis();
-                step("init start; modelDir=" + modelDir);
-                copyAssets(ASSET_VOICE_DIR, modelDir);
-                step("assets copied; modelBytes=" + new File(modelDir, MODEL_NAME).length() + " espeak=" + new File(modelDir, "espeak-ng-data").list().length);
-                // eSpeak 优先读这个环境变量；不是所有 ROM 都允许设置，失败不影响主路径
-                try {
-                    android.system.Os.setenv("ESPEAK_DATA_PATH", modelDir.getAbsolutePath(), true);
-                } catch (Throwable ignored) { /* ignore */ }
-                step("creating engine (newFromFile, cpu)");
-                OfflineTts engine = new OfflineTts(
-                        // 关键：必须传 null！OfflineTts 的构造函数有这个分支：
-                        //   assetManager == null → newFromFile（按真实文件系统路径）
-                        //   assetManager != null → newFromAsset（把路径当 assets 里的名字解析）
-                        // 前面几版一直传 getAssets()，于是 filesDir 的绝对路径被当成 assets 名
-                        // 去查 → 找不到 → 原生层直接崩。这就是「内置引擎崩溃」的真凶。
-                        (AssetManager) null,
-                        buildConfig(
-                                new File(modelDir, MODEL_NAME).getAbsolutePath(),
-                                new File(modelDir, "tokens.txt").getAbsolutePath(),
-                                modelDir.getAbsolutePath()));   // ← espeak-ng-data 的父目录
-                tts = engine;
+                ensureModel(MODEL_KOKORO);
                 route = "files";
                 state = STATE_READY;
                 lastError = null;
-                step("ready in " + (System.currentTimeMillis() - t0) + "ms, sampleRate=" + engine.sampleRate());
             } catch (Throwable t) {
+                // Kokoro 不可用不是致命的 —— lessac 兜底仍能朗读，故不置全局 error 让前端放弃
                 state = STATE_ERROR;
                 lastError = describe(t);
-                step("failed: " + lastError);
             }
+            call.resolve(stateObject());
         }).start();
-        call.resolve(stateObject());
+    }
+
+    /** 一个模型的全部配置 */
+    private static final class ModelDef {
+        final String assetDir;      // assets 下的源目录
+        final String kind;          // "kokoro" | "vits"
+        final String modelFile;
+        final String tokensFile;
+        final String voicesFile;    // kokoro 专用
+        final String lexiconFile;   // kokoro 专用，无则 null
+        final String lang;          // kokoro 专用，无则 null
+        final boolean sharedEspeak; // espeak 数据是否指向共享的 Piper 目录
+
+        ModelDef(String assetDir, String kind, String modelFile, String tokensFile,
+                 String voicesFile, String lexiconFile, String lang, boolean sharedEspeak) {
+            this.assetDir = assetDir;
+            this.kind = kind;
+            this.modelFile = modelFile;
+            this.tokensFile = tokensFile;
+            this.voicesFile = voicesFile;
+            this.lexiconFile = lexiconFile;
+            this.lang = lang;
+            this.sharedEspeak = sharedEspeak;
+        }
+    }
+
+    private static final Map<String, ModelDef> REGISTRY = new HashMap<>();
+    static {
+        REGISTRY.put(MODEL_KOKORO, new ModelDef(
+                KOKORO_ASSET_DIR, "kokoro", "model.int8.onnx", "tokens.txt",
+                "voices.bin", "lexicon-us-en.txt", "en-us", true));
+        REGISTRY.put(MODEL_LESSAC, new ModelDef(
+                LESSAC_ASSET_DIR, "vits", "en_US-lessac-medium.onnx", "tokens.txt",
+                null, null, null, false));
+    }
+
+    /**
+     * 按需加载模型（幂等）。Kokoro 109MB，首次摊包+建引擎需数秒，故调用方一般在后台线程里调。
+     * 已加载的常驻不释放 —— 反复换音色不该反复付加载代价。
+     */
+    private OfflineTts ensureModel(String modelId) throws Exception {
+        ModelDef def = REGISTRY.get(modelId);
+        if (def == null) throw new IllegalArgumentException("unknown_model:" + modelId);
+
+        OfflineTts cached = engines.get(modelId);
+        if (cached != null) return cached;
+
+        // 已经失败过的不再重试（避免每次朗读都白等一次加载超时）
+        String prevErr = modelErrors.get(modelId);
+        if (prevErr != null) throw new IllegalStateException("model_load_failed:" + modelId + ":" + prevErr);
+
+        synchronized (synthLock) {
+            cached = engines.get(modelId);
+            if (cached != null) return cached;
+            try {
+                File dir = new File(getContext().getFilesDir(), def.assetDir);
+                modelDirs.put(modelId, dir);
+                step("ensureModel " + modelId + ": copying assets → " + dir);
+                copyAssets(def.assetDir, dir);
+
+                // 共享 espeak：Kokoro 不打包 espeak-ng-data，靠 Piper 这份数据工作。
+                // 正常流程里 Piper 资产已由 fetch-android-tts.cjs 就位，这里兜住异常情况。
+                File espeakParent;
+                if (def.sharedEspeak) {
+                    File shared = new File(getContext().getFilesDir(), SHARED_ESPEAK_PARENT);
+                    if (!new File(shared, "espeak-ng-data").isDirectory()) {
+                        step("shared espeak missing; copying " + SHARED_ESPEAK_PARENT);
+                        copyAssets(SHARED_ESPEAK_PARENT, shared);
+                    }
+                    espeakParent = shared;
+                } else {
+                    espeakParent = dir;
+                }
+                try {
+                    android.system.Os.setenv("ESPEAK_DATA_PATH", espeakParent.getAbsolutePath(), true);
+                } catch (Throwable ignored) { /* 不是所有 ROM 都允许设置，失败不影响主路径 */ }
+
+                long t0 = System.currentTimeMillis();
+                step("creating engine " + modelId + " kind=" + def.kind);
+                // assetManager 必须传 null！OfflineTts 的构造函数有这个分支：
+                //   assetManager == null → newFromFile（按真实文件系统路径）
+                //   assetManager != null → newFromAsset（把路径当 assets 里的名字解析）
+                // 前面几版一直传 getAssets()，于是 filesDir 的绝对路径被当成 assets 名
+                // 去查 → 找不到 → 原生层直接崩。这就是「内置引擎崩溃」的真凶。
+                OfflineTts engine = new OfflineTts(
+                        (AssetManager) null, buildConfig(getContext(), def, espeakParent));
+                engines.put(modelId, engine);
+                modelErrors.remove(modelId);
+                step("ready " + modelId + " in " + (System.currentTimeMillis() - t0)
+                        + "ms, sampleRate=" + engine.sampleRate()
+                        + " numSpeakers=" + engine.numSpeakers());
+                return engine;
+            } catch (Throwable t) {
+                String msg = describe(t);
+                modelErrors.put(modelId, msg);
+                step("failed " + modelId + ": " + msg);
+                throw new Exception(msg, t);
+            }
+        }
     }
 
     /**
@@ -196,21 +317,45 @@ public class SherpaTtsPlugin extends Plugin {
      * 构造函数里有 Intrinsics.checkNotNullParameter —— 传 null 会立刻抛
      * NullPointerException（前几版「内置引擎加载失败」就是踩了这个：
      * lexicon/dictDir/matcha/kokoro/kitten/ruleFsts/ruleFars 一律要传空值或空实例）。
+     *
+     * Kokoro 的参数顺序不可错位：lang 在 lexicon 之后、dictDir 之前。位置传错会把
+     * 语言当词典路径，加载直接失败。
+     *
+     * @param ctx 用于推导模型自身目录（模型文件都在那里）
+     * @param espeakParent espeak-ng-data 的父目录。共享时为 Piper 音色目录，否则为模型自身目录。
      */
-    private OfflineTtsConfig buildConfig(String modelPath, String tokensPath, String dataDir) {
-        OfflineTtsVitsModelConfig vits = new OfflineTtsVitsModelConfig(
-                modelPath,  // model
-                "",         // lexicon —— 非空，无词典时给空串
-                tokensPath, // tokens
-                dataDir,    // dataDir
-                "",         // dictDir —— 非空，同上
-                0.667f,     // noiseScale
-                0.8f,       // noiseScaleW
-                1.0f);      // lengthScale
+    private static OfflineTtsConfig buildConfig(android.content.Context ctx, ModelDef def, File espeakParent) {
+        File dir = new File(ctx.getFilesDir(), def.assetDir);
+        String dataDirPath = espeakParent.getAbsolutePath();
+
+        OfflineTtsVitsModelConfig vits;
+        OfflineTtsKokoroModelConfig kokoro;
+        if ("kokoro".equals(def.kind)) {
+            vits = new OfflineTtsVitsModelConfig("", "", "", "", "", 0.667f, 0.8f, 1.0f);
+            kokoro = new OfflineTtsKokoroModelConfig(
+                    new File(dir, def.modelFile).getAbsolutePath(),     // model
+                    new File(dir, def.voicesFile).getAbsolutePath(),    // voices
+                    new File(dir, def.tokensFile).getAbsolutePath(),    // tokens
+                    dataDirPath,                                        // dataDir（espeak 父目录）
+                    def.lexiconFile == null ? "" : new File(dir, def.lexiconFile).getAbsolutePath(),
+                    def.lang == null ? "" : def.lang,
+                    "",                                                 // dictDir：中文分词用，英文传空
+                    1.0f);                                              // lengthScale：语速走 generate 的 speed
+        } else {
+            vits = new OfflineTtsVitsModelConfig(
+                    new File(dir, def.modelFile).getAbsolutePath(),
+                    "",
+                    new File(dir, def.tokensFile).getAbsolutePath(),
+                    dataDirPath,
+                    "",
+                    0.667f, 0.8f, 1.0f);
+            kokoro = new OfflineTtsKokoroModelConfig("", "", "", "", "", "", "", 1.0f);
+        }
+
         OfflineTtsModelConfig model = new OfflineTtsModelConfig(
                 vits,
                 new OfflineTtsMatchaModelConfig(),   // 未使用，但必须给空实例
-                new OfflineTtsKokoroModelConfig(),   // 同上
+                kokoro,
                 new OfflineTtsKittenModelConfig(),   // 同上
                 Math.max(2, Runtime.getRuntime().availableProcessors() / 2), // numThreads
                 false,      // debug
@@ -231,33 +376,49 @@ public class SherpaTtsPlugin extends Plugin {
 
     /**
      * 合成一段文本为 WAV。
-     * 参数: { text: string, speed?: number (1.0=原速, 越大越快) }
-     * 返回: { path, bytes, durationMs, cached }
+     * 参数: { text: string, modelId?: string, speakerId?: number, speed?: number (1.0=原速) }
+     * 返回: { path, bytes, durationMs, cached, ms }
      */
     @PluginMethod
     public void speak(PluginCall call) {
         ensureDirs();
         final String text = call.getString("text", "");
+        final String modelId = call.getString("modelId", MODEL_LESSAC);
+        final Integer speakerIdOpt = call.getInt("speakerId", 0);
         Double speedOpt = call.getDouble("speed", 1.0);
         final double speed = speedOpt == null ? 1.0 : speedOpt;
+
         if (text == null || text.trim().isEmpty()) {
             call.reject("empty_text");
             return;
         }
-        if (tts == null) {
-            call.reject("engine_not_ready:" + state + (lastError != null ? ":" + lastError : ""));
+        if (modelId == null || !REGISTRY.containsKey(modelId)) {
+            // 未知模型直接拒绝，不静默换别的模型 —— 否则会读出错误音色且难以察觉
+            call.reject("unknown_model:" + modelId);
             return;
         }
+
         new Thread(() -> {
             try {
-                File wav = new File(wavDir, sha1(text + "|" + speed) + ".wav");
+                OfflineTts engine = ensureModel(modelId);
+
+                final int sid = speakerIdOpt == null ? 0 : speakerIdOpt;
+                int nsp = engine.numSpeakers();
+                if (sid < 0 || sid >= nsp) {
+                    // 越界必须在这里挡住：原生层拿它当数组下标，传下去会直接崩
+                    call.reject("speaker_out_of_range:" + sid + "/" + nsp);
+                    return;
+                }
+
+                // 缓存 key 必须含 modelId 与 speakerId：只按文本+语速缓存会让换音色播出上一个音色
+                File wav = new File(wavDir, sha1(modelId + "|" + sid + "|" + speed + "|" + text) + ".wav");
                 boolean cached = wav.exists() && wav.length() > 1024;
                 long t0 = System.currentTimeMillis();
                 if (!cached) {
                     float[] samples;
                     int sampleRate;
                     synchronized (synthLock) {
-                        GeneratedAudio audio = tts.generate(text, 0, (float) speed);
+                        GeneratedAudio audio = engine.generate(text, sid, (float) speed);
                         samples = audio != null ? audio.getSamples() : null;
                         sampleRate = audio != null ? audio.getSampleRate() : 0;
                     }
