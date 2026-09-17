@@ -1,0 +1,332 @@
+# 离线语音合成 SDK —— 多音色 + 高采样率
+
+日期：2026-09-18
+状态：设计已批准，待实现
+
+## 1. 背景与目标
+
+### 现状
+
+App 已内置离线朗读引擎（sherpa-onnx + Piper VITS），但因三层硬编码而只能发出**一个音色**：
+
+| 位置 | 硬编码内容 |
+|---|---|
+| `android/.../SherpaTtsPlugin.java` | `ASSET_VOICE_DIR = "piper/vits-piper-en_US-lessac-medium"` |
+| 同上 | `tts.generate(text, 0, speed)` —— speakerId 恒为 0 |
+| `src/lib/sherpa-tts.ts` | `sherpaSpeak(text, speed)` —— 无音色概念 |
+
+`OfflineTts` 原生 API 其实支持多说话人（`numSpeakers()` / `generate(text, speakerId, speed)`），只是从未被使用。
+
+### 目标
+
+1. **多音色**：内置 11 个英语音色，覆盖美音/英音、男声/女声
+2. **高采样率**：24000Hz（现为 22050Hz），且**必须是模型原生**，不做插值造假
+3. **音质提升**：换用 Kokoro-82M 模型（250MB 级），自然度高于 Piper medium
+
+### 关于"高采样率"的边界（重要）
+
+采样率是模型训练时烧死的属性，无法通过 SDK 调高：
+
+- 把 22050Hz 插值到 44100Hz 不增加任何声音信息，只让文件大一倍——这是假的高采样率
+- 现实中不存在 44100Hz 的可离线部署 TTS 模型（VITS 系全部训练在 22050Hz）
+- **22050Hz 对语音已到 CD 级**：奈奎斯特频率 11kHz 完整覆盖语音有效频段（基频 + 共振峰）
+
+因此本方案把"高采样率"落实为：
+- 24000Hz 原生输出（较现状 +8.8%）
+- **不经二次重采样**：WAV 严格按 `GeneratedAudio.getSampleRate()` 报告的值写入
+- 16-bit PCM 单声道，与现状一致（已是模型原生精度）
+
+### 非目标
+
+- 不做运行时下载音色包（全部随包内置）
+- 不自己量化模型（用现成产物，避免音质劣化风险）
+- 不支持中文朗读（剥离中文资产，见 §4.1）
+
+## 2. 模型与音色选型（已实测验证）
+
+### 选定：`csukuangfj/kokoro-multi-lang-v1_0`
+
+| 文件 | 体积 | 用途 |
+|---|---|---|
+| `model.onnx` | 310.5MB | 主模型 |
+| `voices.bin` | 26.9MB | 音色嵌入表（54 个音色） |
+| `lexicon-us-en.txt` | 5.7MB | 美音发音词典 |
+| `espeak-ng-data/` | 17.2MB | 音素化数据（363 个文件） |
+| `tokens.txt` | ~0.7KB | 词表 |
+| **合计（仅英文）** | **360.6MB** | 剥离中文资产后 |
+
+输出采样率 **24000Hz**，单模型含 54 个音色。
+
+### 为什么不用 int8 版（v1.1）
+
+镜像上有体积更小的 `kokoro-int8-multi-lang-v1_1`（int8，全量 205MB），但**已排除**，理由是实测得出的：
+
+speakerId 是 `voices.bin` 里的数组下标，映射错了会读成别人的声音。为验证能否沿用 v1.0 的映射，下载了两个版本做字节比对：
+
+| 版本 | voices.bin 体积 | 音色数 | 每音色 522240 字节 |
+|---|---|---|---|
+| v1.0 | 28200960 | 54 | 54 × 522240 = 28200960 ✓ |
+| v1.1 | 53790720 | 103 | 103 × 522240 = 53790720 ✓ |
+
+比对结果：**v1.0 的 54 个音色嵌入在 v1.1 中一个都找不到**（按 SHA-1 指纹逐块比对）。两版是**独立训练的音色库**，v1.1 并非在 v1.0 基础上追加或重排。
+
+v1.1 的 103 个音色顺序没有可靠公开来源（其仓库 README 仅一句介绍，sherpa 文档也未给出配置与 speaker 表），无法静态确定映射。而 v1.0 的音色表由 sherpa 官方脚本 `generate_voices_bin.py` 从 `Kokoro-82M/voices` 生成，ID 映射在 sherpa 文档中公开，可信。
+
+**取舍**：多付 175MB，换取映射可信。若日后 v1.1 映射得到确认，可切过去省下这笔体积。
+
+### 音色清单（11 个）
+
+speakerId 来自 sherpa-onnx 官方文档的 v1_0 speaker 表：
+
+| speakerId | 音色名 | 性别 | 口音 | 定位 |
+|---|---|---|---|---|
+| 2 | af_bella | 女 | 美音 | 温暖亲切 |
+| 3 | af_heart | 女 | 美音 | 柔和自然 |
+| 6 | af_nicole | 女 | 美音 | 轻柔低语 |
+| 9 | af_sarah | 女 | 美音 | 清晰标准（默认） |
+| 10 | af_sky | 女 | 美音 | 年轻活泼 |
+| 11 | am_adam | 男 | 美音 | 沉稳 |
+| 16 | am_michael | 男 | 美音 | 自然 |
+| 18 | am_puck | 男 | 美音 | 活泼 |
+| 19 | am_santa | 男 | 美音 | 低沉厚重 |
+| 21 | bf_emma | 女 | 英音 | 标准英音 |
+| 26 | bm_george | 男 | 英音 | 沉稳英音 |
+
+**英音价值**：`src/lib/tts-voice-catalog.ts` 的 Edge 在线目录已在区分美音/英音/澳音，但**本地音色此前一个英音都没有**。这两个填补空白。
+
+**默认音色** `af_sarah`（清晰标准，适合学习场景）。
+
+> `af` 单名音色属于 `kokoro-en-v0_19` 模型（11 音色，另一套 ID），本方案的 v1_0 多语模型中不存在，故不列。
+
+### 兜底音色
+
+保留现有 `vits-piper-en_US-lessac-medium`（22050Hz，已验证真机可跑），作为 Kokoro 不可用时的自动回退。不增加包体积（本来就在包里）。
+
+## 3. 架构
+
+### 3.1 分层
+
+```
+┌─ 表现层 ────────────────────────────────────────────┐
+│ TTSSettings.tsx   音色分组下拉 + 逐个试听           │
+└────────────────────┬───────────────────────────────┘
+                     │ voiceId
+┌─ SDK 公开 API ─────▼───────────────────────────────┐
+│ src/lib/sherpa-tts.ts                              │
+│   listVoices()  speak(text,{voiceId,speed})        │
+│   prewarm(text,{voiceId,speed})  purgeVoices()     │
+└────────────────────┬───────────────────────────────┘
+                     │ Capacitor 桥
+┌─ 原生 ─────────────▼───────────────────────────────┐
+│ SherpaTtsPlugin.java                               │
+│   · 每模型一个 OfflineTts 实例（Kokoro + lessac）  │
+│   · speakerId 跨端传递                             │
+│   · 缓存 key 含音色维度                            │
+└────────────────────────────────────────────────────┘
+```
+
+### 3.2 音色清单：单一事实来源
+
+新增 `assets/tts/manifest.json`，原生与 JS 都从它读，避免两处各写一份：
+
+```json
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "kokoro-v1_0",
+      "kind": "kokoro",
+      "dir": "tts/kokoro-multi-lang-v1_0",
+      "model": "model.onnx",
+      "voices": "voices.bin",
+      "tokens": "tokens.txt",
+      "dataDir": "espeak-ng-data",
+      "lexicon": "lexicon-us-en.txt",
+      "lang": "en-us",
+      "sampleRate": 24000,
+      "numSpeakers": 54,
+      "bundled": true
+    },
+    {
+      "id": "piper-lessac",
+      "kind": "vits",
+      "dir": "piper/vits-piper-en_US-lessac-medium",
+      "model": "en_US-lessac-medium.onnx",
+      "tokens": "tokens.txt",
+      "dataDir": ".",
+      "sampleRate": 22050,
+      "numSpeakers": 1,
+      "bundled": true
+    }
+  ],
+  "voices": [
+    { "id": "kokoro:af_bella", "name": "Bella", "gender": "female", "accent": "美音",
+      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 2, "note": "温暖亲切" },
+    { "id": "kokoro:af_heart", "name": "Heart", "gender": "female", "accent": "美音",
+      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 3, "note": "柔和自然" },
+    { "id": "kokoro:af_nicole", "name": "Nicole", "gender": "female", "accent": "美音",
+      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 6, "note": "轻柔低语" },
+    { "id": "kokoro:af_sarah", "name": "Sarah", "gender": "female", "accent": "美音",
+      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 9, "note": "清晰标准" },
+    { "id": "kokoro:af_sky", "name": "Sky", "gender": "female", "accent": "美音",
+      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 10, "note": "年轻活泼" },
+    { "id": "kokoro:am_adam", "name": "Adam", "gender": "male", "accent": "美音",
+      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 11, "note": "沉稳" },
+    { "id": "kokoro:am_michael", "name": "Michael", "gender": "male", "accent": "美音",
+      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 16, "note": "自然" },
+    { "id": "kokoro:am_puck", "name": "Puck", "gender": "male", "accent": "美音",
+      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 18, "note": "活泼" },
+    { "id": "kokoro:am_santa", "name": "Santa", "gender": "male", "accent": "美音",
+      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 19, "note": "低沉厚重" },
+    { "id": "kokoro:bf_emma", "name": "Emma", "gender": "female", "accent": "英音",
+      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 21, "note": "标准英音" },
+    { "id": "kokoro:bm_george", "name": "George", "gender": "male", "accent": "英音",
+      "tier": "local", "modelId": "kokoro-v1_0", "speakerId": 26, "note": "沉稳英音" },
+    { "id": "piper:lessac", "name": "Lessac", "gender": "female", "accent": "美音",
+      "tier": "local", "modelId": "piper-lessac", "speakerId": 0, "note": "经典音色" }
+  ]
+}
+```
+
+表中 11 个 `kokoro:*` 音色对应 §2 音色清单，另加 1 个 `piper:lessac` 兜底音色（不计入 11 个）。默认音色 `kokoro:af_sarah`。
+
+JS 侧 `src/lib/tts-voice-catalog.ts` 增补 `KOKORO_VOICES`，id 形如 `kokoro:af_sarah`，与既有 `srv:edge:*` 命名风格一致，可并存于同一个 `<Select>`。
+
+### 3.3 原生插件改造
+
+| 改动 | 说明 |
+|---|---|
+| 模型注册表 | 由 manifest 驱动，取代 `ASSET_VOICE_DIR` 常量；每个模型持有独立 `OfflineTts` 实例 |
+| 摊包路径 | `filesDir/<model.dir>`，沿用现有 `copyAssets` 逻辑与"已存在且大小一致则跳过"判断 |
+| 懒加载 | 首次用到某模型才加载，避免冷启动同时加载两个引擎吃内存 |
+| `speak` 参数 | 新增 `voiceId`，插件由 manifest 解析出 `modelId` + `speakerId` |
+| 缓存 key | 现为 `sha1(text + "\|" + speed)` → 改为 `sha1(voiceId + "\|" + text + "\|" + speed)`。**现有代码换音色会串音，这是必须修的 bug** |
+| `status` | 增加 `numSpeakers`、`loadedModels`，让设置页能显示真实可用音色数 |
+| 引擎配置 | Kokoro 走 `OfflineTtsKokoroModelConfig`；注意其 8 个字符串参数均为 Kotlin 非空类型，无值须传 `""` 而非 `null`（此前踩过 NPE 坑） |
+
+`OfflineTtsConfig` 构造函数签名（已从 AAR 反解确认，**参数顺序必须严格一致**）：
+
+```
+OfflineTtsConfig(model: OfflineTtsModelConfig, ruleFsts: String, ruleFars: String,
+                 maxNumSentences: Int, silenceScale: Float)
+
+OfflineTtsModelConfig(vits, matcha, kokoro, kitten, numThreads: Int, debug: Boolean, provider: String)
+
+// 8 个字段，顺序不可错位 —— lang 在 lexicon 之后、dictDir 之前
+OfflineTtsKokoroModelConfig(model, voices, tokens, dataDir, lexicon, lang, dictDir, lengthScale: Float)
+```
+
+Kokoro 参数取值：`model` / `voices` / `tokens` 为绝对路径；`dataDir` 为 `espeak-ng-data` 的**父目录**（与 VITS 的 dataDir 约定一致，见现有注释）；`lexicon` 为 `lexicon-us-en.txt` 绝对路径；`lang` 为 `"en-us"`；`dictDir` 传 `""`（英文不需要 jieba 词典，且非空类型不能传 null）；`lengthScale` 传 `1.0`（语速由 `generate` 的 speed 参数实时控制，不走这里）。
+
+### 3.4 JS API
+
+```ts
+// 向后兼容：voiceId 省略时用默认音色，旧调用点无需改动
+sherpaSpeak(text: string, opts?: { voiceId?: string; speed?: number })
+sherpaPrewarm(text: string, opts?: { voiceId?: string; speed?: number })
+
+// 新增
+listLocalVoices(): ILocalVoice[]        // 从 catalog 读，含 speakerId
+getSherpaStatus(): ISherpaStatus        // 扩展返回 numSpeakers / loadedModels
+```
+
+`src/lib/use-tts.ts` 的 piper 档位改为携带 `voiceId`（由 `TTSSettings.selectedVoiceURI` 提供），`sherpaPrewarm` 调用点同步传音色。
+
+### 3.5 数据流
+
+```
+用户在设置页选音色
+  → TTSSettings 写入 selectedVoiceURI = "kokoro:af_sarah"
+  → tts-settings 持久化（safeStorage）
+  → use-tts 的 speak() 读设置，piper 档位调用 sherpaSpeak(text, {voiceId, speed})
+  → sherpa-tts 查 catalog 得 {modelId, speakerId}
+  → 插件 ensureModel(modelId)（懒加载，首次摊包+建引擎）
+  → tts.generate(text, speakerId, speed)
+  → WAV 落盘 cacheDir，路径经 convertFileSrc 返回
+  → WebView <audio> 播放（播放队列/暂停/续读全部复用现有逻辑）
+```
+
+## 4. 构建集成
+
+### 4.1 扩展 `scripts/fetch-android-tts.cjs`
+
+沿用现有模式：`--voice` 参数化、离线已就位就跳过（构建不因网络抖动失败）、hf-mirror 并发下载。
+
+新增 Kokoro 拉取，**按白名单只取英文所需文件**：
+
+```
+model.onnx, voices.bin, tokens.txt, lexicon-us-en.txt, espeak-ng-data/**
+```
+
+剥离（省 31.3MB，英语学习用不到）：`dict/`（13.9MB）、`lexicon-zh.txt`（2.3MB）、`lexicon-gb-en.txt`（6.1MB）、`*zh.fst`（0.3MB）。
+
+> 注意：v1.0 的 `espeak-ng-data/` 与 Piper 音色自带的是同一份数据。若校验一致，可只保留一份（省 17.2MB）；不一致则各自保留。此项在实现时实测决定。
+
+### 4.2 APK 体积
+
+| 项 | 体积 |
+|---|---|
+| 现有 APK | 720MB |
+| 新增 Kokoro（仅英文） | +360.6MB |
+| **预计合计** | **约 1080MB** |
+
+已在 `android/app/build.gradle` 限制 `abiFilters 'arm64-v8a', 'armeabi-v7a'`（省约 42MB），继续沿用。
+
+### 4.3 存储影响
+
+Play 渠道的 APK 体积上限是 200MB，本方案远超，故**这条路只适用于本地直装**（现有 APK 已有 720MB，同样如此，不改变分发方式）。
+
+运行时额外占用：模型摊到 `filesDir` 约 361MB，加上已有的 878MB 书籍模型，内部存储需预留约 1.3GB。
+
+## 5. 错误处理
+
+| 场景 | 行为 |
+|---|---|
+| Kokoro 加载抛异常 | 记 `state=error` + 原因，`speak` 自动回退 lessac 音色，不中断朗读 |
+| Kokoro 原生崩溃（Java 接不住） | 复用现有 `checkBundledEngineHealth()` 护栏：加载前打标记、成功才清除；下次启动发现标记残留则自动停用，回退系统/云端引擎 |
+| 音色包体积过大导致摊包失败（存储不足） | 捕获 `IOException`，提示"存储空间不足，已改用系统朗读"，不静默失败 |
+| speakerId 超出 `numSpeakers()` | 拒绝合成并回报，避免原生层越界 |
+| 模型文件损坏（大小不符） | 校验失败则重新摊包一次；仍失败则回退 |
+
+## 6. 验证
+
+### 6.1 构建期（本机可执行）
+
+1. `node scripts/fetch-android-tts.cjs` 拉全模型，校验文件数与体积
+2. manifest.json 与 `tts-voice-catalog.ts` 的音色表一致性校验（11 条 id 与 speakerId 逐条比对）
+3. `npm run typecheck` 通过
+4. `npm run package:apk` 出包，确认 APK 体积符合预期
+
+### 6.2 真机（需用户在手机上执行）
+
+本环境无法运行安卓，故以下为交付给用户的步骤：
+
+1. **音色映射人工确认（关键）**：设置页逐个试听 11 个音色，确认标注与实际听感一致（如 `af_bella` 确实是女声、`bm_george` 确实是英音男声）。这是唯一无法静态验证的点——字节比对已排除版本错误，但"ID 9 听起来确实是清晰女声"只能靠耳朵。
+2. **采样率核验**：设置页应显示 24000Hz
+3. **长文本连续朗读**：确认换音色后不串音（验证缓存 key 修复）
+4. **冷启动加载耗时**：Kokoro 310MB 模型首次加载，记录耗时是否可接受
+
+### 6.3 若映射不符的处理
+
+若试听发现某 speakerId 名不符实：改 manifest 的 `speakerId` 后重装即可，无需改代码。若整体错位，说明 v1.0 文档表与实际 `voices.bin` 有偏差，则退回"只启用听感确认过的音色"，并把其余标注为待验证。
+
+## 7. 影响文件
+
+| 文件 | 改动 |
+|---|---|
+| `android/app/src/main/assets/tts/manifest.json` | 新增 |
+| `android/app/src/main/java/com/nativethink/app/SherpaTtsPlugin.java` | 模型注册表、speakerId、缓存 key、Kokoro 配置 |
+| `src/lib/sherpa-tts.ts` | 多音色 API，保持旧签名兼容 |
+| `src/lib/tts-voice-catalog.ts` | 增补 `KOKORO_VOICES` |
+| `src/lib/use-tts.ts` | piper 档位传 voiceId |
+| `src/components/TTSSettings.tsx` | 音色分组下拉 + 试听 |
+| `scripts/fetch-android-tts.cjs` | Kokoro 拉取 + 白名单 |
+| `android/app/src/main/assets/tts/kokoro-multi-lang-v1_0/**` | 新增（构建产物，gitignore） |
+| `ROADMAP.md` | 更新朗读引擎现状 |
+
+## 8. 参考
+
+- [sherpa-onnx Kokoro 模型文档](https://k2-fsa.github.io/sherpa/onnx/tts/pretrained_models/kokoro.html) —— 音色 ID 表与配置参数来源
+- [sherpa-onnx tts-models 发布页](https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models)
+- [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) —— 上游模型
+- `csukuangfj/kokoro-multi-lang-v1_0`（hf-mirror）—— 本方案采用的仓库
