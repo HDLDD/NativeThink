@@ -62,6 +62,7 @@ import { useFavorites } from '@/lib/use-favorites';
 import { useAI } from '@/hooks/use-ai';
 import { useSpellingSentences } from '@/lib/use-spelling-sentences';
 import { useSpellingLearning } from '@/lib/use-spelling-learning';
+import { useLearningStats } from '@/lib/use-learning-stats';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { queryWords, preloadLevels, isLevelReady } from '@/data/wordbank';
@@ -380,6 +381,7 @@ export default function SpellingPage() {
   const tts = useTTS();
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
   const ai = useAI();
+  const { addStudyMinutes } = useLearningStats();
 
   // Mode state
   const [mode, setMode] = useState<SpellingMode>('dictation');
@@ -587,6 +589,7 @@ export default function SpellingPage() {
 
     const quality = calculateQuality(correctCount, totalWords);
     recordAttempt(currentSentence.id, quality, wrongWords, mode);
+    addStudyMinutes(0.3, 'spelling');
 
     setResults({ wordResults, score: correctCount, total: totalWords });
     setSubmitted(true);
@@ -597,7 +600,7 @@ export default function SpellingPage() {
 
     // Re-read the sentence aloud after submit
     tts.speak(currentSentence.en);
-  }, [currentSentence, mode, dictationInputs, fillInputs, fillParts, calculateQuality, recordAttempt, tts]);
+  }, [currentSentence, mode, dictationInputs, fillInputs, fillParts, calculateQuality, recordAttempt, tts, addStudyMinutes]);
 
   /** Navigate to next sentence — mark completed */
   const handleNext = useCallback(() => {

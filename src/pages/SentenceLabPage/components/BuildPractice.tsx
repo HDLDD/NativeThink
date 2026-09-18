@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAI } from '@/hooks/use-ai';
 import { useTTS } from '@/lib/use-tts';
 import { useFavorites } from '@/lib/use-favorites';
+import { useLearningStats } from '@/lib/use-learning-stats';
 import { cn } from '@/lib/utils';
 import { MOCK_BACK_TRANSLATIONS } from '@/data/backtranslation';
 
@@ -34,6 +35,7 @@ export function BuildPractice() {
   const { isConfigured, chat } = useAI();
   const { speak } = useTTS();
   const { addFavorite } = useFavorites();
+  const { addStudyMinutes } = useLearningStats();
 
   const pool = useMemo(
     () => MOCK_BACK_TRANSLATIONS.filter((b) => b.referenceSentence && b.keyword).slice(0, 400),
@@ -89,6 +91,7 @@ export function BuildPractice() {
         { temperature: 0.3, maxTokens: 1200, signal: ctrl.signal, task: 'chat' },
       );
       setFeedback(out || '（没有返回内容，请重试）');
+      addStudyMinutes(0.5, 'sentences');
     } catch (e) {
       if (!ctrl.signal.aborted) toast.error('反馈生成失败，请稍后重试');
     } finally {

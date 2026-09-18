@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useTTS } from '@/lib/use-tts';
 import { useFavorites } from '@/lib/use-favorites';
 import { useSentenceReview } from '@/lib/use-sentence-review';
+import { useLearningStats } from '@/lib/use-learning-stats';
 import { lookupWord, type IWordLookup } from '@/lib/word-lookup';
 import { cn } from '@/lib/utils';
 import { SENTENCE_LAB, READ_STEPS, type ISentenceLabItem } from '@/data/sentence-lab';
@@ -54,6 +55,7 @@ export function ChunkDrill() {
   const { speak } = useTTS();
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
   const { grade, dueIds, stats } = useSentenceReview();
+  const { addStudyMinutes } = useLearningStats();
 
   // 语料池：复习模式 = 到期的句子；否则按来源/难度筛选
   const dueSet = useMemo(() => new Set(dueIds), [dueIds]);
@@ -118,6 +120,7 @@ export function ChunkDrill() {
     const backboneRight = backbonePick !== null && item.segments[backbonePick]?.r === 'core';
     const quality = splitPerfect && backboneRight ? 5 : backboneRight ? 3 : 2;
     grade(item.id, quality);
+    if (!demo) addStudyMinutes(0.3, 'sentences');
     if (quality < 3 && !demo) toast.info('这句已加入复习队列', { duration: 1800 });
   };
 
