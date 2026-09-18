@@ -459,23 +459,50 @@ public class SherpaTtsPlugin extends Plugin {
     // ── 内部工具 ──
 
     /** 递归把 assets 下的音色目录摊到内部存储（已存在且大小一致则跳过） */
+    /**
+     * 递归把 assets 下的目录摊到内部存储。
+     *
+     * 首次摊包后打一个标记；之后启动只要标记在就直接返回 —— 这是加载速度的关键。
+     * 不能靠「逐文件比对大小」判断是否已就位：拿 asset 大小必须先 `am.open()`，
+     * 而 asset 是压缩存储的，open 会**解压整个文件**；109MB 的模型每次启动都
+     * 白解压一遍，模型越大越慢。磁盘上的文件一旦摊好就不会自己变样。
+     *
+     * 标记放在独立的 markDir 下（以 asset 路径命名），不放 dst 里 —— 否则
+     * Kokoro 为共享 espeak 而摊 Piper 目录时，会把「只摊到一半的 Piper」也标记成完成。
+     */
     private void copyAssets(String assetPath, File dst) throws IOException {
+        File markDir = new File(getContext().getFilesDir(), ".tts-extracted");
+        File marker = new File(markDir, assetPath.replace('/', '_'));
+        if (marker.exists()) return;
+
+        copyAssetsInner(assetPath, dst);
+
+        try {
+            if (!markDir.exists() && !markDir.mkdirs()) return;
+            try (OutputStream out = new FileOutputStream(marker)) {
+                out.write("1".getBytes("UTF-8"));
+            }
+        } catch (IOException ignored) { /* 标记写不了不影响功能，只是下次会重摊 */ }
+    }
+
+    private void copyAssetsInner(String assetPath, File dst) throws IOException {
         AssetManager am = getContext().getAssets();
         String[] children = am.list(assetPath);
         if (children != null && children.length > 0) {
             if (!dst.exists() && !dst.mkdirs()) throw new IOException("mkdir_failed:" + dst);
             for (String child : children) {
-                copyAssets(assetPath + "/" + child, new File(dst, child));
+                copyAssetsInner(assetPath + "/" + child, new File(dst, child));
             }
             return;
         }
-        long assetSize = -1;
+        // 叶子：asset 打不开就当它是目录已列过，跳过
+        long assetSize;
         try (InputStream in = am.open(assetPath)) {
             assetSize = in.available();
         } catch (IOException e) {
-            return; // 既不是目录也打不开，跳过
+            return;
         }
-        if (dst.exists() && assetSize > 0 && dst.length() == assetSize) return;
+        if (dst.exists() && dst.length() == assetSize) return;
         File parent = dst.getParentFile();
         if (parent != null && !parent.exists() && !parent.mkdirs()) throw new IOException("mkdir_failed:" + parent);
         try (InputStream in = am.open(assetPath); OutputStream out = new FileOutputStream(dst)) {

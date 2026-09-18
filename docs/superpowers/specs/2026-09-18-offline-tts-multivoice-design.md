@@ -44,48 +44,54 @@ App 已内置离线朗读引擎（sherpa-onnx + Piper VITS），但因三层硬�
 
 ## 2. 模型与音色选型（已实测验证）
 
-### 选定：`csukuangfj/kokoro-int8-multi-lang-v1_1`（int8 量化）
+### 选定：`csukuangfj/kokoro-int8-multi-lang-v1_0`（int8 量化）
 
 | 文件 | 体积 | 用途 |
 |---|---|---|
-| `model.int8.onnx` | 109.0MB | 主模型（int8 量化） |
-| `voices.bin` | 51.3MB | 音色嵌入表（103 个音色） |
+| `model.int8.onnx` | 108.9MB | 主模型（int8 量化，内嵌元数据含音色表） |
+| `voices.bin` | 26.9MB | 音色嵌入表（54 音色 × 522240 字节，与元数据 `n_speakers=54` 精确吻合） |
 | `lexicon-us-en.txt` | 5.7MB | 美音发音词典 |
 | `tokens.txt` | ~0.5KB | 词表 |
 | `espeak-ng-data/` | **0** | 与 Piper 自带的那份逐文件相同，复用 |
-| **合计新增** | **166.0MB** | |
+| **合计新增（磁盘）** | **141.5MB** | 包内占 113.0MB（资产会被压缩） |
 
-输出采样率 **24000Hz**。
+输出采样率 **24000Hz**，54 个音色其中 28 个英语。
 
-### 体积预算的约束（决定了选型）
+### 选型经过：一次踩坑与修正
 
-主模型占新增体积的 **86%**，是唯一有意义的杠杆。**降低音色数量省不下任何空间**——`voices.bin` 与模型大小无关，speakerId 只是数组下标，砍到 3 个音色仍是 360.6MB。所以只能换更小的模型。
+初版选了 `kokoro-int8-multi-lang-v1_1`（体积相近），真机反馈两条症状：声音很奇怪、加载慢。排查后确认 **v1.1-zh 的音色库与 v1.0 完全不同**，其内嵌元数据 `id2speaker` 表为：
 
-espeak-ng-data 复用产生额外节省：实测 Kokoro 的 `espeak-ng-data/` 与 Piper 自带的那份**逐文件 SHA-1 完全一致**（355 个文件全部匹配，`phondata`/`phontab`/`phonindex` 逐字节相同），故只保留一份。这是从 187.7MB 降到 166.0MB 的关键。
+```
+0->af_maple, 1->af_sol, 2->bf_vale, 3->zf_001, 4->zf_002, ... 102->zm_100
+```
 
-### 体积对照
+**103 个音色里只有 3 个英语**（`af_maple`/`af_sol`/`bf_vale`），其余 100 个是中文。而本项目硬编码的 speakerId（2/3/6/9/10/11/16/18/19/21/26）是按 v1.0 查的，在 v1.1 上正好落在 `zf_001`~`zf_007` 一带 —— **等于用中文音色读英文**，这就是"声音很奇怪"的根因。
 
-| 方案 | 主模型 | 新增体积 | 相对 |
-|---|---|---|---|
-| ~~kokoro-multi-lang-v1_0（fp32）~~ | 310.5MB | 360.6MB | 基准 |
-| **kokoro-int8-multi-lang-v1_1** | **109.0MB** | **166.0MB** | **−54%** |
+换回 v1.0 后，其元数据 `speaker2id` 表与本项目目录逐条吻合：
 
-### 为什么接受 int8 带来的代价
-
-int8 量化会与 fp32 存在轻微音质差异（本方案选 int8 纯粹出于体积约束）。取舍如下：
-
-| 维度 | fp32 v1.0 | int8 v1.1 |
+| speakerId | v1.0 元数据中的音色 | 本项目采用 |
 |---|---|---|
-| speakerId 映射来源 | sherpa 官方文档公开的 speaker 表 | **无可靠公开来源**（v1.1 仓库 README 仅一句介绍） |
-| 音色嵌入 | 与 v1.1 非同一套（见下） | 需真机试听确定 |
-| 音质 | 基准 | 量化，待真机确认 |
-| 新增体积 | 360.6MB | 166.0MB |
+| 2 | af_bella | ✓ |
+| 3 | af_heart | ✓ |
+| 6 | af_nicole | ✓ |
+| 9 | af_sarah | ✓ |
+| 10 | af_sky | ✓ |
+| 11 | am_adam | ✓ |
+| 16 | am_michael | ✓ |
+| 18 | am_puck | ✓ |
+| 19 | am_santa | ✓ |
+| 21 | bf_emma | ✓ |
+| 26 | bm_george | ✓ |
 
-**两版音色库互不相同**：为验证能否沿用 v1.0 的映射，下载两版 `voices.bin` 做字节比对（每音色 522240 字节，v1.0 = 54 × 522240 = 28200960，v1.1 = 103 × 522240 = 53790720，均整除吻合）。按 SHA-1 逐块比对，**v1.0 的 54 个音色嵌入在 v1.1 中一个都找不到**——两版是独立训练的音色库，非追加或重排。
+**教训**：音色数与音色表必须取自模型内嵌元数据（`n_speakers` / `speaker2id`），不能信仓库描述或文档。`voices.bin` 字节数除以 522240 即可反推音色数并交叉验证。元数据位于 ONNX 文件**末尾**，取最后 8KB 就能读到，无需下载整个模型。
 
-因此 v1.1 的 11 个英文音色 speakerId **必须在真机上逐个试听确认**（见 §6.2）。这是本方案唯一的未验证假设，已明确记录。
+> 另一个曾误判的点：`lang` 在 multi-lang 路径下**完全不被使用** —— `KokoroMultiLangLexicon` 只接收 lexicon，`lang` 仅用于「lexicon 与 lang 不能同时为空」的校验。传 `en-us`（而非文档示例的 `en`）无害，因为音素化实际由 `lexicon-us-en.txt` 完成。
 
-> 音色命名沿用 Kokoro 官方规范 `<语种><性别>_<名字>`：`af_bella` = American English / female / bella。故 v1.1 的英文音色命名与 v1.0 相同，只是数组下标可能不同。
+### 为什么接受 int8
+
+int8 量化与 fp32 存在轻微音质差异。选 int8 纯粹出于体积：主模型占新增体积的 77%，是唯一有意义的杠杆。**降低音色数量省不下任何空间**——`voices.bin` 与模型大小无关，speakerId 只是数组下标。
+
+espeak-ng-data 复用产生额外节省：实测 Kokoro 的 `espeak-ng-data/` 与 Piper 自带的那份**逐文件 SHA-1 完全一致**（355 个文件全部匹配，`phondata`/`phontab`/`phonindex` 逐字节相同），故只保留一份。
 
 ### 音色清单（11 个）
 
@@ -157,7 +163,7 @@ export interface ILocalVoice {
   gender: 'female' | 'male';
   accent: '美音' | '英音';
   /** 原生侧模型注册表的 key */
-  modelId: 'kokoro-v1_1' | 'piper-lessac';
+  modelId: 'kokoro' | 'piper-lessac';
   /** voices.bin 里的数组下标 */
   speakerId: number;
   /** 一句定位描述，设置页显示 */
@@ -165,17 +171,17 @@ export interface ILocalVoice {
 }
 
 export const KOKORO_VOICES: ILocalVoice[] = [
-  { id: 'kokoro:af_bella',  name: 'Bella',  gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 2,  note: '温暖亲切' },
-  { id: 'kokoro:af_heart',  name: 'Heart',  gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 3,  note: '柔和自然' },
-  { id: 'kokoro:af_nicole', name: 'Nicole', gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 6,  note: '轻柔低语' },
-  { id: 'kokoro:af_sarah',  name: 'Sarah',  gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 9,  note: '清晰标准' },
-  { id: 'kokoro:af_sky',    name: 'Sky',    gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 10, note: '年轻活泼' },
-  { id: 'kokoro:am_adam',   name: 'Adam',   gender: 'male',   accent: '美音', modelId: 'kokoro-v1_1', speakerId: 11, note: '沉稳' },
-  { id: 'kokoro:am_michael',name: 'Michael',gender: 'male',   accent: '美音', modelId: 'kokoro-v1_1', speakerId: 16, note: '自然' },
-  { id: 'kokoro:am_puck',   name: 'Puck',   gender: 'male',   accent: '美音', modelId: 'kokoro-v1_1', speakerId: 18, note: '活泼' },
-  { id: 'kokoro:am_santa',  name: 'Santa',  gender: 'male',   accent: '美音', modelId: 'kokoro-v1_1', speakerId: 19, note: '低沉厚重' },
-  { id: 'kokoro:bf_emma',   name: 'Emma',   gender: 'female', accent: '英音', modelId: 'kokoro-v1_1', speakerId: 21, note: '标准英音' },
-  { id: 'kokoro:bm_george', name: 'George', gender: 'male',   accent: '英音', modelId: 'kokoro-v1_1', speakerId: 26, note: '沉稳英音' },
+  { id: 'kokoro:af_bella',  name: 'Bella',  gender: 'female', accent: '美音', modelId: 'kokoro', speakerId: 2,  note: '温暖亲切' },
+  { id: 'kokoro:af_heart',  name: 'Heart',  gender: 'female', accent: '美音', modelId: 'kokoro', speakerId: 3,  note: '柔和自然' },
+  { id: 'kokoro:af_nicole', name: 'Nicole', gender: 'female', accent: '美音', modelId: 'kokoro', speakerId: 6,  note: '轻柔低语' },
+  { id: 'kokoro:af_sarah',  name: 'Sarah',  gender: 'female', accent: '美音', modelId: 'kokoro', speakerId: 9,  note: '清晰标准' },
+  { id: 'kokoro:af_sky',    name: 'Sky',    gender: 'female', accent: '美音', modelId: 'kokoro', speakerId: 10, note: '年轻活泼' },
+  { id: 'kokoro:am_adam',   name: 'Adam',   gender: 'male',   accent: '美音', modelId: 'kokoro', speakerId: 11, note: '沉稳' },
+  { id: 'kokoro:am_michael',name: 'Michael',gender: 'male',   accent: '美音', modelId: 'kokoro', speakerId: 16, note: '自然' },
+  { id: 'kokoro:am_puck',   name: 'Puck',   gender: 'male',   accent: '美音', modelId: 'kokoro', speakerId: 18, note: '活泼' },
+  { id: 'kokoro:am_santa',  name: 'Santa',  gender: 'male',   accent: '美音', modelId: 'kokoro', speakerId: 19, note: '低沉厚重' },
+  { id: 'kokoro:bf_emma',   name: 'Emma',   gender: 'female', accent: '英音', modelId: 'kokoro', speakerId: 21, note: '标准英音' },
+  { id: 'kokoro:bm_george', name: 'George', gender: 'male',   accent: '英音', modelId: 'kokoro', speakerId: 26, note: '沉稳英音' },
 ];
 
 /** 兜底音色 —— Kokoro 不可用时自动回退 */
@@ -192,7 +198,7 @@ export const DEFAULT_LOCAL_VOICE_ID = 'kokoro:af_sarah';
 
 ```java
 // 模型 key → 配置。kind 决定走哪个 OfflineTtsXxxModelConfig
-private static final String MODEL_KOKORO = "kokoro-v1_1";
+private static final String MODEL_KOKORO = "kokoro";
 private static final String MODEL_LESSAC = "piper-lessac";
 ```
 
@@ -412,7 +418,7 @@ Play 渠道的 APK 体积上限是 200MB，本方案远超，故**这条路只�
 | `src/lib/use-tts.ts` | piper 档位传 voiceId |
 | `src/components/TTSSettings.tsx` | 音色分组下拉 + 试听 |
 | `scripts/fetch-android-tts.cjs` | Kokoro 拉取 + 白名单 + 流式下载大文件 |
-| `android/app/src/main/assets/tts/kokoro-int8-multi-lang-v1_1/**` | 新增（构建产物，gitignore） |
+| `android/app/src/main/assets/tts/kokoro-int8-multi-lang-v1_0/**` | 新增（构建产物，gitignore） |
 | `ROADMAP.md` | 更新朗读引擎现状 |
 
 ## 8. 参考
@@ -421,5 +427,6 @@ Play 渠道的 APK 体积上限是 200MB，本方案远超，故**这条路只�
 - [sherpa-onnx tts-models 发布页](https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models)
 - [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) —— 上游模型
 - [hexgrad/Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh) —— v1.1 上游
-- `csukuangfj/kokoro-int8-multi-lang-v1_1`（hf-mirror）—— **本方案采用的仓库**
+- `csukuangfj/kokoro-int8-multi-lang-v1_0`（hf-mirror）—— **本方案采用的仓库**
+- `csukuangfj/kokoro-int8-multi-lang-v1_1`（hf-mirror）—— 已弃用：103 音色中仅 3 个英语，其余为中文
 - `csukuangfj/kokoro-multi-lang-v1_0`（hf-mirror）—— 回退备选（fp32，官方有文档）
