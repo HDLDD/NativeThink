@@ -21,3 +21,8 @@ android/app/src/main/assets/tts/
 
 # 句料扩量脚本的断点状态（本地用，不入库）
 .sentence-auto-state.json
+
+# 本地工具目录与脚本断点状态（本地用，不入库）
+.zcode/
+.zcode-restore-backup-*/
+.sentence-explain-state.json
