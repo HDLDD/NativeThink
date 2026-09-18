@@ -28,7 +28,7 @@ interface ProgressChartsProps {
 }
 
 // ── Module config ──
-const MODULE_COLORS = ['#EC4899', '#0EA5E9', '#F59E0B', '#00B894', '#1F2937', '#6366F1', '#F97316', '#8B5CF6'];
+const MODULE_COLORS = ['#EC4899', '#0EA5E9', '#F59E0B', '#00B894', '#1F2937', '#6366F1', '#F97316', '#F59E0B', '#8B5CF6', '#14B8A6'];
 const MODULE_NAMES: Record<string, string> = {
   vocabulary: '词汇深度',
   articles: '文章阅读',
@@ -37,7 +37,9 @@ const MODULE_NAMES: Record<string, string> = {
   chunks: '语块训练',
   conversation: '对话练习',
   shadowing: '影子跟读',
+  sentences: '句子学习',
   writing: '写作练习',
+  cet: '四六级备考',
 };
 
 export default function ProgressCharts({ calendar, stats }: ProgressChartsProps) {

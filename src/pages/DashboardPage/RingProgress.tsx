@@ -11,7 +11,8 @@ interface RingProgressProps {
 function RingProgressInner({ value, label, icon: Icon, color }: RingProgressProps) {
   const radius = 34;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (value / 100) * circumference;
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const offset = circumference - (safeValue / 100) * circumference;
 
   return (
     <div className="flex flex-col items-center gap-3 group">
@@ -47,7 +48,7 @@ function RingProgressInner({ value, label, icon: Icon, color }: RingProgressProp
             <Icon className="size-4" />
           </div>
           <span className="text-lg font-black italic text-foreground tabular-nums tracking-tight">
-            {Math.round(value)}%
+            {Math.round(safeValue)}%
           </span>
         </div>
       </div>

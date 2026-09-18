@@ -40,6 +40,7 @@ const ROUTE_PREFETCH: Record<string, () => Promise<unknown>> = {
   '/writing': () => import('@/pages/WritingPage/WritingPage'),
   '/progress': () => import('@/pages/ProgressPage/ProgressPage'),
   '/spelling': () => import('@/pages/SpellingPage/SpellingPage'),
+  '/sentences': () => import('@/pages/SentenceLabPage/SentenceLabPage'),
   '/cet': () => import('@/pages/CetExamPage/CetExamPage'),
 };
 

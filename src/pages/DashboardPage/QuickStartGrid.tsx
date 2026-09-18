@@ -12,6 +12,7 @@ function shadowFor(color: string): string {
     : color.includes('indigo') ? 'rgba(99,102,241,0.3)'
     : color.includes('amber') ? 'rgba(245,158,11,0.3)'
     : color.includes('violet') ? 'rgba(139,92,246,0.3)'
+    : color.includes('teal') ? 'rgba(20,184,166,0.3)'
     : color.includes('gray') ? 'rgba(31,41,55,0.2)'
     : 'rgba(249,115,22,0.3)';
   return v;
