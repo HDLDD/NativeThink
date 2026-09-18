@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { safeStorage } from '@/lib/safe-storage';
+import { formatDate } from '@/lib/utils';
 import type { IChunk } from '@/data/chunks';
 
 const STORAGE_KEY = '__nativethink_phrase_learning';
@@ -22,7 +23,8 @@ export interface IPhraseLearningState {
 }
 
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  // 本地日期，避免东八区 00:00–07:59 仍落在 UTC「昨天」
+  return formatDate(new Date());
 }
 
 function loadState(): IPhraseLearningState {

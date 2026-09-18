@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { cn, cleanText } from '@/lib/utils';
+import { cn, cleanText, formatDate } from '@/lib/utils';
 import { WEEK_DAYS } from './constants';
 
 interface HistoryEntry {
@@ -44,7 +44,7 @@ function HistoryCalendarInner({
   onGoToToday,
   monthLabel,
 }: HistoryCalendarProps) {
-  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayStr = useMemo(() => formatDate(new Date()), []);
 
   const monthStats = useMemo(() => {
     const prefix = `${historyYear}-${String(historyMonth + 1).padStart(2, '0')}`;

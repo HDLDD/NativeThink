@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { safeStorage } from './safe-storage';
+import { formatDate } from './utils';
 import type { ISpellingSentence, ISpellingProgress, ISpellingLearningState, SpellingMode } from '@/types/spelling';
 
 const STORAGE_KEY = '__nativethink_spelling_progress';
@@ -56,7 +57,8 @@ function saveCompletedIds(ids: string[]) {
 }
 
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  // 本地日期，避免东八区 00:00–07:59 仍落在 UTC「昨天」
+  return formatDate(new Date());
 }
 
 function loadState(): ISpellingLearningState {
