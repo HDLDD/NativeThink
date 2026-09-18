@@ -18,15 +18,21 @@ const CATALOG = path.join(ROOT, 'src', 'lib', 'tts-voice-catalog.ts');
 /**
  * 模型注册表 —— 必须与 SherpaTtsPlugin.java 的 MODEL_* 常量一致。
  * 改这里时同步改 Java，反过来也一样。
+ *
+ * numSpeakers 不是估的：它来自模型内嵌元数据的 n_speakers，且与 voices.bin
+ * 字节数精确对应（每音色 522240 字节 = style_dim 510×1×256×4B）。
+ * 曾因忽略这个对应关系，把一个「103 音色但只有 3 个英语」的中文模型当成英语
+ * 多音色模型用，结果是用中文音色读英文 —— 这类错误只有真机能听出来，
+ * 所以边界值必须取自模型本身，而不是文档或仓库描述。
  */
 const MODELS = {
-  'kokoro-v1_1': {
-    dir: path.join(ASSETS, 'tts', 'kokoro-int8-multi-lang-v1_1'),
+  kokoro: {
+    dir: path.join(ASSETS, 'tts', 'kokoro-int8-multi-lang-v1_0'),
     files: ['model.int8.onnx', 'voices.bin', 'tokens.txt', 'lexicon-us-en.txt'],
     /** Kokoro 复用 Piper 的 espeak 数据，故 dataDir 指向 Piper 音色目录 */
     dataDir: path.join(ASSETS, 'piper', 'vits-piper-en_US-lessac-medium'),
     sampleRate: 24000,
-    numSpeakers: 103,
+    numSpeakers: 54,
   },
   'piper-lessac': {
     dir: path.join(ASSETS, 'piper', 'vits-piper-en_US-lessac-medium'),
@@ -93,7 +99,7 @@ if (!block) {
         errors.push(`音色 ${v.id}: speakerId ${v.speakerId} 越界（模型 ${v.modelId} 只有 ${m.numSpeakers} 个音色）`);
       }
     }
-    kokoroVoiceCount = voices.filter((v) => v.modelId === 'kokoro-v1_1').length;
+    kokoroVoiceCount = voices.filter((v) => v.modelId === 'kokoro').length;
     if (kokoroVoiceCount !== EXPECTED_KOKORO_VOICES) {
       notes.push(`Kokoro 音色数 ${kokoroVoiceCount}，设计为 ${EXPECTED_KOKORO_VOICES} 个`);
     }
@@ -113,14 +119,14 @@ if (!/export const FALLBACK_VOICE/.test(src)) {
 }
 
 // ── 4) 资产体积报告 ──
-const kokoroDir = MODELS['kokoro-v1_1'].dir;
+const kokoroDir = MODELS['kokoro'].dir;
 if (fs.existsSync(kokoroDir)) {
   let total = 0;
   for (const f of fs.readdirSync(kokoroDir)) {
     const p = path.join(kokoroDir, f);
     if (fs.statSync(p).isFile()) total += fs.statSync(p).size;
   }
-  console.log(`  Kokoro 资产合计 ${mb(total)}（设计预期 166MB 量级）`);
+  console.log(`  Kokoro 资产合计 ${mb(total)}（设计预期约 142MB）`);
   const stray = fs.readdirSync(kokoroDir).filter((f) => f === 'espeak-ng-data' || f === 'dict');
   if (stray.length) {
     notes.push(`Kokoro 目录出现本该共享/剥离的 ${stray.join('、')} —— 会白占体积`);

@@ -438,33 +438,66 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         }
       };
 
-      const playUrl = (url: string, opts?: { applyRate?: boolean; engine?: 'piper' | 'cf' | 'edge' | 'google'; t0?: number }) => {
-        if (abortedRef.current) { onDone(); return; }
+      /**
+       * 播放一个 URL。两个回调都带上"本句是否已经出过声"，因为这决定失败后该怎么办：
+       *  - 从未出声 → 换下一个引擎重试同一句（用户没听到任何东西，该重试）
+       *  - 已经出声 → 直接进下一句（绝不能换引擎把同一句再读一遍，那是"两个引擎相继发声"）
+       * 原生引擎分支早就是这么做的（spokeAtLeastOnce），这里补齐 URL 引擎。
+       */
+      const playUrl = (
+        url: string,
+        opts: {
+          applyRate?: boolean;
+          engine?: 'piper' | 'cf' | 'edge' | 'google';
+          t0?: number;
+          /** 本引擎没出声就失败 → 调它换下一个引擎 */
+          retryNextEngine: () => void;
+          /** 本引擎已出声但中断，或整句放完 → 调它进下一句 */
+          skipChunk: () => void;
+        },
+      ) => {
+        if (abortedRef.current) { opts.skipChunk(); return; }
         stopAudio();
+        // 关键：撤掉上一个引擎留下的看门狗。否则它会在新引擎朗读途中触发，
+        // 把引擎索引用陈旧闭包再推进一次 —— 同一句被两个引擎各读一遍。
+        if (safetyRef.current) { clearTimeout(safetyRef.current); safetyRef.current = null; }
+        let madeSound = false;
         const a = new Audio(url);
         audioRef.current = a;
         a.preload = 'auto';
         a.volume = settings.volume;
         // cf/google engines have no server-side rate control — compensate via
         // playbackRate (preserves pitch). Edge engine already encodes rate in SSML.
-        if (opts?.applyRate) a.playbackRate = Math.min(2, Math.max(0.5, rate));
+        if (opts.applyRate) a.playbackRate = Math.min(2, Math.max(0.5, rate));
         a.onplay = () => {
+          madeSound = true;
           if (!abortedRef.current) { setIsSpeaking(true); setIsPaused(false); }
-          if (opts?.engine && opts.t0) {
+          if (opts.engine && opts.t0) {
             reportPlayback({ engine: opts.engine, firstAudioMs: Date.now() - opts.t0, fellBack: engineIdx > 0 });
           }
         };
-        a.onended = () => { if (audioRef.current === a) audioRef.current = null; onDone(); };
-        a.onerror = () => { if (audioRef.current === a) audioRef.current = null; onFail(); };
+        a.onended = () => { if (audioRef.current === a) audioRef.current = null; opts.skipChunk(); };
+        a.onerror = () => {
+          if (audioRef.current === a) audioRef.current = null;
+          madeSound ? opts.skipChunk() : opts.retryNextEngine();
+        };
         safetyRef.current = setTimeout(() => {
           // Don't kill a chunk the user deliberately paused
           if (a.paused) return;
-          if (audioRef.current === a) { a.pause(); a.src = ''; audioRef.current = null; onFail(); }
+          if (audioRef.current === a) { a.pause(); a.src = ''; audioRef.current = null; }
+          madeSound ? opts.skipChunk() : opts.retryNextEngine();
         }, 25000);
         // After first-touch prime(), mobile browsers allow play() — but if it
         // still fails (e.g. no prior user gesture), cascade to next engine
-        a.play().catch(() => { if (audioRef.current === a) audioRef.current = null; onFail(); });
+        a.play().catch(() => {
+          if (audioRef.current === a) audioRef.current = null;
+          madeSound ? opts.skipChunk() : opts.retryNextEngine();
+        });
       };
+
+      /** 供 URL 引擎使用的两个回调 —— 已出声就进下一句，否则换引擎重试本句 */
+      const retryNextEngine = () => playChunkWithFallback(chunks, idx, rate, engineIdx + 1);
+      const skipChunk = () => playChunkWithFallback(chunks, idx + 1, rate, 0);
 
       if (engine === 'native') {
         getNativeTts()
@@ -568,14 +601,15 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       }
 
       if (engine === 'piper') {
-        // 内置离线引擎：设备内合成（不联网），起播几十毫秒；下一段顺手预合成
+        // 内置离线引擎：设备内合成（不联网），起播几十毫秒；下一段顺手预合成。
+        // 音色本身不可用时 sherpaSpeak 内部已经回退到 lessac，所以这里失败即整句跳过。
         const t0 = Date.now();
         const voiceId = localVoiceIdFor(settings.selectedVoiceURI);
         const next = chunks[idx + 1];
         if (next) sherpaPrewarm(next, { voiceId, speed: rate });
         sherpaSpeak(chunks[idx], { voiceId, speed: rate })
-          .then(({ url }) => playUrl(url, { engine: 'piper', t0 }))
-          .catch(onFail);
+          .then(({ url }) => playUrl(url, { engine: 'piper', t0, retryNextEngine, skipChunk }))
+          .catch(() => skipChunk());
         return;
       }
 
@@ -586,17 +620,19 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         const url = cfTtsUrl(chunks[idx], rate, settings.selectedVoiceURI, googleLangOf(settings.selectedVoiceURI));
         const t0 = Date.now();
         getCachedOrUrl(url)
-          .then((u) => playUrl(u, { applyRate: !isServerVoice(settings.selectedVoiceURI), engine: 'cf', t0 }))
-          .catch(onFail);
+          .then((u) => playUrl(u, { applyRate: !isServerVoice(settings.selectedVoiceURI), engine: 'cf', t0, retryNextEngine, skipChunk }))
+          // 还没拿到音频就失败 → 本引擎没出声，交给下一个引擎
+          .catch(retryNextEngine);
       } else if (engine === 'edge') {
         const t0 = Date.now();
         edgeTTSBlob(chunks[idx], rate, edgeVoiceFor(settings.selectedVoiceURI))
-          .then((blob) => playUrl(URL.createObjectURL(blob), { engine: 'edge', t0 }))
-          .catch(onFail);
+          .then((blob) => playUrl(URL.createObjectURL(blob), { engine: 'edge', t0, retryNextEngine, skipChunk }))
+          .catch(retryNextEngine);
       } else {
         // google
         const t0 = Date.now();
-        playUrl(googleTTSUrl(chunks[idx], googleLangOf(settings.selectedVoiceURI)), { applyRate: true, engine: 'google', t0 });
+        playUrl(googleTTSUrl(chunks[idx], googleLangOf(settings.selectedVoiceURI)),
+          { applyRate: true, engine: 'google', t0, retryNextEngine, skipChunk });
       }
     },
     [settings.volume, settings.selectedVoiceURI],

@@ -92,7 +92,7 @@ export interface ILocalVoice {
   gender: 'female' | 'male';
   accent: '美音' | '英音';
   /** 原生侧模型注册表的 key —— 必须与 SherpaTtsPlugin.java 的 MODEL_* 常量一致 */
-  modelId: 'kokoro-v1_1' | 'piper-lessac';
+  modelId: 'kokoro' | 'piper-lessac';
   /** voices.bin 里的数组下标 */
   speakerId: number;
   /** 一句定位描述，设置页显示 */
@@ -107,17 +107,17 @@ export interface ILocalVoice {
  * 若名不符实，改这里的数字即可，不必改原生代码。
  */
 export const KOKORO_VOICES: ILocalVoice[] = [
-  { id: 'kokoro:af_bella', name: 'Bella', gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 2, note: '温暖亲切' },
-  { id: 'kokoro:af_heart', name: 'Heart', gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 3, note: '柔和自然' },
-  { id: 'kokoro:af_nicole', name: 'Nicole', gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 6, note: '轻柔低语' },
-  { id: 'kokoro:af_sarah', name: 'Sarah', gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 9, note: '清晰标准' },
-  { id: 'kokoro:af_sky', name: 'Sky', gender: 'female', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 10, note: '年轻活泼' },
-  { id: 'kokoro:am_adam', name: 'Adam', gender: 'male', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 11, note: '沉稳' },
-  { id: 'kokoro:am_michael', name: 'Michael', gender: 'male', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 16, note: '自然' },
-  { id: 'kokoro:am_puck', name: 'Puck', gender: 'male', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 18, note: '活泼' },
-  { id: 'kokoro:am_santa', name: 'Santa', gender: 'male', accent: '美音', modelId: 'kokoro-v1_1', speakerId: 19, note: '低沉厚重' },
-  { id: 'kokoro:bf_emma', name: 'Emma', gender: 'female', accent: '英音', modelId: 'kokoro-v1_1', speakerId: 21, note: '标准英音' },
-  { id: 'kokoro:bm_george', name: 'George', gender: 'male', accent: '英音', modelId: 'kokoro-v1_1', speakerId: 26, note: '沉稳英音' },
+  { id: 'kokoro:af_bella', name: 'Bella', gender: 'female', accent: '美音', modelId: 'kokoro', speakerId: 2, note: '温暖亲切' },
+  { id: 'kokoro:af_heart', name: 'Heart', gender: 'female', accent: '美音', modelId: 'kokoro', speakerId: 3, note: '柔和自然' },
+  { id: 'kokoro:af_nicole', name: 'Nicole', gender: 'female', accent: '美音', modelId: 'kokoro', speakerId: 6, note: '轻柔低语' },
+  { id: 'kokoro:af_sarah', name: 'Sarah', gender: 'female', accent: '美音', modelId: 'kokoro', speakerId: 9, note: '清晰标准' },
+  { id: 'kokoro:af_sky', name: 'Sky', gender: 'female', accent: '美音', modelId: 'kokoro', speakerId: 10, note: '年轻活泼' },
+  { id: 'kokoro:am_adam', name: 'Adam', gender: 'male', accent: '美音', modelId: 'kokoro', speakerId: 11, note: '沉稳' },
+  { id: 'kokoro:am_michael', name: 'Michael', gender: 'male', accent: '美音', modelId: 'kokoro', speakerId: 16, note: '自然' },
+  { id: 'kokoro:am_puck', name: 'Puck', gender: 'male', accent: '美音', modelId: 'kokoro', speakerId: 18, note: '活泼' },
+  { id: 'kokoro:am_santa', name: 'Santa', gender: 'male', accent: '美音', modelId: 'kokoro', speakerId: 19, note: '低沉厚重' },
+  { id: 'kokoro:bf_emma', name: 'Emma', gender: 'female', accent: '英音', modelId: 'kokoro', speakerId: 21, note: '标准英音' },
+  { id: 'kokoro:bm_george', name: 'George', gender: 'male', accent: '英音', modelId: 'kokoro', speakerId: 26, note: '沉稳英音' },
 ];
 
 /** 兜底音色 —— Kokoro 不可用时自动回退（22050Hz，真机已验证可跑） */

@@ -31,8 +31,8 @@ const VOICE_REPO = `csukuangfj/${VOICE}`;
 // 主模型 109MB，单模型含 103 个音色，输出 24000Hz —— 一个模型顶 11 个 Piper 音色。
 // espeak-ng-data 不在此拉取：与 Piper 音色自带的那份实测逐文件 SHA-1 相同（355 个文件），
 // 只保留一份，Kokoro 在原生侧通过 dataDir 指向 Piper 音色目录复用。
-const KOKORO_REPO = 'csukuangfj/kokoro-int8-multi-lang-v1_1';
-const KOKORO_DIR_NAME = 'kokoro-int8-multi-lang-v1_1';
+const KOKORO_REPO = 'csukuangfj/kokoro-int8-multi-lang-v1_0';
+const KOKORO_DIR_NAME = 'kokoro-int8-multi-lang-v1_0';
 /** 白名单：只取英文所需。dict/ 是中文分词，lexicon-zh / lexicon-gb-en / *zh.fst 本项目用不到 */
 const KOKORO_FILES = ['model.int8.onnx', 'voices.bin', 'tokens.txt', 'lexicon-us-en.txt'];
 const KOKORO_MIN_BYTES = 100 * 1024 * 1024;

@@ -55,11 +55,11 @@ public class SherpaTtsPlugin extends Plugin {
 
     // ── 模型注册表 ──
     // 新增模型时同步更新 scripts/check-tts-voices.cjs 的 MODELS 表，二者必须一致。
-    private static final String MODEL_KOKORO = "kokoro-v1_1";
+    private static final String MODEL_KOKORO = "kokoro";
     private static final String MODEL_LESSAC = "piper-lessac";
 
     /** Kokoro：assets/tts/ 下的多音色模型（int8 量化，103 个音色，24000Hz） */
-    private static final String KOKORO_ASSET_DIR = "tts/kokoro-int8-multi-lang-v1_1";
+    private static final String KOKORO_ASSET_DIR = "tts/kokoro-int8-multi-lang-v1_0";
     /** Piper 兜底音色：assets/piper/ 下（22050Hz，单音色，真机已验证可跑） */
     private static final String LESSAC_ASSET_DIR = "piper/vits-piper-en_US-lessac-medium";
 
