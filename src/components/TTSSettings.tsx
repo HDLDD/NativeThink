@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/popover';
 import { useTTSSettings, getEnglishVoices } from '@/lib/tts-settings';
 import { previewTtsVoice, probeTtsEngines, getLastTtsReport, type ITtsEngineProbe, type ITtsPlaybackReport } from '@/lib/use-tts';
-import { getSherpaInitLog, getSherpaStatus, isBundledEngineDisabled, reenableBundledEngine, warmSherpa, type ISherpaStatus } from '@/lib/sherpa-tts';
+import { getSherpaInitLog, getSherpaStatus, isBundledEngineDisabled, reenableBundledEngine, sherpaSpeak, warmSherpa, type ISherpaStatus } from '@/lib/sherpa-tts';
 import { isSfxEnabled, setSfxEnabled, sfxTick } from '@/lib/sfx';
 import { toast } from 'sonner';
 import { EDGE_VOICE_CATALOG, KOKORO_VOICES } from '@/lib/tts-voice-catalog';
@@ -372,7 +372,6 @@ export default function TTSSettings() {
                         updateSettings({ selectedVoiceURI: v.id });
                         setPreviewing(v.id);
                         try {
-                          const { sherpaSpeak } = await import('@/lib/sherpa-tts');
                           const { url } = await sherpaSpeak(SAMPLE_SENTENCE, { voiceId: v.id, speed: settings.rate });
                           const audio = new Audio(url);
                           audio.volume = settings.volume;
