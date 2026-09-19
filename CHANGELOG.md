@@ -142,6 +142,10 @@
 
 
 
+
+## 2026-09-19
+- fix(wordbank): index.ts 补出新增的 detail 加载 API（@/data/wordbank 走聚合导出） (`786cd02`)
+
 ## 2026-09-19
 - refactor(wordbank): detail 字段拆分为独立文件 + 按需加载层（preloadLevels 契约不变） (`9012784`)
 

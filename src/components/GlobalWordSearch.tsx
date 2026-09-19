@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
 import { useFavorites, type IFavoriteItem } from '@/lib/use-favorites';
-import { queryWords, preloadLevels, getEssentialLevels, isAllReady, getWordCounts, WORD_COUNTS } from '@/data/wordbank';
+import { queryWords, preloadCoreOnly, preloadDetail, isDetailReady, getEssentialLevels, isAllReady, getWordCounts, WORD_COUNTS } from '@/data/wordbank';
 import type { IWordEntry } from '@/data/wordbank';
 
 // ============================================================
@@ -59,20 +59,23 @@ export default function GlobalWordSearch() {
 
   // Expanded word for detail view
   const [expandedWord, setExpandedWord] = useState<string | null>(null);
+  /** 展开词的 detail 是否已就绪（完整词库只预加载了核心字段） */
+  const [detailReady, setDetailReady] = useState(false);
 
-  // Progressive preload: load essential levels first, then load remaining in background
+  // Progressive preload: 只预加载**核心字段** —— 9 级合计 gzip ≈2.8MB，原全量为 9.66MB。
+  // detail（搭配/例句/深度解释）在用户展开某个词时才按需加载该等级。
   useEffect(() => {
     if (open && !dataReady) {
       setLoading(true);
       const essential = getEssentialLevels();
       // Phase 1: Load essential levels for instant search capability
-      preloadLevels(essential).then(() => {
+      preloadCoreOnly(essential).then(() => {
         setDataReady(true);
         setLoading(false);
         // Phase 2: Load remaining levels in background (non-blocking)
         const allLevels = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
         const remaining = allLevels.filter(l => !essential.includes(l));
-        remaining.forEach(level => preloadLevels([level]));
+        remaining.forEach(level => preloadCoreOnly([level]));
       });
     }
   }, [open, dataReady]);
@@ -99,6 +102,19 @@ export default function GlobalWordSearch() {
     const counts = getWordCounts();
     return Object.values(counts).reduce((a, b) => a + b, 0);
   }, [dataReady]);
+
+  // 展开某词时才加载该等级的 detail（幂等；已加载则同步就绪）。
+  // ⚠️ 必须放在 results 定义之后：依赖数组在渲染期求值，提前引用会触发 TDZ 白屏。
+  useEffect(() => {
+    if (!expandedWord) { setDetailReady(false); return; }
+    const entry = results.find((w) => w.word.toLowerCase() === expandedWord.toLowerCase());
+    if (!entry) { setDetailReady(false); return; }
+    if (isDetailReady(entry.level)) { setDetailReady(true); return; }
+    let alive = true;
+    setDetailReady(false);
+    preloadDetail([entry.level]).then(() => { if (alive) setDetailReady(true); });
+    return () => { alive = false; };
+  }, [expandedWord, results]);
 
   // Favorite toggle
   const handleToggleFav = (word: IWordEntry) => {
@@ -284,6 +300,9 @@ export default function GlobalWordSearch() {
                       {/* Expanded detail */}
                       {isExpanded && (
                         <div className="px-3 pb-4 pt-0 space-y-3 border-t border-border/50 mx-3">
+                          {!detailReady && (
+                            <p className="text-[11px] text-muted-foreground pt-3">正在加载搭配与例句…</p>
+                          )}
                           {/* Examples */}
                           {word.examples.length > 0 && (
                             <div>
