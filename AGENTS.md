@@ -196,6 +196,7 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 6. **改词库后必须重跑 `npm run wordbank:split`**：`src/data/wordbank/data/<level>.ts` 只保留核心字段，detail（搭配/例句/深度解释）在 `<level>.detail.ts`。任何词库生成器都会重新写出全字段主文件，重跑拆分脚本即可恢复。脚本幂等，可安全重复执行；`preloadLevels` 默认仍加载 detail，只有 `preloadCoreOnly` 才跳过。
 7. **产品需求勿覆盖**：`docs/PRODUCT-SPEC.md` 是需求规格；本 AGENTS.md 是 agent 工作指南。
 8. **Git**：未明确要求不要 commit/push；仓库已用 worktree 时避免在主工作树做跨分支 git 操作。
+9. **APK 版本号**：`android/version.properties` 的 `versionCode` **每次打包必须递增**（Android 拒绝非递增的升级安装，会要求先卸载 → 丢数据）；`versionName` 走 `major.minor.patch`，`npm run version:apk-bump` 每次只递增 **patch**（2.0.0 → 2.0.1）。要切新的 minor/major，手改该文件的 `versionName` 即可，脚本会沿用你写的 `major.minor`。当前线：**2.x**。
 
 ---
 
