@@ -20,6 +20,7 @@
     "android:apk": "npm run package:web && npm run package:apk",
     "version:apk-bump": "node scripts/bump-android-version.cjs",
     "check:tts-voices": "node scripts/check-tts-voices.cjs",
+    "wordbank:split": "node scripts/split-wordbank-detail.mjs",
     "package:web": "npm run version:apk-bump && node scripts/fetch-android-tts.cjs && npm run build:web",
     "package:apk": "npm run check:tts-voices && node node_modules/@capacitor/cli/bin/capacitor copy android && node scripts/android-copy-models.cjs && cd android && gradlew.bat assembleDebug && cd .. && node -e \"fs.copyFileSync('android/app/build/outputs/apk/debug/app-debug.apk', 'release/NativeThink-mobile-debug.apk')\"",
     "package:desktop": "node scripts/pack-app.mjs --skip-web",

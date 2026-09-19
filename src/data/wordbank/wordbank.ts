@@ -1,7 +1,7 @@
 // Wordbank query engine — lazy-loading edition
 // Data files are dynamically imported per-level. Components preload via `preloadLevel()` / `preloadAll()`
 // then use sync wrappers once `isLevelReady()` returns true.
-import type { IWordEntry, IWordQuery } from './schema';
+import type { IWordEntry, IWordQuery, IWordDetailMap } from './schema';
 import { idbGet, idbSet } from '@/lib/idb';
 
 // ── Pre-computed constants (no data loading needed) ──
@@ -16,13 +16,19 @@ export const ALL_PARTS_OF_SPEECH: string[] = [
 // ── Dynamic level loaders ──
 const ALL_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] as const;
 
-const CACHE_VERSION = 2; // Bump version for IndexedDB migration
+const CACHE_VERSION = 3; // v3: detail 拆分为独立文件 + 词条新增 hasCollocations
 const LS_PREFIX = '__nativethink_wb_';
 const IDB_PREFIX = 'wb_';
 
 const _levelCache: Record<string, IWordEntry[]> = {};
 const _loaded: Set<string> = new Set();
 const _loading: Map<string, Promise<void>> = new Map();
+
+// ── detail 按需加载状态（与核心的 _loaded / _loading 正交）──
+const _detailLoaded: Set<string> = new Set();
+const _detailLoading: Map<string, Promise<void>> = new Map();
+const DETAIL_IDB_PREFIX = 'wb_detail_';
+const DETAIL_LS_PREFIX = '__nativethink_wbd_';
 
 /**
  * Load wordbank from IndexedDB (async, high capacity) or localStorage (sync, limited).
@@ -99,7 +105,7 @@ function ensureIndexes() {
   _indexesDirty = false;
 }
 
-async function loadLevel(level: string): Promise<void> {
+async function loadCore(level: string): Promise<void> {
   if (_loaded.has(level)) return;
   if (_loading.has(level)) { await _loading.get(level); return; }
 
@@ -141,6 +147,98 @@ async function loadLevel(level: string): Promise<void> {
   try { await p; } finally { _loading.delete(level); }
 }
 
+/**
+ * 把 detail 就地补齐到已加载的核心词条上。
+ *
+ * ⚠️ 必须就地改字段，禁止写成重建对象（如 `w = {...w, ...d}`）：
+ * ensureIndexes() 里的 `deduped.push(w)` / `all.push(w)` 推入的是**同一批对象引用**，
+ * 就地补齐可自动对 _levelIndex / _allWordsCache / _wordIndex 生效；
+ * 重建对象会让三个索引仍指向旧对象，detail 永远不可见 —— 且不报错，界面只是空着。
+ */
+function applyDetail(level: string, map: IWordDetailMap): void {
+  const words = _levelCache[level];
+  if (!words) return;
+  for (const w of words) {
+    const d = map[w.word.toLowerCase()];
+    if (!d) continue;
+    w.collocations = d.collocations ?? [];
+    w.examples = d.examples ?? [];
+    w.deepExplanation = d.deepExplanation ?? '';
+  }
+}
+
+/** 按需加载某等级的 detail（幂等、并发安全、失败静默） */
+async function loadDetail(level: string): Promise<void> {
+  if (_detailLoaded.has(level)) return;
+  if (_detailLoading.has(level)) { await _detailLoading.get(level); return; }
+
+  const p = (async () => {
+    // ── 缓存命中：IndexedDB 优先，localStorage 兜底 ──
+    try {
+      const idb = await idbGet<{ v: number; d: IWordDetailMap }>(`${DETAIL_IDB_PREFIX}${level}`);
+      if (idb?.v === CACHE_VERSION && idb.d) {
+        applyDetail(level, idb.d);
+        _detailLoaded.add(level);
+        return;
+      }
+    } catch { /* IndexedDB not available */ }
+    try {
+      const raw = localStorage.getItem(`${DETAIL_LS_PREFIX}${level}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.v === CACHE_VERSION && parsed.d) {
+          idbSet(`${DETAIL_IDB_PREFIX}${level}`, parsed).catch(() => {});
+          applyDetail(level, parsed.d);
+          _detailLoaded.add(level);
+          return;
+        }
+      }
+    } catch { /* quota / corrupt */ }
+
+    // ── 网络加载 ──
+    let mod: Record<string, IWordDetailMap>;
+    switch (level) {
+      case 'zhongkao': mod = await import('./data/zhongkao.detail'); break;
+      case 'gaokao': mod = await import('./data/gaokao.detail'); break;
+      case 'cet4': mod = await import('./data/cet4.detail'); break;
+      case 'cet6': mod = await import('./data/cet6.detail'); break;
+      case 'ielts': mod = await import('./data/ielts.detail'); break;
+      case 'toefl': mod = await import('./data/toefl.detail'); break;
+      case 'postgraduate': mod = await import('./data/postgraduate.detail'); break;
+      case 'professional': mod = await import('./data/professional.detail'); break;
+      case 'advanced': mod = await import('./data/advanced.detail'); break;
+      default: return;
+    }
+    const key = Object.keys(mod).find((k) => k.toUpperCase().includes('DETAIL'));
+    const map: IWordDetailMap = key ? (mod as any)[key] : {};
+    applyDetail(level, map);
+    _detailLoaded.add(level);
+
+    // 缓存给下次访问（fire-and-forget）
+    const data = { v: CACHE_VERSION, d: map };
+    idbSet(`${DETAIL_IDB_PREFIX}${level}`, data).catch(() => {});
+    try { localStorage.setItem(`${DETAIL_LS_PREFIX}${level}`, JSON.stringify(data)); } catch { /* quota */ }
+  })();
+
+  _detailLoading.set(level, p);
+  try { await p; } finally { _detailLoading.delete(level); }
+}
+
+/**
+ * 加载等级。withDetail 默认为 true —— 与改动前行为完全一致（核心 + detail），
+ * 因此所有走 preloadLevels 的既有消费方无需任何改动。
+ * 只做搜索/查词的流程请用 preloadCoreOnly 跳过 detail。
+ *
+ * 注意这里是对 loadCore 的包装而非在其末尾追加：loadCore 在缓存命中时会提前 return，
+ * 若把 detail 加载写在 loadCore 内部末尾，缓存命中路径将永远不加载 detail。
+ */
+async function loadLevel(level: string, withDetail = true): Promise<void> {
+  await loadCore(level);
+  if (withDetail) {
+    try { await loadDetail(level); } catch { /* detail 失败不阻断核心可用 */ }
+  }
+}
+
 let _allReady = false;
 async function loadAll(): Promise<void> {
   if (_allReady) return;
@@ -158,10 +256,24 @@ async function loadAll(): Promise<void> {
 export function isLevelReady(level: string): boolean { return _loaded.has(level); }
 export function isAllReady(): boolean { return _allReady; }
 
-/** Preload one or more levels (returns promise — await in useEffect). */
+/** Preload one or more levels（核心 + detail，与改动前行为一致；returns promise — await in useEffect） */
 export function preloadLevels(levels: string[]): Promise<void> {
-  return Promise.all(levels.map(loadLevel)).then(() => {});
+  // 必须写成显式箭头函数：Array.map 会把索引作为第二参数传入，而 loadLevel 的
+  // 第二参数是 withDetail —— 索引 0 为 falsy，会导致第一个等级不加载 detail。
+  return Promise.all(levels.map((l) => loadLevel(l, true))).then(() => {});
 }
+
+/** 只加载核心字段（不含 detail）—— 供仅做搜索/查词的流程使用 */
+export function preloadCoreOnly(levels: string[]): Promise<void> {
+  return Promise.all(levels.map((l) => loadLevel(l, false))).then(() => {});
+}
+
+/** 按需加载 detail（幂等、并发安全、失败静默） */
+export function preloadDetail(levels: string[]): Promise<void> {
+  return Promise.all(levels.map((l) => loadDetail(l).catch(() => {}))).then(() => {});
+}
+
+export function isDetailReady(level: string): boolean { return _detailLoaded.has(level); }
 
 /** Preload every level. */
 export function preloadAll(): Promise<void> { return loadAll(); }

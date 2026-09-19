@@ -448,7 +448,7 @@ export default function DeepVocabularyPage() {
       register: registerFilter !== 'all' ? registerFilter : undefined,
     });
     // Client-side filters
-    if (collocOnly) words = words.filter((w) => w.collocations.length > 0);
+    if (collocOnly) words = words.filter((w) => w.hasCollocations);
     if (emotionFilter !== 'all') words = words.filter((w) => w.emotion === emotionFilter);
     if (noChineseEquivOnly) words = words.filter((w) => w.hasNoChineseEquivalent);
     // Memory filter
