@@ -143,6 +143,10 @@
 
 
 
+
+## 2026-09-19
+- perf(wordbank): 全局搜索改用仅核心预加载，展开词时按需加载 detail (`b6b5254`)
+
 ## 2026-09-19
 - fix(wordbank): index.ts 补出新增的 detail 加载 API（@/data/wordbank 走聚合导出） (`786cd02`)
 

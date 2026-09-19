@@ -25,7 +25,7 @@ import {
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
-import { preloadLevels } from '@/data/wordbank';
+import { preloadCoreOnly } from '@/data/wordbank';
 
 // Route chunk prefetch map — triggers dynamic import() on hover to warm the browser cache
 const ROUTE_PREFETCH: Record<string, () => Promise<unknown>> = {
@@ -91,8 +91,8 @@ export default function AppSidebar() {
                   : pathname === item.path || pathname.startsWith(`${item.path}/`);
               return (
                 <SidebarMenuItem key={item.path}
-                  onMouseEnter={() => { ROUTE_PREFETCH[item.path]?.(); if (item.path === '/vocabulary') preloadLevels(['cet4']); }}
-                  onTouchStart={() => { ROUTE_PREFETCH[item.path]?.(); if (item.path === '/vocabulary') preloadLevels(['cet4']); }}
+                  onMouseEnter={() => { ROUTE_PREFETCH[item.path]?.(); if (item.path === '/vocabulary') preloadCoreOnly(['cet4']); }}
+                  onTouchStart={() => { ROUTE_PREFETCH[item.path]?.(); if (item.path === '/vocabulary') preloadCoreOnly(['cet4']); }}
                 >
                   <SidebarMenuButton asChild tooltip={item.label} isActive={isActive}>
                     <NavLink

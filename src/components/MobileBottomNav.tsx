@@ -8,7 +8,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { preloadLevels } from '@/data/wordbank';
+import { preloadCoreOnly } from '@/data/wordbank';
 
 // Route chunk prefetch map — triggers dynamic import() on touch to warm the browser cache
 const ROUTE_PREFETCH: Record<string, () => Promise<unknown>> = {
@@ -46,7 +46,7 @@ export default function MobileBottomNav() {
             <button
               key={path}
               onClick={() => navigate(path)}
-              onTouchStart={() => { ROUTE_PREFETCH[path]?.(); if (path === '/vocabulary') preloadLevels(['cet4']); }}
+              onTouchStart={() => { ROUTE_PREFETCH[path]?.(); if (path === '/vocabulary') preloadCoreOnly(['cet4']); }}
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 h-full py-1 transition-colors',
                 isActive

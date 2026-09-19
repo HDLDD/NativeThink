@@ -189,8 +189,9 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 3. **typecheck 必过**：`npm run typecheck`（或上方 tsc 全路径）。
 4. **不引入考试焦虑视觉**；不改主色/圆角/阴影语言。
 5. **打包体积敏感**：APK/Electron 不要往 `public/` 塞大文件；大模型走硬链接与 `scripts/` 流程。
-6. **产品需求勿覆盖**：`docs/PRODUCT-SPEC.md` 是需求规格；本 AGENTS.md 是 agent 工作指南。
-7. **Git**：未明确要求不要 commit/push；仓库已用 worktree 时避免在主工作树做跨分支 git 操作。
+6. **改词库后必须重跑 `npm run wordbank:split`**：`src/data/wordbank/data/<level>.ts` 只保留核心字段，detail（搭配/例句/深度解释）在 `<level>.detail.ts`。任何词库生成器都会重新写出全字段主文件，重跑拆分脚本即可恢复。脚本幂等，可安全重复执行；`preloadLevels` 默认仍加载 detail，只有 `preloadCoreOnly` 才跳过。
+7. **产品需求勿覆盖**：`docs/PRODUCT-SPEC.md` 是需求规格；本 AGENTS.md 是 agent 工作指南。
+8. **Git**：未明确要求不要 commit/push；仓库已用 worktree 时避免在主工作树做跨分支 git 操作。
 
 ---
 

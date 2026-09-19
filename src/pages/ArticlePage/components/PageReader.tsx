@@ -21,7 +21,7 @@ import { cn, cleanText, extractJson } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { IReadingContent, TransMode, IParagraph } from '@/data/reading';
 import { buildPages } from '@/data/reading';
-import { queryWords, preloadLevels, getEssentialLevels, isAllReady, findWord } from '@/data/wordbank';
+import { queryWords, preloadCoreOnly, getEssentialLevels, isAllReady, findWord } from '@/data/wordbank';
 import { lookupDictionary } from '@/data/dictionary';
 import { useWordLearning } from '@/lib/use-word-learning';
 import { fetchFullBook } from '@/data/book-fulltext';
@@ -390,7 +390,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   useEffect(() => {
     if (!isAllReady()) {
       const essential = getEssentialLevels(); // User's level + 1 adjacent (~3 levels max)
-      preloadLevels(essential);
+      preloadCoreOnly(essential);
     }
   }, []);
 
