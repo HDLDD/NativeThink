@@ -15,7 +15,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
 import { getNativeTts as getNativeTtsPlugin, pickPreferredEnglishVoice } from './native-tts';
-import { isBundledEngineDisabled, isSherpaAvailable, sherpaPrewarm, sherpaSpeak, warmSherpa } from './sherpa-tts';
+import { isBundledEngineDisabled, isSherpaAvailable, sherpaInFlightCount, sherpaPrewarm, sherpaSpeak, warmSherpa } from './sherpa-tts';
 import { DEFAULT_LOCAL_VOICE_ID, findLocalVoice, isLocalVoiceId } from './tts-voice-catalog';
 import { edgeVoiceNameOf, googleLangOf, isEdgeCatalogVoice } from './tts-voice-catalog';
 import { useTTSSettings } from './tts-settings';
@@ -235,7 +235,8 @@ async function warmTtsCache(url: string): Promise<void> {
     if (typeof caches === 'undefined') return;
     const cache = await caches.open(TTS_CACHE_NAME);
     if (await cache.match(url)) return;
-    const resp = await fetch(url, { priority: 'low' } as RequestInit);
+    // 必须带超时：网络被黑洞时 fetch 不会 reject，会永久挂起（真机上表现为"点朗读毫无反应"）
+    const resp = await fetch(url, { priority: 'low', signal: AbortSignal.timeout(10_000) } as RequestInit);
     if (resp.ok) await cache.put(url, resp.clone());
   } catch { /* ignore */ }
 }
@@ -397,7 +398,9 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       const piperOk = isSherpaAvailable() && !isBundledEngineDisabled();
       const engines: Array<'piper' | 'native' | 'cf' | 'edge' | 'google'> = IS_ANDROID_NATIVE
         ? (settings.preferNative
-          ? (piperOk ? ['piper', 'native'] : ['native'])
+          // 「只用系统引擎」必须真的只用系统引擎：内置引擎一旦不可用（含原生线程耗尽导致的
+          // 闪退）用户就会打开这个开关来避开它，若仍把 piper 排第一就完全避不开。
+          ? ['native']
           : (wantsOnlineVoice
             ? (piperOk ? ['cf', 'piper', 'native', 'edge', 'google'] : ['cf', 'native', 'edge', 'google'])
             : (piperOk ? ['piper', 'native', 'cf', 'edge', 'google'] : ['native', 'cf', 'edge', 'google'])))
@@ -601,15 +604,19 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       }
 
       if (engine === 'piper') {
-        // 内置离线引擎：设备内合成（不联网），起播几十毫秒；下一段顺手预合成。
-        // 音色本身不可用时 sherpaSpeak 内部已经回退到 lessac，所以这里失败即整句跳过。
+        // 内置离线引擎：设备内合成（不联网），起播几十毫秒。
+        // 失败必须**降级到下一个引擎**（与 cf/edge/google 一致）。原先 .catch(() => skipChunk())
+        // 会让「内置引擎不可用」表现为彻底静默：没声音、没提示、也不去试系统/云端引擎 ——
+        // 真机上"点朗读没反应"就是这个后果。
         const t0 = Date.now();
         const voiceId = localVoiceIdFor(settings.selectedVoiceURI);
         const next = chunks[idx + 1];
-        if (next) sherpaPrewarm(next, { voiceId, speed: rate });
+        // 原生合成是串行的（synthLock）：前方还有在途请求时不再预取，
+        // 否则预合成只是把请求堆进原生队列（曾是线程数耗尽的诱因之一）。
+        if (next && sherpaInFlightCount() === 0) sherpaPrewarm(next, { voiceId, speed: rate });
         sherpaSpeak(chunks[idx], { voiceId, speed: rate })
           .then(({ url }) => playUrl(url, { engine: 'piper', t0, retryNextEngine, skipChunk }))
-          .catch(() => skipChunk());
+          .catch(retryNextEngine);
         return;
       }
 
@@ -973,7 +980,8 @@ export async function probeTtsEngines(rate = 0.9): Promise<ITtsEngineProbe[]> {
     const t1 = Date.now();
     try {
       const url = cfTtsUrl(text, rate, null, 'en');
-      const r = await fetch(url, { method: 'GET' });
+      // 必须带超时：不可达网络下 fetch 会永久挂起，导致「朗读自检」卡死不出结果
+      const r = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(8_000) });
       const blob = r.ok ? await r.blob() : null;
       out.push({ engine: 'cloud', ok: !!(blob && blob.size > 500), ms: Date.now() - t1, note: blob ? `${blob.size} B` : `HTTP ${r.status}` });
     } catch (e) {

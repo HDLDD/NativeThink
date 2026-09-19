@@ -28,6 +28,9 @@ import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 内置离线朗读引擎（sherpa-onnx）。
@@ -88,6 +91,53 @@ public class SherpaTtsPlugin extends Plugin {
     private File progressLog;
     /** sherpa-onnx 的 generate 不是线程安全的，串行化 */
     private final Object synthLock = new Object();
+
+    /**
+     * 合成任务的工作线程 —— 必须是**有界**的。
+     *
+     * 历史事故（真机崩溃栈确认）：speak() 原本「每次调用 new Thread」，而 generate() 被
+     * synthLock 串行化，于是并发请求各自占一条 OS 线程（1MB 栈）阻塞在锁上；请求一多就
+     * 把进程线程数耗尽，new Thread 抛 OutOfMemoryError: pthread_create failed → 整个 App
+     * 闪退（表现为「朗读一会直接退出」）。
+     *
+     * 单线程足够：合成本来就是串行的，线程池只让请求变成排队的轻量任务对象，
+     * 不再每个请求各占一条栈。
+     */
+    private final ExecutorService ttsWorker = Executors.newSingleThreadExecutor(run -> {
+        Thread t = new Thread(run, "sherpa-tts");
+        t.setDaemon(true);
+        return t;
+    });
+
+    /** 模型加载单独一条线程，避免被合成队列挡住 */
+    private final ExecutorService loadWorker = Executors.newSingleThreadExecutor(run -> {
+        Thread t = new Thread(run, "sherpa-load");
+        t.setDaemon(true);
+        return t;
+    });
+
+    /** 在途（含排队）合成任务上限 —— 超过直接拒绝，避免请求无限堆积 */
+    private static final int MAX_PENDING_TTS = 8;
+    private final AtomicInteger pendingTts = new AtomicInteger(0);
+
+    /** 提交合成任务；已达上限返回 false，由调用方 reject */
+    private boolean submitTts(Runnable task) {
+        if (pendingTts.get() >= MAX_PENDING_TTS) return false;
+        pendingTts.incrementAndGet();
+        try {
+            ttsWorker.execute(() -> {
+                try {
+                    task.run();
+                } finally {
+                    pendingTts.decrementAndGet();
+                }
+            });
+        } catch (Throwable t) {
+            pendingTts.decrementAndGet();
+            return false;
+        }
+        return true;
+    }
 
     private void ensureDirs() {
         if (wavDir == null) {
@@ -196,7 +246,7 @@ public class SherpaTtsPlugin extends Plugin {
         state = STATE_LOADING;
         lastError = null;
         try { if (progressLog != null && progressLog.exists()) progressLog.delete(); } catch (Throwable ignored) { /* ignore */ }
-        new Thread(() -> {
+        loadWorker.execute(() -> {
             try {
                 ensureModel(MODEL_KOKORO);
                 route = "files";
@@ -208,7 +258,7 @@ public class SherpaTtsPlugin extends Plugin {
                 lastError = describe(t);
             }
             call.resolve(stateObject());
-        }).start();
+        });
     }
 
     /** 一个模型的全部配置 */
@@ -398,7 +448,7 @@ public class SherpaTtsPlugin extends Plugin {
             return;
         }
 
-        new Thread(() -> {
+        if (!submitTts(() -> {
             try {
                 OfflineTts engine = ensureModel(modelId);
 
@@ -437,7 +487,10 @@ public class SherpaTtsPlugin extends Plugin {
             } catch (Throwable t) {
                 call.reject(t.getClass().getSimpleName() + ": " + t.getMessage());
             }
-        }).start();
+        })) {
+            // 队列已满：明确拒绝，让前端快速降级/提示，而不是继续堆积任务
+            call.reject("busy: too many pending tts requests");
+        }
     }
 
     /** 清空合成缓存（设置页的「清理朗读缓存」用） */

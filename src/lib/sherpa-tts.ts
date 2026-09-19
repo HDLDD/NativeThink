@@ -182,6 +182,22 @@ function notifyVoiceFallback(from: string, to: string): void {
 }
 
 /**
+ * 合成结果类型 */
+type ISherpaSpeakResultUrl = { url: string; durationMs: number; cached: boolean; ms: number };
+
+/**
+ * 在途请求去重 —— 相同 (音色, 文本, 语速) 的并发调用共用同一个 Promise。
+ *
+ * 为什么需要：原生合成是**串行**的（SherpaTtsPlugin 用 synthLock 串行化 generate），
+ * 重复提交同样的文本只会把请求堆进原生队列；真机上这种堆积曾把进程线程数耗尽，
+ * 导致 OutOfMemoryError: pthread_create failed → 整个 App 闪退。
+ */
+const inflight = new Map<string, Promise<ISherpaSpeakResultUrl>>();
+
+/** 当前在途（尚未完成）的合成请求数 —— 供调用方判断要不要预合成下一段 */
+export function sherpaInFlightCount(): number { return inflight.size; }
+
+/**
  * 合成并返回可播放 URL（设备内合成，不联网）。
  * speed：1.0 原速，越大越快（与全站 rate 语义一致）。
  *
@@ -191,14 +207,30 @@ function notifyVoiceFallback(from: string, to: string): void {
 export async function sherpaSpeak(
   text: string,
   opts?: ISherpaSpeakOptions | number,
-): Promise<{ url: string; durationMs: number; cached: boolean; ms: number }> {
+): Promise<ISherpaSpeakResultUrl> {
   const clean = text.trim();
   if (!clean) throw new Error('empty_text');
   const { voiceId, speed } = normalizeOpts(opts);
+  const key = keyOf(voiceId, clean, speed);
 
-  const hit = urlCache.get(keyOf(voiceId, clean, speed));
+  const hit = urlCache.get(key);
   if (hit) return { ...hit, cached: true, ms: 0 };
 
+  // 已在途 → 复用同一个 Promise，不重复提交原生
+  const pending = inflight.get(key);
+  if (pending) return pending;
+
+  const p = runSpeak(clean, voiceId, speed);
+  inflight.set(key, p);
+  try {
+    return await p;
+  } finally {
+    inflight.delete(key);
+  }
+}
+
+/** sherpaSpeak 的实际合成体（已去重/缓存判定之后） */
+async function runSpeak(clean: string, voiceId: string, speed: number): Promise<ISherpaSpeakResultUrl> {
   await warmSherpa();
 
   const requested = findLocalVoice(voiceId) ?? FALLBACK_VOICE;

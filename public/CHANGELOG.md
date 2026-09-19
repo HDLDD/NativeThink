@@ -154,6 +154,10 @@
 
 
 
+
+## 2026-09-19
+- docs: 明确 APK 产物命名约定 —— 当前线占用规范名并覆盖，旧版本线冻结为 -<major>.x (`e4aaed1`)
+
 ## 2026-09-19
 - chore(release): APK 版本线切到 2.0.0（versionCode 45），versionName 改为 patch 自增 (`40b0bfe`)
 
