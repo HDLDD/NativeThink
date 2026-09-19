@@ -1,19 +1,19 @@
-# wordbank detail 字段按需加载 —— 设计文档
+# wordbank detail 字段按需加载 —— 设计文档（修订版）
 
-- 日期：2026-09-19
+- 日期：2026-09-19（修订：采纳"detail 默认加载 + 仅核心路径"简化）
 - 状态：待评审
-- 前置分析：[2026-09-19-wordbank-detail-split-analysis.md](./2026-09-19-wordbank-detail-split-analysis.md)（测量数据与消费者分布）
+- 前置分析：[2026-09-19-wordbank-detail-split-analysis.md](./2026-09-19-wordbank-detail-split-analysis.md)
 - 关联：[AGENTS.md](../../../AGENTS.md)、[ROADMAP.md](../../../ROADMAP.md)
 
 ---
 
 ## 1. 目标
 
-把 wordbank 词条的 **detail 字段**（`collocations` / `examples` / `deepExplanation`）从等级主文件中拆出、改为按需加载，使只做搜索与列表浏览的流程不必下载这部分数据。
+把 wordbank 词条的 **detail 字段**（`collocations` / `examples` / `deepExplanation`）从等级主文件中拆出，使**只做搜索的流程**不必下载这部分数据。
 
-**唯一量化目标**：`GlobalWordSearch` 的全量预加载体积由 **9.66 MB gzip 降至 ≈2.8 MB gzip**，且**搜索覆盖范围与搜索结果完全不变**（只影响展开后的详情面板）。
+**唯一量化目标**：`GlobalWordSearch` 的全量预加载由 **9.66 MB gzip 降至 ≈2.8 MB gzip**，且**搜索覆盖与搜索结果完全不变**。
 
-依据（前置分析 §3.3、本次新增的分等级测量）：
+依据：
 
 | 口径 | gzip |
 |---|---|
@@ -21,43 +21,55 @@
 | 9 个等级仅核心字段 | 2.78 MB |
 | 差（detail 部分） | 6.87 MB |
 
-`queryWords` 的搜索只用 `word` / `meaning` / `phonetic`，筛选用 `topics` / `register` / `pos` / `frequencyRank` —— **全部属于核心字段**。因此只加载核心字段不改变任何查询语义。这是本方案优于"削减预加载等级数"的关键：后者省得更多（7.24 MB）但会把搜索覆盖从 9 个等级缩到 3 个。
+`queryWords` 的搜索只用 `word` / `meaning` / `phonetic`，筛选用 `topics` / `register` / `pos` / `frequencyRank` —— **全部属于核心字段**。故只加载核心不改变任何查询语义。这优于"削减预加载等级数"（省 7.24 MB 但搜索覆盖从 9 级缩到 3 级）。
+
+### 1.1 为什么只有 1 个消费方需要改造
+
+关键设计决策：**`loadLevel(level)` 默认仍然"核心 + detail"一起加载**，只新增一条"仅核心"路径。
+
+由此：
+
+| 流程 | 改动后的行为 |
+|---|---|
+| 词汇页 / 拼写页 / 阅读器（走 `preloadLevels`） | 仍加载 core + detail，**字节数与改动前完全相同**，其同步消费逻辑天然正确，**一行都不用改** |
+| `GlobalWordSearch`（走新增的仅核心路径） | 9 级预加载只拿核心 → 体积收益在此落地；展开某词时按需加载该等级的 detail |
+
+因此需要改造的消费方从原设计的 7 个降为 **1 个**，且**不存在中间态回归**：`preloadLevels` 的契约未变。
 
 ## 2. 非目标
 
 | 不做 | 原因 |
 |---|---|
-| 移除 `synonyms` / `antonyms` / `wordFamily` | 虽 99.999% 为空，但 gzip 收益≈0，且会触碰 3 处消费方（`GlobalWordSearch:332-354`、`DeepVocabularyPage:1388-1410`、`SpellingPage:547`） |
-| 紧凑编码 / 元组数组格式 | 实测 gzip 仅 −5.4%，叠加 detail 拆分后只再省 0.23 MB |
+| 改造通过 `preloadLevels` 获取 detail 的消费方（`DeepVocabularyPage`、`CollocationsTab`、`FlashcardMode`、`DailyLearningMode`、`SpellingPage`） | 它们的契约不变即正确；多改一处就多一处风险 |
+| 移除 `synonyms` / `antonyms` / `wordFamily` | 虽 99.999% 为空，但 gzip 收益≈0，且会触碰 3 处消费方 |
+| 紧凑编码 / 元组数组格式 | 实测 gzip 仅 −5.4% |
 | 按词懒加载 detail | 会让 `CollocationsTab` 退化为 N 次异步请求 |
-| 调整 `GlobalWordSearch` 的预加载等级数 | 会缩小搜索覆盖，不如本方案 |
-| 改动 `dictionary/` 相关体积 | 与本任务无关 |
-| 删除 `preloadAll` / `preloadProgressive` 死代码 | 属独立清理，避免混入本次改动 |
+| 调整 `GlobalWordSearch` 的预加载等级数 | 会缩小搜索覆盖 |
+| 删除 `preloadAll` / `preloadProgressive` 死代码 | 独立清理，避免混入 |
 
 ## 3. 架构
 
-三层，自下而上：
-
 ```
-数据层    <level>.ts（核心字段 + hasCollocations）  +  <level>.detail.ts（IWordDetailMap）
+数据层    <level>.ts（核心字段 + detail 空占位 + hasCollocations）  +  <level>.detail.ts
             ↑ 由 scripts/split-wordbank-detail.mjs 确定性产出
-加载层    wordbank.ts：loadLevel(核心，现有) / loadDetail(按需，新增) + 就地补齐
-消费层    7 个消费方按需 await preloadDetail(...)，靠 version 号触发重渲染
+加载层    wordbank.ts：loadLevel(level, withDetail=true 默认) / preloadCoreOnly / preloadDetail
+消费层    GlobalWordSearch 改用 preloadCoreOnly + 展开时 preloadDetail（唯一必需改动）
 ```
 
 ### 3.1 数据层
 
-- `<level>.ts`：**文件名与导出名不变**（仍为 `<LEVEL>_WORDS`），内容改为仅含核心字段。这样一来 `wordbank.ts` 现有 `switch` 里的 9 条 `import('./data/<level>')` 完全不用改。
+- `<level>.ts`：**文件名与导出名不变**（仍为 `<LEVEL>_WORDS`），内容改为：核心字段 + `hasCollocations` + **detail 三字段的空占位**（`collocations: []`、`examples: []`、`deepExplanation: ''`）。
+  - 保留空占位是刻意的：`IWordEntry` 的 detail 字段仍为必填，因此**渲染代码 `w.collocations.length` / `w.examples[0]` 无需加任何保护**，且不会出现 `TypeError`。
+  - 空占位是高度重复的内容，gzip 后近似零成本（V5 会实测确认）。
 - `<level>.detail.ts`：新增，导出 `export const <LEVEL>_DETAIL: IWordDetailMap`。
-- 新增核心字段 `hasCollocations: boolean`，取值 = 拆分前 `collocations.length > 0`。
-  **它存在的唯一理由**：让 `DeepVocabularyPage.tsx:451` 的 `collocOnly` 过滤在 detail 尚未加载时仍能得到与改动前**逐条相同**的结果集。
+- `hasCollocations: boolean` = 拆分前 `collocations.length > 0`。它**不再是 load-bearing**（detail 默认会加载），但保留并用于 `collocOnly` 过滤：这样该查询期过滤不再隐式依赖 detail 的加载时机，且给验证提供一个可全量断言的不变式。
 
 产出工具 `scripts/split-wordbank-detail.mjs`（新增）：
 
-- **用 TypeScript 编译器加载真实数组**，不用正则解析：`ts.transpileModule(source)` → 写临时 `.mjs` → 动态 import。理由：数据文件是 TS 对象字面量，且存在**两种引号风格**（`zhongkao`/`gaokao`/`postgraduate`/`professional` 用单引号，其余用双引号），正则方案会静默漏掉 4 个等级（前置分析 §3.1 已踩过这个坑）。此技术已在本次会话中验证可用。
-- 输出统一使用无引号键 + 双引号字符串，消除双风格隐患。
-- **幂等**：若 `<level>.ts` 已无 detail 字段则跳过（避免二次拆分把 detail 当核心）。
-- 纳入 npm 脚本 `wordbank:split`，并在文档中说明：**重新运行任何词库生成器后必须再跑本脚本**，否则 detail 会重新混回主文件。
+- **用 TypeScript 编译器加载真实数组，不用正则解析**：`ts.transpileModule(source)` → 临时 `.mjs` → 动态 import。数据文件是 TS 对象字面量且存在**两种引号风格**（`zhongkao`/`gaokao`/`postgraduate`/`professional` 单引号，其余双引号），正则方案会静默漏掉 4 个等级（分析文档 §3.1 已踩过）。
+- 输出统一为无引号键 + 双引号字符串，消除双风格隐患。
+- **幂等**：若检测到主文件已无真实 detail（只剩空占位）则跳过，避免二次拆分。
+- 纳入 npm 脚本 `wordbank:split`；**重跑任何词库生成器后必须再跑本脚本**，否则 detail 会重新混回主文件。
 
 ### 3.2 类型（`src/data/wordbank/schema.ts`）
 
@@ -84,9 +96,9 @@ export interface IWordEntry {
   emotion: 'positive' | 'neutral' | 'negative';
   topics: string[];
   hasNoChineseEquivalent: boolean;
-  /** 拆分前 collocations.length > 0；供 collocOnly 过滤在 detail 未加载时保持正确 */
+  /** 拆分前 collocations.length > 0；供 collocOnly 过滤不依赖 detail 加载时机 */
   hasCollocations: boolean;
-  // ── detail 字段（保留在类型中作为占位，detail 加载后就地补齐）──
+  // ── detail 字段：类型仍为必填，未加载时为空占位 ──
   collocations: string[];
   examples: IExample[];
   deepExplanation: string;
@@ -97,19 +109,23 @@ export interface IWordEntry {
 }
 ```
 
-**为什么 detail 字段仍留在 `IWordEntry` 上**：所有渲染代码都在读 `w.collocations.length` / `w.examples[0]`。保留字段并以空值占位，可让渲染层在不改动的情况下安全降级（detail 未到位时显示为空，而非抛 `TypeError`）。
-
 ### 3.3 加载层（`src/data/wordbank/wordbank.ts`）
 
-新增导出：
+**契约变化仅一处新增，`preloadLevels` 语义完全不变。**
 
 ```ts
-export function isDetailReady(level: string): boolean;
-/** 幂等；并发安全；失败静默（调用方按空 detail 降级） */
-export function preloadDetail(levels: string[]): Promise<void>;
+/** 预加载等级（核心 + detail）—— 语义与改动前一致 */
+export function preloadLevels(levels: string[]): Promise<void>;   // 现有，不改
+
+/** 仅预加载核心字段，不加载 detail —— 供只做搜索/查词的流程使用 */
+export function preloadCoreOnly(levels: string[]): Promise<void>;  // 新增
+
+/** 按需加载 detail（幂等、并发安全、失败静默） */
+export function preloadDetail(levels: string[]): Promise<void>;    // 新增
+export function isDetailReady(level: string): boolean;             // 新增
 ```
 
-新增内部状态与常量：
+内部状态（与现有 `_loaded` / `_loading` 正交）：
 
 ```ts
 const _detailCache: Record<string, IWordDetailMap> = {};
@@ -119,14 +135,22 @@ const DETAIL_IDB_PREFIX = 'wb_detail_';
 const DETAIL_LS_PREFIX = '__nativethink_wbd_';
 ```
 
-`loadDetail(level)` 流程（与现有 `loadLevel` 同构，复用其缓存策略）：
+内部签名改为 `loadLevel(level: string, withDetail = true)`：
+1. 确保核心已加载（现有逻辑不变）
+2. `withDetail === true` 时，继续 `await loadDetail(level)`
 
-1. `_detailLoaded.has(level)` → 直接返回
-2. `_detailLoading.has(level)` → await 同一个 promise（防并发重复加载）
-3. 读缓存（IndexedDB `wb_detail_<level>` → localStorage 兜底，版本不符则丢弃）
+- `preloadLevels(levels)` → `Promise.all(levels.map(l => loadLevel(l, true)))`（默认，不变）
+- `preloadCoreOnly(levels)` → `Promise.all(levels.map(l => loadLevel(l, false)))`
+- `preloadDetail(levels)` → 只走 `loadDetail`，不动核心
+
+`loadDetail(level)`：
+
+1. `_detailLoaded.has(level)` → 返回
+2. `_detailLoading.has(level)` → await 同一 promise（防并发重复）
+3. 读缓存（IndexedDB `wb_detail_<level>` → localStorage 兜底，版本不符即丢弃）
 4. 未命中 → `await import('./data/<level>.detail')`，取导出名含 `DETAIL` 的键
-5. `applyDetail(level, map)` **就地补齐**
-6. `saveToCache` 同构写入 detail 缓存（fire-and-forget）
+5. `applyDetail(level, map)` 就地补齐
+6. 写缓存（fire-and-forget）
 7. 标记 `_detailLoaded`
 
 ```ts
@@ -143,28 +167,36 @@ function applyDetail(level: string, map: IWordDetailMap): void {
 }
 ```
 
-**就地补齐（而非重建对象）是刻意的，且是 load-bearing 的**：`queryWords` 返回的是 `_levelCache` 内对象的引用，已渲染的列表持有同一批引用；就地改字段配合消费方的 version 号即可让详情面板刷新，无需重新查询。
+**就地补齐（而非重建对象）是刻意的，且是 load-bearing 的**：`queryWords` 返回的是 `_levelCache` 内对象的引用。进一步地，`ensureIndexes()` 构建 `_levelIndex` 与 `_allWordsCache` 时执行 `deduped.push(w)` / `all.push(w)`——**推入的是同一批对象引用而非副本**，因此就地补齐自动对三个索引生效。
 
-进一步地，`ensureIndexes()` 构建 `_levelIndex` 与 `_allWordsCache` 时执行的是 `deduped.push(w)` / `all.push(w)`——**推入的是同一批对象引用，不是副本**。因此就地补齐会自动对 `_levelIndex`、`_allWordsCache`、`_wordIndex` 全部生效。**实现时若把 `applyDetail` 写成重建对象（例如 `w = {...w, ...d}`），上述三个索引仍指向旧对象，detail 将永远不可见**——这是本设计最容易踩坏的一处。
+> **实现时若把 `applyDetail` 写成重建对象（如 `w = {...w, ...d}`），三个索引仍指向旧对象，detail 将永远不可见**——不报错，界面只是空着。这是本设计最隐蔽的失败模式。
 
-**缓存版本必须递增**：`CACHE_VERSION` 由 `2` 改为 `3`。
-
-- 理由：旧 `wb_<level>` 里存的是**含 detail 的全字段结构**。若不递增，改造后首次加载会命中旧缓存，得到"看起来正常但缺 `hasCollocations`"的数据（值为 `undefined` → `collocOnly` 过滤全部判假，功能静默损坏）。
-- 代价：老用户首次访问会重新下载一次；但此时下载的是**核心文件（2.78 MB）而非 9.66 MB**，实际更快。
+**缓存版本必须递增**：`CACHE_VERSION` 由 `2` 改为 `3`。旧 `wb_<level>` 缓存存的是含真实 detail 的全字段结构；若不递增，改造后首次加载命中旧缓存会导致数据形态混杂（旧结构里 detail 有值但缺少 `hasCollocations`）。代价是老用户重下一次，但此时下载的是核心文件（更小）。
 
 ### 3.4 消费方义务
 
-| 消费方 | 用到的 detail | 改造要求 |
-|---|---|---|
-| `GlobalWordSearch.tsx` | 展开面板：`examples:288`、`collocations:313`、`synonyms/antonyms:332-354`、`deepExplanation:366` | 全量预加载**保持加载 9 个等级的核心**；`expandedWord` 变化时 `await preloadDetail([level])` 后 bump version |
-| `DeepVocabularyPage.tsx` | `collocOnly` 过滤 `:451`、详情面板 `:1372-1470`、`collocWordPopup:1770`、收藏 `:834` | **`:451` 改用 `hasCollocations`**（同步、语义不变）；选中词 / 进入需 detail 的模式时 `await preloadDetail([level])` |
-| `CollocationsTab.tsx` | 全库建索引 `:285-301` | 它建索引的 `:270` 是**同步 `useMemo`，无法 await**。改用本仓库既有 `dataVersion` 模式：`useEffect` 里 `await preloadDetail(selectedLevels)` → `setDetailVersion(v=>v+1)`，并把 `detailVersion` 加入 `useMemo` 依赖 |
-| `SpellingPage.tsx` | 构建拼写题 `:798`、`synonyms:547` | 生成题目前 `await preloadDetail([level])` |
-| `FlashcardMode.tsx` | `examples[0]:121,349` | 进入卡片模式时确保 detail 就绪 |
-| `DailyLearningMode.tsx` | `examples:256,363,858`、`collocations:552,865` | 同上 |
-| `PageReader.tsx`、`AppSidebar.tsx`、`MobileBottomNav.tsx` | **无**（只做查词/预加载） | 无需改动 |
+**必需（1 处）** —— `src/components/GlobalWordSearch.tsx`：
 
-**降级约定**：`preloadDetail` 失败时静默返回，消费方按"detail 为空"渲染（列表仍可见、例句区为空），不弹错、不阻断页面。
+| 位置 | 改动 |
+|---|---|
+| `:69` | `preloadLevels(essential)` → `preloadCoreOnly(essential)` |
+| `:75` | `remaining.forEach(level => preloadLevels([level]))` → `preloadCoreOnly([level])` |
+| 新增 | `detailReady` state + `useEffect`：`expandedWord` 变化时找到该词的 `level`，若 `!isDetailReady(level)` 则 `await preloadDetail([level])` 后 `setDetailReady(true)`；`!detailReady` 时详情面板显示加载占位 |
+| `:119` | `expandedEntry` 派生逻辑不变（`detailReady` 变化会触发重渲染，就地补齐后的对象随即可见） |
+
+**可选（3 处，各自一行，只做查词、不用 detail）**：
+
+| 位置 | 改动 |
+|---|---|
+| `ArticlePage/components/PageReader.tsx:393` | `preloadLevels(essential)` → `preloadCoreOnly(essential)` |
+| `components/AppSidebar.tsx:94-95` | `preloadLevels(['cet4'])` → `preloadCoreOnly(['cet4'])` |
+| `components/MobileBottomNav.tsx:49` | 同上 |
+
+**无需改动**：`DeepVocabularyPage`（含 `:451` 的 `collocOnly`，改为使用 `hasCollocations`，见下）、`CollocationsTab`、`FlashcardMode`、`DailyLearningMode`、`SpellingPage`、`DeepVocabularyPage` 的 `preloadLevels` 调用点。
+
+**唯一一处消费方逻辑微调**：`DeepVocabularyPage.tsx:451` 的 `w.collocations.length > 0` → `w.hasCollocations`。语义等价，但让该过滤不再隐式依赖 detail 加载时机。
+
+**降级约定**：`preloadDetail` 失败时静默返回；`GlobalWordSearch` 详情面板回落为"仅显示核心信息（释义/音标）"，不弹错、不阻断。
 
 ## 4. 验证方案
 
@@ -173,40 +205,49 @@ function applyDetail(level: string, map: IWordDetailMap): void {
 | V1 | `npm run typecheck` + `npm run lint:eslint` | 均 exit 0 |
 | V2 | `npm run build:web` | exit 0 |
 | V3 | **全新 clone 构建**（`git archive` + junction `node_modules` + `vite build`） | exit 0 |
-| V4 | **Node 断言（针对真实源码）**：用项目自带 tsc 转译 `wordbank.ts` 与拆分脚本产物后在 Node 直接调用，断言：①`hasCollocations` 与拆分前 `collocations.length > 0` 在**全部 75,113 条**上逐条一致；②`applyDetail` 就地补齐后字段值与 detail 源文件一致；③`collocOnly` 过滤结果集与改动前**完全相同**（对比 ID 集合） | 全部断言通过 |
-| V5 | **体积指标**：拆分后 9 级核心合计 gzip、以及 `GlobalWordSearch` 全量预加载对应的 chunk 集合 gzip | 核心合计 ≈2.8 MB（原 9.66 MB）；不劣于 3.2 MB |
+| V4 | **Node 断言（针对真实源码）**：用项目自带 tsc 转译后在 Node 直接调用。①全部 **75,113 条**上 `hasCollocations === (拆分前 collocations.length > 0)`；②`applyDetail` 就地补齐后字段值与 detail 源文件逐条一致；③`collocOnly` 过滤结果集（词条 ID 集合）与改动前**完全相同**；④`applyDetail` 后 `_levelIndex` 中对象的 detail 字段也已更新（验证共享引用，防"重建对象"回归） | 全部断言通过 |
+| V5 | **体积指标**：拆分后 9 级核心合计 gzip；确认空占位未抵消收益 | 核心合计 ≤3.2 MB（原 9.66 MB） |
 
 V4 沿用本次会话已验证可用的手法（tsc `transpileModule` → 临时 `.mjs` → 动态 import → Node 断言），不引入测试框架（本项目无 vitest/jest，见 AGENTS.md）。
+
+**V4 必须在拆分前先跑一次并留存基线快照**，否则"与改动前完全相同"无法证明。
 
 ## 5. 验收标准
 
 1. V1–V4 全部通过。
 2. `GlobalWordSearch` 首次打开时加载的 wordbank 体积由 9.66 MB gzip 降至 ≈2.8 MB gzip。
-3. 搜索功能**行为不变**：同一查询词的结果条数、顺序、可见字段与改动前一致。
-4. `collocOnly` 过滤的结果集与改动前逐条相同（V4③）。
-5. 词汇页各模式（浏览 / 闪卡 / 每日学习 / 搭配 / 详情面板）功能与改动前逐项对照一致，无空白详情面板。
-6. `CACHE_VERSION` 已递增，且升级后旧缓存不会导致 `collocOnly` 静默失效。
+3. 搜索行为不变：同一查询词的结果条数、顺序、可见字段与改动前一致。
+4. `collocOnly` 过滤结果集与改动前逐条相同（V4③）。
+5. 词汇页 / 拼写页 / 阅读器 / 全局搜索的行为与改动前逐项对照一致；全局搜索展开词的详情面板在 detail 到位后完整显示（含加载中占位）。
+6. `CACHE_VERSION` 已递增。
+7. `preloadLevels` 的对外契约与调用点数量未变（除上述 1 必需 + 3 可选）。
 
 ## 6. 风险与缓解
 
 | 风险 | 缓解 |
 |---|---|
-| 就地补齐后**已渲染的列表不刷新**，详情面板显示空白 | 消费方一律在 `await preloadDetail` 后 bump version（本仓库 `DeepVocabularyPage:370` 已有 `dataVersion` 先例）；消费方清单已在上表逐个列出，不遗漏 |
-| 旧 IndexedDB 缓存缺 `hasCollocations` → `collocOnly` 静默返回空 | `CACHE_VERSION` 递增至 3；V4① 全量断言兜底 |
-| 词库生成器重跑**覆盖拆分结果** | 拆分脚本幂等且纳入 npm 脚本；在 `AGENTS.md` 与脚本头部注明"改词库后必须重跑 `wordbank:split`" |
-| 正则解析漏掉单引号等级（本次已踩坑） | 拆分脚本用 tsc 转译 + 动态 import，不做正则解析 |
-| `preloadDetail` 与 `loadLevel` 并发导致重复加载/竞态 | 用 `_detailLoading: Map<level, Promise>` 去重，与现有 `_loading` 同构 |
-| 拆分后主文件仍有 detail 字段占位，误以为未拆分 | V5 体积指标 + V4② 字段一致性断言 |
+| `applyDetail` 写成重建对象 → 三个索引指向旧对象，detail 永不可见（**最隐蔽**） | V4④ 专门断言 `_levelIndex` 内对象的 detail 已更新；设计文档已显式标注为 load-bearing |
+| 拆分脚本用正则解析 → 静默漏掉 4 个单引号等级 | 脚本用 tsc 转译 + 动态 import；V4①② 全量断言兜底 |
+| 旧 IndexedDB 缓存结构混杂 | `CACHE_VERSION` 递增至 3 |
+| 词库生成器重跑覆盖拆分结果 | 脚本幂等 + 纳入 `wordbank:split`；`AGENTS.md` 注明"改词库后必须重跑" |
+| 空占位抵消体积收益 | V5 实测门槛 ≤3.2 MB，不达标即需改为彻底省略字段（并相应加渲染保护） |
+| `GlobalWordSearch` 展开词时 detail 未就绪出现空白面板 | `detailReady` 状态 + 加载占位；失败静默回落核心信息 |
+| `loadDetail` 与 `loadLevel` 并发导致重复加载 | `_detailLoading` Map 去重，与现有 `_loading` 同构 |
+| **`preloadLevels` 内的 `levels.map(loadLevel)` 会把 `map` 的索引当作 `withDetail`** —— 索引 `0` 为 falsy，导致**第一个等级永远不加载 detail**（不报错，界面只是空着） | 必须改为显式箭头函数 `levels.map((l) => loadLevel(l, true))`；V4 增加静态守卫断言禁止 `levels.map(loadLevel)` 写法 |
+| `loadLevel` 的缓存命中路径会提前 `return`，若把 detail 加载追加到原函数末尾则**缓存命中时 detail 永不加载**（老用户二次访问详情全空） | 必须把原 `loadLevel` 重命名为 `loadCore`，另加薄包装 `loadLevel(level, withDetail)`，保证两条路径都覆盖 |
 
 ## 7. 回滚
 
-逐提交 revert 即可。唯一副作用：`CACHE_VERSION` 回退会让用户已有的 v3 缓存失效并重新下载一次核心文件（2.78 MB），不影响数据正确性（学习进度存在另一套 key，与本缓存无关）。
+逐提交 revert。唯一副作用：`CACHE_VERSION` 回退使 v3 缓存失效并重新下载核心文件一次，不影响学习进度（存于另一套 key）。
 
 ## 8. 交付物
 
-- `scripts/split-wordbank-detail.mjs`（新增）+ `package.json` 的 `wordbank:split` 脚本
-- `src/data/wordbank/schema.ts`（新增 `IWordDetail` / `IWordDetailMap` / `hasCollocations`）
-- `src/data/wordbank/data/*.ts`（改写为核心字段）+ `*.detail.ts`（新增 9 个）
-- `src/data/wordbank/wordbank.ts`（新增 detail 加载层 + `CACHE_VERSION` 递增）
-- 7 个消费方适配（见 §3.4）
-- `AGENTS.md` 补充"改词库后必须重跑 `wordbank:split`"约定
+- `scripts/split-wordbank-detail.mjs`（新增）+ `package.json` 的 `wordbank:split`
+- `scripts/verify-wordbank-split.mjs`（新增，V4 断言工具）
+- `src/data/wordbank/schema.ts`（`IWordDetail` / `IWordDetailMap` / `hasCollocations`）
+- `src/data/wordbank/data/*.ts`（改写为核心 + 空占位）+ `*.detail.ts`（新增 9 个）
+- `src/data/wordbank/wordbank.ts`（`preloadCoreOnly` / `preloadDetail` / `isDetailReady` / `loadLevel(withDetail)` / `CACHE_VERSION` → 3）
+- `src/components/GlobalWordSearch.tsx`（必需改造）
+- `DeepVocabularyPage.tsx:451`（改用 `hasCollocations`）
+- 可选三处：`PageReader.tsx`、`AppSidebar.tsx`、`MobileBottomNav.tsx`
+- `AGENTS.md` 补充"改词库后必须重跑 `wordbank:split`"
