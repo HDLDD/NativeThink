@@ -135,6 +135,10 @@
 
 
 
+
+## 2026-09-19
+- fix(stats): 移除恒为 0 的 cet 进度环 —— 外链应用无法上报学习时长 (`e3b0c4d`)
+
 ## 2026-09-19
 - docs: AGENTS.md 拆分 + PRODUCT-SPEC 入库 + 设计文档 + CHANGELOG 补记 + gitignore 补漏 (`4e5381f`)
 
