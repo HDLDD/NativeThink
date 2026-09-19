@@ -153,6 +153,10 @@
 
 
 
+
+## 2026-09-19
+- chore(release): APK 版本线切到 2.0.0（versionCode 45），versionName 改为 patch 自增 (`40b0bfe`)
+
 ## 2026-09-19
 - docs(changelog): 补记合并提交日志 (`f4b9fa7`)
 
