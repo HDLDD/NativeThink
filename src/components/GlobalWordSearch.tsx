@@ -63,8 +63,6 @@ export default function GlobalWordSearch() {
   const [detailReady, setDetailReady] = useState(false);
   /** detail 加载是否失败（loadDetail 失败是静默的，需主动检测才能提示用户） */
   const [detailFailed, setDetailFailed] = useState(false);
-  /** 递增以重试 detail 加载 */
-  const [detailRetry, setDetailRetry] = useState(0);
 
   // Progressive preload: 只预加载**核心字段** —— 9 级合计 gzip ≈2.8MB，原全量为 9.66MB。
   // detail（搭配/例句/深度解释）在用户展开某个词时才按需加载该等级。
@@ -120,12 +118,14 @@ export default function GlobalWordSearch() {
     preloadDetail([entry.level]).then(() => {
       if (!alive) return;
       // preloadDetail 失败时静默返回，因此只能用 isDetailReady 判定成败。
-      // 失败时 _detailLoaded 未置位，故“重试”会真正重新发起加载。
+      // 注意：失败的模块加载会被 JS 模块表缓存，原地再调 preloadDetail **不会**重新求值
+      // （已由 scripts/verify-wordbank-loading.mjs 实测确认），所以失败时提供的是
+      // 「刷新页面」而非原地重试 —— 只有新的 JS realm 才会重新拉取该 chunk。
       if (isDetailReady(entry.level)) setDetailReady(true);
       else setDetailFailed(true);
     });
     return () => { alive = false; };
-  }, [expandedWord, results, detailRetry]);
+  }, [expandedWord, results]);
 
   // Favorite toggle
   const handleToggleFav = (word: IWordEntry) => {
@@ -316,10 +316,10 @@ export default function GlobalWordSearch() {
                               <p className="text-[11px] text-muted-foreground pt-3">
                                 搭配与例句加载失败。
                                 <button
-                                  onClick={() => setDetailRetry((n) => n + 1)}
+                                  onClick={() => window.location.reload()}
                                   className="ml-1 font-bold text-ink-teal hover:underline"
                                 >
-                                  重试
+                                  刷新页面重试
                                 </button>
                               </p>
                             ) : (

@@ -107,6 +107,27 @@ await wbmod.preloadCoreOnly(['toefl']);
 ok(wbmod.isDetailReady('toefl') === false, 'preloadCoreOnly 对第二个等级同样不加载 detail');
 ok(wbmod.queryWords({ level: 'toefl', limit: 10 }).every((w) => w.examples.length === 0), 'toefl 仅核心时无例句');
 
+// ⑥ detail 加载失败必须不污染状态 —— 这是 GlobalWordSearch「重试」按钮的前提
+const ieltsDetailPath = path.join(OUT, 'data', 'ielts.detail.mjs');
+fs.writeFileSync(ieltsDetailPath, 'throw new Error("simulated detail load failure");\n');
+let threw = false;
+try { await wbmod.preloadDetail(['ielts']); } catch { threw = true; }
+ok(threw === false, 'preloadDetail 失败时不向上抛错（调用方按空 detail 降级）');
+ok(wbmod.isDetailReady('ielts') === false,
+  '失败后 isDetailReady 仍为 false（未被错误标记成“已加载”，否则重试会永久失效）');
+ok(wbmod.queryWords({ level: 'ielts', limit: 5 }).every((w) => w.examples.length === 0),
+  '失败后该等级 detail 为空，但核心查询仍可用');
+
+// ⑦ 实测结论（锁进断言，防止把 UI 改回“原地重试”这个无效方案）：
+//    失败的模块加载会被 JS 模块表缓存，再次 import 同一 specifier 不会重新求值。
+//    因此 GlobalWordSearch 失败时给的是「刷新页面」——只有新的 JS realm 才会重新拉取 chunk。
+fs.writeFileSync(ieltsDetailPath, tr(fs.readFileSync(path.join(ROOT, 'data', 'ielts.detail.ts'), 'utf8')));
+await wbmod.preloadDetail(['ielts']);
+const retriedOk = wbmod.isDetailReady('ielts');
+ok(retriedOk === false,
+  '失败模块被模块表缓存：原地重试不会重新求值（故 UI 用「刷新页面」而非原地重试）',
+  `isDetailReady(ielts)=${retriedOk}`);
+
 let failed = 0;
 for (const r of results) {
   if (!r.pass) failed++;
