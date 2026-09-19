@@ -134,6 +134,10 @@
 
 
 
+
+## 2026-09-19
+- docs: AGENTS.md 拆分 + PRODUCT-SPEC 入库 + 设计文档 + CHANGELOG 补记 + gitignore 补漏 (`4e5381f`)
+
 ## 2026-09-19
 - refactor(tts): 删除 TTSSettings 中失效的动态导入 (`d9c4a46`)
 

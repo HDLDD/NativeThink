@@ -28,7 +28,8 @@ interface ProgressChartsProps {
 }
 
 // ── Module config ──
-const MODULE_COLORS = ['#EC4899', '#0EA5E9', '#F59E0B', '#00B894', '#1F2937', '#6366F1', '#F97316', '#F59E0B', '#8B5CF6', '#14B8A6'];
+// 颜色按下标对应 moduleProgress 的键顺序（见 use-learning-stats.ts 的 MODULE_PROGRESS_KEYS）
+const MODULE_COLORS = ['#EC4899', '#0EA5E9', '#F59E0B', '#00B894', '#1F2937', '#6366F1', '#F97316', '#F59E0B', '#8B5CF6'];
 const MODULE_NAMES: Record<string, string> = {
   vocabulary: '词汇深度',
   articles: '文章阅读',
@@ -39,7 +40,6 @@ const MODULE_NAMES: Record<string, string> = {
   shadowing: '影子跟读',
   sentences: '句子学习',
   writing: '写作练习',
-  cet: '四六级备考',
 };
 
 export default function ProgressCharts({ calendar, stats }: ProgressChartsProps) {

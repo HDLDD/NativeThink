@@ -26,8 +26,6 @@ export interface ILearningStats {
     spelling: number;
     /** 句子学习（拆句/句型/造句） */
     sentences: number;
-    /** 四六级备考 */
-    cet: number;
   };
   totalDays: number;
   lastStudyDate: string;
@@ -54,18 +52,40 @@ const DEFAULT_STATS: ILearningStats = {
     articles: 0,
     spelling: 0,
     sentences: 0,
-    cet: 0,
   },
   totalDays: 0,
   lastStudyDate: formatDate(new Date()),
 };
 
+/**
+ * moduleProgress 的权威键清单 —— 顺序即统计图表的取色顺序。
+ * 必须与 src/pages/DashboardPage/constants.ts 的 MODULES[].key 一一对应。
+ *
+ * 这里用「白名单投影」而不是对象展开合并：老用户的 localStorage 里可能残留
+ * 已废弃的键（例如 cet —— 它曾被写入且从未被移除），直接展开会让它继续出现在
+ * 统计图表里，而 MODULE_COLORS 已按新长度收窄，取色会得到 undefined。
+ */
+const MODULE_PROGRESS_KEYS = [
+  'think',
+  'chunks',
+  'conversation',
+  'shadowing',
+  'vocabulary',
+  'writing',
+  'articles',
+  'spelling',
+  'sentences',
+] as const;
+
 function mergeStats(parsed: Partial<ILearningStats> | null | undefined): ILearningStats {
-  return {
-    ...DEFAULT_STATS,
-    ...(parsed || {}),
-    moduleProgress: { ...DEFAULT_STATS.moduleProgress, ...(parsed?.moduleProgress || {}) },
-  };
+  const src = (parsed?.moduleProgress || {}) as Record<string, unknown>;
+  const moduleProgress = {} as ILearningStats['moduleProgress'];
+  for (const k of MODULE_PROGRESS_KEYS) {
+    const v = src[k];
+    // 非有限数一律回落 0 —— 兜住旧数据里的 null/NaN/字符串
+    moduleProgress[k] = typeof v === 'number' && Number.isFinite(v) ? v : 0;
+  }
+  return { ...DEFAULT_STATS, ...(parsed || {}), moduleProgress };
 }
 
 function readStatsFromStorage(): ILearningStats {

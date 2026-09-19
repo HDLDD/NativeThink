@@ -110,7 +110,6 @@ export const MODULES = [
   { key: 'conversation', label: '对话练习', icon: MessageSquare, color: '#6366F1' },
   { key: 'shadowing', label: '影子跟读', icon: Mic, color: '#F97316' },
   { key: 'writing', label: '写作练习', icon: PenLine, color: '#8B5CF6' },
-  { key: 'cet', label: '四六级备考', icon: GraduationCap, color: '#14B8A6' },
 ] as const;
 
 export const LEARNING_OPTIONS = [
