@@ -58,6 +58,10 @@ npm run package:all
 
 # TTS 音色与模型资产校验（改音色后必跑）
 npm run check:tts-voices
+
+# 词库回归验证（本项目无测试框架，这两个脚本就是它的回归防线；改词库或加载层后必跑）
+node scripts/verify-wordbank-loading.mjs          # 加载层集成验证（无需浏览器）
+node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆分校验，须先用 --baseline 采集
 ```
 
 **提交约定**：`npm run typecheck` 通过后再提交。手机端数据只进 localStorage / IndexedDB，不写系统目录。
@@ -79,7 +83,7 @@ npm run check:tts-voices
 | `/writing` | `WritingPage` | `writing` |
 | `/sentences` | `SentenceLabPage` | `sentences` |
 | `/spelling` | `SpellingPage` | `spelling` |
-| `/cet` | `CetExamPage`（外链 CetThink，不在包内） | `cet` |
+| `/cet` | `CetExamPage`（外链 CetThink，不在包内） | — |
 | `/progress` | `ProgressPage` | — |
 
 新增页面时必须同步四处：

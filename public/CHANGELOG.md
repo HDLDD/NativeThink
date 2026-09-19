@@ -146,6 +146,10 @@
 
 
 
+
+## 2026-09-19
+- feat(wordbank): 详情面板 detail 加载失败时可重试（原先静默为空） (`238adf5`)
+
 ## 2026-09-19
 - test(wordbank): 新增加载层集成验证 —— 覆盖 preloadLevels map 陷阱与共享引用链路 (`5c0152e`)
 
