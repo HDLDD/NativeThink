@@ -61,6 +61,10 @@ export default function GlobalWordSearch() {
   const [expandedWord, setExpandedWord] = useState<string | null>(null);
   /** 展开词的 detail 是否已就绪（完整词库只预加载了核心字段） */
   const [detailReady, setDetailReady] = useState(false);
+  /** detail 加载是否失败（loadDetail 失败是静默的，需主动检测才能提示用户） */
+  const [detailFailed, setDetailFailed] = useState(false);
+  /** 递增以重试 detail 加载 */
+  const [detailRetry, setDetailRetry] = useState(0);
 
   // Progressive preload: 只预加载**核心字段** —— 9 级合计 gzip ≈2.8MB，原全量为 9.66MB。
   // detail（搭配/例句/深度解释）在用户展开某个词时才按需加载该等级。
@@ -106,15 +110,22 @@ export default function GlobalWordSearch() {
   // 展开某词时才加载该等级的 detail（幂等；已加载则同步就绪）。
   // ⚠️ 必须放在 results 定义之后：依赖数组在渲染期求值，提前引用会触发 TDZ 白屏。
   useEffect(() => {
-    if (!expandedWord) { setDetailReady(false); return; }
+    if (!expandedWord) { setDetailReady(false); setDetailFailed(false); return; }
     const entry = results.find((w) => w.word.toLowerCase() === expandedWord.toLowerCase());
-    if (!entry) { setDetailReady(false); return; }
-    if (isDetailReady(entry.level)) { setDetailReady(true); return; }
+    if (!entry) { setDetailReady(false); setDetailFailed(false); return; }
+    if (isDetailReady(entry.level)) { setDetailReady(true); setDetailFailed(false); return; }
     let alive = true;
     setDetailReady(false);
-    preloadDetail([entry.level]).then(() => { if (alive) setDetailReady(true); });
+    setDetailFailed(false);
+    preloadDetail([entry.level]).then(() => {
+      if (!alive) return;
+      // preloadDetail 失败时静默返回，因此只能用 isDetailReady 判定成败。
+      // 失败时 _detailLoaded 未置位，故“重试”会真正重新发起加载。
+      if (isDetailReady(entry.level)) setDetailReady(true);
+      else setDetailFailed(true);
+    });
     return () => { alive = false; };
-  }, [expandedWord, results]);
+  }, [expandedWord, results, detailRetry]);
 
   // Favorite toggle
   const handleToggleFav = (word: IWordEntry) => {
@@ -301,7 +312,19 @@ export default function GlobalWordSearch() {
                       {isExpanded && (
                         <div className="px-3 pb-4 pt-0 space-y-3 border-t border-border/50 mx-3">
                           {!detailReady && (
-                            <p className="text-[11px] text-muted-foreground pt-3">正在加载搭配与例句…</p>
+                            detailFailed ? (
+                              <p className="text-[11px] text-muted-foreground pt-3">
+                                搭配与例句加载失败。
+                                <button
+                                  onClick={() => setDetailRetry((n) => n + 1)}
+                                  className="ml-1 font-bold text-ink-teal hover:underline"
+                                >
+                                  重试
+                                </button>
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-muted-foreground pt-3">正在加载搭配与例句…</p>
+                            )
                           )}
                           {/* Examples */}
                           {word.examples.length > 0 && (
