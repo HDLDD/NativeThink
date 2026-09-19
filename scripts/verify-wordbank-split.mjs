@@ -48,25 +48,40 @@ async function collect() {
   return out;
 }
 
+/** 与 wordbank.ts 的 ensureIndexes() 一致：同等级内**首次出现者胜**（索引与界面展示的都是第一条） */
+function firstWins(core) {
+  const seen = new Set();
+  const out = [];
+  for (const e of core) {
+    const k = e.word.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(e);
+  }
+  return out;
+}
+
 async function baseline(outFile) {
   const data = await collect();
   const snap = { levels: {} };
   for (const lv of LEVELS) {
     const { core } = data[lv];
-    const expectedHasCollocations = {};
-    const collocOnlyIds = [];
-    for (const e of core) {
-      const w = e.word.toLowerCase();
-      const has = Array.isArray(e.collocations) && e.collocations.length > 0;
-      expectedHasCollocations[w] = has;
-      if (has) collocOnlyIds.push(w);
-    }
-    snap.levels[lv] = { count: core.length, expectedHasCollocations, collocOnlyIds: collocOnlyIds.sort() };
+    // 按位置记录：同等级内存在重复词条（如 professional 的 "facet"），
+    // 用 word→bool 的映射会互相覆盖，无法表达"第一条"与"第二条"的差异。
+    const words = core.map((e) => e.word);
+    const hasCollocationsByIndex = core.map((e) => Array.isArray(e.collocations) && e.collocations.length > 0);
+    // collocOnly 的真实作用对象是去重后的条目（queryWords 返回 _levelIndex）
+    const collocOnlyIds = firstWins(core)
+      .filter((e) => e.collocations.length > 0)
+      .map((e) => e.word.toLowerCase())
+      .sort();
+    snap.levels[lv] = { count: core.length, words, hasCollocationsByIndex, collocOnlyIds };
   }
   fs.writeFileSync(outFile, JSON.stringify(snap));
   console.log(`基线已写入 ${outFile}`);
   for (const lv of LEVELS) {
-    console.log(`  ${lv.padEnd(13)} ${String(snap.levels[lv].count).padStart(6)} 条  collocOnly=${snap.levels[lv].collocOnlyIds.length}`);
+    const s = snap.levels[lv];
+    console.log(`  ${lv.padEnd(13)} ${String(s.count).padStart(6)} 条  去重后 ${String(firstWins(data[lv].core).length).padStart(6)}  collocOnly=${s.collocOnlyIds.length}`);
   }
 }
 
@@ -78,13 +93,17 @@ async function check(baselineFile) {
     const base = snap.levels[lv];
     const { core, detail } = data[lv];
 
-    // ① 条目数与 hasCollocations 逐条一致
+    // ① 条目数与 hasCollocations 按位置逐条一致（按位置才能区分重复词条）
     ok(core.length === base.count, `${lv}: 条目数 ${core.length} ≠ 基线 ${base.count}`);
-    for (const e of core) {
-      const w = e.word.toLowerCase();
-      const expect = base.expectedHasCollocations[w];
-      if (expect === undefined) { fail.push(`${lv}: 出现基线中不存在的词 ${w}`); continue; }
-      ok(e.hasCollocations === expect, `${lv}/${w}: hasCollocations=${e.hasCollocations} ≠ 基线 ${expect}`);
+    for (let i = 0; i < core.length; i++) {
+      if (core[i].word !== base.words[i]) {
+        fail.push(`${lv}[${i}]: 词条顺序与基线不同（${core[i].word} ≠ ${base.words[i]}）`);
+        continue;
+      }
+      const expect = base.hasCollocationsByIndex[i];
+      if (core[i].hasCollocations !== expect) {
+        fail.push(`${lv}[${i}] ${core[i].word}: hasCollocations=${core[i].hasCollocations} ≠ 基线 ${expect}`);
+      }
     }
 
     // ② detail 源文件存在，且核心占位必须为空（证明拆分干净）
@@ -99,8 +118,8 @@ async function check(baselineFile) {
       }
     }
 
-    // ③ collocOnly 结果集（用 hasCollocations）与基线完全相同
-    const nowIds = core.filter((e) => e.hasCollocations).map((e) => e.word.toLowerCase()).sort();
+    // ③ collocOnly 结果集（用 hasCollocations，作用在去重后的条目上）与基线完全相同
+    const nowIds = firstWins(core).filter((e) => e.hasCollocations).map((e) => e.word.toLowerCase()).sort();
     ok(JSON.stringify(nowIds) === JSON.stringify(base.collocOnlyIds),
       `${lv}: collocOnly 结果集与基线不同（基线 ${base.collocOnlyIds.length} / 现在 ${nowIds.length}）`);
   }
