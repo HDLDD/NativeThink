@@ -224,7 +224,56 @@ for (const [name, content] of contents) {
   });
 }
 
-// ── 4. 脚手架自检：确认"词数等式"断言不是恒真（否则上面的断言①就是空的）──
+// ── 4. 阅读器 UI 契约（真机回归过的两个坑，锁死避免复发）──
+const readerSrc = readFileSync(join(ROOT, 'src/pages/ArticlePage/components/ReaderParagraph.tsx'), 'utf8');
+const novelSrc = readFileSync(join(ROOT, 'src/pages/ArticlePage/components/NovelReader.tsx'), 'utf8');
+
+// 坑①：段落按钮被文字压住 —— 正文必须给右侧按钮列留出净空
+check(
+  /'text-foreground\/85 font-medium flex-1 pr-9'/.test(readerSrc),
+  '段落正文留出右侧净空（pr-9），按钮不被单词遮住',
+);
+// 坑②：按钮太淡看不见 —— 不许再退回 opacity-40 那种"几乎透明"的写法
+check(
+  !/opacity-40 hover:opacity-100/.test(readerSrc),
+  '段落按钮不再用 opacity-40 的近乎透明样式（触屏上等于不可见）',
+);
+check(
+  /size-7 rounded-lg bg-background border border-border\/70 shadow-sm/.test(readerSrc),
+  '段落按钮有不透明底色 + 描边（在文字上方也读得清）',
+);
+
+// 坑③：朗读时抢滚动位置 —— 自动滚动必须让位于用户手动滑动。
+// 只判断"该段滑出视野"是不够的：用户主动划走时这个条件恰好成立，于是每次切片回调
+// 都会把用户拉回去，真机表现就是"朗读时屏幕滑不动"。
+check(
+  /if \(!readPos \|\| !tts\.isSpeaking \|\| !followRead\) return;/.test(pageReaderSrc),
+  'PageReader 自动滚动以 followRead 为闸（手动滑动后不再抢滚动）',
+);
+check(
+  /onTouchMove=\{\(e\) => \{ if \(followRead\) setFollowRead\(false\); handleTouchMove\(e\); \}\}/.test(pageReaderSrc),
+  'PageReader 滚动容器在 touchmove 时关闭自动跟随（且保留原有滑动翻页）',
+);
+check(
+  /if \(!readPara \|\| !followRead\) return;/.test(novelSrc),
+  'NovelReader 自动滚动同样以 followRead 为闸',
+);
+check(
+  /onTouchMove=\{\(\) => \{ if \(followRead\) setFollowRead\(false\); \}\}/.test(novelSrc),
+  'NovelReader 滚动容器在 touchmove 时关闭自动跟随',
+);
+// 自动滚动不能用整个 readPos 对象当依赖 —— readPos 每个切片都变，会导致每片都重新居中
+check(
+  /\}, \[readPos\?\.pageIdx, readPos\?\.paraIdx, currentPage, tts\.isSpeaking, followRead\]\);/.test(pageReaderSrc),
+  'PageReader 自动滚动依赖段落身份而非 readPos 对象（否则每片都重新居中）',
+);
+// 用户滑走后必须有回来的入口，否则跟随一旦关闭就再也回不到朗读位置
+check(
+  /const recenterOnReading = useCallback/.test(pageReaderSrc) && /回到正在朗读的段落/.test(pageReaderSrc),
+  '提供「回到朗读处」入口（跟随关闭后可恢复）',
+);
+
+// ── 5. 脚手架自检：确认"词数等式"断言不是恒真（否则上面的断言①就是空的）──
 {
   const probe = 'The quick brown fox jumps over the lazy dog near the river bank today.';
   const good = chunkText(probe, 20);
@@ -238,7 +287,7 @@ for (const [name, content] of contents) {
   );
 }
 
-// ── 5. 汇总 ──
+// ── 6. 汇总 ──
 console.log('');
 console.log('被抽出的真实实现：cleanText / countWords / chunkText（源码文本按函数名提取后转译）');
 console.log(`书目数=${contents.length}  页数=${pagesTested}  切片数=${chunksTested}`);

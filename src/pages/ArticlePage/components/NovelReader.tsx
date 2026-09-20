@@ -87,6 +87,10 @@ interface NovelReaderProps {
   onStopBookTranslation: () => void;
   /** 正在朗读的段落（跨页定位）—— 高亮 + 自动滚入视野，让"读到哪"可见 */
   readPara?: { pageIdx: number; paraIdx: number } | null;
+  /** 朗读会话号（每次开始朗读递增）—— 用来重置"跟随滚动" */
+  readSession?: number;
+  /** 「回到朗读处」信号（递增触发）—— 用户手动滑走后一键跳回 */
+  recenterSignal?: number;
 }
 
 export default function NovelReader({
@@ -119,6 +123,8 @@ export default function NovelReader({
   onStartBookTranslation,
   onStopBookTranslation,
   readPara,
+  readSession,
+  recenterSignal,
 }: NovelReaderProps) {
   const { notes, saveNote, removeNote } = useReaderNotes(content.id);
 
@@ -139,9 +145,14 @@ export default function NovelReader({
   const lastSaveRef = useRef(0);
   const paraRefs = useRef(new Map<number, HTMLElement>());
 
-  // 朗读到哪 → 把该段滚进视野（只在已滑出可视区时滚，避免与用户手动滚动打架）
+  // 自动跟随滚动 —— 用户手动滑动就让位，否则"把朗读段滚回视野"会把用户一把拉回去
+  // （真机表现为：朗读时屏幕根本滑不动）。开始新朗读或点「回到朗读处」时恢复跟随。
+  const [followRead, setFollowRead] = useState(true);
+  useEffect(() => { setFollowRead(true); }, [readSession, recenterSignal]);
+
+  // 朗读到哪 → 把该段滚进视野
   useEffect(() => {
-    if (!readPara) return;
+    if (!readPara || !followRead) return;
     const c = scrollRef.current;
     const items = chapters[chapterIdx]?.items;
     if (!c || !items) return;
@@ -153,7 +164,7 @@ export default function NovelReader({
     if (r.top < cr.top + 8 || r.bottom > cr.bottom - 8) {
       el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
-  }, [readPara, chapters, chapterIdx]);
+  }, [readPara, followRead, chapters, chapterIdx]);
 
   // onProgress 通过 ref 读取 — 滚动/保存回调不因父级重建函数而失效
   const onProgressRef = useRef(onProgress);
@@ -466,6 +477,9 @@ export default function NovelReader({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
+        // 用户一动滚动就关掉自动跟随，把滚动权交还给他
+        onTouchMove={() => { if (followRead) setFollowRead(false); }}
+        onWheel={() => { if (followRead) setFollowRead(false); }}
         className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >

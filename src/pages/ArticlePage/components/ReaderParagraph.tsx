@@ -74,7 +74,8 @@ function ReaderParagraphImpl({
               <p
                 className={cn(
                   FONT_SIZE_CLASSES[fontSize],
-                  'text-foreground/85 font-medium flex-1',
+                  // pr-9 = 36px：右侧按钮列宽 28px，留出净空，长句文字不会跑到按钮底下
+                  'text-foreground/85 font-medium flex-1 pr-9',
                   hasNote && 'underline decoration-amber-400/60 decoration-2 underline-offset-[6px]',
                 )}
               >
@@ -99,7 +100,7 @@ function ReaderParagraphImpl({
               <div className="absolute right-0 top-0 flex flex-col gap-1 items-end">
               <button
                 onClick={(e) => { e.stopPropagation(); onSpeak(cleanText(displayEn)); }}
-                className="shrink-0 size-7 rounded-lg bg-background/80 flex items-center justify-center text-muted-foreground/40 hover:text-ink-teal transition-colors opacity-40 hover:opacity-100"
+                className="shrink-0 size-7 rounded-lg bg-background border border-border/70 shadow-sm flex items-center justify-center text-muted-foreground hover:text-ink-teal hover:border-ink-teal/50 transition-colors"
                 title="朗读段落"
               >
                 <Volume2 className="size-3.5" />
@@ -108,21 +109,21 @@ function ReaderParagraphImpl({
                 <button
                   onClick={(e) => { e.stopPropagation(); onTranslate(pageIdx, paraIdx); }}
                   disabled={translating}
-                  className="shrink-0 size-7 rounded-lg bg-background/80 flex items-center justify-center text-muted-foreground/40 hover:text-amber-500 transition-colors opacity-40 hover:opacity-100"
+                  className="shrink-0 size-7 rounded-lg bg-background border border-border/70 shadow-sm flex items-center justify-center text-muted-foreground hover:text-amber-500 hover:border-amber-400/50 transition-colors"
                   title="翻译本段"
                 >
                   {translating ? <Loader2 className="size-3 animate-spin" /> : <Globe className="size-3" />}
                 </button>
               )}
-              {/* 段落批注 — 有批注时常亮（角标），悬停出现入口 */}
+              {/* 段落批注 — 有批注时常亮（角标） */}
               {onOpenNote && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onOpenNote(para); }}
                   className={cn(
-                    'shrink-0 mt-0.5 transition-colors',
+                    'shrink-0 size-7 rounded-lg bg-background border border-border/70 shadow-sm flex items-center justify-center transition-colors',
                     hasNote
-                      ? 'text-amber-500'
-                      : 'text-muted-foreground/25 hover:text-amber-500 opacity-40 hover:opacity-100',
+                      ? 'text-amber-500 border-amber-400/50'
+                      : 'text-muted-foreground hover:text-amber-500 hover:border-amber-400/50',
                   )}
                   title={hasNote ? '查看/编辑批注' : '添加批注'}
                 >
@@ -132,8 +133,10 @@ function ReaderParagraphImpl({
               <button
                 onClick={(e) => { e.stopPropagation(); onToggleFav(para); }}
                 className={cn(
-                  'shrink-0 size-7 rounded-lg bg-background/80 flex items-center justify-center transition-colors opacity-40 hover:opacity-100',
-                  faved ? 'text-rose-500' : 'text-muted-foreground/40 hover:text-rose-500',
+                  'shrink-0 size-7 rounded-lg bg-background border border-border/70 shadow-sm flex items-center justify-center transition-colors',
+                  faved
+                    ? 'text-rose-500 border-rose-400/50'
+                    : 'text-muted-foreground hover:text-rose-500 hover:border-rose-400/50',
                 )}
                 title={faved ? '取消收藏本句' : '收藏本句'}
               >

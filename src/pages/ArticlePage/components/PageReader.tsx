@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   X, ChevronLeft, ChevronRight, BookOpen, Heart, Globe,
   Sparkles, Hash, Wand2, Loader2, Volume2, ChevronDown, ChevronUp, ListTree, Repeat, Copy, Type, Brain, Languages,
-  Pause, Play, Square,
+  Pause, Play, Square, LocateFixed,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -128,6 +128,20 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   // 把累计词数反查成 (pageIdx, paraIdx)，才能高亮"读到哪"并画出进度条。
   const readRangesRef = useRef<Array<{ pageIdx: number; paraIdx: number; startWord: number; endWord: number }>>([]);
   const [readPos, setReadPos] = useState<{ pageIdx: number; paraIdx: number; ratio: number } | null>(null);
+  // 自动跟随滚动 —— 用户一旦手动滑动就**让位**（否则"把朗读段滚回视野"会立刻把用户拉回来，
+  // 表现为朗读时根本滑不动）。开始新一次朗读时重新打开跟随。
+  const [followRead, setFollowRead] = useState(true);
+  // 朗读会话号：每次开始朗读递增，用于让子组件（NovelReader）重置跟随状态
+  const [readSession, setReadSession] = useState(0);
+  // 「回到朗读处」信号：用户手动滑走后，一键跳回正在朗读的段落
+  const [recenterSignal, setRecenterSignal] = useState(0);
+
+  /** 开始一次新朗读：重置进度、重新跟随、递增会话号 */
+  const beginReadSession = useCallback(() => {
+    setReadPos(null);
+    setFollowRead(true);
+    setReadSession((s) => s + 1);
+  }, []);
 
   const tts = useTTS({
     // 切片进度 → 当前段落。词数单调递增，顺序扫一遍区间表即可（段落数量级很小）。
@@ -506,7 +520,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       .map((p, i) => ({ en: p.en, pageIdx, paraIdx: i }))
       .filter((it) => !it.en.startsWith('##CHAPTER##'));
     if (!buildReadRanges(items)) return;
-    setReadPos(null);
+    beginReadSession();
     const text = items.map((it) => cleanText(it.en)).filter(Boolean).join(' ');
     if (text) safeSpeak(text);
   }, [validPages, safeSpeak, buildReadRanges]);
@@ -519,7 +533,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       .map((it) => ({ en: it.para.en, pageIdx: it.pageIdx, paraIdx: it.paraIdx }))
       .filter((it) => !it.en.startsWith('##CHAPTER##'));
     if (!buildReadRanges(items)) return;
-    setReadPos(null);
+    beginReadSession();
     const text = items.map((it) => cleanText(it.en)).filter(Boolean).join(' ');
     if (text) safeSpeak(text);
   }, [novelChapters, safeSpeak, buildReadRanges]);
@@ -531,7 +545,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       readRangesRef.current = w
         ? [{ pageIdx, paraIdx, startWord: 0, endWord: w }]
         : [];
-      setReadPos(null);
+      beginReadSession();
       safeSpeak(cleanText(text));
     },
     [safeSpeak],
@@ -580,18 +594,33 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     try { tts.cancel(); } catch { /* ignore */ }
   }, [tts]);
 
-  /** 朗读到哪 → 把该段滚进视野（只在它已经滑出可视区时才滚，避免打断用户手动滚动） */
+  /**
+   * 朗读到哪 → 把该段滚进视野。
+   *
+   * 关键：**用户手动滑动时绝不动滚动位置**。原先只判断"该段是否滑出视野"，
+   * 而用户主动划走时这个条件恰好成立 → 每次切片回调都把用户拉回去，
+   * 表现为"朗读时屏幕滑不动"。现在由 followRead 让位，靠悬浮条的「回到朗读处」回来。
+   * deps 用段落的 pageIdx/paraIdx 而非整个 readPos 对象：readPos 每个切片都会变，
+   * 用它当依赖会导致每个切片都重新居中。
+   */
   useEffect(() => {
-    if (!readPos || !tts.isSpeaking) return;
+    if (!readPos || !tts.isSpeaking || !followRead) return;
+    if (readPos.pageIdx !== currentPage) return;
     const container = contentRef.current;
     const el = container?.querySelector<HTMLElement>(`[data-read-para="${readPos.paraIdx}"]`);
-    if (!container || !el || readPos.pageIdx !== currentPage) return;
+    if (!container || !el) return;
     const r = el.getBoundingClientRect();
     const cr = container.getBoundingClientRect();
     if (r.top < cr.top + 8 || r.bottom > cr.bottom - 8) {
       el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
-  }, [readPos, currentPage, tts.isSpeaking]);
+  }, [readPos?.pageIdx, readPos?.paraIdx, currentPage, tts.isSpeaking, followRead]);
+
+  /** 回到正在朗读的段落（用户手动滑走后的恢复入口） */
+  const recenterOnReading = useCallback(() => {
+    setFollowRead(true);
+    setRecenterSignal((n) => n + 1);
+  }, []);
 
   // Touch swipe handlers (must be after goPrev/goNext and currentPage/activePages are defined)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -1113,6 +1142,8 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           onStartBookTranslation={startBookTranslation}
           onStopBookTranslation={stopBookTranslation}
           readPara={readPos}
+          readSession={readSession}
+          recenterSignal={recenterSignal}
         />
       )}
       {/* ════ 翻页模式（保留旧实现） ════ */}
@@ -1167,10 +1198,11 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
         onClick={toggleChrome}
         onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
+        // 用户一动滚动就关掉自动跟随，把滚动权交还给他（朗读不再抢滚动位置）
+        onTouchMove={(e) => { if (followRead) setFollowRead(false); handleTouchMove(e); }}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchCancel}
-        onWheel={handleWheel}
+        onWheel={(e) => { if (followRead) setFollowRead(false); handleWheel(e); }}
       >
         {/* Swipe edge indicators -- visual feedback during horizontal swipe */}
         {swipeOffset > 20 && (
@@ -1559,6 +1591,17 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
               <span className="px-0.5 text-[10px] font-bold text-muted-foreground tabular-nums">
                 {Math.round(readPos.ratio * 100)}%
               </span>
+            )}
+            {readPos && !followRead && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={recenterOnReading}
+                className="size-8 rounded-xl text-ink-teal"
+                title="回到正在朗读的段落"
+              >
+                <LocateFixed className="size-4" />
+              </Button>
             )}
             <Button
               variant="ghost"
