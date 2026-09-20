@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   X, ChevronLeft, ChevronRight, BookOpen, Heart, Globe,
   Sparkles, Hash, Wand2, Loader2, Volume2, ChevronDown, ChevronUp, ListTree, Repeat, Copy, Type, Brain, Languages,
+  Pause, Play, Square,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -507,6 +508,13 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       tts.cancel();
     }
   }, [readerMode, speakCurrentPage, speakCurrentChapter, tts]);
+
+  /** 停止朗读：同时关掉连读，否则读完本页还会自动继续 */
+  const stopSpeaking = useCallback(() => {
+    autoReadRef.current = false;
+    setAutoReadPages(false);
+    try { tts.cancel(); } catch { /* ignore */ }
+  }, [tts]);
 
   // Touch swipe handlers (must be after goPrev/goNext and currentPage/activePages are defined)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -1460,6 +1468,33 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── 朗读悬浮控制条 —— 两种阅读模式共用；只在朗读/连读时出现，不干扰静读 ── */}
+      {(tts.isSpeaking || autoReadPages) && (
+        <div className="fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1.5 rounded-2xl border border-border/60 bg-background/95 px-2 py-1.5 shadow-lg backdrop-blur">
+          <span className="px-1.5 text-[11px] font-black text-ink-teal">
+            {tts.isPaused ? '已暂停' : autoReadPages ? '连读中' : '朗读中'}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => (tts.isPaused ? tts.resume() : tts.pause())}
+            className="size-8 rounded-xl"
+            title={tts.isPaused ? '继续朗读' : '暂停朗读'}
+          >
+            {tts.isPaused ? <Play className="size-4" /> : <Pause className="size-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={stopSpeaking}
+            className="size-8 rounded-xl text-muted-foreground hover:text-rose-500"
+            title="停止朗读"
+          >
+            <Square className="size-3.5" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
