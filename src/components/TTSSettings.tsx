@@ -24,7 +24,7 @@ import { previewTtsVoice, probeTtsEngines, getLastTtsReport, type ITtsEngineProb
 import { getSherpaInitLog, getSherpaStatus, isBundledEngineDisabled, reenableBundledEngine, sherpaSpeak, warmSherpa, type ISherpaStatus } from '@/lib/sherpa-tts';
 import { isSfxEnabled, setSfxEnabled, sfxTick } from '@/lib/sfx';
 import { toast } from 'sonner';
-import { EDGE_VOICE_CATALOG, KOKORO_VOICES } from '@/lib/tts-voice-catalog';
+import { EDGE_VOICE_CATALOG, listLocalVoices } from '@/lib/tts-voice-catalog';
 import {
   isAndroidNative,
   listNativeEnglishVoices,
@@ -360,10 +360,12 @@ export default function TTSSettings() {
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                 朗读声音 · 内置离线音色{' '}
-                <span className="text-muted-foreground/60 normal-case font-bold">不联网 · 起播快 · 含英音</span>
+                <span className="text-muted-foreground/60 normal-case font-bold">
+                  不联网 · Lessac 最流畅 · Kokoro 音质更佳但长文可能断续
+                </span>
               </label>
               <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
-                {KOKORO_VOICES.map((v) => {
+                {listLocalVoices().map((v) => {
                   const active = settings.selectedVoiceURI === v.id;
                   return (
                     <button

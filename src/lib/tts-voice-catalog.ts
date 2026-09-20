@@ -123,15 +123,29 @@ export const KOKORO_VOICES: ILocalVoice[] = [
 /** 兜底音色 —— Kokoro 不可用时自动回退（22050Hz，真机已验证可跑） */
 export const FALLBACK_VOICE: ILocalVoice = {
   id: 'piper:lessac', name: 'Lessac', gender: 'female', accent: '美音',
-  modelId: 'piper-lessac', speakerId: 0, note: '经典音色',
+  modelId: 'piper-lessac', speakerId: 0, note: '最流畅 · 离线',
 };
 
-/** 未选择音色时使用 */
-export const DEFAULT_LOCAL_VOICE_ID = 'kokoro:af_sarah';
+/**
+ * 未选择音色时的默认音色。
+ *
+ * 为什么默认 lessac 而不是 Kokoro —— 真机实测（同一段 122 字符、模型已加载的稳态）：
+ *   lessac(VITS) : 音频 5789ms / 合成 428ms → **RTF 0.076**（约 13 倍实时）
+ *   Kokoro(int8) : 音频 6819ms / 合成 6867ms → **RTF 1.008**（≈ 实时）
+ *
+ * RTF > 1 意味着合成永远追不上播放：长文朗读必然段落断续，**加大预取深度也无法解决**
+ * （只会让队列无限积压）。因此默认走流畅的 lessac；Kokoro 的 11 个音色仍可显式选择，
+ * 音质更好，代价是长文朗读可能断续。
+ */
+export const DEFAULT_LOCAL_VOICE_ID = 'piper:lessac';
 
-/** 本地音色全集（Kokoro 11 个 + 兜底 1 个） */
+/**
+ * 本地音色全集。**最流畅的 lessac 排在首位**（它也是默认音色）：
+ * 真机实测 lessac RTF 0.076、Kokoro RTF≈1.008，长文朗读只有前者能跟上播放。
+ * 顺序仅影响设置页展示，查找用的是 find()，不依赖下标。
+ */
 export function listLocalVoices(): ILocalVoice[] {
-  return [...KOKORO_VOICES, FALLBACK_VOICE];
+  return [FALLBACK_VOICE, ...KOKORO_VOICES];
 }
 
 /** 是否为本地离线音色 id */
