@@ -6,10 +6,13 @@ const APP_URL = 'https://cetthink.pages.dev';
 /**
  * 安卓包下载地址。APK 已移出 public/ —— 放在那里会让主 APK、桌面版、网页
  * 三份产物各白背 7MB（主 APK 里还会嵌套一个 APK）。
- * 发布到对象存储或 Release 页后把地址填这里；留空则隐藏该按钮
- * —— 宁可不显示，也不给一个点了 404 的按钮。
+ * 现托管在 CetThink 仓库的 Release（约 227MB，含离线朗读模型）：
+ *   https://github.com/HDLDD/CetThink/releases
+ * 发新版本时同步换下面的 tag（与 CetThink 的 android/version.properties 对齐）；
+ * 留空则隐藏该按钮 —— 宁可不显示，也不给一个点了 404 的按钮。
  */
-const APK_URL = '';
+const APK_URL =
+  'https://github.com/HDLDD/CetThink/releases/download/v1.0.0/CetThink-mobile-debug.apk';
 
 /** 四六级独立应用入口 — 不再 iframe 内嵌 */
 export default function CetExamPage() {
