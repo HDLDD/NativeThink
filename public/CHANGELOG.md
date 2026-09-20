@@ -162,6 +162,11 @@
 
 
 
+
+
+## 2026-09-21
+- fix(reader): 朗读时不再抢滚动位置（followRead 让位 + 回到朗读处）+ 段落按钮不再被文字压住/过淡 (`4cd66db`)
+
 ## 2026-09-21
 - fix(tts): check-tts-voices 默认音色守卫改为校验「设置页可选集合」——原先硬绑 KOKORO_VOICES，默认改 piper 后误报并阻断打包 (`650abe2`)
 

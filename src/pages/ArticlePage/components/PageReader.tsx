@@ -129,18 +129,20 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const readRangesRef = useRef<Array<{ pageIdx: number; paraIdx: number; startWord: number; endWord: number }>>([]);
   const [readPos, setReadPos] = useState<{ pageIdx: number; paraIdx: number; ratio: number } | null>(null);
   // 自动跟随滚动 —— 用户一旦手动滑动就**让位**（否则"把朗读段滚回视野"会立刻把用户拉回来，
-  // 表现为朗读时根本滑不动）。开始新一次朗读时重新打开跟随。
+  // 表现为朗读时根本滑不动）。这份状态**只在这里持有**：翻页模式自己用，小说模式通过
+  // followRead/onUserScroll 传给 NovelReader。各存一份的话，会出现"滚动已让位、但悬浮条的
+  // 「回到朗读处」不出现"，用户就再也回不到朗读位置（真机实测踩过）。
   const [followRead, setFollowRead] = useState(true);
-  // 朗读会话号：每次开始朗读递增，用于让子组件（NovelReader）重置跟随状态
-  const [readSession, setReadSession] = useState(0);
-  // 「回到朗读处」信号：用户手动滑走后，一键跳回正在朗读的段落
-  const [recenterSignal, setRecenterSignal] = useState(0);
 
-  /** 开始一次新朗读：重置进度、重新跟随、递增会话号 */
+  /** 用户手动滚动 → 让位（幂等，同一帧重复调用不会再触发渲染） */
+  const onUserScroll = useCallback(() => {
+    setFollowRead(false);
+  }, []);
+
+  /** 开始一次新朗读：重置进度、重新跟随 */
   const beginReadSession = useCallback(() => {
     setReadPos(null);
     setFollowRead(true);
-    setReadSession((s) => s + 1);
   }, []);
 
   const tts = useTTS({
@@ -616,10 +618,10 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     }
   }, [readPos?.pageIdx, readPos?.paraIdx, currentPage, tts.isSpeaking, followRead]);
 
-  /** 回到正在朗读的段落（用户手动滑走后的恢复入口） */
+  /** 回到正在朗读的段落（用户手动滑走后的恢复入口）—— 重新打开跟随即可，
+   *  两个模式的滚动 effect 都以 followRead 为依赖，翻回 true 就会重新居中。 */
   const recenterOnReading = useCallback(() => {
     setFollowRead(true);
-    setRecenterSignal((n) => n + 1);
   }, []);
 
   // Touch swipe handlers (must be after goPrev/goNext and currentPage/activePages are defined)
@@ -1142,8 +1144,8 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           onStartBookTranslation={startBookTranslation}
           onStopBookTranslation={stopBookTranslation}
           readPara={readPos}
-          readSession={readSession}
-          recenterSignal={recenterSignal}
+          followRead={followRead}
+          onUserScroll={onUserScroll}
         />
       )}
       {/* ════ 翻页模式（保留旧实现） ════ */}

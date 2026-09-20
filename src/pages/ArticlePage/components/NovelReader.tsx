@@ -87,10 +87,14 @@ interface NovelReaderProps {
   onStopBookTranslation: () => void;
   /** 正在朗读的段落（跨页定位）—— 高亮 + 自动滚入视野，让"读到哪"可见 */
   readPara?: { pageIdx: number; paraIdx: number } | null;
-  /** 朗读会话号（每次开始朗读递增）—— 用来重置"跟随滚动" */
-  readSession?: number;
-  /** 「回到朗读处」信号（递增触发）—— 用户手动滑走后一键跳回 */
-  recenterSignal?: number;
+  /**
+   * 是否自动跟随朗读位置滚动。
+   * **必须由 PageReader 统一持有**：跟随状态如果各存一份，会出现"滚动已经让位、
+   * 但悬浮条的「回到朗读处」不出现"，用户就再也回不到朗读位置（真机实测踩过）。
+   */
+  followRead?: boolean;
+  /** 用户手动滚动 → 通知 PageReader 关闭自动跟随 */
+  onUserScroll?: () => void;
 }
 
 export default function NovelReader({
@@ -123,8 +127,8 @@ export default function NovelReader({
   onStartBookTranslation,
   onStopBookTranslation,
   readPara,
-  readSession,
-  recenterSignal,
+  followRead = true,
+  onUserScroll,
 }: NovelReaderProps) {
   const { notes, saveNote, removeNote } = useReaderNotes(content.id);
 
@@ -145,12 +149,8 @@ export default function NovelReader({
   const lastSaveRef = useRef(0);
   const paraRefs = useRef(new Map<number, HTMLElement>());
 
-  // 自动跟随滚动 —— 用户手动滑动就让位，否则"把朗读段滚回视野"会把用户一把拉回去
-  // （真机表现为：朗读时屏幕根本滑不动）。开始新朗读或点「回到朗读处」时恢复跟随。
-  const [followRead, setFollowRead] = useState(true);
-  useEffect(() => { setFollowRead(true); }, [readSession, recenterSignal]);
-
-  // 朗读到哪 → 把该段滚进视野
+  // 朗读到哪 → 把该段滚进视野。followRead 由 PageReader 统一持有：
+  // 用户手动滑动时它变 false，这里就不再动滚动位置（否则会把用户一把拉回去）。
   useEffect(() => {
     if (!readPara || !followRead) return;
     const c = scrollRef.current;
@@ -477,9 +477,9 @@ export default function NovelReader({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        // 用户一动滚动就关掉自动跟随，把滚动权交还给他
-        onTouchMove={() => { if (followRead) setFollowRead(false); }}
-        onWheel={() => { if (followRead) setFollowRead(false); }}
+        // 用户一动滚动就通知 PageReader 关闭自动跟随，把滚动权交还给他
+        onTouchMove={onUserScroll}
+        onWheel={onUserScroll}
         className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >

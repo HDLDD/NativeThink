@@ -228,10 +228,27 @@ for (const [name, content] of contents) {
 const readerSrc = readFileSync(join(ROOT, 'src/pages/ArticlePage/components/ReaderParagraph.tsx'), 'utf8');
 const novelSrc = readFileSync(join(ROOT, 'src/pages/ArticlePage/components/NovelReader.tsx'), 'utf8');
 
-// 坑①：段落按钮被文字压住 —— 正文必须给右侧按钮列留出净空
+// 坑①：段落按钮被文字压住 —— 正文必须给右侧动作区留出净空
 check(
-  /'text-foreground\/85 font-medium flex-1 pr-9'/.test(readerSrc),
-  '段落正文留出右侧净空（pr-9），按钮不被单词遮住',
+  /'text-foreground\/85 font-medium flex-1 pr-16'/.test(readerSrc),
+  '段落正文留出右侧净空（pr-16），动作区不压住文字',
+);
+// 坑④：动作区**必须横排**。原先竖排 4 个按钮高 124px，而短段落（对话行）只有 28~92px 高，
+// 相邻段落的按钮列会互相压在一起（真机实测 8 对重叠、最多叠 73px）。
+// 横排高度恒为单行高度 28px，任何段落都装得下 → 结构上不可能堆叠。
+check(
+  /absolute right-0 top-0 flex items-center gap-1/.test(readerSrc),
+  '段落动作区横向排列（高度恒为单行，结构上不可能与相邻段落堆叠）',
+);
+check(
+  !/absolute right-0 top-0 flex flex-col/.test(readerSrc),
+  '段落动作区不再用 flex-col 竖排（竖排 124px 会溢出短段落造成堆叠）',
+);
+// 收进菜单的动作仍须可达，否则等于删功能
+check(
+  /DropdownMenuTrigger/.test(readerSrc) && /翻译本段/.test(readerSrc)
+    && /添加批注|查看\/编辑批注/.test(readerSrc) && /收藏本句|取消收藏本句/.test(readerSrc),
+  '「更多」菜单里保留 翻译本段 / 批注 / 收藏 三个动作',
 );
 // 坑②：按钮太淡看不见 —— 不许再退回 opacity-40 那种"几乎透明"的写法
 check(
@@ -259,8 +276,23 @@ check(
   'NovelReader 自动滚动同样以 followRead 为闸',
 );
 check(
-  /onTouchMove=\{\(\) => \{ if \(followRead\) setFollowRead\(false\); \}\}/.test(novelSrc),
-  'NovelReader 滚动容器在 touchmove 时关闭自动跟随',
+  /onTouchMove=\{onUserScroll\}/.test(novelSrc),
+  'NovelReader 把用户滚动上报给 PageReader（而非自己存一份跟随状态）',
+);
+// 跟随状态必须**只有一份**（PageReader 持有、传给 NovelReader）。
+// 各存一份会导致：滚动已让位（NovelReader 那份 false），但悬浮条的「回到朗读处」
+// 读的是 PageReader 那份（仍 true）→ 按钮不出现，用户再也回不到朗读位置。真机踩过。
+check(
+  !/const \[followRead, setFollowRead\] = useState/.test(novelSrc),
+  'NovelReader 不再自持 followRead（避免两份状态不一致）',
+);
+check(
+  /followRead=\{followRead\}\s*\n\s*onUserScroll=\{onUserScroll\}/.test(pageReaderSrc),
+  'PageReader 把唯一的 followRead 与 onUserScroll 传给 NovelReader',
+);
+check(
+  /const onUserScroll = useCallback\(\(\) => \{\s*\n\s*setFollowRead\(false\);/.test(pageReaderSrc),
+  'PageReader 持有唯一的 onUserScroll（用户滚动 → 关闭跟随）',
 );
 // 自动滚动不能用整个 readPos 对象当依赖 —— readPos 每个切片都变，会导致每片都重新居中
 check(
@@ -271,6 +303,11 @@ check(
 check(
   /const recenterOnReading = useCallback/.test(pageReaderSrc) && /回到正在朗读的段落/.test(pageReaderSrc),
   '提供「回到朗读处」入口（跟随关闭后可恢复）',
+);
+// 「回到朗读处」的显示条件必须与滚动闸门同源
+check(
+  /\{readPos && !followRead && \(/.test(pageReaderSrc),
+  '「回到朗读处」按钮与滚动闸门共用同一个 followRead',
 );
 
 // ── 5. 脚手架自检：确认"词数等式"断言不是恒真（否则上面的断言①就是空的）──

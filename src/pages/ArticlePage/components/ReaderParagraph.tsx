@@ -5,7 +5,10 @@
  * 单段 AI 翻译、句子收藏；小说模式额外支持批注（黄色下划线 + 批注按钮角标）。
  */
 import { memo } from 'react';
-import { Volume2, Globe, Loader2, Heart, StickyNote } from 'lucide-react';
+import { Volume2, Globe, Loader2, Heart, StickyNote, MoreHorizontal } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { cn, cleanText } from '@/lib/utils';
 import type { IParagraph, TransMode } from '@/data/reading';
 import { FONT_SIZE_CLASSES, type ReaderFontSize } from './reader-shared';
@@ -74,8 +77,8 @@ function ReaderParagraphImpl({
               <p
                 className={cn(
                   FONT_SIZE_CLASSES[fontSize],
-                  // pr-9 = 36px：右侧按钮列宽 28px，留出净空，长句文字不会跑到按钮底下
-                  'text-foreground/85 font-medium flex-1 pr-9',
+                  // pr-16 = 64px：右侧动作区是两个 28px 按钮 + 间距，留净空后长句不会跑到按钮底下
+                  'text-foreground/85 font-medium flex-1 pr-16',
                   hasNote && 'underline decoration-amber-400/60 decoration-2 underline-offset-[6px]',
                 )}
               >
@@ -97,51 +100,64 @@ function ReaderParagraphImpl({
                   );
                 })}
               </p>
-              <div className="absolute right-0 top-0 flex flex-col gap-1 items-end">
-              <button
-                onClick={(e) => { e.stopPropagation(); onSpeak(cleanText(displayEn)); }}
-                className="shrink-0 size-7 rounded-lg bg-background border border-border/70 shadow-sm flex items-center justify-center text-muted-foreground hover:text-ink-teal hover:border-ink-teal/50 transition-colors"
-                title="朗读段落"
-              >
-                <Volume2 className="size-3.5" />
-              </button>
-              {!para.zh && onTranslate && (
+              {/*
+                动作区 —— 必须**横向**排列，高度恒为 28px。
+                原先竖排 4 个按钮高 124px，而短段落（尤其对话行）只有 28~92px 高，
+                于是相邻段落的按钮列互相压在一起（真机实测 8 对重叠、最多叠 73px）。
+                现在只留「朗读段落」这一个常用动作，其余收进「更多」菜单：
+                高度 = 单行高度，任何段落都装得下，永不堆叠。
+              */}
+              <div className="absolute right-0 top-0 flex items-center gap-1">
                 <button
-                  onClick={(e) => { e.stopPropagation(); onTranslate(pageIdx, paraIdx); }}
-                  disabled={translating}
-                  className="shrink-0 size-7 rounded-lg bg-background border border-border/70 shadow-sm flex items-center justify-center text-muted-foreground hover:text-amber-500 hover:border-amber-400/50 transition-colors"
-                  title="翻译本段"
+                  onClick={(e) => { e.stopPropagation(); onSpeak(cleanText(displayEn)); }}
+                  className="shrink-0 size-7 rounded-lg bg-background border border-border/70 shadow-sm flex items-center justify-center text-muted-foreground hover:text-ink-teal hover:border-ink-teal/50 transition-colors"
+                  title="朗读段落"
                 >
-                  {translating ? <Loader2 className="size-3 animate-spin" /> : <Globe className="size-3" />}
+                  <Volume2 className="size-3.5" />
                 </button>
-              )}
-              {/* 段落批注 — 有批注时常亮（角标） */}
-              {onOpenNote && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onOpenNote(para); }}
-                  className={cn(
-                    'shrink-0 size-7 rounded-lg bg-background border border-border/70 shadow-sm flex items-center justify-center transition-colors',
-                    hasNote
-                      ? 'text-amber-500 border-amber-400/50'
-                      : 'text-muted-foreground hover:text-amber-500 hover:border-amber-400/50',
-                  )}
-                  title={hasNote ? '查看/编辑批注' : '添加批注'}
-                >
-                  <StickyNote className={cn('size-3.5', hasNote && 'fill-amber-400/30')} />
-                </button>
-              )}
-              <button
-                onClick={(e) => { e.stopPropagation(); onToggleFav(para); }}
-                className={cn(
-                  'shrink-0 size-7 rounded-lg bg-background border border-border/70 shadow-sm flex items-center justify-center transition-colors',
-                  faved
-                    ? 'text-rose-500 border-rose-400/50'
-                    : 'text-muted-foreground hover:text-rose-500 hover:border-rose-400/50',
+                {(onTranslate || onOpenNote || onToggleFav) && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        onClick={(e) => e.stopPropagation()}
+                        className={cn(
+                          'shrink-0 size-7 rounded-lg bg-background border border-border/70 shadow-sm flex items-center justify-center transition-colors hover:border-ink-teal/50',
+                          (faved || hasNote) ? 'text-ink-teal' : 'text-muted-foreground hover:text-ink-teal',
+                        )}
+                        title="更多操作"
+                      >
+                        <MoreHorizontal className="size-3.5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44 rounded-xl">
+                      {!para.zh && onTranslate && (
+                        <DropdownMenuItem
+                          disabled={translating}
+                          onClick={() => onTranslate(pageIdx, paraIdx)}
+                          className="gap-2 text-xs font-bold"
+                        >
+                          {translating ? <Loader2 className="size-3.5 animate-spin" /> : <Globe className="size-3.5" />}
+                          翻译本段
+                        </DropdownMenuItem>
+                      )}
+                      {onOpenNote && (
+                        <DropdownMenuItem onClick={() => onOpenNote(para)} className="gap-2 text-xs font-bold">
+                          <StickyNote className={cn('size-3.5', hasNote && 'fill-amber-400/30 text-amber-500')} />
+                          {hasNote ? '查看/编辑批注' : '添加批注'}
+                        </DropdownMenuItem>
+                      )}
+                      {onToggleFav && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => onToggleFav(para)} className="gap-2 text-xs font-bold">
+                            <Heart className={cn('size-3.5', faved && 'fill-current text-rose-500')} />
+                            {faved ? '取消收藏本句' : '收藏本句'}
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
-                title={faved ? '取消收藏本句' : '收藏本句'}
-              >
-                <Heart className={cn('size-3.5', faved && 'fill-current')} />
-              </button>
               </div>
             </div>
           )}
