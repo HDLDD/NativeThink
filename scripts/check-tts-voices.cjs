@@ -108,11 +108,41 @@ if (!block) {
 }
 
 // ── 3) 默认音色与兜底音色 ──
+// 默认音色必须是「用户在设置页真能选到的音色」。设置页渲染 listLocalVoices()
+// = [FALLBACK_VOICE, ...KOKORO_VOICES]，所以默认值允许落在 Kokoro 11 音色里，
+// 也允许就是兜底的 lessac（实测 RTF 0.076，长文唯一跟得上播放的离线音色——
+// 见 tts-voice-catalog.ts 里 DEFAULT_LOCAL_VOICE_ID 的注释）。
+// 原先这里硬绑 KOKORO_VOICES，默认改成 piper 后会让守卫误报。
+const listMatch = src.match(/export function listLocalVoices\(\)[^{]*\{\s*return\s*\[([^\]]*)\]/);
+const fbMatch = src.match(/export const FALLBACK_VOICE[^=]*=\s*\{[\s\S]*?\bid:\s*'([^']+)'/);
 const defMatch = src.match(/DEFAULT_LOCAL_VOICE_ID\s*=\s*'([^']+)'/);
+
 if (!defMatch) {
   notes.push('DEFAULT_LOCAL_VOICE_ID 尚未定义');
-} else if (block && !block[1].includes(`'${defMatch[1]}'`)) {
-  errors.push(`DEFAULT_LOCAL_VOICE_ID='${defMatch[1]}' 不在 KOKORO_VOICES 里`);
+} else {
+  // 把 listLocalVoices() 里的符号解析成真实音色 id
+  const reachable = new Set();
+  if (listMatch) {
+    for (const sym of listMatch[1].split(',').map((s) => s.trim()).filter(Boolean)) {
+      if (sym === 'FALLBACK_VOICE') {
+        if (fbMatch) reachable.add(fbMatch[1]);
+        continue;
+      }
+      const lit = sym.match(/^'([^']+)'$/);
+      if (lit) { reachable.add(lit[1]); continue; }
+      const spread = sym.match(/^\.\.\.(\w+)$/);
+      if (spread && spread[1] === 'KOKORO_VOICES' && block) {
+        for (const m of block[1].matchAll(/\bid:\s*'([^']+)'/g)) reachable.add(m[1]);
+      }
+    }
+  }
+  if (!reachable.size) {
+    notes.push('无法解析 listLocalVoices() 的可选集合 —— 默认音色可达性检查被跳过');
+  } else if (!reachable.has(defMatch[1])) {
+    errors.push(
+      `DEFAULT_LOCAL_VOICE_ID='${defMatch[1]}' 不在 listLocalVoices() 可选集合里（共 ${reachable.size} 个）—— 用户选不中默认音色`,
+    );
+  }
 }
 if (!/export const FALLBACK_VOICE/.test(src)) {
   notes.push('FALLBACK_VOICE 尚未定义');
