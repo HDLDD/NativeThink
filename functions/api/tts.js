@@ -24,8 +24,11 @@ async function handler(context) {
   if (!text || text.trim().length === 0) {
     return new Response('Missing "text" parameter', { status: 400 });
   }
-  if (text.length > 400) {
-    return new Response('Text too long (max 400 chars). Split longer text into chunks.', { status: 400 });
+  // 上游 Google Translate TTS 的硬上限就是 200 字符（实测 200 通过、205 起返回 400）。
+  // 这里必须按真实上限拒绝：写成 400 会把越界文本放行到上游，最终变成一个
+  // 含义模糊的 502（"Upstream returned 400"），排查时极具误导性。
+  if (text.length > 200) {
+    return new Response('Text too long (max 200 chars — upstream Google TTS limit). Split longer text into chunks.', { status: 400 });
   }
 
   const trimmed = text.trim();

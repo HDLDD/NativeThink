@@ -156,6 +156,10 @@
 
 
 
+
+## 2026-09-20
+- chore(release): v2.0.1 (versionCode 46) —— TTS 线程耗尽闪退修复 (`1b4e1b1`)
+
 ## 2026-09-20
 - fix(tts): 原生合成改用有界线程池 —— 修掉「朗读一会直接闪退」(pthread_create OOM) (`f6ddfea`)
 

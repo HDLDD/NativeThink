@@ -259,7 +259,17 @@ function isServerVoice(voiceURI: string | null | undefined): boolean {
 
 // ── Chunk long texts ──
 
-function chunkText(text: string, maxLen = 400): string[] {
+/**
+ * 按句边界把长文本切片（优先在 `.` `?` `!` 后切，其次空格，最后硬切）。
+ *
+ * maxLen 必须 ≤ 200：云端 /api/tts 代理的是 Google Translate TTS，而上游**硬上限是
+ * 200 字符**（真机实测：200 通过、205 起上游返回 400 → 函数转成 502）。原先切 400，
+ * 导致云端通道对几乎每个文章段落都失败 —— 于是被迫退回离线引擎（Kokoro RTF≈1.0），
+ * 表现为"朗读又慢又断续"。
+ *
+ * 切小还有额外好处：首段音频更早合成出来（感知延迟显著下降），流水线粒度也更细。
+ */
+function chunkText(text: string, maxLen = 180): string[] {
   const out: string[] = [];
   let r = text.trim();
   while (r.length > 0) {
