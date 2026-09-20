@@ -122,7 +122,29 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const novelChapterIdxRef = useRef(0);
   const novelFrontMatterRef = useRef(false);
 
+  // ── 朗读进度（切片词数 → 段落）──
+  // 离线原生引擎没有词级回调（currentWordIndex 只对 SpeechSynthesis 有效），useTTS 的
+  // onChunk 只上报"本切片之前累计了多少词"。这里在朗读前编译一张段落词序区间表，
+  // 把累计词数反查成 (pageIdx, paraIdx)，才能高亮"读到哪"并画出进度条。
+  const readRangesRef = useRef<Array<{ pageIdx: number; paraIdx: number; startWord: number; endWord: number }>>([]);
+  const [readPos, setReadPos] = useState<{ pageIdx: number; paraIdx: number; ratio: number } | null>(null);
+
   const tts = useTTS({
+    // 切片进度 → 当前段落。词数单调递增，顺序扫一遍区间表即可（段落数量级很小）。
+    onChunk: (_chunkIndex, wordsBefore) => {
+      const ranges = readRangesRef.current;
+      if (!ranges.length) return;
+      let hit = ranges[ranges.length - 1];
+      for (const r of ranges) {
+        if (wordsBefore < r.endWord) { hit = r; break; }
+      }
+      const total = ranges[ranges.length - 1].endWord;
+      setReadPos({
+        pageIdx: hit.pageIdx,
+        paraIdx: hit.paraIdx,
+        ratio: total > 0 ? Math.min(1, wordsBefore / total) : 0,
+      });
+    },
     // When 连读 is on, advance to the next unit (page/chapter) and keep reading after each
     onEnd: () => {
       if (!autoReadRef.current) return;
@@ -453,27 +475,67 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [currentPage]);
 
+  /**
+   * 编译「段落词序区间表」—— onChunk 给出的累计词数据此反查回段落。
+   *
+   * 词数口径必须与 chunkText 一致：chunkText 只在空白/句末切分、只做 trim，不增删单词，
+   * 所以 各段词数之和 === 合并后文本的词数，词序也严格一致（区间可用前缀和直接算）。
+   */
+  const buildReadRanges = useCallback(
+    (items: Array<{ en: string; pageIdx: number; paraIdx: number }>) => {
+      let acc = 0;
+      const ranges: typeof readRangesRef.current = [];
+      for (const it of items) {
+        const w = cleanText(it.en).trim().split(/\s+/).filter(Boolean).length;
+        if (!w) continue;
+        ranges.push({ pageIdx: it.pageIdx, paraIdx: it.paraIdx, startWord: acc, endWord: acc + w });
+        acc += w;
+      }
+      readRangesRef.current = ranges;
+      return ranges.length > 0;
+    },
+    [],
+  );
+
   /** 朗读当前页（翻页模式的连读核心步骤，也被工具栏按钮调用） */
   const speakCurrentPage = useCallback(() => {
     const data = validPages[currentPageRef.current];
     if (!data) return;
-    const text = data.paragraphs
-      .filter((p) => !p.en.startsWith('##CHAPTER##'))
-      .map((p) => cleanText(p.en))
-      .join(' ');
+    const pageIdx = currentPageRef.current;
+    const items = data.paragraphs
+      .map((p, i) => ({ en: p.en, pageIdx, paraIdx: i }))
+      .filter((it) => !it.en.startsWith('##CHAPTER##'));
+    if (!buildReadRanges(items)) return;
+    setReadPos(null);
+    const text = items.map((it) => cleanText(it.en)).filter(Boolean).join(' ');
     if (text) safeSpeak(text);
-  }, [validPages, safeSpeak]);
+  }, [validPages, safeSpeak, buildReadRanges]);
 
   /** 朗读当前章（小说模式的朗读/连读单元） */
   const speakCurrentChapter = useCallback(() => {
     const ch = novelChapters[novelChapterIdxRef.current];
     if (!ch) return;
-    const text = ch.items
-      .filter((it) => !it.para.en.startsWith('##CHAPTER##'))
-      .map((it) => cleanText(it.para.en))
-      .join(' ');
+    const items = ch.items
+      .map((it) => ({ en: it.para.en, pageIdx: it.pageIdx, paraIdx: it.paraIdx }))
+      .filter((it) => !it.en.startsWith('##CHAPTER##'));
+    if (!buildReadRanges(items)) return;
+    setReadPos(null);
+    const text = items.map((it) => cleanText(it.en)).filter(Boolean).join(' ');
     if (text) safeSpeak(text);
-  }, [novelChapters, safeSpeak]);
+  }, [novelChapters, safeSpeak, buildReadRanges]);
+
+  /** 只朗读一个段落（段落级按钮）—— 进度表缩成这一段，读到哪里同样可见 */
+  const speakOneParagraph = useCallback(
+    (pageIdx: number, paraIdx: number, text: string) => {
+      const w = text.trim().split(/\s+/).filter(Boolean).length;
+      readRangesRef.current = w
+        ? [{ pageIdx, paraIdx, startWord: 0, endWord: w }]
+        : [];
+      setReadPos(null);
+      safeSpeak(cleanText(text));
+    },
+    [safeSpeak],
+  );
 
   // Sync refs for the 连读 onEnd closure — 小说模式以"章"为单元，翻页模式以"页"为单元
   modeRef.current = readerMode;
@@ -513,8 +575,23 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const stopSpeaking = useCallback(() => {
     autoReadRef.current = false;
     setAutoReadPages(false);
+    readRangesRef.current = [];
+    setReadPos(null);
     try { tts.cancel(); } catch { /* ignore */ }
   }, [tts]);
+
+  /** 朗读到哪 → 把该段滚进视野（只在它已经滑出可视区时才滚，避免打断用户手动滚动） */
+  useEffect(() => {
+    if (!readPos || !tts.isSpeaking) return;
+    const container = contentRef.current;
+    const el = container?.querySelector<HTMLElement>(`[data-read-para="${readPos.paraIdx}"]`);
+    if (!container || !el || readPos.pageIdx !== currentPage) return;
+    const r = el.getBoundingClientRect();
+    const cr = container.getBoundingClientRect();
+    if (r.top < cr.top + 8 || r.bottom > cr.bottom - 8) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [readPos, currentPage, tts.isSpeaking]);
 
   // Touch swipe handlers (must be after goPrev/goNext and currentPage/activePages are defined)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -1022,7 +1099,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           onChapterChange={handleNovelChapterChange}
           onProgress={saveNovelProgress}
           onWordClick={handleWordClick}
-          onSpeakPara={(text) => safeSpeak(text)}
+          onSpeakPara={(text, pi, qi) => speakOneParagraph(pi, qi, text)}
           onTranslatePara={translateParagraph}
           paraTranslating={paraTranslating}
           onToggleParaFav={toggleParaFav}
@@ -1035,6 +1112,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           bookTranslationStats={bookTransStats}
           onStartBookTranslation={startBookTranslation}
           onStopBookTranslation={stopBookTranslation}
+          readPara={readPos}
         />
       )}
       {/* ════ 翻页模式（保留旧实现） ════ */}
@@ -1152,10 +1230,11 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
               paraIdx={i}
               translating={paraTranslating === `${currentPage}-${i}`}
               onWordClick={handleWordClick}
-              onSpeak={(text) => safeSpeak(text)}
+              onSpeak={(text) => speakOneParagraph(currentPage, i, text)}
               onTranslate={translateParagraph}
               onToggleFav={toggleParaFav}
               faved={paraFaved(para.en)}
+              reading={readPos?.pageIdx === currentPage && readPos?.paraIdx === i}
             />
           ))}
         </div>
@@ -1471,28 +1550,42 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
       {/* ── 朗读悬浮控制条 —— 两种阅读模式共用；只在朗读/连读时出现，不干扰静读 ── */}
       {(tts.isSpeaking || autoReadPages) && (
-        <div className="fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1.5 rounded-2xl border border-border/60 bg-background/95 px-2 py-1.5 shadow-lg backdrop-blur">
-          <span className="px-1.5 text-[11px] font-black text-ink-teal">
-            {tts.isPaused ? '已暂停' : autoReadPages ? '连读中' : '朗读中'}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => (tts.isPaused ? tts.resume() : tts.pause())}
-            className="size-8 rounded-xl"
-            title={tts.isPaused ? '继续朗读' : '暂停朗读'}
-          >
-            {tts.isPaused ? <Play className="size-4" /> : <Pause className="size-4" />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={stopSpeaking}
-            className="size-8 rounded-xl text-muted-foreground hover:text-rose-500"
-            title="停止朗读"
-          >
-            <Square className="size-3.5" />
-          </Button>
+        <div className="fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-1">
+          <div className="flex items-center gap-1.5 rounded-2xl border border-border/60 bg-background/95 px-2 py-1.5 shadow-lg backdrop-blur">
+            <span className="px-1.5 text-[11px] font-black text-ink-teal">
+              {tts.isPaused ? '已暂停' : autoReadPages ? '连读中' : '朗读中'}
+            </span>
+            {readPos && (
+              <span className="px-0.5 text-[10px] font-bold text-muted-foreground tabular-nums">
+                {Math.round(readPos.ratio * 100)}%
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => (tts.isPaused ? tts.resume() : tts.pause())}
+              className="size-8 rounded-xl"
+              title={tts.isPaused ? '继续朗读' : '暂停朗读'}
+            >
+              {tts.isPaused ? <Play className="size-4" /> : <Pause className="size-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={stopSpeaking}
+              className="size-8 rounded-xl text-muted-foreground hover:text-rose-500"
+              title="停止朗读"
+            >
+              <Square className="size-3.5" />
+            </Button>
+          </div>
+          {/* 本朗读单元（页/章）的进度 —— 词数口径，与段落高亮同源 */}
+          <div className="h-1 w-36 overflow-hidden rounded-full bg-border/60">
+            <div
+              className="h-full rounded-full bg-[#00B894] transition-[width] duration-500"
+              style={{ width: `${Math.round((readPos?.ratio ?? 0) * 100)}%` }}
+            />
+          </div>
         </div>
       )}
     </div>

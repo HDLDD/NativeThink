@@ -28,6 +28,17 @@ export interface UseTTSOptions {
   onEnd?: () => void;
   onError?: (err: Error) => void;
   onBoundary?: (event: SpeechSynthesisEvent, wordIndex: number) => void;
+  /**
+   * 切片粒度进度上报 —— 每个切片**首次**开始合成时回调一次（降级重试不重复报）。
+   *
+   * `wordsBefore` 是本切片之前所有切片的词数累计，与传入 `speak()` 的文本词序一一对应
+   * （chunkText 只在空白/句末处切分，不增删单词），所以调用方可以据此把进度反查回段落。
+   *
+   * 为什么需要它：离线原生引擎没有词级回调 —— `currentWordIndex` 只由 SpeechSynthesis 的
+   * onboundary 填充，而安卓原生路径在 speakSS 里直接 return。没有这个上报，"读到哪"在
+   * 安卓上就完全无法显示。
+   */
+  onChunk?: (chunkIndex: number, wordsBefore: number) => void;
 }
 
 export interface SpeakOptions {
@@ -269,6 +280,11 @@ function isServerVoice(voiceURI: string | null | undefined): boolean {
  *
  * 切小还有额外好处：首段音频更早合成出来（感知延迟显著下降），流水线粒度也更细。
  */
+/** 词数统计 —— 切片进度上报与预期时长估算共用，保证口径一致 */
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
 function chunkText(text: string, maxLen = 180): string[] {
   const out: string[] = [];
   let r = text.trim();
@@ -424,6 +440,14 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         return;
       }
 
+      // 进度上报：只在本切片第一次尝试（engineIdx === 0）时报，降级重试不再重复报，
+      // 否则同一段会被点亮多次，进度条也会来回跳。
+      if (engineIdx === 0) {
+        let wordsBefore = 0;
+        for (let i = 0; i < idx; i++) wordsBefore += countWords(chunks[i]);
+        optionsRef.current?.onChunk?.(idx, wordsBefore);
+      }
+
       const onDone = () => playChunkWithFallback(chunks, idx + 1, rate, 0); // next chunk, reset to best engine
       const onFail = () => {
         // Current engine failed — try next one for the SAME chunk
@@ -572,7 +596,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
             } catch { /* ignore */ }
 
             // 预期朗读时长（粗略）：按词数估算，用于识别"瞬间返回但没出声"的假成功
-            const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+            const wordCount = countWords(text);
             const expectedMs = Math.max(500, (wordCount * 260) / Math.max(0.5, rate));
 
             plugin.speak({

@@ -26,6 +26,8 @@ interface ReaderParagraphProps {
   /** 小说模式批注：有批注的段落显示黄色下划线，批注按钮常亮 */
   hasNote?: boolean;
   onOpenNote?: (para: IParagraph) => void;
+  /** 正在被朗读 —— 高亮该段，让"读到哪"可见（安卓离线引擎无词级回调，只能到段） */
+  reading?: boolean;
 }
 
 function ReaderParagraphImpl({
@@ -42,12 +44,22 @@ function ReaderParagraphImpl({
   faved,
   hasNote,
   onOpenNote,
+  reading,
 }: ReaderParagraphProps) {
   const displayEn = para.en.startsWith('##CHAPTER##') ? para.en.replace('##CHAPTER##', '') : para.en;
   const isChapter = para.en.startsWith('##CHAPTER##');
 
   return (
-    <div className={isChapter ? 'text-center pt-10 pb-3' : ''}>
+    <div
+      data-read-para={isChapter ? undefined : paraIdx}
+      className={cn(
+        isChapter
+          ? 'text-center pt-10 pb-3'
+          // -mx/px 抵消：给高亮留出左右内边距，但文字位置与纵向间距完全不变（避免高亮移动时版面跳动）
+          : 'rounded-xl transition-colors duration-300 -mx-2 px-2',
+        !isChapter && reading && 'bg-[#00B894]/10 ring-1 ring-inset ring-[#00B894]/30',
+      )}
+    >
       {isChapter ? (
         <div className="flex items-center justify-center gap-3">
           <span className="h-px w-8 sm:w-12 bg-[#00B894]/30" />

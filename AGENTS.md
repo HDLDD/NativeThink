@@ -64,6 +64,11 @@ node scripts/verify-wordbank-loading.mjs          # 加载层集成验证（无�
 node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆分校验，须先用 --baseline 采集
 ```
 
+```powershell
+# 朗读进度回归验证（改 TTS 切片上限或阅读器朗读逻辑后必跑）
+node scripts/verify-tts-progress.mjs
+```
+
 **提交约定**：`npm run typecheck` 通过后再提交。手机端数据只进 localStorage / IndexedDB，不写系统目录。
 
 ---

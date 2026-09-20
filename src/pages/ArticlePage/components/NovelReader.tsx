@@ -70,7 +70,7 @@ interface NovelReaderProps {
   onChapterChange: (idx: number) => void;
   onProgress: (chapterIdx: number, ratio: number) => void;
   onWordClick: (e: React.MouseEvent, word: string) => void;
-  onSpeakPara: (text: string) => void;
+  onSpeakPara: (text: string, pageIdx: number, paraIdx: number) => void;
   onTranslatePara: (pageIdx: number, paraIdx: number) => void;
   paraTranslating: string | null;
   onToggleParaFav: (para: IParagraph) => void;
@@ -85,6 +85,8 @@ interface NovelReaderProps {
   bookTranslationStats: { translatedChapters: number; totalChapters: number; translatedSegments: number } | null;
   onStartBookTranslation: () => void;
   onStopBookTranslation: () => void;
+  /** 正在朗读的段落（跨页定位）—— 高亮 + 自动滚入视野，让"读到哪"可见 */
+  readPara?: { pageIdx: number; paraIdx: number } | null;
 }
 
 export default function NovelReader({
@@ -115,7 +117,9 @@ export default function NovelReader({
   bookTranslation,
   bookTranslationStats,
   onStartBookTranslation,
-  onStopBookTranslation,}: NovelReaderProps) {
+  onStopBookTranslation,
+  readPara,
+}: NovelReaderProps) {
   const { notes, saveNote, removeNote } = useReaderNotes(content.id);
 
   // 本章尚未翻译的段数 —— 横条上直接显示，点一下就补齐
@@ -134,6 +138,22 @@ export default function NovelReader({
   chapterIdxRef.current = chapterIdx;
   const lastSaveRef = useRef(0);
   const paraRefs = useRef(new Map<number, HTMLElement>());
+
+  // 朗读到哪 → 把该段滚进视野（只在已滑出可视区时滚，避免与用户手动滚动打架）
+  useEffect(() => {
+    if (!readPara) return;
+    const c = scrollRef.current;
+    const items = chapters[chapterIdx]?.items;
+    if (!c || !items) return;
+    const ii = items.findIndex((it) => it.pageIdx === readPara.pageIdx && it.paraIdx === readPara.paraIdx);
+    const el = ii >= 0 ? paraRefs.current.get(ii) : undefined;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const cr = c.getBoundingClientRect();
+    if (r.top < cr.top + 8 || r.bottom > cr.bottom - 8) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [readPara, chapters, chapterIdx]);
 
   // onProgress 通过 ref 读取 — 滚动/保存回调不因父级重建函数而失效
   const onProgressRef = useRef(onProgress);
@@ -499,12 +519,13 @@ export default function NovelReader({
                     paraIdx={it.paraIdx}
                     translating={paraTranslating === `${it.pageIdx}-${it.paraIdx}`}
                     onWordClick={onWordClick}
-                    onSpeak={onSpeakPara}
+                    onSpeak={(text) => onSpeakPara(text, it.pageIdx, it.paraIdx)}
                     onTranslate={onTranslatePara}
                     onToggleFav={onToggleParaFav}
                     faved={isParaFaved(it.para.en)}
                     hasNote={!!notes[key]}
                     onOpenNote={openNoteEditor}
+                    reading={readPara?.pageIdx === it.pageIdx && readPara?.paraIdx === it.paraIdx}
                   />
                 </div>
               );
