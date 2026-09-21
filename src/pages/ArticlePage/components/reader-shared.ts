@@ -22,11 +22,16 @@ const CHAPTER_PREFIX = '##CHAPTER##';
 
 // ── 阅读进度持久化（__reader_progress_<contentId>） ──
 // page:      翻页模式页码 / 小说模式当前章起始页（兼容 ArticlePage 的进度展示）
+// total:     保存时的总页数 —— **必须存**：books.ts 只是压缩节选（每本约 4800 词），
+//            而阅读器会运行时升级为完整版全文，分页随之变化。外部列表若拿"当前节选页数"
+//            当分母去除"全文空间的页码"，会得到几百个百分点（真机实测 516%/484%）。
+//            有了 total，百分比就能在**保存时的同一个量纲**里算。
 // chapter:   小说模式当前章节号
 // ratio:     小说模式当前章内滚动比例（0-1）
 // perChapter:小说模式每章的章内滚动位置 — "记住每章阅读位置"
 export interface ReaderProgress {
   page: number;
+  total?: number;
   chapter?: number;
   ratio?: number;
   perChapter?: Record<string, number>;

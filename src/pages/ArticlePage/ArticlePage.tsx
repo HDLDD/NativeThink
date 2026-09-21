@@ -23,11 +23,13 @@ import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import { buildPages } from '@/data/reading';
 import { loadImportedBooks, importBookFromText, deleteImportedBook, IMPORTED_ID_PREFIX } from '@/data/imported-books';
 import { loadBookStats, type IBookStat } from '@/data/book-stats';
+import type { ReaderProgress } from './components/reader-shared';
+import { WEBNOVELS, WEBNOVEL_GROUP_LABEL, type WebnovelGroup } from '@/data/webnovels';
 import { EXTRA_PUBLICATIONS } from '@/data/publications-extra';
 import type { SpeechMeta } from '@/data/speeches';
 // ── Types ──
 type Level = 'beginner' | 'intermediate' | 'advanced';
-type MainTab = 'books' | 'publications' | 'ai' | 'speeches' | 'wikipedia';
+type MainTab = 'books' | 'webnovels' | 'publications' | 'ai' | 'speeches' | 'wikipedia';
 
 const LEVELS: { key: Level; label: string; color: string; desc: string }[] = [
   { key: 'beginner', label: '初级', color: '#00B894', desc: '简单句式，常用词汇' },
@@ -48,6 +50,7 @@ const TOPICS: { key: string; label: string; icon: string }[] = [
 
 const MAINTABS: { key: MainTab; label: string; icon: typeof BookOpen }[] = [
   { key: 'books', label: '书籍', icon: Library },
+  { key: 'webnovels', label: '网文推荐', icon: BookMarked },
   { key: 'publications', label: '刊物', icon: Newspaper },
   { key: 'ai', label: 'AI 生成', icon: Sparkles },
   { key: 'speeches', label: '演讲', icon: Mic },
@@ -412,13 +415,35 @@ export default function ArticlePage() {
   }, [isConfigured, aiChat, level]);
 
   // ── Reading progress check ──
-  const getBookProgress = (bookId: string): { page: number; total: number } | null => {
+  // 返回整条进度记录（不再只取 page 并丢弃 total）。
+  // 原因：books.ts 只是压缩节选（每本约 4800 词，见 book-stats.ts 注释），而阅读器会运行时
+  // 升级为完整版全文，分页随之变化；小说模式存的 page 更是"章起始页"（全文页空间）。
+  // 于是「全文空间的页码 ÷ 节选页数」会算出几百个百分点 —— 真机实测 516% / 484%。
+  const getBookProgress = (bookId: string): ReaderProgress | null => {
     try {
       const raw = safeStorage.getItem(`__reader_progress_${bookId}`);
       if (!raw) return null;
-      const p = JSON.parse(raw);
-      return p.page > 0 ? { page: p.page, total: 0 } : null;
+      const p = JSON.parse(raw) as ReaderProgress;
+      if (!p || typeof p.page !== 'number') return null;
+      return p.chapter != null || p.page > 0 ? p : null;
     } catch { return null; }
+  };
+
+  /**
+   * 进度百分比（0-100）。必须在**保存时的量纲**里算：
+   *  - 小说模式：用「章」——(chapter + 章内比例) / 真实章数（来自 /books/index.json）
+   *  - 翻页模式：用保存时的总页数 p.total（新增字段）；老数据没有 total 才回落到节选页数
+   * 两种情形都夹到 0-100，避免进度条溢出。
+   */
+  const progressPct = (p: ReaderProgress, bookId: string, fallbackPages: number): number => {
+    const chapters = bookStats[bookId]?.chapters ?? 0;
+    if (p.chapter != null && chapters > 0) {
+      const inChapter = Math.min(1, Math.max(0, p.ratio ?? 0));
+      return Math.min(100, Math.max(0, Math.round(((p.chapter + inChapter) / chapters) * 100)));
+    }
+    const total = p.total && p.total > 0 ? p.total : fallbackPages;
+    if (total <= 0) return 0;
+    return Math.min(100, Math.max(0, Math.round((p.page / total) * 100)));
   };
 
   // Load speech data when speeches tab is first selected
@@ -719,8 +744,7 @@ export default function ArticlePage() {
           <div className="stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {allBooks.map((book) => {
               const progress = getBookProgress(book.id);
-              const totalPages = book.pages.length;
-              const pct = progress && totalPages > 0 ? Math.round((progress.page / totalPages) * 100) : 0;
+              const pct = progress ? progressPct(progress, book.id, book.pages.length) : 0;
               return (
               <Card
                 key={book.id}
@@ -743,10 +767,14 @@ export default function ArticlePage() {
                         <span className="text-[9px] text-muted-foreground ml-auto">{(bookStats[book.id]?.words ?? book.totalWords).toLocaleString()} 词</span>
                       </div>
                       {/* Reading progress */}
-                      {progress && progress.page > 0 && (
+                      {progress && (progress.chapter != null || progress.page > 0) && (
                         <div className="mt-2 space-y-1">
                           <div className="flex items-center justify-between text-[9px]">
-                            <span className="font-bold text-ink-teal">继续阅读 (第{progress.page}页)</span>
+                            <span className="font-bold text-ink-teal">
+                              {progress.chapter != null
+                                ? `继续阅读 · 第 ${progress.chapter + 1} 章`
+                                : `继续阅读 (第${progress.page}页)`}
+                            </span>
                             <span className="text-muted-foreground font-bold">{pct}%</span>
                           </div>
                           <div className="h-1 bg-muted rounded-full overflow-hidden">
@@ -762,6 +790,82 @@ export default function ArticlePage() {
             })}
           </div>
           )}
+        </div>
+      )}
+
+      {/* ── WEBNOVELS TAB —— 只做推荐 + 官方外链，不内置正文 ── */}
+      {mainTab === 'webnovels' && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-border/60 bg-muted/30 p-4 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <BookMarked className="size-5 text-ink-teal" />
+              <span className="text-sm font-black">{WEBNOVELS.length} 部英文网文推荐</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              这里只提供<strong className="text-foreground/80">官方阅读入口</strong>，App 内不收录正文 ——
+              这些作品版权归作者所有，多数平台（如 Royal Road）也明确禁止复制与抓取。
+              点「去阅读」会在浏览器中打开官方页面；想在自己的阅读器里读，请用「书籍 → 导入书籍」导入你合法获得的文本。
+            </p>
+          </div>
+
+          {(Object.keys(WEBNOVEL_GROUP_LABEL) as WebnovelGroup[]).map((group) => {
+            const items = WEBNOVELS.filter((w) => w.group === group);
+            if (!items.length) return null;
+            return (
+              <div key={group} className="space-y-3">
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-xs font-black text-ink-teal">{WEBNOVEL_GROUP_LABEL[group]}</span>
+                  <span className="text-[10px] text-muted-foreground">{items.length} 部</span>
+                </div>
+                <div className="stagger grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {items.map((w) => (
+                    <Card key={w.id} className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all">
+                      <CardContent className="p-5 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <div className="size-11 rounded-2xl bg-gradient-to-br from-[#00B894]/10 to-emerald-100 dark:to-emerald-500/20 flex items-center justify-center text-xl shrink-0">
+                            {group === 'cc' ? '📗' : group === 'translated' ? '🌐' : group === 'royalroad' ? '⚔️' : '📘'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-black text-foreground leading-snug">
+                              {w.zhTitle ? `${w.zhTitle} · ` : ''}{w.title}
+                            </h3>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">{w.author} · {w.platform} · {w.length}</p>
+                          </div>
+                        </div>
+
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">{w.zhBlurb}</p>
+
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {w.tags.map((t) => (
+                            <Badge key={t} className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-muted text-muted-foreground">{t}</Badge>
+                          ))}
+                          {w.builtin && (
+                            <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">作者 CC 授权</Badge>
+                          )}
+                        </div>
+
+                        {w.licenseNote && (
+                          <p className="text-[10px] text-amber-600 dark:text-amber-500 leading-relaxed border-l-2 border-amber-400/50 pl-2">
+                            {w.licenseNote}
+                          </p>
+                        )}
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full rounded-2xl gap-1.5 text-xs font-bold"
+                          onClick={() => window.open(w.url, '_blank', 'noopener,noreferrer')}
+                        >
+                          <ExternalLink className="size-3.5" />
+                          去阅读（官方页面）
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

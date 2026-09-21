@@ -412,13 +412,14 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     const next: ReaderProgress = {
       ...prev,
       page: ch ? ch.startPage : prev.page,
+      total: validPages.length,
       chapter: chapterIdx,
       ratio: rounded,
       perChapter: { ...(prev.perChapter || {}), [String(chapterIdx)]: rounded },
     };
     novelProgressRef.current = next;
     saveProgress(content.id, next);
-  }, [content.id, novelChapters]);
+  }, [content.id, novelChapters, validPages.length]);
 
   const handleNovelChapterChange = useCallback((idx: number) => {
     novelChapterIdxRef.current = idx;
@@ -433,11 +434,12 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     }
   }, []);
 
-  // Save progress — 翻页模式存页码（保留小说模式的章节字段）；小说模式由 NovelReader 按"章节+滚动位置"存
+  // Save progress — 翻页模式存页码 + 当前总页数（total 与 page 同量纲，供外部列表算百分比）；
+  // 小说模式由 NovelReader 按"章节+滚动位置"存
   useEffect(() => {
     if (modeRef.current === 'novel') return;
-    saveProgress(activeContent.id, { ...loadProgress(activeContent.id), page: currentPage });
-  }, [activeContent.id, currentPage]);
+    saveProgress(activeContent.id, { ...loadProgress(activeContent.id), page: currentPage, total: validPages.length });
+  }, [activeContent.id, currentPage, validPages.length]);
 
   // 切换阅读模式时恢复对应模式的进度（页码 ↔ 章节号）
   const prevModeRef = useRef<ReaderMode>(readerMode);

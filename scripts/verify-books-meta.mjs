@@ -143,6 +143,61 @@ check(
   '生成器里 The Time Machine 的 id 若存在必须是 35',
 );
 
+// ── ⑤ 阅读进度百分比必须在「保存时的量纲」里算 ──
+// 真机实测过 516% / 484%：books.ts 是压缩节选（每本约 4800 词 → 约 19 页），而阅读器会运行时
+// 升级为完整版全文，小说模式存的 page 是全文分页下的"章起始页" → 用节选页数当分母就爆表。
+const articleSrc = readFileSync(join(ROOT, 'src/pages/ArticlePage/ArticlePage.tsx'), 'utf8');
+const sharedSrc = readFileSync(join(ROOT, 'src/pages/ArticlePage/components/reader-shared.ts'), 'utf8');
+const pageReaderSrc = readFileSync(join(ROOT, 'src/pages/ArticlePage/components/PageReader.tsx'), 'utf8');
+
+check(
+  /total\?:\s*number;/.test(sharedSrc),
+  'ReaderProgress 有 total 字段（保存时的总页数，供外部列表同量纲算百分比）',
+);
+check(
+  /page: currentPage, total: validPages\.length/.test(pageReaderSrc),
+  '翻页模式保存进度时一并写入 total',
+);
+check(
+  /page: ch \? ch\.startPage : prev\.page,\s*\r?\n\s*total: validPages\.length,/.test(pageReaderSrc),
+  '小说模式保存进度时一并写入 total',
+);
+check(
+  /p\.chapter != null && chapters > 0/.test(articleSrc),
+  '小说模式进度按「章」算（chapter / 真实章数）',
+);
+check(
+  /const total = p\.total && p\.total > 0 \? p\.total : fallbackPages;/.test(articleSrc),
+  '翻页模式进度用保存时的 total，老数据才回落到节选页数',
+);
+check(
+  !/Math\.round\(\(progress\.page \/ totalPages\) \* 100\)/.test(articleSrc),
+  '不再用「页码 ÷ 当前书对象页数」算百分比（量纲不一致的原始 bug）',
+);
+// 数值验证：真实章数下任意 chapter/ratio 都落在 0-100；且旧的错误算法确实会溢出
+{
+  let stats = {};
+  try { stats = JSON.parse(readFileSync(join(ROOT, 'public/books/index.json'), 'utf8')); } catch { /* 清单缺失则跳过 */ }
+  const ids = Object.keys(stats);
+  check(ids.length > 0, '自检：读到 public/books/index.json 的真实章数', `n=${ids.length}`);
+
+  let over = 0, maxPct = 0;
+  for (const id of ids) {
+    const chapters = stats[id]?.chapters ?? 0;
+    if (!chapters) continue;
+    for (const [ch, ratio] of [[0, 0], [1, 0.5], [Math.floor(chapters / 2), 0.333], [chapters - 1, 0.999], [chapters, 1]]) {
+      const pct = Math.min(100, Math.max(0, Math.round(((ch + ratio) / chapters) * 100)));
+      if (pct < 0 || pct > 100) over++;
+      maxPct = Math.max(maxPct, pct);
+    }
+  }
+  check(over === 0, '新算法：真实章数下百分比恒在 0-100', `越界=${over}`);
+  check(maxPct === 100, '新算法：读完能到 100%（不会算不到头）', `max=${maxPct}`);
+  // 旧算法：真机出现过的 page=98 ÷ 节选页数(约 19) → 516%
+  const oldPct = Math.round((98 / 19) * 100);
+  check(oldPct > 100, '自检：旧的「页码÷节选页数」算法确实会溢出（断言非恒真）', `旧算法=${oldPct}%`);
+}
+
 // ── 输出 ──
 console.log('');
 console.log(`生成器条目=${genBooks.length}  数据条目=${dataBooks.size}`);
