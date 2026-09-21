@@ -1781,7 +1781,7 @@ const _p3600: string[] = [
 
 export const BOOK_3600: IReadingContent = bookContent(
   '3600', 'Essays of Michel de Montaigne', '蒙田随笔', 'Michel de Montaigne', '蒙田',
-  'business', 'intermediate', _p3600,
+  'philosophy', 'advanced', _p3600,
 );
 
 const _p1228: string[] = [
@@ -1872,7 +1872,7 @@ const _p3300: string[] = [
 
 export const BOOK_3300: IReadingContent = bookContent(
   '3300', 'The Wealth of Nations', '国富论', 'Adam Smith', '亚当·斯密',
-  'philosophy', 'advanced', _p3300,
+  'business', 'intermediate', _p3300,
 );
 
 export const ALL_BOOKS: IReadingContent[] = [

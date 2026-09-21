@@ -1,5 +1,9 @@
 # NativeThink 开发日志
 
+
+## 2026-09-22
+- fix(hooks): post-commit 当日标题判断用 ### 但写入 ## → grep 永不命中，每次提交都插新日期标题；同时收敛累积的 168 行空行与 9 个重复日期标题 (`890d972`)
+
 ## 2026-09-21
 - chore(release): v2.0.4 (versionCode 49) —— 打包产物含阅读器堆叠/滚动/进度修复 (`1bdb62f`)
 - feat(cet): 填入 APK_URL 指向 CetThink GitHub Release —— 恢复安卓包下载入口，并补上发布/替换 tag 的说明 (`85c56a5`)

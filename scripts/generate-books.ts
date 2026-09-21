@@ -32,12 +32,12 @@ const BOOKS: { id: number; title: string; zhTitle: string; author: string; zhAut
   { id: 1260, title: 'Jane Eyre', zhTitle: '简·爱', author: 'Charlotte Brontë', zhAuthor: '夏洛蒂·勃朗特', topic: 'literature' },
   { id: 768, title: 'Wuthering Heights', zhTitle: '呼啸山庄', author: 'Emily Brontë', zhAuthor: '艾米莉·勃朗特', topic: 'literature' },
   { id: 76, title: 'Huckleberry Finn', zhTitle: '哈克贝利·费恩历险记', author: 'Mark Twain', zhAuthor: '马克·吐温', topic: 'literature' },
-  { id: 244, title: 'The Time Machine', zhTitle: '时间机器', author: 'H.G. Wells', zhAuthor: 'H.G.威尔斯', topic: 'literature' },
+  { id: 244, title: 'A Study in Scarlet', zhTitle: '血字的研究', author: 'Arthur Conan Doyle', zhAuthor: '柯南·道尔', topic: 'literature' },
   { id: 1232, title: 'The Prince', zhTitle: '君主论', author: 'Niccolò Machiavelli', zhAuthor: '马基雅维利', topic: 'philosophy' },
   { id: 1635, title: 'Meditations', zhTitle: '沉思录', author: 'Marcus Aurelius', zhAuthor: '马可·奥勒留', topic: 'philosophy' },
-  { id: 3600, title: 'The Wealth of Nations', zhTitle: '国富论', author: 'Adam Smith', zhAuthor: '亚当·斯密', topic: 'business' },
+  { id: 3600, title: 'Essays of Michel de Montaigne', zhTitle: '蒙田随笔', author: 'Michel de Montaigne', zhAuthor: '蒙田', topic: 'philosophy' },
   { id: 1228, title: 'On the Origin of Species', zhTitle: '物种起源', author: 'Charles Darwin', zhAuthor: '查尔斯·达尔文', topic: 'science' },
-  { id: 3300, title: 'The Republic', zhTitle: '理想国', author: 'Plato', zhAuthor: '柏拉图', topic: 'philosophy' },
+  { id: 3300, title: 'The Wealth of Nations', zhTitle: '国富论', author: 'Adam Smith', zhAuthor: '亚当·斯密', topic: 'business' },
 ];
 
 function cleanGutenberg(raw: string): string {

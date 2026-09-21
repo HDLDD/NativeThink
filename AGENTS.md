@@ -69,6 +69,11 @@ node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆�
 node scripts/verify-tts-progress.mjs
 ```
 
+```powershell
+# 书目元数据一致性（改书单或 scripts/generate-books.ts 后必跑；防"生成器与数据漂移"）
+node scripts/verify-books-meta.mjs
+```
+
 **提交约定**：`npm run typecheck` 通过后再提交。手机端数据只进 localStorage / IndexedDB，不写系统目录。
 
 ---
