@@ -13,7 +13,7 @@ if [ ! -f "$CHANGELOG" ]; then
 fi
 
 # Check if today's date header already exists
-TODAY_HEADER="### $COMMIT_DATE"
+TODAY_HEADER="## $COMMIT_DATE"
 if ! grep -q "$TODAY_HEADER" "$CHANGELOG"; then
   # Insert new date header after the title line
   if grep -q "^## [0-9]" "$CHANGELOG"; then
