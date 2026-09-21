@@ -41,7 +41,7 @@ export const WEBNOVEL_GROUP_LABEL: Record<WebnovelGroup, string> = {
   classic: '口碑经典（作者自建站）',
   royalroad: 'Royal Road 热门',
   translated: '翻译网文（官方英译平台）',
-  cc: '作者 CC 授权（可考虑内置）',
+  cc: '可直接内置（作者 CC 授权 / 公有领域）',
 };
 
 export const WEBNOVELS: IWebnovel[] = [
@@ -214,13 +214,36 @@ export const WEBNOVELS: IWebnovel[] = [
     licenseNote: '译作版权链复杂，仅外链，勿内置。',
   },
 
-  // ── 作者主动 CC 授权（可考虑内置，但仍受许可约束）──
+  // ── 已核验「可以直接内置」的来源（许可允许再分发；仍须守各自约束）──
+  // 这一组是本次调研的真正落点：英文网文圈里体量大又允许内置的几乎没有，
+  // 但下面三个来源的许可是**实测查过原文**的，不是凭印象。
+  {
+    id: 'scp-foundation', title: 'SCP Foundation', zhTitle: 'SCP 基金会', author: 'SCP Wiki 社区',
+    zhBlurb: '英文互联网最出名的协作虚构体系，数千篇档案体短篇（每篇几百到几千词），篇幅天然适合 App 分页与朗读；社区体量极大、门槛低，很适合作为"想读点英文网文"的入口。',
+    url: 'https://scp-wiki.wikidot.com/scp-series', platform: 'SCP Wiki', group: 'cc',
+    tags: ['协作虚构', '档案体', '短篇', '可内置'], length: '单篇数百~数千词', builtin: true,
+    licenseNote: '站点内容为 **CC BY-SA 3.0**（原文明确允许整篇复制甚至售卖）。内置须：①逐篇署名到作者与链接；②衍生内容（含 AI 翻译）按同一协议共享。图片另有 Image Use Policy，注意 SCP-173 原图（Izumi Kato《Untitled 2004》）**不在** CC 内，不可用。',
+  },
+  {
+    id: 'standard-ebooks', title: 'Standard Ebooks', author: 'Standard Ebooks L3C',
+    zhBlurb: '志愿者精校的公版电子书库，排版质量高于 Gutenberg 原始文本；提供 bulk downloads，适合直接替换/补充现有书库的正文来源。',
+    url: 'https://standardebooks.org/bulk-downloads', platform: 'standardebooks.org', group: 'cc',
+    tags: ['公版', '精校排版', '批量下载', '可内置'], length: '全库数百部', builtin: true,
+    licenseNote: '其产出以 **CC0 1.0** 完全释入公有领域（原文：releasing the entirety of each ebook file into the public domain）→ **无附加条件**，可自由内置。',
+  },
+  {
+    id: 'doctorow-novels', title: 'Cory Doctorow 小说全站', author: 'Cory Doctorow',
+    zhBlurb: '作者把几乎全部长篇都放在自家站上免费下载（Little Brother / Homeland / Pirate Cinema / Makers / For the Win / Walkaway 等），全部 CC 授权。',
+    url: 'https://craphound.com/category/novels/', platform: 'craphound.com', group: 'cc',
+    tags: ['科幻', 'YA', '多部长篇', '可内置'], length: '单本 6~15 万词', builtin: true,
+    licenseNote: '下载页原文为 **CC BY-NC-SA 3.0**：可分享/改编/再分发，但**必须非商业**。另：**封面图不在授权内**（版权归出版社），内置时不要带封面。',
+  },
   {
     id: 'blindsight', title: 'Blindsight', author: 'Peter Watts',
     zhBlurb: '硬科幻长篇，作者官网提供免费全文下载，正文含 Creative Commons 授权章节。',
     url: 'https://www.rifters.com/real/Blindsight.htm', platform: '作者官网', group: 'cc',
     tags: ['硬科幻', '已出版'], length: '约 12 万词', builtin: true,
-    licenseNote: 'CC 授权（须逐个确认变体）。若含 NC 则要求 App 保持非商业。',
+    licenseNote: '正文含「Creative Commons Licensing Information」章节（已亲眼确认该节存在），但**具体变体尚未读到**；内置前须拉到那一节确认是 BY 还是 BY-NC-SA。',
   },
   {
     id: 'little-brother', title: 'Little Brother', author: 'Cory Doctorow',

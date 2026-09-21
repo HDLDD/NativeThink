@@ -430,13 +430,38 @@ export default function ArticlePage() {
   };
 
   /**
+   * 是否该用「章」来展示这位作者的进度 —— 与 progressPct 的判定同源，
+   * 避免出现「按页算出来的百分比」却标成「第 N 章」（刊物/演讲稿没有章数概念）。
+   */
+  const hasChapterProgress = (p: ReaderProgress, bookId: string): boolean =>
+    p.chapter != null && resolveChapters(p, bookId) > 0;
+
+  /**
+   * 总章数：优先用**保存时**记下的 chapters（阅读器自己切出来的），
+   * 老记录没有才回落到 /books/index.json —— 两者并不相等（弗兰肯斯坦 29 vs ≥43），
+   * 用错会算出 >100%（实测 111%）。
+   */
+  const resolveChapters = (p: ReaderProgress, bookId: string): number =>
+    p.chapters && p.chapters > 0 ? p.chapters : (bookStats[bookId]?.chapters ?? 0);
+
+  /**
+   * 是否值得显示进度条。注意不能只看 `page > 0`：
+   * 真机上有书 page=0 但 chapter=9（小说模式从章首进入、没翻过页），旧逻辑会整条不显示。
+   * 反之刊物/演讲稿只有 chapter=0 + page=0，不该显示成「第0页」。
+   */
+  const hasProgress = (p: ReaderProgress, bookId: string): boolean => {
+    if (p.page > 0) return true;
+    return hasChapterProgress(p, bookId) && ((p.chapter ?? 0) > 0 || (p.ratio ?? 0) > 0);
+  };
+
+  /**
    * 进度百分比（0-100）。必须在**保存时的量纲**里算：
-   *  - 小说模式：用「章」——(chapter + 章内比例) / 真实章数（来自 /books/index.json）
-   *  - 翻页模式：用保存时的总页数 p.total（新增字段）；老数据没有 total 才回落到节选页数
+   *  - 小说模式：用「章」——(chapter + 章内比例) / 保存时的总章数
+   *  - 翻页模式：用保存时的总页数 p.total；老数据没有 total 才回落到节选页数
    * 两种情形都夹到 0-100，避免进度条溢出。
    */
   const progressPct = (p: ReaderProgress, bookId: string, fallbackPages: number): number => {
-    const chapters = bookStats[bookId]?.chapters ?? 0;
+    const chapters = resolveChapters(p, bookId);
     if (p.chapter != null && chapters > 0) {
       const inChapter = Math.min(1, Math.max(0, p.ratio ?? 0));
       return Math.min(100, Math.max(0, Math.round(((p.chapter + inChapter) / chapters) * 100)));
@@ -767,12 +792,12 @@ export default function ArticlePage() {
                         <span className="text-[9px] text-muted-foreground ml-auto">{(bookStats[book.id]?.words ?? book.totalWords).toLocaleString()} 词</span>
                       </div>
                       {/* Reading progress */}
-                      {progress && (progress.chapter != null || progress.page > 0) && (
+                      {progress && hasProgress(progress, book.id) && (
                         <div className="mt-2 space-y-1">
                           <div className="flex items-center justify-between text-[9px]">
                             <span className="font-bold text-ink-teal">
-                              {progress.chapter != null
-                                ? `继续阅读 · 第 ${progress.chapter + 1} 章`
+                              {hasChapterProgress(progress, book.id)
+                                ? `继续阅读 · 第 ${progress.chapter! + 1} 章`
                                 : `继续阅读 (第${progress.page}页)`}
                             </span>
                             <span className="text-muted-foreground font-bold">{pct}%</span>

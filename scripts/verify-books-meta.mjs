@@ -155,6 +155,21 @@ check(
   'ReaderProgress 有 total 字段（保存时的总页数，供外部列表同量纲算百分比）',
 );
 check(
+  /chapters\?:\s*number;/.test(sharedSrc),
+  'ReaderProgress 有 chapters 字段（保存时的总章数）',
+);
+check(
+  /chapters: novelChapters\.length/.test(pageReaderSrc),
+  '小说模式保存进度时一并写入阅读器自己的总章数',
+);
+// 分母必须是**保存时**的章数：/books/index.json 的 chapters 是另一套算法算的，与阅读器切章不一致
+// —— 真机实测弗兰肯斯坦 index=29 而 chapter 已到 32（perChapter 里有 key "42"），拿 index 当分母
+// 会算出 111%。这条断言就是钉住"分母来自保存时"。
+check(
+  /p\.chapters && p\.chapters > 0 \? p\.chapters : \(bookStats\[bookId\]\?\.chapters \?\? 0\)/.test(articleSrc),
+  '总章数优先用保存时的 chapters，index.json 只作老数据回落',
+);
+check(
   /page: currentPage, total: validPages\.length/.test(pageReaderSrc),
   '翻页模式保存进度时一并写入 total',
 );

@@ -414,6 +414,8 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       page: ch ? ch.startPage : prev.page,
       total: validPages.length,
       chapter: chapterIdx,
+      // 存阅读器自己切出的总章数 —— index.json 的 chapters 是另一套算法，不能当分母
+      chapters: novelChapters.length,
       ratio: rounded,
       perChapter: { ...(prev.perChapter || {}), [String(chapterIdx)]: rounded },
     };

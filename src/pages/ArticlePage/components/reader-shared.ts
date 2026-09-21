@@ -27,12 +27,18 @@ const CHAPTER_PREFIX = '##CHAPTER##';
 //            当分母去除"全文空间的页码"，会得到几百个百分点（真机实测 516%/484%）。
 //            有了 total，百分比就能在**保存时的同一个量纲**里算。
 // chapter:   小说模式当前章节号
+// chapters:  保存时的**总章数**（阅读器自己切出来的）—— 必须存：`/books/index.json` 的 chapters
+//            是 dump-book-texts.cjs 另算的，与阅读器的切章结果并不一致。真机实测：
+//            弗兰肯斯坦 index=29 而阅读器 chapter 已到 32（perChapter 里有 key "42"）；
+//            爱丽丝 index=13 而 perChapter 里出现 key "55"。拿 index 的数字当分母会算出
+//            111%（32/29），所以分母要用这里存下的那个。
 // ratio:     小说模式当前章内滚动比例（0-1）
 // perChapter:小说模式每章的章内滚动位置 — "记住每章阅读位置"
 export interface ReaderProgress {
   page: number;
   total?: number;
   chapter?: number;
+  chapters?: number;
   ratio?: number;
   perChapter?: Record<string, number>;
 }

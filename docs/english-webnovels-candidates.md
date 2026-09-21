@@ -158,9 +158,46 @@ BY-NC-ND 这类看着自由，实际上和 App 的翻译/朗读功能直接冲�
 
 ---
 
-## 五、结论
+## 五、能真正落地的网文（许可已查原文，可再分发）
 
-1. **英文网文不能内置**：Royal Road 站规禁止复制/爬取，多数作者保留全部权利，同人连授权资格都没有。
+前面的结论是"热门网文基本不能内置"，但**下面这些是可以的** —— 全部打开许可原文核验过，不是凭印象：
+
+| 来源 | 许可 | 能做什么 | 出处 |
+|---|---|---|---|
+| **SCP 基金会** | **CC BY-SA 3.0** | ✅ **可内置，甚至可商用**。原文：放宽到「people will be able to copy your work wholesale, **and even sell it**, provided that they properly attribute you and release their work under the same license」 | [licensing-guide](https://scp-wiki.wikidot.com/licensing-guide) |
+| **Standard Ebooks** | **CC0 1.0**（完全释入公有领域） | ✅ 可内置，**无附加条件**。原文：releasing the entirety of each ebook file into the public domain；且提供 bulk downloads | [about](https://standardebooks.org/about) · [bulk-downloads](https://standardebooks.org/bulk-downloads) |
+| **Cory Doctorow 小说** | **CC BY-NC-SA 3.0** | ⚠️ 可内置但**必须非商业**；**封面图不在授权内**（版权归出版社） | [下载页原文](https://craphound.com/littlebrother/download/) |
+| **Peter Watts《Blindsight》** | CC（变体未确认） | ⚠️ 正文确有「Creative Commons Licensing Information」一节（已亲眼看到该节标题），但**具体是 BY 还是 BY-NC-SA 还没读到**，内置前必须拉到那一节确认 | [rifters.com](https://www.rifters.com/real/Blindsight.htm) |
+
+**SCP 是这批里最合适的落点**，理由不是"它最有名"，而是三条刚好对上 App 的形态：
+
+1. **篇幅天然合页**：单篇几百到几千词的档案体短文，正好匹配阅读器按 ~300 词分页、按 Chapter 切章的节奏；不像《Worm》那种百万词长篇会把分页与进度压垮。
+2. **体量与热度**：英文互联网最有名的协作虚构体系，数千篇，社区极其活跃 —— 满足"英文圈火"这个诉求。
+3. **许可最宽松**：BY-SA 连商用都允许，是这一批里唯一不需要"保持非商业"前提的。
+
+**内置时必须做到的两件事**（BY-SA 的硬要求）：
+
+- **逐篇署名 + 原文链接**（例：`SCP-682 由 Dr Gears 创作，源自 SCP Wiki`）；
+- **衍生内容按同一协议共享** —— 注意 App 的 **AI 翻译**属于衍生作品，其译文也要按 CC BY-SA 提供，不能声明独占。
+
+**一个必须避开的坑**：图片另有 [Image Use Policy](https://scp-wiki.wikidot.com/image-use-policy)，且站方特别声明
+**SCP-173 的原图（Izumi Kato《Untitled 2004》）不在 CC 授权内**，商用会招致法律行动 —— 所以只取文本，不要抓图。
+
+**Standard Ebooks 的额外价值**：现有 `books.ts` 的正文来自 Gutenberg 原始文本（含版权页、校对署名等噪声，
+生成器还要专门过滤）；Standard Ebooks 是精校版且 CC0，可作为**正文来源的升级** —— 与"加网文"是两条独立的收益线。
+
+---
+
+## 六、结论（更新）
+
+1. **热门英文网文不能内置**：Royal Road 站规禁止复制/爬取，多数作者保留全部权利，同人连授权资格都没有 → 走"推荐 + 官方外链"。
 2. **能做的是**：推荐清单 + 官方外链（方案 A）；用户自行导入走已有「导入书籍」（方案 B，已实现）。
-3. **能内置的只有少数 CC 作品**（如 `Blindsight`），且必须守 NC（保持非商业）与 ND（与 AI 翻译冲突）的约束，并逐个打开作者页确认许可变体。
-4. **动手加书之前先查 `ArticlePage.tsx:415/722` 的进度量纲问题**（页码来自保存时的分页、分母来自当前分页），否则长书进度会显示成几百个百分点。
+3. **能内置的是**：SCP 基金会（BY-SA，最推荐）、Standard Ebooks（CC0）、Doctorow 小说（BY-NC-SA，须非商业）、Watts（变体待确认）。
+4. 落地时守住四条：**署名 + 同协议共享**（BY-SA）、**保持非商业**（BY-NC）、**不抓图**（图片政策）、**不打包封面**（出版社权利）。
+5. **进度量纲问题已于本轮修复并真机验证**：`ReaderProgress` 增加 `total`/`chapters`（保存时一并写），
+   小说模式按章算、翻页模式按保存时的总页数算，都夹到 0-100。真机结果 1663%→**2%**、521%→**9%**、484%→**20%**、153%→**1%**，
+   标签也从「第98页」变成「第 33 章」。守卫见 `npm run verify:books-meta`（180 断言）。
+   ⚠️ 仍然存在的口径差异：`/books/index.json` 的 `chapters` 与**阅读器自己切出的章数不一致**
+   （弗兰肯斯坦 index=29 而阅读器 chapter 已到 32；爱丽丝 index=13 而 perChapter 出现 key "55"）——
+   老记录没有 `chapters` 时会回落到 index 的数字，因此弗兰肯斯坦这条老数据仍显示 100%（重新打开一次书就会写入正确章数并自愈）。
+   **要彻底解决应查明 dump-book-texts.cjs 的切章逻辑与阅读器为何不同。**
