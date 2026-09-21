@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn, cleanText } from '@/lib/utils';
 import type { IParagraph, TransMode } from '@/data/reading';
+import { useHighlightColor, useHighlightWords, matchesHighlight, HIGHLIGHT_COLORS } from '@/lib/reader-highlight';
 import { FONT_SIZE_CLASSES, type ReaderFontSize } from './reader-shared';
 
 interface ReaderParagraphProps {
@@ -51,6 +52,10 @@ function ReaderParagraphImpl({
 }: ReaderParagraphProps) {
   const displayEn = para.en.startsWith('##CHAPTER##') ? para.en.replace('##CHAPTER##', '') : para.en;
   const isChapter = para.en.startsWith('##CHAPTER##');
+  // 复习词高亮：词表与颜色都来自 reader-highlight 模块（阅读设置里可换色）
+  const reviewWords = useHighlightWords();
+  const [hlColorId] = useHighlightColor();
+  const hlColor = HIGHLIGHT_COLORS.find((c) => c.id === hlColorId) ?? HIGHLIGHT_COLORS[0];
 
   return (
     <div
@@ -85,6 +90,8 @@ function ReaderParagraphImpl({
                 {displayEn.split(/\s+/).filter(Boolean).map((w, wi) => {
                   const clean = w.replace(/[^a-zA-Z'-]/g, '');
                   const isWord = clean.length >= 2;
+                  // 复习词高亮：用当前选定的颜色给词加一个框（颜色可在阅读设置里换）
+                  const isReview = isWord && matchesHighlight(w, reviewWords);
                   return (
                     <span key={wi}>
                       {wi > 0 && ' '}
@@ -92,6 +99,13 @@ function ReaderParagraphImpl({
                         className={cn(
                           isWord && 'cursor-pointer hover:text-ink-teal hover:underline underline-offset-2 transition-colors',
                         )}
+                        style={isReview ? {
+                          border: `1.5px solid ${hlColor.border}`,
+                          background: hlColor.background,
+                          borderRadius: 6,
+                          padding: '0 2px',
+                        } : undefined}
+                        title={isReview ? '待复习单词' : undefined}
                         onClick={isWord ? (e) => onWordClick(e, w) : undefined}
                       >
                         {w}

@@ -25,6 +25,7 @@ import { buildPages } from '@/data/reading';
 import { queryWords, preloadCoreOnly, getEssentialLevels, isAllReady, findWord } from '@/data/wordbank';
 import { lookupDictionary } from '@/data/dictionary';
 import { useWordLearning } from '@/lib/use-word-learning';
+import { setHighlightWords, useHighlightColor, HIGHLIGHT_COLORS } from '@/lib/reader-highlight';
 import { fetchFullBook } from '@/data/book-fulltext';
 import { translateChapterByIndex, translateBook, getChapterTranslation, splitChapters } from '@/data/book-translation';
 import { translateWithLocalMt, isLocalMtReady, hasBundledMt, getTranslateEngine, setTranslateEngine, loadLocalMt, getLocalMtProgress, type TranslateEngine } from '@/lib/local-mt';
@@ -180,6 +181,13 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
   // Cleanup on unmount: stop TTS + release heavy references for GC
   useEffect(() => { return () => { try { tts.cancel(); } catch { /* */ } }; }, []);
+
+  // 复习词高亮：把当前内容的待复习词表推给 reader-highlight 模块
+  // （只有「用复习词汇生成文章」产出的内容带 highlightWords；退出阅读器时清空）
+  useEffect(() => {
+    setHighlightWords(content.highlightWords ?? null);
+    return () => setHighlightWords(null);
+  }, [content.id, content.highlightWords]);
   useEffect(() => { return () => {
     // Help GC by clearing translation cache and display content on unmount
     setTransCache({});
@@ -211,6 +219,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     return 'lg';
   });
   // ── 沉浸式阅读：点击内容区切换工具栏；设置面板；阅读主题 ──
+  const [highlightColorId, setHighlightColorId] = useHighlightColor();
   const [chromeVisible, setChromeVisible] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [readerTheme, setReaderTheme] = useState<'light' | 'paper' | 'night'>(() => {
@@ -1379,6 +1388,29 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 </Button>
               </div>
             </div>
+            {/* 复习词高亮颜色 —— 只在当前内容确实有待复习词时出现 */}
+            {(content.highlightWords?.length ?? 0) > 0 && (
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">
+                  待复习词的颜色（{content.highlightWords!.length} 个）
+                </p>
+                <div className="flex items-center gap-2">
+                  {HIGHLIGHT_COLORS.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setHighlightColorId(c.id)}
+                      title={c.label}
+                      aria-label={c.label}
+                      className={cn(
+                        'size-7 rounded-lg transition-all',
+                        highlightColorId === c.id ? 'ring-2 ring-offset-2 ring-foreground/40' : 'ring-1 ring-border',
+                      )}
+                      style={{ border: `2px solid ${c.border}`, background: c.background }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
             {/* 翻译引擎 */}
             <div>
               <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">翻译引擎</p>

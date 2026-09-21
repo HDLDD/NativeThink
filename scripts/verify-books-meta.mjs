@@ -17,10 +17,13 @@
  *
  * 用法：node scripts/verify-books-meta.mjs
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
 
+const require = createRequire(import.meta.url);
+const ts = require('typescript');
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 
@@ -211,6 +214,72 @@ check(
   // 旧算法：真机出现过的 page=98 ÷ 节选页数(约 19) → 516%
   const oldPct = Math.round((98 / 19) * 100);
   check(oldPct > 100, '自检：旧的「页码÷节选页数」算法确实会溢出（断言非恒真）', `旧算法=${oldPct}%`);
+}
+
+// ── ⑥ SCP 内容（CC BY-SA 3.0）的许可合规与数据完整性 ──
+// BY-SA 的硬要求：每篇必须署名到来源、App 内声明同一许可。这条断言就是防止
+// 以后重新生成 scp.ts 时把 author/sourceUrl 丢掉 —— 那会直接变成违规使用。
+{
+  const scpSrc = readFileSync(join(ROOT, 'src/data/scp.ts'), 'utf8');
+  const arts = [...scpSrc.matchAll(/export const (SCP_[A-Z0-9_]+): IReadingContent = \{([\s\S]*?)\n\};/g)]
+    .map((m) => ({ name: m[1], body: m[2] }));
+  check(arts.length >= 15, 'SCP 篇目数量足够（≥15）', `n=${arts.length}`);
+  const noAuthor = arts.filter((a) => !/author: '[^']+'/.test(a.body));
+  check(noAuthor.length === 0, 'SCP 每篇都有署名（抽不到作者时退回 wiki 级）', noAuthor.map((a) => a.name).join(','));
+  check(
+    arts.every((a) => /source: 'SCP Wiki · CC BY-SA 3\.0'/.test(a.body)),
+    'SCP 每篇都标注 CC BY-SA 3.0 来源',
+  );
+  check(
+    arts.every((a) => /sourceUrl: 'https:\/\/scp-wiki\.wikidot\.com\/scp-\d+'/.test(a.body)),
+    'SCP 每篇都带精确原文链接',
+  );
+  check(/export const SCP_LICENSE = \{[\s\S]*?name: 'CC BY-SA 3\.0'/.test(scpSrc), '导出 SCP_LICENSE 许可声明');
+  check(/share-alike|同协议|CC BY-SA 3\.0 提供/.test(scpSrc), 'SCP_LICENSE.note 含 share-alike 声明');
+  // 只取文本：产物里不应出现任何 <img>/图片链接
+  const imgs = [...scpSrc.matchAll(/<img|\.jpg|\.png|\.jpeg|wikidot\.com\/local--files/gi)];
+  check(imgs.length === 0, 'SCP 产物不含图片（图片另有 Image Use Policy，且 173 原图不在 CC 内）', `命中=${imgs.length}`);
+  check(!/page-content|Authors' Pages|Powered by Wikidot|rating: \+/.test(scpSrc), 'SCP 产物无站内噪声残留');
+}
+
+// ── ⑦ 复习词高亮：把 matchesHighlight 的真实实现抽出来做单元测试 ──
+// 形态归并很容易写成"过度匹配"（把无关词也框起来），所以必须真测。
+{
+  const hlSrc = readFileSync(join(ROOT, 'src/lib/reader-highlight.ts'), 'utf8');
+  const grab = (header) => {
+    const i = hlSrc.indexOf(header);
+    if (i < 0) throw new Error('missing ' + header);
+    let d = 0, j = hlSrc.indexOf('{', i), start = j;
+    for (; j < hlSrc.length; j++) {
+      if (hlSrc[j] === '{') d++;
+      else if (hlSrc[j] === '}') { d--; if (d === 0) break; }
+    }
+    return hlSrc.slice(i, j + 1);
+  };
+  const normSrc = grab('function norm(');
+  const matchSrc = grab('export function matchesHighlight(');
+  const mod = ts.transpileModule(
+    `${normSrc}\n${matchSrc}\nexport { matchesHighlight };`,
+    { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
+  ).outputText;
+  const outFile = join(process.env.TEMP || '/tmp', 'nt-highlight-test.mjs');
+  writeFileSync(outFile, mod, 'utf8');
+  const { matchesHighlight } = await import(pathToFileURL(outFile).href);
+
+  check(matchesHighlight('run', ['run']) === true, '高亮：原形命中');
+  check(matchesHighlight('Running', ['run']) === true, '高亮：大小写 + ing 命中');
+  check(matchesHighlight('stopped', ['stop']) === true, '高亮：双写辅音 + ed 命中');
+  check(matchesHighlight('studies', ['study']) === false, '高亮：y→ies 不误判（保守策略，宁少不错）');
+  check(matchesHighlight('carpet', ['car']) === false, '高亮：不做词干化，carpet 不该命中 car');
+  check(matchesHighlight('the', []) === false, '高亮：词表为空时一律不高亮');
+  check(matchesHighlight('resilient', ['resilient']) === true, '高亮：长词精确命中');
+
+  const appSrc2 = readFileSync(join(ROOT, 'src/pages/ArticlePage/ArticlePage.tsx'), 'utf8');
+  check(/highlightWords: words\.map\(\(w\) => w\.wordKey\)/.test(appSrc2), '「用复习词汇生成文章」把复习词交给阅读器高亮');
+  check(/highlightWords\?: string\[\];/.test(readFileSync(join(ROOT, 'src/data/reading.ts'), 'utf8')), 'IReadingContent 有 highlightWords 字段');
+  check(/setHighlightWords\(content\.highlightWords \?\? null\)/.test(pageReaderSrc), '阅读器进入时下发复习词、退出时清空');
+  check(/HIGHLIGHT_COLORS\.map/.test(pageReaderSrc), '阅读设置里提供可选颜色');
+  check(/matchesHighlight\(w, reviewWords\)/.test(readFileSync(join(ROOT, 'src/pages/ArticlePage/components/ReaderParagraph.tsx'), 'utf8')), '段落渲染按复习词加框');
 }
 
 // ── 输出 ──

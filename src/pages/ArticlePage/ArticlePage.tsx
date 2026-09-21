@@ -4,7 +4,7 @@ import {
   Upload,
   FileText, Sparkles, Languages, BookOpen, Volume2, RefreshCw, Loader2,
   Search, ExternalLink, X, Globe, Library, Mic, Wand2, BookMarked,
-  GraduationCap, Clock, RotateCw, History, Newspaper, ChevronLeft, ChevronRight, Play, HelpCircle,
+  GraduationCap, Clock, RotateCw, History, Newspaper, ChevronLeft, ChevronRight, Play, HelpCircle, ShieldAlert,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,11 +25,12 @@ import { loadImportedBooks, importBookFromText, deleteImportedBook, IMPORTED_ID_
 import { loadBookStats, type IBookStat } from '@/data/book-stats';
 import type { ReaderProgress } from './components/reader-shared';
 import { WEBNOVELS, WEBNOVEL_GROUP_LABEL, type WebnovelGroup } from '@/data/webnovels';
+import { SCP_ARTICLES, SCP_LICENSE } from '@/data/scp';
 import { EXTRA_PUBLICATIONS } from '@/data/publications-extra';
 import type { SpeechMeta } from '@/data/speeches';
 // ── Types ──
 type Level = 'beginner' | 'intermediate' | 'advanced';
-type MainTab = 'books' | 'webnovels' | 'publications' | 'ai' | 'speeches' | 'wikipedia';
+type MainTab = 'books' | 'webnovels' | 'scp' | 'publications' | 'ai' | 'speeches' | 'wikipedia';
 
 const LEVELS: { key: Level; label: string; color: string; desc: string }[] = [
   { key: 'beginner', label: '初级', color: '#00B894', desc: '简单句式，常用词汇' },
@@ -51,6 +52,7 @@ const TOPICS: { key: string; label: string; icon: string }[] = [
 const MAINTABS: { key: MainTab; label: string; icon: typeof BookOpen }[] = [
   { key: 'books', label: '书籍', icon: Library },
   { key: 'webnovels', label: '网文推荐', icon: BookMarked },
+  { key: 'scp', label: 'SCP 基金会', icon: ShieldAlert },
   { key: 'publications', label: '刊物', icon: Newspaper },
   { key: 'ai', label: 'AI 生成', icon: Sparkles },
   { key: 'speeches', label: '演讲', icon: Mic },
@@ -649,6 +651,8 @@ export default function ArticlePage() {
         topic: 'vocabulary', difficulty: level,
         pages: buildPages(parsed.paragraphs || []),
         totalWords: (parsed.paragraphs || []).reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
+        // 把这批待复习词交给阅读器用颜色框出来（颜色可在阅读设置里换）
+        highlightWords: words.map((w) => w.wordKey),
       };
       openReader(content);
       saveToHistory(parsed.title || '复习词汇文章', content.totalWords.toString(), 'review-words');
@@ -891,6 +895,71 @@ export default function ArticlePage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── SCP 基金会 TAB —— CC BY-SA 3.0，可内置；但必须署名 + 声明同一许可 ── */}
+      {mainTab === 'scp' && (
+        <div className="space-y-4">
+          {/* 许可声明：BY-SA 的 share-alike 要求，不能省 */}
+          <div className="rounded-2xl border border-border/60 bg-muted/30 p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="size-5 text-ink-teal" />
+              <span className="text-sm font-black">{SCP_ARTICLES.length} 篇 SCP 基金会文章</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              内容来自{' '}
+              <button className="text-ink-teal underline underline-offset-2"
+                onClick={() => window.open(SCP_LICENSE.sourceUrl, '_blank', 'noopener,noreferrer')}>
+                {SCP_LICENSE.sourceName}
+              </button>
+              ，按{' '}
+              <button className="text-ink-teal underline underline-offset-2"
+                onClick={() => window.open(SCP_LICENSE.url, '_blank', 'noopener,noreferrer')}>
+                {SCP_LICENSE.name}
+              </button>
+              {' '}授权使用。{SCP_LICENSE.note}
+            </p>
+            <p className="text-[10px] text-muted-foreground">只收录文本，未收录任何图片（图片适用另一套 Image Use Policy）。</p>
+          </div>
+
+          <div className="stagger grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {SCP_ARTICLES.map((a) => (
+              <Card key={a.id}
+                className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
+                onClick={() => { openReader(a); saveToHistory(a.zhTitle, '', 'scp', { bookId: a.id }); }}
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="size-12 rounded-2xl bg-gradient-to-br from-[#00B894]/10 to-emerald-100 dark:to-emerald-500/20 flex items-center justify-center text-2xl shrink-0">
+                      🗂️
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-black text-foreground group-hover:text-ink-teal transition-colors line-clamp-2">
+                        {a.title}
+                      </h3>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        作者：{a.author} · {a.totalWords.toLocaleString()} 词
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+                          {SCP_LICENSE.name}
+                        </Badge>
+                        {a.sourceUrl && (
+                          <button
+                            className="text-[10px] text-muted-foreground hover:text-ink-teal underline underline-offset-2 ml-auto"
+                            onClick={(e) => { e.stopPropagation(); window.open(a.sourceUrl!, '_blank', 'noopener,noreferrer'); }}
+                          >
+                            原文
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
 

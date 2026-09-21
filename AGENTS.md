@@ -70,8 +70,11 @@ node scripts/verify-tts-progress.mjs
 ```
 
 ```powershell
-# 书目元数据一致性（改书单或 scripts/generate-books.ts 后必跑；防"生成器与数据漂移"）
+# 书目/SCP 元数据一致性 + 复习词高亮逻辑（改书单、scp.ts、reader-highlight.ts 后必跑）
 node scripts/verify-books-meta.mjs
+
+# 重新抓取 SCP 文章（约 1 req/s，产物 src/data/scp.ts 勿手改）
+node scripts/fetch-scp.cjs
 ```
 
 **提交约定**：`npm run typecheck` 通过后再提交。手机端数据只进 localStorage / IndexedDB，不写系统目录。

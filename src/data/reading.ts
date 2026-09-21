@@ -30,6 +30,16 @@ export interface IReadingContent {
   totalWords: number;
   /** Project Gutenberg 书籍 ID — 存在时阅读器可运行时升级为完整版 */
   gutenbergId?: number;
+  /**
+   * 原文页面地址。SCP 这类 CC BY-SA 内容**必须**带它：
+   * 许可要求署名到具体来源，读者要能点回原文核对。
+   */
+  sourceUrl?: string;
+  /**
+   * 需要高亮的复习单词（如「用复习词汇生成文章」产出的文章）。
+   * 阅读器会把这些词用可选的颜色框出来，提示"这是待复习的词"。
+   */
+  highlightWords?: string[];
 }
 
 /** Build pages from paragraph pairs — autopaginate by word count (~200-400 words/page) */
