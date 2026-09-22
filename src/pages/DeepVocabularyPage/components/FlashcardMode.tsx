@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { useTTS } from '@/lib/use-tts';
 import { sfxComplete } from '@/lib/sfx';
 import { decideSwipe, SWIPE_THRESHOLD, SWIPE_QUALITY_UNKNOWN, SWIPE_QUALITY_KNOWN } from '@/lib/vocab-swipe';
+import { createSessionOrder, scheduleRelearn, nextIndex, forecastByDay, MAX_RELEARN, type ISessionOrder } from '@/lib/vocab-session';
 
 const FL_LEVEL_COLORS: Record<string, string> = {
   all: '#00B894', zhongkao: '#EF4444', gaokao: '#F97316', cet4: '#0EA5E9', cet6: '#6C5CE7', ielts: '#F59E0B', toefl: '#EC4899', postgraduate: '#8B5CF6', professional: '#14B8A6', advanced: '#64748B',
@@ -42,10 +43,16 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const { LazyMotionDiv: MotionDiv, LazyAnimatePresence: AnimatePresence } = useFramerMotion();
   const currentLevel = level || 'all';
   const { addStudyMinutes } = useLearningStats();
-  const { state, dueForReview, getNewWords, recordReview } = useWordLearning(currentLevel);
+  const { state, dueForReview, getNewWords, recordReview, setSuspended, suspendedCount } = useWordLearning(currentLevel);
   const tts = useTTS();
 
   const [currentIdx, setIdx] = useState(0);
+  /**
+   * 本轮会话：**开始时冻结**顺序（原先直接用依赖 state.progress 的 queue 配下标，
+   * 每评一次分 queue 就重算，会话中途顺序会漂）。答错的词按 RELEARN_GAP 重新插回队尾方向。
+   */
+  const [session, setSession] = useState<ISessionOrder>(() => createSessionOrder([]));
+  const [sessionEntries, setSessionEntries] = useState<IWordEntry[]>([]);
   const [isFlipped, setFlipped] = useState(false);
   const [dir, setDir] = useState(0);
   const [autoSpeak, setAutoSpeak] = useState(() => {
@@ -136,16 +143,26 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const ttsRef = useRef(tts);
   ttsRef.current = tts;
   const lastSpokenKey = useRef('');
-  // 会话预热：进入队列时预合成前 3 个词，首词朗读零等待
+  /**
+   * 会话当前词。**必须声明在下面的朗读 effect 之前** —— 否则 `cw` 出现在 effect 的依赖
+   * 数组里就是 TDZ（AGENTS.md 已记的坑：hook/const 声明顺序）。
+   */
+  const cw = useMemo(() => {
+    const key = session.order[currentIdx];
+    if (!key) return undefined;
+    return sessionEntries.find((w) => w.word.toLowerCase() === key) ?? findWord(key);
+  }, [session.order, currentIdx, sessionEntries]);
+  useImmersive(started && !!cw);
+  // 会话预热：进入队列时预合成前 5 个词，首词朗读零等待
   useEffect(() => {
     if (!autoSpeak) return;
-    queue.slice(0, 5).forEach((w, i) => {
+    sessionEntries.slice(0, 5).forEach((w, i) => {
       setTimeout(() => ttsRef.current.prewarm(w.word, { rate: 0.85 }), 120 * i);
     });
-  }, [queue, autoSpeak]);
+  }, [sessionEntries, autoSpeak]);
   useEffect(() => {
     if (!autoSpeak) return;
-    const word = queue[currentIdx];
+    const word = cw;
     if (!word) return;
     const side = isFlipped ? 'back' : 'front';
     const key = `${currentIdx}-${side}`;
@@ -153,20 +170,18 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     lastSpokenKey.current = key;
     if (!isFlipped) {
       ttsRef.current.speak(word.word, { rate: 0.85 });
-      const next = queue[currentIdx + 1];
+      const nk = session.order[currentIdx + 1];
+      const next = nk ? findWord(nk) : undefined;
       if (next) ttsRef.current.prewarm(next.word, { rate: 0.85 });
     } else if (word.examples[0]) {
       const timer = setTimeout(() => { ttsRef.current.speak(cleanText(word.examples[0].en), { rate: 0.85 }); }, 400);
       return () => clearTimeout(timer);
     }
-  }, [autoSpeak, currentIdx, isFlipped, queue]);
+  }, [autoSpeak, currentIdx, isFlipped, cw, session.order]);
 
   useEffect(() => {
     setIdx(0); setFlipped(false); setDir(0); setRated(false); setShowDeep(false);
   }, [currentLevel]);
-
-  const cw = queue[currentIdx];
-  useImmersive(started && !!cw);
 
   /**
    * 展示用的词条：detail（搭配/例句/深度解释）是**懒加载并按原对象就地补齐**的
@@ -194,6 +209,26 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     return () => window.removeEventListener('keydown', onKey);
   }, [started]);
 
+  /** 本轮该词已被重排几次（背面提示"本轮已重排 N 次"） */
+  const relearnUsed = useCallback((word: string) => session.relearnCounts[word.toLowerCase()] ?? 0, [session.relearnCounts]);
+
+  /** 未来 7 天到期预测（含今天逾期）—— 让用户对复习负担有预期 */
+  const forecast = useMemo(
+    () => forecastByDay(Object.values(state.progress).filter((p) => !p.suspended), 7),
+    [state.progress],
+  );
+
+  /** 恢复所有被「不再出现」屏蔽的词 */
+  const restoreSuspended = useCallback(() => {
+    const keys = Object.values(state.progress).filter((p) => p.suspended).map((p) => p.wordKey);
+    let n = 0;
+    for (const k of keys) {
+      const w = findWord(k);
+      if (w) { setSuspended(w, false); n++; }
+    }
+    if (n > 0) toast.success(`已恢复 ${n} 个词`, { duration: 2000 });
+  }, [state.progress, setSuspended]);
+
   const stats = useMemo(() => {
     let mastered = 0, learning = 0;
     for (const p of Object.values(state.progress)) {
@@ -213,29 +248,68 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setSessionRated((p) => p + 1);
     if (quality >= 3) setSessionGood((p) => p + 1);
     setRated(true);
+    // 答错立即重排：隔 RELEARN_GAP 张后再出现（最多 MAX_RELEARN 次）—— 这比只记 wrongCount
+    // 有用得多，是主流 SRS（Anki learning steps）的即时巩固环节。
+    if (quality <= 2) {
+      const key = cw.word.toLowerCase();
+      // 先判断是否还会重排再提示 —— 不要把 toast 放进 setState 更新函数里（StrictMode 下会弹两次）
+      if ((session.relearnCounts[key] ?? 0) < MAX_RELEARN) {
+        setSession((s) => scheduleRelearn(s, currentIdx, key));
+        toast.info('答错的词稍后会再出现一次', { duration: 1200 });
+      }
+    }
     const labels = ['完全忘了', '有点印象', '基本记得', '比较熟悉', '完全掌握'];
     toast(labels[quality] || '已记录', { duration: 800 });
-  }, [cw, rated, recordReview]);
+  }, [cw, rated, recordReview, currentIdx]);
 
   const advance = useCallback((direction = 1) => {
     setDir(direction); setFlipped(false); setRated(false); setShowDeep(false);
     setTimeout(() => setIdx((p) => {
-      const next = (p + 1) % queue.length;
-      // 走完最后一循环回第一张 = 完成一整轮，给个里程碑反馈
-      if (next === 0 && p === queue.length - 1) {
+      const next = nextIndex(session, p);
+      if (next === null) {
+        // 走到队尾：本轮结束，回开头再来一轮（重排插入的词也已经消费完）
         sfxComplete();
-        toast.success(`🎉 完成一整轮 ${queue.length} 张卡片 · 累计评分 ${sessionReviewCount + 1} 次，巩固完成`, { duration: 4000 });
+        toast.success(`🎉 完成一整轮 ${session.order.length} 张卡片 · 累计评分 ${sessionReviewCount + 1} 次，巩固完成`, { duration: 4000 });
+        return 0;
       }
       return next;
     }), 150);
-  }, [queue.length, sessionReviewCount]);
+  }, [session, sessionReviewCount]);
+
+  /** 开启一轮复习：把当时的队列**冻结**成会话顺序（此后评分不再改变本轮的出卡顺序） */
+  const startSession = useCallback((entries: IWordEntry[]) => {
+    setSessionEntries(entries);
+    setSession(createSessionOrder(entries.map((w) => w.word.toLowerCase())));
+    setIdx(0); setFlipped(false); setDir(0); setRated(false); setShowDeep(false);
+    setSessionRated(0); setSessionGood(0);
+    setStarted(true);
+  }, []);
+
+  /** 已会/不感兴趣 → 屏蔽该词，并从本轮移除 */
+  const suspendCurrent = useCallback(() => {
+    if (!cw) return;
+    const word = cw;
+    setSuspended(word, true);
+    setSession((s) => {
+      const key = word.word.toLowerCase();
+      const removed = s.order.filter((k) => k !== key);
+      const nextIdx = Math.min(currentIdx, Math.max(0, removed.length - 1));
+      setIdx(nextIdx);
+      return { order: removed, relearnCounts: s.relearnCounts };
+    });
+    setFlipped(false); setRated(false); setShowDeep(false);
+    toast.success(`已把「${word.word}」移出学习队列`, {
+      duration: 5000,
+      action: { label: '撤销', onClick: () => setSuspended(word, false) },
+    });
+  }, [cw, setSuspended, currentIdx]);
 
   // ── 全键盘操作：空格翻面/默认好评，1-5 评分，→ 下一个，S 开关自动发音 ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || !cw) return;
-      if (!started) { if (e.code === 'Space') { e.preventDefault(); setStarted(true); } return; }
+      if (!started) { if (e.code === 'Space') { e.preventDefault(); startSession(queue); } return; }
       if (e.code === 'Space') {
         e.preventDefault();
         if (!isFlipped) flip();
@@ -271,7 +345,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     markWithQuality(action === 'rate-unknown' ? SWIPE_QUALITY_UNKNOWN : SWIPE_QUALITY_KNOWN);
   };
 
-  if (!cw) {
+  // 只有"根本没词可复习"才走空状态；会话未开始时 cw 也是 undefined，不能混为一谈
+  if (queue.length === 0) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-2">
@@ -329,7 +404,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { setWrongDrill(true); setStarted(true); setIdx(0); setFlipped(false); setRated(false); }}
+              onClick={() => { setWrongDrill(true); startSession(wrongEntries); }}
               disabled={wrongEntries.length === 0}
               className="rounded-xl text-[10px] font-black uppercase tracking-wider gap-1.5 border-border hover:border-rose-300 hover:text-rose-500"
             >
@@ -377,9 +452,41 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
           </div>
         </div>
 
+        {/* 未来 7 天复习负担 + 已屏蔽出口 —— 预期管理，避免"怎么又来一堆"的挫败 */}
+        <div className="rounded-2xl border border-border/60 p-3.5 space-y-2">
+          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider">
+            <span className="text-muted-foreground">未来 7 天复习量</span>
+            <span className="text-muted-foreground/80 normal-case font-bold">
+              明天 {forecast[1] ?? 0} 个
+            </span>
+          </div>
+          <div className="flex items-end gap-1.5 h-12">
+            {forecast.map((n, i) => {
+              const max = Math.max(1, ...forecast);
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1" title={`${i === 0 ? '今天（含逾期）' : `${i} 天后`}：${n} 个`}>
+                  <span className="text-[8px] font-black tabular-nums text-muted-foreground">{n || ''}</span>
+                  <div className={cn('w-full rounded-t-md transition-all', i === 0 ? 'bg-rose-400' : 'bg-[#6C5CE7]/60')}
+                    style={{ height: `${Math.max(2, (n / max) * 34)}px` }} />
+                  <span className="text-[8px] font-bold text-muted-foreground/70">{i === 0 ? '今' : i}</span>
+                </div>
+              );
+            })}
+          </div>
+          {suspendedCount > 0 && (
+            <div className="flex items-center justify-between pt-1 border-t border-border/50">
+              <span className="text-[9px] font-bold text-muted-foreground">已屏蔽（不再出现）{suspendedCount} 个</span>
+              <button onClick={restoreSuspended}
+                className="text-[9px] font-black uppercase tracking-wider text-ink-violet hover:text-[#5A4BD1]">
+                恢复全部
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="flex justify-center pt-2">
           <Button
-            onClick={() => { setSessionRated(0); setSessionGood(0); setStarted(true); }}
+            onClick={() => { setWrongDrill(false); startSession(queue); }}
             disabled={queue.length === 0}
             className="bg-[#6C5CE7] hover:bg-[#5A4BD1] text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-violet-200/50 gap-2"
           >
@@ -390,7 +497,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   );
   }
   const accuracy = sessionRated > 0 ? Math.round((sessionGood / sessionRated) * 100) : 0;
-  const progressPct = queue.length > 0 ? Math.round((sessionRated / queue.length) * 100) : 0;
+  const progressPct = session.order.length > 0 ? Math.round((sessionRated / session.order.length) * 100) : 0;
   const swipeHint = Math.abs(dragX) < SWIPE_THRESHOLD ? null : (dragX < 0 ? 'left' : 'right');
   return (
     <div className="space-y-4">
@@ -415,7 +522,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
               <div className="h-full bg-[#6C5CE7] transition-all duration-300" style={{ width: `${progressPct}%` }} />
             </div>
             <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-wider text-muted-foreground">
-              <span className="tabular-nums">{currentIdx + 1}/{queue.length}</span>
+              <span className="tabular-nums">{currentIdx + 1}/{session.order.length}</span>
               <span className="tabular-nums">已评 {sessionRated}</span>
               {sessionRated > 0 && <span className={cn('tabular-nums', accuracy >= 70 ? 'text-emerald-600' : 'text-amber-600')}>记得 {accuracy}%</span>}
             </div>
@@ -463,7 +570,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                 {!isFlipped ? (
                   <>
                     <Badge className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground mb-4">
-                      {currentIdx + 1} / {queue.length}
+                      {currentIdx + 1} / {session.order.length}
                       {state.progress[shown!.word.toLowerCase()] && (
                         <span className="ml-1.5 text-ink-violet">
                           · {state.progress[shown!.word.toLowerCase()].status === 'mastered' ? '已掌握' : '复习中'}
@@ -607,6 +714,25 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                         ))}
                       </div>
                     )}
+                    {/* 记忆状态与出口 —— 让用户知道"为什么还会再看到它"，
+                        并给熟练用户一个「别再来烦我」的出口（主流 App 都有，缺了会流失） */}
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-violet-100/70">
+                      <div className="text-[9px] font-bold text-muted-foreground">
+                        {rated && state.progress[shown!.word.toLowerCase()]
+                          ? `下次复习：${state.progress[shown!.word.toLowerCase()].interval} 天后 · 间隔 ${state.progress[shown!.word.toLowerCase()].interval}d`
+                          : (state.progress[shown!.word.toLowerCase()]
+                            ? `当前间隔 ${state.progress[shown!.word.toLowerCase()].interval} 天`
+                            : '首次学习 · 答对后 1 天再见')}
+                        {relearnUsed(shown!.word) > 0 && ` · 本轮已重排 ${relearnUsed(shown!.word)} 次`}
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); suspendCurrent(); }}
+                        className="shrink-0 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                        title="已会 / 不感兴趣 —— 从学习队列移除（可撤销）"
+                      >
+                        不再出现
+                      </button>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -640,7 +766,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       {rated && (
         <div className="flex justify-center">
           <Button onClick={() => advance()} className="bg-[#6C5CE7] hover:bg-[#5A4BD1] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-violet-200/50">
-            {currentIdx < queue.length - 1 ? '下一个' : '再来一组'}<RotateCw className="size-4 ml-2" />
+            {currentIdx < session.order.length - 1 ? '下一个' : '再来一组'}<RotateCw className="size-4 ml-2" />
           </Button>
         </div>
       )}

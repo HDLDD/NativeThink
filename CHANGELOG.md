@@ -2,6 +2,7 @@
 
 
 ## 2026-09-22
+- feat(vocab): 复习卡片对齐主流背单词 App —— 左右滑手势(左不认识/右认识)、本轮进度条+正确率、背面信息层次(搭配/例句/近义反义/词族/深度解释/语域/词频)、修 autoSpeak 死代码与 detail 懒加载不重读 (`0a3b084`)
 - chore(release): v2.0.6 (versionCode 51) —— 含 SCP 落地与复习词高亮 (`529205c`)
 - feat(reading): SCP 基金会落地（20 篇/CC BY-SA 3.0，逐篇署名+原文链接+许可声明 tab）+ 复习词高亮（可选 6 色框，按形态归并匹配） (`6ce9bab`)
 - fix(reading): 进度分母改存「保存时的章数/页数」（真机 1663%→2%、521%→9%）+ 网文推荐补入 3 个已核验可内置来源（SCP CC BY-SA / Standard Ebooks CC0 / Doctorow CC BY-NC-SA） (`09effe0`)

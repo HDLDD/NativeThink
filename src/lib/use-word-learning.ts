@@ -27,6 +27,12 @@ export interface IWordProgress {
   nextReview: number;      // Date.now() at next review time
   lastReview: number;      // timestamp
   wrongCount?: number;     // 连续答错累计（quality<=2 时 +1，答对清零）— 错词重练用
+  /**
+   * 用户主动「不再出现」（已会/不感兴趣）。
+   * 主流背单词 App 都有这个出口：没有它，熟练用户会被简单词反复占用时间而流失。
+   * 可选字段，老数据无需迁移。
+   */
+  suspended?: boolean;
 }
 
 export interface ILearningState {
@@ -176,13 +182,19 @@ export function useWordLearning(level: string) {
 
   const wordKey = (w: IWordEntry) => w.word.toLowerCase();
 
-  // Words that are due for review today
+  // Words that are due for review today（不含用户主动屏蔽的词）
   const dueForReview = useMemo(() => {
     const now = Date.now();
     return Object.values(state.progress).filter(
-      (p) => p.nextReview <= now && p.status !== 'new',
+      (p) => p.nextReview <= now && p.status !== 'new' && !p.suspended,
     );
   }, [state.progress]);
+
+  /** 被用户「不再出现」屏蔽的词数（概览里给出口，否则屏蔽后无法找回） */
+  const suspendedCount = useMemo(
+    () => Object.values(state.progress).filter((p) => p.suspended).length,
+    [state.progress],
+  );
 
   // New words available to learn (not yet started)
   const knownKeys = useMemo(() => new Set(Object.keys(state.progress)), [state.progress]);
@@ -191,10 +203,35 @@ export function useWordLearning(level: string) {
     [dailyQuota, state.todayLearned.length],
   );
 
-  // Get new words for today from the word bank
+  // Get new words for today from the word bank（跳过已屏蔽的词）
   const getNewWords = (count: number): IWordEntry[] => {
     const all = getRandomWords(200, level === 'all' ? undefined : level);
     return all.filter((w) => !knownKeys.has(wordKey(w))).slice(0, count);
+  };
+
+  /**
+   * 「不再出现」开关。屏蔽后不出现在复习队列/新词里；再次打开即恢复原进度。
+   * 需要时自动补一条 status='new' 的记录，这样"没学过的词也能直接屏蔽"。
+   */
+  const setSuspended = (word: IWordEntry, suspended: boolean) => {
+    const key = wordKey(word);
+    const base: IWordProgress = { wordKey: key, status: 'new', easeFactor: 2.5, interval: 0, repetitions: 0, nextReview: 0, lastReview: 0 };
+    const apply = (targets: string[]) => {
+      for (const lvl of targets) {
+        const s = loadState(lvl);
+        s.progress[key] = { ...(s.progress[key] || base), suspended };
+        saveState(lvl, s);
+      }
+    };
+    if (isAllLevels) {
+      apply([word.level && SUB_LEVELS.includes(word.level) ? word.level : SUB_LEVELS[0]]);
+    } else {
+      apply([level]);
+    }
+    setState((prev) => ({
+      ...prev,
+      progress: { ...prev.progress, [key]: { ...(prev.progress[key] || base), suspended } },
+    }));
   };
 
   const recordReview = (word: IWordEntry, quality: number) => {
@@ -265,6 +302,8 @@ export function useWordLearning(level: string) {
     setDailyQuota,
     todayRemaining,
     dueForReview,
+    suspendedCount,
+    setSuspended,
     knownKeys,
     getNewWords,
     recordReview,
