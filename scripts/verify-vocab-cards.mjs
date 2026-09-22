@@ -159,6 +159,38 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/下次复习：\$\{state\.progress\[shown!\.word\.toLowerCase\(\)\]\.interval\} 天后/.test(fc), '背面显示下次复习时间（解释"为什么还会再见到"）');
 }
 
+// ── ⑧ 回看上一个词 + 每日目标 + 生词本 ──
+{
+  // 回看：advance(-1) 必须真的往回走，并且直接翻到背面（"查看上一个词的具体信息"）
+  check(/if \(direction < 0\) \{[\s\S]{0,260}setIdx\(\(p\) => Math\.max\(0, p - 1\)\)[\s\S]{0,80}setFlipped\(true\)/.test(fc),
+    '回看：advance(-1) 往回走并直接展开释义（原先忽略方向符号，左滑其实还是往前走）');
+  check(/onClick=\{\(\) => advance\(-1\)\} disabled=\{currentIdx === 0\}/.test(fc), '头部有「上一个」按钮且到第一张时禁用');
+  check(/const viewingPast = rated && isFlipped/.test(fc), '回看态可识别（用于显示「回看第 N 张」并隐藏评分）');
+  check(/isFlipped && !rated && !viewingPast/.test(fc), '回看已评过的卡时不再出现评分按钮');
+  // rated 由"已评词集合"派生，否则回看时状态会错乱
+  check(/const rated = !!currentKey && ratedKeys\.has\(currentKey\)/.test(fc), 'rated 由 ratedKeys 派生（回看/前进状态一致）');
+  check(!/setRated\(/.test(fc), '不再有独立的 setRated 状态（已由 ratedKeys 取代）');
+
+  // 每日目标入口
+  check(/setDailyQuota\(n\)/.test(fc), '概览可直接设定每日目标');
+  check(/\[10, 20, 30, 50, 100\]/.test(fc), '每日目标有 5 档预设');
+  check(/今天新学 \{state\.todayLearned\.length\}\/\{dailyQuota\}/.test(fc), '显示今日进度（今天新学 x/目标）');
+
+  // 生词本
+  const reader = readFileSync(join(ROOT, 'src/pages/ArticlePage/components/PageReader.tsx'), 'utf8');
+  const cwLib = readFileSync(join(ROOT, 'src/lib/custom-words.ts'), 'utf8');
+  const uwl2 = readFileSync(join(ROOT, 'src/lib/use-word-learning.ts'), 'utf8');
+  check(/export function addCustomWord/.test(cwLib) && /export function toWordEntry/.test(cwLib), '生词本库导出 addCustomWord / toWordEntry');
+  check(/level: 'custom'/.test(cwLib), '生词本词条用独立等级 custom（不污染真实词书）');
+  check(/'custom'\]/.test(uwl2), "'custom' 纳入 SUB_LEVELS（生词本也能聚合与落盘）");
+  check(/lookupDictionary\(clean\)\.then/.test(reader), '阅读器：词库未收录时走词典兜底');
+  check(/addCustomWord\(base\)/.test(reader), '阅读器：兜底命中后写入生词本');
+  check(/toWordEntry\(\{ \.\.\.base/.test(reader), '阅读器：同时把生词本词条加入复习队列');
+  check(!/词库未收录 "\$\{word\}"，无法加入学习/.test(reader), '不再出现"词库未收录 → 无法加入"的断头路文案');
+  check(/customList\.map\(toWordEntry\)/.test(fc), '复习队列纳入生词本词条');
+  check(/setShowCustom\(true\)/.test(fc) && /removeCustomWord\(w\.word\)/.test(fc), '生词本有管理入口与移除操作');
+}
+
 console.log('');
 console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
 if (fail) {

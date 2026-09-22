@@ -5,8 +5,8 @@ export interface IWordEntry {
   phonetic: string;
   partOfSpeech: string;
   meaning: string;
-  /** 等级: zhongkao, gaokao, cet4, cet6, ielts, toefl, postgraduate, professional, advanced */
-  level: 'zhongkao' | 'gaokao' | 'cet4' | 'cet6' | 'ielts' | 'toefl' | 'postgraduate' | 'professional' | 'advanced';
+  /** 等级: zhongkao, gaokao, cet4, cet6, ielts, toefl, postgraduate, professional, advanced, custom(生词本) */
+  level: 'zhongkao' | 'gaokao' | 'cet4' | 'cet6' | 'ielts' | 'toefl' | 'postgraduate' | 'professional' | 'advanced' | 'custom';
   /** COCA 词频排名 (1 = most frequent) */
   frequencyRank: number;
   /** detail 字段：搭配；未加载 detail 时为空数组（真实值见 <level>.detail.ts） */

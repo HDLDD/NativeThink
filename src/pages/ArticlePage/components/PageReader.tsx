@@ -24,6 +24,7 @@ import type { IReadingContent, TransMode, IParagraph } from '@/data/reading';
 import { buildPages } from '@/data/reading';
 import { queryWords, preloadCoreOnly, getEssentialLevels, isAllReady, findWord } from '@/data/wordbank';
 import { lookupDictionary } from '@/data/dictionary';
+import { addCustomWord, toWordEntry } from '@/lib/custom-words';
 import { useWordLearning } from '@/lib/use-word-learning';
 import { setHighlightWords, useHighlightColor, HIGHLIGHT_COLORS } from '@/lib/reader-highlight';
 import { fetchFullBook } from '@/data/book-fulltext';
@@ -103,11 +104,30 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   // 查词 → 一键加入学习队列（'all' 模式自动落到词的源词书，复习队列立即可见）
   const { recordReview: recordWordLearn } = useWordLearning('all');
   const addToLearning = useCallback((word: string) => {
-    const entry = findWord(word);
-    if (!entry) { toast.info(`词库未收录 "${word}"，无法加入学习`); return; }
-    recordWordLearn(entry, 0); // quality 0 = 完全忘了 → 立即进入复习队列
-    toast.success(`已加入学习队列 — 复习闪卡中将出现 "${word}"`);
-  }, [recordWordLearn]);
+    const clean = word.replace(/[^a-zA-Z'-]/g, '') || word;
+    const entry = findWord(clean);
+    if (entry) {
+      recordWordLearn(entry, 0); // quality 0 = 完全忘了 → 立即进入复习队列
+      toast.success(`已加入学习队列 — 复习闪卡中将出现 "${clean}"`);
+      return;
+    }
+    // 词库未收录 → 走词典兜底并存入生词本（阅读里遇到的超纲词恰恰是最该记的）
+    lookupDictionary(clean).then((dict) => {
+      if (!dict) { toast.info(`词典里也没查到 "${clean}"，未能加入`); return; }
+      const base = {
+        word: clean,
+        phonetic: dict.phonetic || '',
+        partOfSpeech: '',
+        meaning: dict.translation || dict.definition || '',
+        source: content?.title ? `阅读：${content.title}` : '阅读',
+      };
+      const isNew = addCustomWord(base);
+      recordWordLearn(toWordEntry({ ...base, addedAt: Date.now() }), 0);
+      toast.success(isNew
+        ? `词库未收录，已存入生词本 — "${clean}"（复习闪卡可见）`
+        : `"${clean}" 已在生词本中，已重新加入复习`);
+    }).catch(() => toast.info(`查询 "${clean}" 失败，请稍后重试`));
+  }, [recordWordLearn, content?.title]);
 
   // ── 连读（auto-read) refs — declared before useTTS so the onEnd closure
   // can read the latest page state without stale-closure pitfalls ──

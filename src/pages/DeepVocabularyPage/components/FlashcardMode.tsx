@@ -1,10 +1,11 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import {
-  RotateCw, Volume2, Sparkles, XCircle, ArrowLeft, ChevronDown, ChevronUp,
+  RotateCw, Volume2, Sparkles, XCircle, ArrowLeft, ChevronLeft, ChevronDown, ChevronUp,
   Link2, BookOpen, Gauge,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { IWordEntry } from '@/data/wordbank/schema';
@@ -20,6 +21,7 @@ import { useTTS } from '@/lib/use-tts';
 import { sfxComplete } from '@/lib/sfx';
 import { decideSwipe, SWIPE_THRESHOLD, SWIPE_QUALITY_UNKNOWN, SWIPE_QUALITY_KNOWN } from '@/lib/vocab-swipe';
 import { createSessionOrder, scheduleRelearn, nextIndex, forecastByDay, MAX_RELEARN, type ISessionOrder } from '@/lib/vocab-session';
+import { useCustomWords, removeCustomWord, toWordEntry, type ICustomWord } from '@/lib/custom-words';
 
 const FL_LEVEL_COLORS: Record<string, string> = {
   all: '#00B894', zhongkao: '#EF4444', gaokao: '#F97316', cet4: '#0EA5E9', cet6: '#6C5CE7', ielts: '#F59E0B', toefl: '#EC4899', postgraduate: '#8B5CF6', professional: '#14B8A6', advanced: '#64748B',
@@ -43,7 +45,9 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const { LazyMotionDiv: MotionDiv, LazyAnimatePresence: AnimatePresence } = useFramerMotion();
   const currentLevel = level || 'all';
   const { addStudyMinutes } = useLearningStats();
-  const { state, dueForReview, getNewWords, recordReview, setSuspended, suspendedCount } = useWordLearning(currentLevel);
+  const { state, dueForReview, getNewWords, recordReview, setSuspended, suspendedCount, dailyQuota, setDailyQuota } = useWordLearning(currentLevel);
+  // 生词本：阅读里收集、词库未收录的词（进度走独立的 'custom' 一路）
+  const customList = useCustomWords();
   const tts = useTTS();
 
   const [currentIdx, setIdx] = useState(0);
@@ -59,7 +63,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     try { return safeStorage.getItem(AUTO_SPEAK_KEY) === '1'; } catch { return false; }
   });
   const [sessionReviewCount, setSessionReviewCount] = useState(0);
-  const [rated, setRated] = useState(false);
+  /** 已评分过的词集合（按 key）—— rated 由它派生：回看上一张时状态才不会错乱 */
+  const [ratedKeys, setRatedKeys] = useState<Set<string>>(() => new Set());
   // 本轮统计：已评分张数 / 其中记得的（quality>=3）—— 用于顶部进度条与正确率
   const [sessionRated, setSessionRated] = useState(0);
   const [sessionGood, setSessionGood] = useState(0);
@@ -68,6 +73,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const [dragX, setDragX] = useState(0);
   const dragStart = useRef<number | null>(null);
   const [detailTick, setDetailTick] = useState(0);
+  const [showCustom, setShowCustom] = useState(false);
 
   const toggleAutoSpeak = useCallback(() => {
     setAutoSpeak((v) => {
@@ -130,9 +136,12 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     }
     // Otherwise, fill with new words to reach 20 cards
     const fillCount = Math.max(0, 20 - cappedDue.length - otherWords.length);
+    // 生词本的词优先排进来（它们来自用户真实阅读，意愿最强）
+    const customEntries = customList.map(toWordEntry).filter((w) => !seen.has(w.word.toLowerCase()) && state.progress[w.word.toLowerCase()]);
+    customEntries.forEach((w) => seen.add(w.word.toLowerCase()));
     const newWords = fillCount > 0 ? getNewWords(fillCount).filter((w) => !seen.has(w.word.toLowerCase())) : [];
-    return [...cappedDue, ...otherWords, ...newWords];
-  }, [wrongDrill, wrongEntries, dueForReview, state.progress, getNewWords]);
+    return [...customEntries, ...cappedDue, ...otherWords, ...newWords];
+  }, [wrongDrill, wrongEntries, dueForReview, state.progress, getNewWords, customList]);
 
   // 到期堆积提示（只在本轮挂载时提示一次）
   const dueOverCap = dueForReview.length > 30;
@@ -153,6 +162,11 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     return sessionEntries.find((w) => w.word.toLowerCase() === key) ?? findWord(key);
   }, [session.order, currentIdx, sessionEntries]);
   useImmersive(started && !!cw);
+  const currentKey = session.order[currentIdx];
+  /** 当前卡是否已评分（派生）—— 回看上一张时仍显示"已评"，不会又冒出评分按钮 */
+  const rated = !!currentKey && ratedKeys.has(currentKey);
+  /** 是否在回看历史卡（回看时不出评分按钮，只展示信息） */
+  const viewingPast = rated && isFlipped;
   // 会话预热：进入队列时预合成前 5 个词，首词朗读零等待
   useEffect(() => {
     if (!autoSpeak) return;
@@ -180,7 +194,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   }, [autoSpeak, currentIdx, isFlipped, cw, session.order]);
 
   useEffect(() => {
-    setIdx(0); setFlipped(false); setDir(0); setRated(false); setShowDeep(false);
+    setIdx(0); setFlipped(false); setDir(0); setShowDeep(false);
   }, [currentLevel]);
 
   /**
@@ -202,7 +216,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     if (!started) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) {
-        setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); setRated(false); setShowDeep(false);
+        setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); setShowDeep(false);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -247,7 +261,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setSessionReviewCount((p) => p + 1);
     setSessionRated((p) => p + 1);
     if (quality >= 3) setSessionGood((p) => p + 1);
-    setRated(true);
+    setRatedKeys((prev) => new Set(prev).add(cw.word.toLowerCase()));
     // 答错立即重排：隔 RELEARN_GAP 张后再出现（最多 MAX_RELEARN 次）—— 这比只记 wrongCount
     // 有用得多，是主流 SRS（Anki learning steps）的即时巩固环节。
     if (quality <= 2) {
@@ -262,8 +276,21 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     toast(labels[quality] || '已记录', { duration: 800 });
   }, [cw, rated, recordReview, currentIdx]);
 
+  /**
+   * 前后翻卡。
+   *  - 向前：按会话顺序推进；到队尾则本轮结束并回到开头。
+   *  - 向后（direction < 0）：回到上一张并**直接翻到背面** —— 用户点"上一个"就是为了
+   *    看那个词的具体信息（释义/搭配/例句），停在正面等于什么都没看到。
+   *    （原先 advance 忽略 direction 符号，左滑"上一个"其实还是往前走，是 bug。）
+   */
   const advance = useCallback((direction = 1) => {
-    setDir(direction); setFlipped(false); setRated(false); setShowDeep(false);
+    if (direction < 0) {
+      setDir(-1); setShowDeep(false);
+      setIdx((p) => Math.max(0, p - 1));
+      setFlipped(true);
+      return;
+    }
+    setDir(direction); setFlipped(false); setShowDeep(false);
     setTimeout(() => setIdx((p) => {
       const next = nextIndex(session, p);
       if (next === null) {
@@ -280,7 +307,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const startSession = useCallback((entries: IWordEntry[]) => {
     setSessionEntries(entries);
     setSession(createSessionOrder(entries.map((w) => w.word.toLowerCase())));
-    setIdx(0); setFlipped(false); setDir(0); setRated(false); setShowDeep(false);
+    setIdx(0); setFlipped(false); setDir(0); setShowDeep(false);
     setSessionRated(0); setSessionGood(0);
     setStarted(true);
   }, []);
@@ -297,7 +324,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       setIdx(nextIdx);
       return { order: removed, relearnCounts: s.relearnCounts };
     });
-    setFlipped(false); setRated(false); setShowDeep(false);
+    setFlipped(false); setShowDeep(false);
     toast.success(`已把「${word.word}」移出学习队列`, {
       duration: 5000,
       action: { label: '撤销', onClick: () => setSuspended(word, false) },
@@ -484,6 +511,33 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
           )}
         </div>
 
+        {/* 每日目标 + 生词本 —— 主流 App 都会把"今天学多少"和"我的生词"放在伸手可及处 */}
+        <div className="rounded-2xl border border-border/60 p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">每日目标</span>
+            <span className="text-[9px] font-bold text-muted-foreground/80">今天新学 {state.todayLearned.length}/{dailyQuota}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {[10, 20, 30, 50, 100].map((n) => (
+              <button key={n} onClick={() => { setDailyQuota(n); toast.success(`每日目标已设为 ${n} 个`, { duration: 1500 }); }}
+                className={cn('flex-1 py-1.5 rounded-xl text-[10px] font-black transition-all border',
+                  dailyQuota === n ? 'border-[#6C5CE7] text-ink-violet bg-[#6C5CE7]/10' : 'border-border text-muted-foreground hover:border-[#6C5CE7]/40')}>
+                {n}
+              </button>
+            ))}
+          </div>
+          {customList.length > 0 && (
+            <div className="flex items-center justify-between pt-1 border-t border-border/50">
+              <span className="text-[9px] font-bold text-muted-foreground">
+                生词本 {customList.length} 个（阅读中收集、词库未收录）
+              </span>
+              <button onClick={() => setShowCustom(true)} className="text-[9px] font-black uppercase tracking-wider text-ink-violet hover:text-[#5A4BD1]">
+                查看 / 管理
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="flex justify-center pt-2">
           <Button
             onClick={() => { setWrongDrill(false); startSession(queue); }}
@@ -493,6 +547,35 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             <RotateCw className="size-4" />开始复习（{queue.length} 张卡片）
           </Button>
         </div>
+
+        {/* 生词本管理：朗读 / 移除（这些词已进复习队列，SM-2 与屏蔽同样适用） */}
+        <Dialog open={showCustom} onOpenChange={setShowCustom}>
+          <DialogContent className="max-w-md rounded-[24px]">
+            <DialogHeader>
+              <DialogTitle className="text-sm font-black">生词本（{customList.length}）</DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[55vh] overflow-y-auto space-y-1.5">
+              {customList.map((w) => (
+                <div key={w.word} className="flex items-center gap-2 p-2.5 rounded-xl border border-border/60">
+                  <button onClick={() => tts.speak(w.word, { rate: 0.9 })} className="shrink-0 text-muted-foreground hover:text-ink-violet">
+                    <Volume2 className="size-4" />
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-black text-foreground truncate">
+                      {w.word}{w.phonetic && <span className="ml-1.5 text-[10px] font-medium text-muted-foreground">{w.phonetic}</span>}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground truncate">{w.meaning || '（无释义）'}</p>
+                    {w.source && <p className="text-[9px] text-muted-foreground/70 truncate">{w.source}</p>}
+                  </div>
+                  <button onClick={() => { removeCustomWord(w.word); toast.success(`已从生词本移除「${w.word}」`, { duration: 1500 }); }}
+                    className="shrink-0 p-1 text-muted-foreground hover:text-rose-500" title="从生词本移除">
+                    <XCircle className="size-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
   );
   }
@@ -506,7 +589,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => { setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); setRated(false); setShowDeep(false); }}
+            onClick={() => { setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); setShowDeep(false); }}
             className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-ink-violet"
             title="返回概览"
           >
@@ -515,6 +598,11 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
           {wrongDrill && (
             <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] font-black bg-rose-500/10 text-rose-500 border-0">
               错词重练中
+            </Badge>
+          )}
+          {viewingPast && (
+            <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] font-black bg-[#6C5CE7]/10 text-ink-violet border-0">
+              回看第 {currentIdx + 1} 张
             </Badge>
           )}
           <div className="flex-1 min-w-0 space-y-1">
@@ -527,6 +615,14 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
               {sessionRated > 0 && <span className={cn('tabular-nums', accuracy >= 70 ? 'text-emerald-600' : 'text-amber-600')}>记得 {accuracy}%</span>}
             </div>
           </div>
+          {/* 上一个词 —— 回看刚看过的词的具体信息（左滑也可以） */}
+          <Button
+            variant="ghost" size="icon" onClick={() => advance(-1)} disabled={currentIdx === 0}
+            className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-ink-violet disabled:opacity-30"
+            title="上一个词（查看它的具体信息）· 左滑也可以"
+          >
+            <ChevronLeft className="size-5" />
+          </Button>
           <Button
             variant="ghost" size="icon" onClick={toggleAutoSpeak}
             className={cn('rounded-xl size-9 shrink-0', autoSpeak ? 'text-ink-violet' : 'text-muted-foreground/60')}
@@ -743,7 +839,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       </div>
 
       {/* SM-2 Quality rating */}
-      {isFlipped && !rated && (
+      {isFlipped && !rated && !viewingPast && (
         <div className="flex justify-center gap-2 flex-wrap">
           {[
             { q: 0, label: '完全忘了', color: 'bg-rose-500 hover:bg-rose-600' },

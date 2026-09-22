@@ -5,7 +5,13 @@ import { getRandomWords } from '@/data/wordbank';
 
 const STORAGE_KEY_PREFIX = '__nativethink_word_learning';
 const DAILY_QUOTA_KEY_PREFIX = '__nativethink_daily_quota';
-const SUB_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
+/**
+ * 参与聚合与落盘的等级。'custom' = 生词本（从阅读里收集、词库未收录的词），
+ * 它不在词库里，但学习进度与其它等级同构，所以一起聚合 —— 这样 'all' 视图能看到它。
+ */
+const SUB_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced', 'custom'];
+/** 词库里真实存在的等级（'all' 模式下决定进度落到哪本词书；生词本单独处理） */
+const WORDBANK_LEVELS = SUB_LEVELS.filter((l) => l !== 'custom');
 
 export function loadLevelState(level: string): ILearningState {
   return loadState(level);
@@ -243,7 +249,7 @@ export function useWordLearning(level: string) {
     });
     // For 'all' mode: persist to the word's source level so per-level data stays accurate
     if (isAllLevels) {
-      const sourceLevel = word.level && SUB_LEVELS.includes(word.level) ? word.level : 'cet4';
+      const sourceLevel = word.level && WORDBANK_LEVELS.includes(word.level) ? word.level : (word.level === 'custom' ? 'custom' : 'cet4');
       const sourceState = loadState(sourceLevel);
       const existing = sourceState.progress[key];
       const updated = applyWrong(existing, sm2Update(
