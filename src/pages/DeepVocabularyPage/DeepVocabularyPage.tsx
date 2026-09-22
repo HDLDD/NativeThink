@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
-import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, ArrowRight } from 'lucide-react';
+import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, ArrowRight, Notebook, NotebookPen, BookMarked, Plane, GraduationCap, Briefcase, Award, Zap, Library, Globe, type LucideIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -50,31 +50,38 @@ interface SetupStepProps {
   onContinue: () => void;
 }
 
-const BOOKS = [
-  { key: 'zhongkao', label: '中考词汇', icon: '📒', color: '#EF4444', desc: '初中英语中考核心词汇', gradient: 'from-red-50 to-rose-50 dark:from-red-500/10 dark:to-rose-500/10' },
-  { key: 'gaokao', label: '高考词汇', icon: '📔', color: '#F97316', desc: '高中英语高考核心词汇', gradient: 'from-orange-50 to-amber-50 dark:from-orange-500/10 dark:to-amber-500/10' },
-  { key: 'cet4', label: '四级词汇', icon: '📗', color: '#0EA5E9', desc: '大学英语四级考试核心词汇', gradient: 'from-sky-50 to-blue-50 dark:from-sky-500/10 dark:to-blue-500/10' },
-  { key: 'cet6', label: '六级词汇', icon: '📘', color: '#6C5CE7', desc: '大学英语六级考试核心词汇', gradient: 'from-violet-50 to-purple-50 dark:from-violet-500/10 dark:to-purple-500/10' },
-  { key: 'ielts', label: '雅思词汇', icon: '📙', color: '#F59E0B', desc: 'IELTS 雅思考试核心词汇', gradient: 'from-amber-50 to-yellow-50 dark:from-amber-500/10 dark:to-yellow-500/10' },
-  { key: 'toefl', label: '托福词汇', icon: '📕', color: '#EC4899', desc: 'TOEFL 托福考试核心词汇', gradient: 'from-pink-50 to-rose-50 dark:from-pink-500/10 dark:to-rose-500/10' },
-  { key: 'postgraduate', label: '考研词汇', icon: '📚', color: '#8B5CF6', desc: '研究生入学考试核心词汇', gradient: 'from-purple-50 to-violet-50 dark:from-purple-500/10 dark:to-violet-500/10' },
-  { key: 'professional', label: '专业词汇', icon: '💼', color: '#14B8A6', desc: 'SAT 学术与职场专业词汇', gradient: 'from-teal-50 to-cyan-50 dark:from-teal-500/10 dark:to-cyan-500/10' },
-  { key: 'advanced', label: '高阶词汇', icon: '📓', color: '#64748B', desc: 'GRE 等高阶英语考试词汇', gradient: 'from-slate-50 to-gray-50 dark:from-slate-500/10 dark:to-gray-500/10' },
+/**
+ * 词书与模式的图标用 **lucide 组件**而不是 emoji。
+ *
+ * 原因：emoji 在不同平台（Android / Windows / iOS）字形与基线都不一样，无法继承
+ * `text-*` 主题色（深色模式下对比度不可控），而且与全局扁平克制的图标语言不一致。
+ * 改成 lucide 后图标能吃到每本书/每个模式自己的强调色，深浅主题都稳。
+ */
+const BOOKS: { key: string; label: string; icon: LucideIcon; color: string; desc: string; gradient: string }[] = [
+  { key: 'zhongkao', label: '中考词汇', icon: Notebook, color: '#EF4444', desc: '初中英语中考核心词汇', gradient: 'from-red-50 to-rose-50 dark:from-red-500/10 dark:to-rose-500/10' },
+  { key: 'gaokao', label: '高考词汇', icon: NotebookPen, color: '#F97316', desc: '高中英语高考核心词汇', gradient: 'from-orange-50 to-amber-50 dark:from-orange-500/10 dark:to-amber-500/10' },
+  { key: 'cet4', label: '四级词汇', icon: BookOpen, color: '#0EA5E9', desc: '大学英语四级考试核心词汇', gradient: 'from-sky-50 to-blue-50 dark:from-sky-500/10 dark:to-blue-500/10' },
+  { key: 'cet6', label: '六级词汇', icon: BookMarked, color: '#6C5CE7', desc: '大学英语六级考试核心词汇', gradient: 'from-violet-50 to-purple-50 dark:from-violet-500/10 dark:to-purple-500/10' },
+  { key: 'ielts', label: '雅思词汇', icon: Plane, color: '#F59E0B', desc: 'IELTS 雅思考试核心词汇', gradient: 'from-amber-50 to-yellow-50 dark:from-amber-500/10 dark:to-yellow-500/10' },
+  { key: 'toefl', label: '托福词汇', icon: Globe, color: '#EC4899', desc: 'TOEFL 托福考试核心词汇', gradient: 'from-pink-50 to-rose-50 dark:from-pink-500/10 dark:to-rose-500/10' },
+  { key: 'postgraduate', label: '考研词汇', icon: GraduationCap, color: '#8B5CF6', desc: '研究生入学考试核心词汇', gradient: 'from-purple-50 to-violet-50 dark:from-purple-500/10 dark:to-violet-500/10' },
+  { key: 'professional', label: '专业词汇', icon: Briefcase, color: '#14B8A6', desc: 'SAT 学术与职场专业词汇', gradient: 'from-teal-50 to-cyan-50 dark:from-teal-500/10 dark:to-cyan-500/10' },
+  { key: 'advanced', label: '高阶词汇', icon: Award, color: '#64748B', desc: 'GRE 等高阶英语考试词汇', gradient: 'from-slate-50 to-gray-50 dark:from-slate-500/10 dark:to-gray-500/10' },
 ];
 
-const MODES = [
-  { key: 'daily', label: '每日学习', icon: '🧠', desc: '按计划每天学新词' },
-  { key: 'quickcard', label: '快速闪卡', icon: '⚡', desc: '只单词 · 认识/不认识' },
-  { key: 'flashcard', label: '复习检测', icon: '🔄', desc: 'SM-2 间隔记忆复习' },
-  { key: 'browse', label: '词库浏览', icon: '📖', desc: '自由浏览全部词汇' },
-  { key: 'collocations', label: '搭配学习', icon: '🔗', desc: '常用搭配与短语' },
-  { key: 'vocabtest', label: '词汇量测试', icon: '🎯', desc: '1分钟估算词汇量' },
-] as const;
+const MODES: { key: string; label: string; icon: LucideIcon; color: string; desc: string }[] = [
+  { key: 'daily', label: '每日学习', icon: Brain, color: '#00B894', desc: '按计划每天学新词' },
+  { key: 'quickcard', label: '快速闪卡', icon: Zap, color: '#0EA5E9', desc: '只单词 · 认识/不认识' },
+  { key: 'flashcard', label: '复习检测', icon: RotateCw, color: '#6C5CE7', desc: 'SM-2 间隔记忆复习' },
+  { key: 'browse', label: '词库浏览', icon: Library, color: '#64748B', desc: '自由浏览全部词汇' },
+  { key: 'collocations', label: '搭配学习', icon: Link2, color: '#F59E0B', desc: '常用搭配与短语' },
+  { key: 'vocabtest', label: '词汇量测试', icon: Target, color: '#EC4899', desc: '1分钟估算词汇量' },
+];
 
-const REVIEW_MODES = [
-  { key: 'sm2', label: '已学单词 (SM-2)', icon: '🧠', desc: '按间隔记忆算法复习需要巩固的单词' },
-  { key: 'full', label: '整本随机', icon: '📚', desc: '随机抽取书内单词进行自测' },
-] as const;
+const REVIEW_MODES: { key: string; label: string; icon: LucideIcon; color: string; desc: string }[] = [
+  { key: 'sm2', label: '已学单词 (SM-2)', icon: Brain, color: '#6C5CE7', desc: '按间隔记忆算法复习需要巩固的单词' },
+  { key: 'full', label: '整本随机', icon: Library, color: '#00B894', desc: '随机抽取书内单词进行自测' },
+];
 
 const DAILY_COUNTS = [5, 10, 20, 30, 50, 100];
 
@@ -132,11 +139,13 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
             <p className="text-xs text-muted-foreground">选择一本词书开始学习</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
-            {BOOKS.map(({ key, label, icon, desc, gradient }) => (
+            {BOOKS.map(({ key, label, icon: BookIcon, color, desc, gradient }) => (
               <button key={key} onClick={() => handleBookSelect(key)}
                 className={cn('group rounded-[24px] p-4 text-left transition-all duration-300 bg-gradient-to-br border border-border/50 shadow-sm hover:shadow-lg hover:-translate-y-1 active:scale-[0.98]', gradient)}>
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">{icon}</span>
+                  <span className="size-10 rounded-2xl grid place-items-center shrink-0" style={{ background: `${color}1a`, color }}>
+                    <BookIcon className="size-5" />
+                  </span>
                   <div>
                     <p className="text-sm font-black text-foreground">{label}</p>
                     <p className="text-[10px] text-muted-foreground">{desc}</p>
@@ -147,7 +156,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
             ))}
             <button onClick={() => handleBookSelect('all')}
               className="col-span-full rounded-[24px] p-4 text-center transition-all border-2 border-dashed border-border/50 hover:border-[#00B894] hover:bg-emerald-50/30 dark:hover:bg-emerald-500/5">
-              <p className="text-sm font-black text-muted-foreground">📖 全部词库 · {Object.values(counts).reduce((a, b) => a + b, 0).toLocaleString()} 词</p>
+              <p className="text-sm font-black text-muted-foreground flex items-center justify-center gap-1.5"><Library className="size-4" />全部词库 · {Object.values(counts).reduce((a, b) => a + b, 0).toLocaleString()} 词</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">加载较慢，建议选择单本词书</p>
             </button>
           </div>
@@ -162,18 +171,18 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
         <div className="max-w-sm mx-auto space-y-6">
           <div className="text-center space-y-1">
             <p className="text-xs font-bold text-muted-foreground">已选词书</p>
-            <p className="text-sm font-black text-foreground">{selectedBook?.icon} {selectedBook?.label} · {counts[chosenLevel]?.toLocaleString() || Object.values(counts).reduce((a, b) => a + b, 0).toLocaleString()} 词</p>
+            <p className="text-sm font-black text-foreground flex items-center justify-center gap-1.5">{selectedBook && <selectedBook.icon className="size-4" style={{ color: selectedBook.color }} />}{selectedBook?.label} · {counts[chosenLevel]?.toLocaleString() || Object.values(counts).reduce((a, b) => a + b, 0).toLocaleString()} 词</p>
           </div>
 
           <div className="space-y-2">
             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">学习方式</p>
             <div className="space-y-2">
-              {MODES.map(({ key, label, icon, desc }) => (
+              {MODES.map(({ key, label, icon: ModeIcon, color, desc }) => (
                 <button key={key} onClick={() => handleModeSelect(key)}
                   className={cn('w-full rounded-[20px] p-4 text-left transition-all border-2',
                     chosenMode === key ? 'border-[#00B894] bg-emerald-50/50 dark:bg-emerald-500/10' : 'border-border hover:border-muted-foreground/30')}>
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">{icon}</span>
+                    <span className="size-9 rounded-xl grid place-items-center shrink-0" style={{ background: `${color}1a`, color }}><ModeIcon className="size-4.5" /></span>
                     <div>
                       <p className="text-sm font-black text-foreground">{label}</p>
                       <p className="text-[10px] text-muted-foreground">{desc}</p>
@@ -195,7 +204,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
       {step === 2 && chosenMode === 'daily' && (
         <div className="max-w-sm mx-auto space-y-6">
           <div className="text-center space-y-1">
-            <p className="text-xs font-bold text-muted-foreground">已选：{selectedBook?.icon} {selectedBook?.label}</p>
+            <p className="text-xs font-bold text-muted-foreground flex items-center justify-center gap-1.5">已选：{selectedBook && <selectedBook.icon className="size-3.5" style={{ color: selectedBook.color }} />}{selectedBook?.label}</p>
             <p className="text-xl font-black text-foreground">每日学习量</p>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -234,16 +243,16 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
       {step === 2 && chosenMode === 'flashcard' && (
         <div className="max-w-sm mx-auto space-y-6">
           <div className="text-center space-y-1">
-            <p className="text-xs font-bold text-muted-foreground">已选：{selectedBook?.icon} {selectedBook?.label}</p>
+            <p className="text-xs font-bold text-muted-foreground flex items-center justify-center gap-1.5">已选：{selectedBook && <selectedBook.icon className="size-3.5" style={{ color: selectedBook.color }} />}{selectedBook?.label}</p>
             <p className="text-xl font-black text-foreground">复习方式</p>
           </div>
           <div className="space-y-2">
-            {REVIEW_MODES.map(({ key, label, icon, desc }) => (
+            {REVIEW_MODES.map(({ key, label, icon: ModeIcon, color, desc }) => (
               <button key={key} onClick={() => setReviewMode(key)}
                 className={cn('w-full rounded-[20px] p-4 text-left transition-all border-2',
                   reviewMode === key ? 'border-[#6C5CE7] bg-violet-50/50 dark:bg-violet-500/10' : 'border-border hover:border-muted-foreground/30')}>
                 <div className="flex items-center gap-3">
-                  <span className="text-xl">{icon}</span>
+                  <span className="size-9 rounded-xl grid place-items-center shrink-0" style={{ background: `${color}1a`, color }}><ModeIcon className="size-4.5" /></span>
                   <div>
                     <p className="text-sm font-black text-foreground">{label}</p>
                     <p className="text-[10px] text-muted-foreground">{desc}</p>
@@ -876,7 +885,11 @@ export default function DeepVocabularyPage() {
             onClick={handleOpenWizard}
             className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 border-2 border-[#00B894]/30 hover:border-[#00B894] transition-all duration-200 active:scale-[0.98]"
           >
-            <span className="text-base">{BOOKS.find((b) => b.key === (selectedLevel === 'all' ? 'cet4' : selectedLevel))?.icon || '📖'}</span>
+            {(() => {
+              const b = BOOKS.find((x) => x.key === (selectedLevel === 'all' ? 'cet4' : selectedLevel));
+              const BIcon = b?.icon ?? BookOpen;
+              return <BIcon className="size-4" style={{ color: b?.color ?? '#00B894' }} />;
+            })()}
             <span className="text-[10px] font-black text-ink-teal">{LEVELS.find((l) => l.key === selectedLevel)?.label || '全部'}</span>
           </button>
         </div>
@@ -890,7 +903,11 @@ export default function DeepVocabularyPage() {
           onClick={handleOpenWizard}
           className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 border-2 border-[#00B894]/30 hover:border-[#00B894] hover:shadow-lg hover:shadow-emerald-200/30 dark:hover:shadow-emerald-900/20 transition-all duration-200 active:scale-[0.98] group"
         >
-          <span className="text-lg">{BOOKS.find((b) => b.key === (selectedLevel === 'all' ? 'cet4' : selectedLevel))?.icon || '📖'}</span>
+          {(() => {
+            const b = BOOKS.find((x) => x.key === (selectedLevel === 'all' ? 'cet4' : selectedLevel));
+            const BIcon = b?.icon ?? BookOpen;
+            return <BIcon className="size-4.5" style={{ color: b?.color ?? '#00B894' }} />;
+          })()}
           <div className="text-left">
             <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal leading-none">
               {LEVELS.find((l) => l.key === selectedLevel)?.label || '全部'}
@@ -928,7 +945,7 @@ export default function DeepVocabularyPage() {
           onClick={() => enterMode('flashcard')}
           className="group flex items-center gap-4 p-4 rounded-[24px] border-2 border-border bg-card text-left transition-all duration-200 hover:border-[#6C5CE7]/40 hover:shadow-md hover:-translate-y-0.5"
         >
-          <span className="size-12 rounded-2xl bg-violet-50 dark:bg-violet-500/15 flex items-center justify-center text-2xl shrink-0">🔄</span>
+          <span className="size-12 rounded-2xl grid place-items-center shrink-0" style={{ background: '#6C5CE71a', color: '#6C5CE7' }}><RotateCw className="size-5.5" /></span>
           <span className="flex-1 min-w-0">
             <span className="flex items-center gap-2">
               <span className="text-sm font-black text-foreground group-hover:text-ink-violet transition-colors">复习检测</span>
@@ -948,7 +965,7 @@ export default function DeepVocabularyPage() {
             onClick={() => enterMode(m.key)}
             className="group flex items-center gap-4 p-4 rounded-[24px] border-2 border-border bg-card text-left transition-all duration-200 hover:border-[#00B894]/40 hover:shadow-md hover:-translate-y-0.5"
           >
-            <span className="size-12 rounded-2xl bg-muted flex items-center justify-center text-2xl shrink-0">{m.icon}</span>
+            <span className="size-12 rounded-2xl grid place-items-center shrink-0" style={{ background: `${m.color}1a`, color: m.color }}><m.icon className="size-5.5" /></span>
             <span className="flex-1 min-w-0">
               <span className="block text-sm font-black text-foreground group-hover:text-ink-teal transition-colors">{m.label}</span>
               <span className="block text-[11px] text-muted-foreground mt-0.5">{m.desc}</span>

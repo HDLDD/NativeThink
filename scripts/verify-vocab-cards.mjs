@@ -188,7 +188,7 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/toWordEntry\(\{ \.\.\.base/.test(reader), '阅读器：同时把生词本词条加入复习队列');
   check(!/词库未收录 "\$\{word\}"，无法加入学习/.test(reader), '不再出现"词库未收录 → 无法加入"的断头路文案');
   check(/customList\.map\(toWordEntry\)/.test(fc), '复习队列纳入生词本词条');
-  check(/setShowCustom\(true\)/.test(fc) && /removeCustomWord\(w\.word\)/.test(fc), '生词本有管理入口与移除操作');
+  check(/setShowCustom\(true\)/.test(fc) && /removeCustom\(w\.word\)/.test(fc), '生词本有管理入口与移除操作');
 }
 
 // ── ⑨ 助记 / 连击 / 断点续学 / 周报 / 入口角标 ──
@@ -231,6 +231,33 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/const dueCount = useGlobalDueCount\(\)/.test(sidebar), '侧边栏读取角标数');
   check(/item\.path === '\/vocabulary' && dueCount > 0/.test(sidebar), '角标只挂在「词汇」入口');
   check(/dispatchEvent\(new CustomEvent\(STATE_EVENT\)\)/.test(uwl3), '状态变更广播（角标能自动刷新）');
+}
+
+// ── ⑩ 图标语言一致性（emoji → lucide）与界面契约 ──
+{
+  const page = readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx'), 'utf8');
+  // 词书/模式/复习方式的图标必须是 lucide 组件：emoji 在不同平台字形与基线不同、
+  // 无法继承主题色，深色模式下对比度不可控。
+  check(!/icon: '[^']*'/u.test(page.match(/const BOOKS[\s\S]*?\n\];/)?.[0] ?? ''), '词书图标不使用 emoji 字符串');
+  check(!/icon: '[^']*'/u.test(page.match(/const MODES[\s\S]*?\n\];/)?.[0] ?? ''), '模式图标不使用 emoji 字符串');
+  check(!/icon: '[^']*'/u.test(page.match(/const REVIEW_MODES[\s\S]*?\n\];/)?.[0] ?? ''), '复习方式图标不使用 emoji 字符串');
+  check(/icon: LucideIcon/.test(page), '图标字段声明为 LucideIcon 类型（TS 会拦住 emoji 混用）');
+  check(/background: `\$\{color\}1a`, color/.test(page), '图标块吃各自的强调色（深浅主题都稳）');
+  check(!/\{icon\}/.test(page) && !/\{m\.icon\}/.test(page), '没有把组件当 ReactNode 渲染的残留写法');
+
+  // 本轮修的几个真实问题
+  const uwl4 = readFileSync(join(ROOT, 'src/lib/use-word-learning.ts'), 'utf8');
+  check(/merged\.history!\[day\] = \{/.test(uwl4), "'all' 模式聚合 history（否则概览默认视图的本周报告恒为空）");
+  check(/if \(!force && t - _dueCacheAt < 800\) return _dueCache;/.test(uwl4), '角标计数带 800ms 缓存（避免每张卡都反序列化 10 个等级）');
+  check(/setTimeout\(\(\) => \{ timer = null; setN\(getGlobalDueCount\(true\)\); \}, 400\)/.test(uwl4), '角标订阅做了 400ms 节流');
+  check(/getGlobalDueCount\(true\)\s*\)/.test(uwl4) || /useState<number>\(\(\) => getGlobalDueCount\(true\)\)/.test(uwl4), '挂载时绕过缓存取真实值');
+  check(/t\?\.closest\?\.\('textarea, input, \[contenteditable="true"\]'\)/.test(fc), '滑动手势避开输入控件（助记文本框里拖动不会误评分）');
+  check(/const next = combo \+ 1;\s*\n\s*setCombo\(next\);/.test(fc), '连击不在 setState 更新函数里做副作用（StrictMode 不会双弹提示）');
+  check(/const \[savedSession, setSavedSession\] = useState<ISavedSession \| null>/.test(fc), '断点用 state（初值只求值一次会导致"接着上次"不刷新）');
+  check(/useEffect\(\(\) => \{ setSavedSession\(loadSession\(currentLevel\)\); \}, \[currentLevel, started\]\);/.test(fc), '回到概览/切换等级时刷新断点');
+  const cwLib2 = readFileSync(join(ROOT, 'src/lib/custom-words.ts'), 'utf8');
+  check(/return \{ words, remove \};/.test(cwLib2), 'useCustomWords 返回 { words, remove }（不再往数组上挂方法）');
+  check(!/Object\.assign\(list, \{ remove \}\)/.test(cwLib2), '去掉了数组挂方法的写法');
 }
 
 console.log('');

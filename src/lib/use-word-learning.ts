@@ -90,26 +90,45 @@ function saveState(level: string, state: ILearningState) {
 /**
  * 全部等级的到期总数 —— 入口角标用（主流 App 都会在入口显示"待复习 N"，制造回访动机）。
  * 直接扫存储而不是走 hook，避免在侧边栏挂一个完整的学习状态实例。
+ *
+ * 性能：saveState 每次评分都会广播，而这里要反序列化最多 10 个等级的状态；
+ * 词库大时（每级数千词）每张卡都全量解析会明显掉帧，所以做 800ms 结果缓存。
+ * 首次挂载用 force=true 绕过缓存，避免显示上一次会话的陈旧数字。
  */
-export function getGlobalDueCount(): number {
-  const now = Date.now();
+let _dueCache = 0;
+let _dueCacheAt = 0;
+
+export function getGlobalDueCount(force = false): number {
+  const t = Date.now();
+  if (!force && t - _dueCacheAt < 800) return _dueCache;
+  const now = t;
   let n = 0;
   for (const lvl of SUB_LEVELS) {
     for (const p of Object.values(loadState(lvl).progress)) {
       if (!p.suspended && p.status !== 'new' && p.nextReview <= now) n++;
     }
   }
+  _dueCache = n;
+  _dueCacheAt = t;
   return n;
 }
 
-/** 订阅全局到期数（状态一变就重算） */
+/** 订阅全局到期数（状态一变就重算，带节流） */
 export function useGlobalDueCount(): number {
-  const [n, setN] = useState<number>(() => getGlobalDueCount());
+  const [n, setN] = useState<number>(() => getGlobalDueCount(true));
   useEffect(() => {
-    const refresh = () => setN(getGlobalDueCount());
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const refresh = () => {
+      // 节流：连续评分时不每张卡都重算（角标不需要那么实时）
+      if (timer) return;
+      timer = setTimeout(() => { timer = null; setN(getGlobalDueCount(true)); }, 400);
+    };
     window.addEventListener(STATE_EVENT, refresh);
     refresh();
-    return () => window.removeEventListener(STATE_EVENT, refresh);
+    return () => {
+      window.removeEventListener(STATE_EVENT, refresh);
+      if (timer) clearTimeout(timer);
+    };
   }, []);
   return n;
 }
@@ -201,7 +220,7 @@ function sm2Update(prev: IWordProgress, quality: number): IWordProgress {
 }
 
 function aggregateAllLevels(): ILearningState {
-  const merged: ILearningState = { progress: {}, todayLearned: [], todayReviewed: [], lastActiveDate: todayKey() };
+  const merged: ILearningState = { progress: {}, todayLearned: [], todayReviewed: [], lastActiveDate: todayKey(), history: {} };
   const learnedSet = new Set<string>();
   const reviewedSet = new Set<string>();
   for (const lvl of SUB_LEVELS) {
@@ -213,6 +232,15 @@ function aggregateAllLevels(): ILearningState {
     }
     s.todayLearned.forEach((k) => learnedSet.add(k));
     s.todayReviewed.forEach((k) => reviewedSet.add(k));
+    // history 也要累加 —— 否则 'all' 模式（概览默认就是 all）的本周报告恒为空
+    for (const [day, h] of Object.entries(s.history || {})) {
+      const cur = merged.history![day] || { learned: 0, reviewed: 0, good: 0 };
+      merged.history![day] = {
+        learned: cur.learned + h.learned,
+        reviewed: cur.reviewed + h.reviewed,
+        good: cur.good + h.good,
+      };
+    }
   }
   merged.todayLearned = Array.from(learnedSet);
   merged.todayReviewed = Array.from(reviewedSet);

@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { IWordEntry } from '@/data/wordbank/schema';
 import { findWord, getWordCounts, preloadDetail } from '@/data/wordbank';
-import { useWordLearning, saveSession, loadSession, clearSession } from '@/lib/use-word-learning';
+import { useWordLearning, saveSession, loadSession, clearSession, type ISavedSession } from '@/lib/use-word-learning';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useImmersive } from '@/lib/focus-mode';
 import { FitWord } from '@/components/FitWord';
@@ -22,7 +22,7 @@ import { useTTS } from '@/lib/use-tts';
 import { sfxComplete } from '@/lib/sfx';
 import { decideSwipe, SWIPE_THRESHOLD, SWIPE_QUALITY_UNKNOWN, SWIPE_QUALITY_KNOWN } from '@/lib/vocab-swipe';
 import { createSessionOrder, scheduleRelearn, nextIndex, forecastByDay, MAX_RELEARN, type ISessionOrder } from '@/lib/vocab-session';
-import { useCustomWords, removeCustomWord, toWordEntry, type ICustomWord } from '@/lib/custom-words';
+import { useCustomWords, toWordEntry } from '@/lib/custom-words';
 import { useWordNote, countWordNotes } from '@/lib/word-notes';
 
 const FL_LEVEL_COLORS: Record<string, string> = {
@@ -49,9 +49,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const { addStudyMinutes } = useLearningStats();
   const { state, dueForReview, getNewWords, recordReview, setSuspended, suspendedCount, dailyQuota, setDailyQuota } = useWordLearning(currentLevel);
   // 生词本：阅读里收集、词库未收录的词（进度走独立的 'custom' 一路）
-  const customList = useCustomWords();
-  /** 生词本列表（resumeSession 里按 key 还原词条时用） */
-  const customWords: ICustomWord[] = customList;
+  const { words: customList, remove: removeCustom } = useCustomWords();
   const tts = useTTS();
 
   const [currentIdx, setIdx] = useState(0);
@@ -244,8 +242,10 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     [state.progress],
   );
 
-  /** 断点（概览里显示"接着上次"按钮） */
-  const [savedSession] = useState(() => loadSession(currentLevel));
+  /** 断点（概览里显示"接着上次"按钮）。用 state 而不是 useState 初值 ——
+   *  初值只在挂载时求值一次，导致"读完一轮回到概览"或"切换等级"后按钮不会刷新。 */
+  const [savedSession, setSavedSession] = useState<ISavedSession | null>(() => loadSession(currentLevel));
+  useEffect(() => { setSavedSession(loadSession(currentLevel)); }, [currentLevel, started]);
 
   /** 本周学习量（最近 7 天，按天聚合 history；老数据没有 history 时全 0） */
   const weekHistory = useMemo(() => {
@@ -293,16 +293,16 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setSessionRated((p) => p + 1);
     if (quality >= 3) {
       setSessionGood((p) => p + 1);
-      // 连击：连续答对累加；每 5 连给一次反馈
-      setCombo((c) => {
-        const next = c + 1;
-        setBestCombo((b) => Math.max(b, next));
-        if (next > 0 && next % 5 === 0) {
-          sfxComplete();
-          toast.success(`连对 ${next} 个！继续保持`, { duration: 1500 });
-        }
-        return next;
-      });
+      // 连击：连续答对累加；每 5 连给一次反馈。
+      // 注意不能把 toast/sfx 放进 setState 更新函数里 —— StrictMode 下更新函数会被调用两次，
+      // 会弹两次提示、响两次音（答错重排那里踩过同一个坑）。
+      const next = combo + 1;
+      setCombo(next);
+      setBestCombo((b) => Math.max(b, next));
+      if (next > 0 && next % 5 === 0) {
+        sfxComplete();
+        toast.success(`连对 ${next} 个！继续保持`, { duration: 1500 });
+      }
     } else {
       setCombo(0);
     }
@@ -367,7 +367,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     const entries: IWordEntry[] = [];
     const missing: string[] = [];
     for (const k of saved.order) {
-      const custom = customWords.find((x) => x.word.toLowerCase() === k);
+      const custom = customList.find((x) => x.word.toLowerCase() === k);
       const w = findWord(k) ?? (custom ? toWordEntry(custom) : undefined);
       if (w) entries.push(w); else missing.push(k);
     }
@@ -382,7 +382,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setCombo(0); setBestCombo(0);
     setStarted(true);
     toast.success(`接着上次继续 — 还剩 ${order.length - idx} 张`, { duration: 2000 });
-  }, [currentLevel, customWords]);
+  }, [currentLevel, customList]);
 
   /** 本轮断点（顺序 + 当前位置）—— 中途退出后仍可续学 */
   useEffect(() => {
@@ -433,7 +433,13 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   }, [cw, isFlipped, rated, started, flip, advance, markWithQuality, toggleAutoSpeak]);
 
   // ── 滑动手势：未翻面→翻面；已翻面未评分→左滑不认识 / 右滑认识；已评分→切换下一张 ──
-  const onTouchStart = (e: React.TouchEvent) => { dragStart.current = e.touches[0].clientX; };
+  // 拖动手势必须避开输入控件：卡片背面有"我的助记"文本框，如果在里面拖动/选中文字
+  // 被当成滑卡，会直接把当前卡评掉（真机上很容易误触）。
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.target as HTMLElement | null;
+    if (t?.closest?.('textarea, input, [contenteditable="true"]')) { dragStart.current = null; return; }
+    dragStart.current = e.touches[0].clientX;
+  };
   const onTouchMove = (e: React.TouchEvent) => {
     if (dragStart.current == null) return;
     setDragX(e.touches[0].clientX - dragStart.current);
@@ -680,7 +686,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                     <p className="text-[10px] text-muted-foreground truncate">{w.meaning || '（无释义）'}</p>
                     {w.source && <p className="text-[9px] text-muted-foreground/70 truncate">{w.source}</p>}
                   </div>
-                  <button onClick={() => { removeCustomWord(w.word); toast.success(`已从生词本移除「${w.word}」`, { duration: 1500 }); }}
+                  <button onClick={() => { removeCustom(w.word); toast.success(`已从生词本移除「${w.word}」`, { duration: 1500 }); }}
                     className="shrink-0 p-1 text-muted-foreground hover:text-rose-500" title="从生词本移除">
                     <XCircle className="size-4" />
                   </button>

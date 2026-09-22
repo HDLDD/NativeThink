@@ -77,16 +77,20 @@ export function isCustomWord(word: string): boolean {
   return read().some((x) => x.word.toLowerCase() === key);
 }
 
-/** 订阅式读取（多个组件同时显示生词本时保持一致） */
-export function useCustomWords(): ICustomWord[] {
-  const [list, setList] = useState<ICustomWord[]>(() => read());
+/**
+ * 订阅式读取（多个组件同时显示生词本时保持一致）。
+ * 返回 `{ words, remove }` —— 之前是"数组上挂一个 remove 方法"，调用方得做类型断言，
+ * 语义不清晰也容易误用。
+ */
+export function useCustomWords(): { words: ICustomWord[]; remove: (w: string) => void } {
+  const [words, setWords] = useState<ICustomWord[]>(() => read());
   useEffect(() => {
-    const onChange = () => setList(read());
+    const onChange = () => setWords(read());
     window.addEventListener(EVENT, onChange);
     return () => window.removeEventListener(EVENT, onChange);
   }, []);
   const remove = useCallback((w: string) => removeCustomWord(w), []);
-  return Object.assign(list, { remove }) as ICustomWord[] & { remove: (w: string) => void };
+  return { words, remove };
 }
 
 /**
