@@ -165,7 +165,7 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/if \(direction < 0\) \{[\s\S]{0,260}setIdx\(\(p\) => Math\.max\(0, p - 1\)\)[\s\S]{0,80}setFlipped\(true\)/.test(fc),
     '回看：advance(-1) 往回走并直接展开释义（原先忽略方向符号，左滑其实还是往前走）');
   check(/onClick=\{\(\) => advance\(-1\)\} disabled=\{currentIdx === 0\}/.test(fc), '头部有「上一个」按钮且到第一张时禁用');
-  check(/const viewingPast = rated && isFlipped/.test(fc), '回看态可识别（用于显示「回看第 N 张」并隐藏评分）');
+  check(/const viewingPast = rated && !justRated/.test(fc), '回看态 = 已评过且非本次刚评（不能再用 isFlipped：刚评完卡也是背面）');
   check(/isFlipped && !rated && !viewingPast/.test(fc), '回看已评过的卡时不再出现评分按钮');
   // rated 由"已评词集合"派生，否则回看时状态会错乱
   check(/const rated = !!currentKey && ratedKeys\.has\(currentKey\)/.test(fc), 'rated 由 ratedKeys 派生（回看/前进状态一致）');
@@ -215,7 +215,7 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/const resumeSession = useCallback/.test(fc), '概览提供"接着上次"');
   check(/saveSession\(currentLevel, \{ order: session\.order, index: currentIdx/.test(fc), '学习中持续保存断点');
   check(/clearSession\(currentLevel\); \/\/ 新开一轮/.test(fc), '新开一轮时丢弃旧断点');
-  check(/setRatedKeys\(new Set\(\)\);   \/\/ 必须清空/.test(fc), '新一轮必须清空 ratedKeys（否则卡片会被当成已评、评分按钮不出现）');
+  check(/setRatedKeys\(new Set\(\)\); setRatedNow\(null\);\s*\/\/ 必须清空/.test(fc), '新一轮必须清空 ratedKeys 与刚评分标记（否则卡片会被当成已评、评分按钮不出现）');
   check(/接着上次（还剩/.test(fc), '续学按钮显示剩余张数');
 
   // 周报（跨天可回溯）
@@ -260,8 +260,34 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(!/Object\.assign\(list, \{ remove \}\)/.test(cwLib2), '去掉了数组挂方法的写法');
 }
 
-console.log('');
-console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
+
+// ── ⑪ 评分后自动跳下一张 + 系统栏避让 ──
+{
+  // 用户明确要求：点了熟悉程度就应该翻到下一张，不该再点一次「下一个」
+  check(/if \(!started \|\| !justRated\) return;/.test(fc), '自动跳转的前置条件（只有"本次刚评分"才跳）');
+  check(/setTimeout\(\(\) => advanceRef\.current\(1\), delay\)/.test(fc), '评分后定时自动进入下一张');
+  check(/const delay = lastQualityRef\.current >= 3 \? 550 : 900;/.test(fc), '答对停留短、答错停留久（让人看清反馈）');
+  check(/advanceRef\.current = advance;/.test(fc), 'advance 同步到 ref（避免 effect 反复重置定时器）');
+  check(/评完自动跳下一个/.test(fc), '提示文案说明会自动跳转');
+  // 回看时不能自动跳（否则刚点开上一个词就被抢走）
+  check(/const justRated = !!currentKey && ratedNow === currentKey;/.test(fc)
+    && /useEffect\(\(\) => \{ setRatedNow\(null\); \}, \[currentKey\]\);/.test(fc),
+    '换卡时清掉"刚评分"标记（区分「刚评完」与「回看已评的卡」）');
+
+  // 顶部被状态栏遮住：targetSdk 36 → Android 15+ 强制 edge-to-edge，
+  // 没有 viewport-fit=cover 时 env(safe-area-inset-*) 恒为 0，外壳无法给状态栏留位。
+  const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
+  const css = readFileSync(join(ROOT, 'src/index.css'), 'utf8');
+  const layout = readFileSync(join(ROOT, 'src/components/Layout.tsx'), 'utf8');
+  const nav = readFileSync(join(ROOT, 'src/components/MobileBottomNav.tsx'), 'utf8');
+  check(/viewport-fit=cover/.test(html), 'index.html 声明 viewport-fit=cover（否则 env(safe-area-*) 恒为 0）');
+  check(/\.safe-area-top \{ padding-top: env\(safe-area-inset-top/.test(css), '定义 safe-area-top 工具类');
+  check(/\.safe-area-bottom \{ padding-bottom: env\(safe-area-inset-bottom/.test(css), '定义 safe-area-bottom（MobileBottomNav 一直在用但此前从未定义）');
+  check(/className="safe-area-top safe-area-left safe-area-right"/.test(layout), '外壳补状态栏/侧边 inset');
+  check(/safe-area-bottom/.test(nav), '底部导航补手势条 inset');
+}
+
+console.log('');console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
 if (fail) {
   failures.slice(0, 20).forEach((f) => console.log('  ✗ ' + f));
   process.exit(1);

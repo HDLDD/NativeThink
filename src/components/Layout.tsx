@@ -104,7 +104,13 @@ export function Layout() {
   }, []);
 
   return (
-    <SidebarProvider>
+    /**
+     * 状态栏/导航栏避让：APK 里是 edge-to-edge（targetSdk 36），WebView 铺到系统栏下面，
+     * 外壳必须自己补 safe-area。放在最外层，侧边栏与内容一起下移；
+     * 底部由 MobileBottomNav 自己补（fixed 定位，不在这层 padding 内）。
+     * env() 在桌面浏览器恒为 0，不影响 Web / Electron。
+     */
+    <SidebarProvider className="safe-area-top safe-area-left safe-area-right">
       {!focused && <AppSidebar />}
       <SidebarInset className="flex flex-col min-w-0 overflow-x-hidden bg-background min-h-screen">
         {!focused && <Header />}

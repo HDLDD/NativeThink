@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
-import { Target, CheckCircle2, RotateCw, Sparkles, Volume2, BookOpen, ArrowRight, ArrowLeft, XCircle, Edit3, Shuffle, Headphones, Link2, PenLine, ChevronDown } from 'lucide-react';
+import { Search, Lightbulb, Target, CheckCircle2, RotateCw, Sparkles, Volume2, BookOpen, ArrowRight, ArrowLeft, XCircle, Edit3, Shuffle, Headphones, Link2, PenLine, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -1009,7 +1009,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                   {/* Hint: first letter + word length */}
                   {spellingHint && !spellingChecked && (
                     <div className="mb-4 p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 max-w-xs mx-auto">
-                      <p className="text-xs font-black uppercase tracking-wider text-amber-600 mb-1">💡 提示</p>
+                      <p className="text-xs font-black uppercase tracking-wider text-amber-600 mb-1 flex items-center gap-1"><Lightbulb className="size-3.5" />提示</p>
                       <p className="text-lg font-mono font-black text-foreground tracking-[0.3em]">
                         {currentWord.word[0]}{' '}{'_ '.repeat(Math.max(0, currentWord.word.length - 1)).trim()}
                       </p>
@@ -1121,7 +1121,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                   {/* Hint: first letter + word length */}
                   {listeningHint && !listeningChecked && (
                     <div className="mb-4 p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 max-w-xs mx-auto">
-                      <p className="text-xs font-black uppercase tracking-wider text-amber-600 mb-1">💡 提示</p>
+                      <p className="text-xs font-black uppercase tracking-wider text-amber-600 mb-1 flex items-center gap-1"><Lightbulb className="size-3.5" />提示</p>
                       <p className="text-lg font-mono font-black text-foreground tracking-[0.3em]">
                         {currentWord.word[0]}{' '}{'_ '.repeat(Math.max(0, currentWord.word.length - 1)).trim()}
                       </p>
@@ -1342,7 +1342,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                     <div className="flex items-center justify-center gap-2 mt-3">
                       <Button variant="ghost" size="sm" onClick={() => { setFillblankHint(true); setFillblankInput(currentWord.word[0]); }}
                         className="rounded-xl text-[10px] font-black uppercase tracking-wider bg-amber-50 dark:bg-amber-500/10 text-amber-600 hover:bg-amber-100">
-                        💡 首字母
+                        <Lightbulb className="size-3 inline" /> 首字母
                       </Button>
                       <Button variant="ghost" size="sm" onClick={handleFillBlankSkip}
                         className="rounded-xl text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-rose-500">

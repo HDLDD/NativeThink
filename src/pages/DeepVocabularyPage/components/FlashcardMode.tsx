@@ -173,8 +173,21 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const currentKey = session.order[currentIdx];
   /** 当前卡是否已评分（派生）—— 回看上一张时仍显示"已评"，不会又冒出评分按钮 */
   const rated = !!currentKey && ratedKeys.has(currentKey);
-  /** 是否在回看历史卡（回看时不出评分按钮，只展示信息） */
-  const viewingPast = rated && isFlipped;
+  /**
+   * 本次访问中**刚**评分的词 key —— 用来区分「刚评完」与「回看已评过的卡」。
+   *
+   * 踩过的坑：原先用 `viewingPast = rated && isFlipped` 当自动跳转的排除条件，
+   * 但"刚评分完"时卡也正好是背面 → viewingPast 为真 → **自动跳转永远不触发**。
+   * 而且守卫当时把这个错误定义一起锁住了（断言写的就是同一份错定义），
+   * 所以修的时候必须连断言一起改 —— 否则真机永远跳不了。
+   */
+  const [ratedNow, setRatedNow] = useState<string | null>(null);
+  /** 当前卡是不是"本次刚评的"（决定是否自动跳下一张） */
+  const justRated = !!currentKey && ratedNow === currentKey;
+  /** 回看：已评过、但不是本次刚评的（从「上一个」翻回来）—— 不出评分按钮、也不自动跳 */
+  const viewingPast = rated && !justRated;
+  // 换卡时清掉"刚评分"标记
+  useEffect(() => { setRatedNow(null); }, [currentKey]);
   // 会话预热：进入队列时预合成前 5 个词，首词朗读零等待
   useEffect(() => {
     if (!autoSpeak) return;
@@ -212,6 +225,10 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const shown = useMemo(() => (cw ? (findWord(cw.word) ?? cw) : cw), [cw, detailTick]);
   // 当前词的助记（必须声明在 shown 之后；切词时 hook 会自动重读）
   const [note, setNote] = useWordNote(shown?.word ?? '');
+  /** 最近一次评分（决定自动跳转的停留时长）；用 ref 避免把它放进 effect 依赖 */
+  const lastQualityRef = useRef(4);
+  /** advance 的 ref 镜像：自动跳转的 effect 用它，避免 advance 每次重建导致定时器反复重置 */
+  const advanceRef = useRef<(dir?: number) => void>(() => {});
 
   // 进入一张卡时确保该词的等级 detail 已加载 —— 否则背面只有释义，没有搭配/例句
   useEffect(() => {
@@ -289,6 +306,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const markWithQuality = useCallback((quality: number) => {
     if (!cw || rated) return;
     recordReview(cw, quality);
+    lastQualityRef.current = quality;
     setSessionReviewCount((p) => p + 1);
     setSessionRated((p) => p + 1);
     if (quality >= 3) {
@@ -307,6 +325,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       setCombo(0);
     }
     setRatedKeys((prev) => new Set(prev).add(cw.word.toLowerCase()));
+    setRatedNow(cw.word.toLowerCase());
     // 答错立即重排：隔 RELEARN_GAP 张后再出现（最多 MAX_RELEARN 次）—— 这比只记 wrongCount
     // 有用得多，是主流 SRS（Anki learning steps）的即时巩固环节。
     if (quality <= 2) {
@@ -347,13 +366,25 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       return next;
     }), 150);
   }, [session, sessionReviewCount]);
+  advanceRef.current = advance;
 
+  /**
+   * 评分后**自动**进入下一张 —— 主流背单词 App 都是这样：点完熟悉程度就翻页，
+   * 不需要再点一次「下一个」。留一小段停留时间让人看清反馈（答错留久一点）。
+   * 回看态 / 未开始 / 未评分都不触发；卡片一换 effect 自动清理定时器。
+   */
+  useEffect(() => {
+    if (!started || !justRated) return;
+    const delay = lastQualityRef.current >= 3 ? 550 : 900;
+    const t = setTimeout(() => advanceRef.current(1), delay);
+    return () => clearTimeout(t);
+  }, [started, justRated, currentKey]);
   /** 开启一轮复习：把当时的队列**冻结**成会话顺序（此后评分不再改变本轮的出卡顺序） */
   const startSession = useCallback((entries: IWordEntry[]) => {
     setSessionEntries(entries);
     setSession(createSessionOrder(entries.map((w) => w.word.toLowerCase())));
     setIdx(0); setFlipped(false); setDir(0); setShowDeep(false);
-    setRatedKeys(new Set());   // 必须清空：否则新一轮里这些卡会被当成"已评"，评分按钮不出现
+    setRatedKeys(new Set()); setRatedNow(null);   // 必须清空：否则新一轮里这些卡会被当成"已评"，评分按钮不出现
     setSessionRated(0); setSessionGood(0);
     setCombo(0); setBestCombo(0);
     clearSession(currentLevel); // 新开一轮就丢掉旧断点
@@ -1003,7 +1034,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             </button>
           ))}
           <span className="w-full text-center text-[9px] text-muted-foreground font-bold mt-1">
-            手机：左滑不认识 / 右滑认识 · 键盘：空格 翻面 / 1-5 评分 / → 下一个
+            手机：左滑不认识 / 右滑认识 · 键盘：空格 翻面 / 1-5 评分 · 评完自动跳下一个
           </span>
         </div>
       )}

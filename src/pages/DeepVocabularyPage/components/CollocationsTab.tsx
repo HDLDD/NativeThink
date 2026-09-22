@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import {
+import { Lightbulb,
   Search,
   Link2,
   ExternalLink,
@@ -958,12 +958,12 @@ export default function CollocationsTab({
               <p className="text-sm text-muted-foreground font-medium leading-relaxed">
                 {isEmpty
                   ? '所选词库中没有搭配数据，试试勾选上方其他等级'
-                  : '👈 从左侧列表点击任意搭配，即可查看释义、例句和关联单词'}
+                  : '从左侧列表点击任意搭配，即可查看释义、例句和关联单词'}
               </p>
               {!isEmpty && (
                 <div className="flex items-center justify-center gap-4 mt-4 text-[10px] font-bold text-muted-foreground/60">
-                  <span>💡 点击搭配展开</span>
-                  <span>🔍 搜索快速定位</span>
+                  <span className="flex items-center gap-1"><Lightbulb className="size-3" />点击搭配展开</span>
+                  <span className="flex items-center gap-1"><Search className="size-3" />搜索快速定位</span>
                   <span>❤️ 收藏常用搭配</span>
                 </div>
               )}

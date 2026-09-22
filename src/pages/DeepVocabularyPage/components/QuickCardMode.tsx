@@ -11,7 +11,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
-import { Zap, Check, X, RefreshCw, ArrowRight, ArrowLeft, Volume2, Shuffle } from 'lucide-react';
+import { Zap, Check, X, RefreshCw, ArrowRight, ArrowLeft, Volume2, Shuffle, Target } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -169,7 +169,7 @@ export default function QuickCardMode({ level }: { level: string }) {
           transition={{ type: 'spring', stiffness: 220, damping: 20 }}
           className="rounded-[32px] border-2 border-[#00B894]/20 bg-card shadow-sm p-8 text-center space-y-5"
         >
-          <div className="text-5xl select-none">🎯</div>
+          <Target className="size-12 text-muted-foreground/40 mx-auto" />
           <div className="space-y-1">
             <p className="text-2xl font-black italic text-foreground">本轮完成！</p>
             <p className="text-xs font-bold text-muted-foreground">

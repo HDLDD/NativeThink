@@ -3,7 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      viewport-fit=cover 是必须的：targetSdk 36 → Android 15+ 强制 edge-to-edge，
+      WebView 会铺到状态栏/导航栏下面。没有这个标记时 env(safe-area-inset-*) 恒为 0，
+      外壳就无法给状态栏留位置 —— 表现为"顶部被白屏遮住一点空间"（真机实测标题落在状态栏带内）。
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>NativeThink</title>
     <!-- Preconnect to Google Fonts origins -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />

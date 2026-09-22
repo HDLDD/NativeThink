@@ -17,7 +17,7 @@
  *
  * 用法：node scripts/verify-books-meta.mjs
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
@@ -282,6 +282,22 @@ check(
   check(/matchesHighlight\(w, reviewWords\)/.test(readFileSync(join(ROOT, 'src/pages/ArticlePage/components/ReaderParagraph.tsx'), 'utf8')), '段落渲染按复习词加框');
 }
 
+
+// ── ⑪ 词库数据不得含 U+FFFD（乱码）──
+// 真机上背单词卡片曾显示「小规??的」「事??」：生成环节丢了单个汉字，变成替换符。
+// 已由 scripts/clean-wordbank-mojibake.mjs 清理 5909 处；这条断言防止它再回来。
+{
+  const dir = join(ROOT, 'src/data/wordbank/data');
+  const files = readdirSync(dir).filter((f) => f.endsWith('.ts'));
+  let bad = 0;
+  const offenders = [];
+  for (const f of files) {
+    const n = (readFileSync(join(dir, f), 'utf8').match(/\uFFFD/g) || []).length;
+    if (n) { bad += n; offenders.push(`${f}:${n}`); }
+  }
+  check(files.length > 0, '自检：读到词库数据文件', `n=${files.length}`);
+  check(bad === 0, '词库数据无 U+FFFD 乱码（改生成逻辑后重跑 clean-wordbank-mojibake.mjs）', offenders.join(','));
+}
 // ── 输出 ──
 console.log('');
 console.log(`生成器条目=${genBooks.length}  数据条目=${dataBooks.size}`);

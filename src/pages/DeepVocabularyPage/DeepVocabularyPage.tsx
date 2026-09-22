@@ -135,7 +135,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
       {step === 0 && (
         <div className="space-y-4">
           <div className="text-center mb-6 space-y-1">
-            <h2 className="text-xl font-black italic text-foreground">选择你的词书 📚</h2>
+            <h2 className="text-xl font-black italic text-foreground">选择你的词书</h2>
             <p className="text-xs text-muted-foreground">选择一本词书开始学习</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
@@ -232,8 +232,8 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
           </div>
           <div className="flex gap-2 pt-2">
             <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="rounded-2xl text-xs">← 返回</Button>
-            <Button onClick={handleComplete} className="flex-1 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50">
-              🚀 开始学习
+            <Button onClick={handleComplete} className="flex-1 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50 gap-1.5">
+              <Sparkles className="size-4" />开始学习
             </Button>
           </div>
         </div>
@@ -264,8 +264,8 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
           </div>
           <div className="flex gap-2 pt-2">
             <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="rounded-2xl text-xs">← 返回</Button>
-            <Button onClick={handleComplete} className="flex-1 rounded-2xl bg-[#6C5CE7] hover:bg-[#5a4bd1] text-white font-black text-sm shadow-lg shadow-violet-200/50">
-              🚀 开始复习
+            <Button onClick={handleComplete} className="flex-1 rounded-2xl bg-[#6C5CE7] hover:bg-[#5a4bd1] text-white font-black text-sm shadow-lg shadow-violet-200/50 gap-1.5">
+              <RotateCw className="size-4" />开始复习
             </Button>
           </div>
         </div>
@@ -930,7 +930,7 @@ export default function DeepVocabularyPage() {
           onClick={() => enterMode('daily')}
           className="group relative overflow-hidden p-6 rounded-[28px] text-left transition-all duration-200 border-2 border-transparent bg-gradient-to-br from-[#00B894] to-emerald-500 shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30 hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.99]"
         >
-          <span className="absolute -right-4 -top-6 text-[120px] leading-none text-white/10 select-none pointer-events-none">🧠</span>
+          <Brain className="absolute -right-6 -top-4 size-[120px] text-white/10 select-none pointer-events-none" aria-hidden />
           <span className="relative block text-[10px] font-black uppercase tracking-[0.2em] text-white/70 mb-1">Daily Learning · 主推</span>
           <span className="relative flex items-center gap-2 mb-1">
             <span className="text-xl font-black italic text-white">每日学习</span>
