@@ -2,6 +2,7 @@
 
 
 ## 2026-09-22
+- chore(release): v2.0.6 (versionCode 51) —— 含 SCP 落地与复习词高亮 (`529205c`)
 - feat(reading): SCP 基金会落地（20 篇/CC BY-SA 3.0，逐篇署名+原文链接+许可声明 tab）+ 复习词高亮（可选 6 色框，按形态归并匹配） (`6ce9bab`)
 - fix(reading): 进度分母改存「保存时的章数/页数」（真机 1663%→2%、521%→9%）+ 网文推荐补入 3 个已核验可内置来源（SCP CC BY-SA / Standard Ebooks CC0 / Doctorow CC BY-NC-SA） (`09effe0`)
 - fix(reading): 进度百分比改在保存时的量纲里算（修真机 516%/484%）+ 新增「网文推荐」tab（24 部，仅官方外链不内置正文） (`9c6e1de`)

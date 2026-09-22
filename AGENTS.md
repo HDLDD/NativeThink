@@ -73,6 +73,9 @@ node scripts/verify-tts-progress.mjs
 # 书目/SCP 元数据一致性 + 复习词高亮逻辑（改书单、scp.ts、reader-highlight.ts 后必跑）
 node scripts/verify-books-meta.mjs
 
+# 背单词卡片交互契约 + 滑动手势决策表（改 FlashcardMode / vocab-swipe 后必跑）
+node scripts/verify-vocab-cards.mjs
+
 # 重新抓取 SCP 文章（约 1 req/s，产物 src/data/scp.ts 勿手改）
 node scripts/fetch-scp.cjs
 ```
