@@ -191,6 +191,48 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/setShowCustom\(true\)/.test(fc) && /removeCustomWord\(w\.word\)/.test(fc), '生词本有管理入口与移除操作');
 }
 
+// ── ⑨ 助记 / 连击 / 断点续学 / 周报 / 入口角标 ──
+{
+  const notes = readFileSync(join(ROOT, 'src/lib/word-notes.ts'), 'utf8');
+  const sidebar = readFileSync(join(ROOT, 'src/components/AppSidebar.tsx'), 'utf8');
+  const uwl3 = readFileSync(join(ROOT, 'src/lib/use-word-learning.ts'), 'utf8');
+
+  // 助记
+  check(/export function setWordNote/.test(notes) && /export function useWordNote/.test(notes), '助记库导出读写与订阅');
+  check(/delete next\[key\]/.test(notes), '助记清空时删键（不留空字符串）');
+  check(/useWordNote\(shown\?\.word \?\? ''\)/.test(fc), '卡片背面按当前词读写助记');
+  check(/我的助记/.test(fc) && /Textarea/.test(fc), '背面有可编辑的助记区');
+
+  // 连击
+  check(/const \[combo, setCombo\]/.test(fc), '有连击状态');
+  check(/setCombo\(0\);?[\s\S]{0,20}\}/.test(fc) || /else \{\s*setCombo\(0\);/.test(fc), '答错清零连击');
+  check(/combo >= 3 && \(/.test(fc), '连对 3 个以上才显示连击提示（避免噪音）');
+  check(/next % 5 === 0/.test(fc), '每 5 连给一次即时反馈');
+
+  // 断点续学
+  check(/export function saveSession/.test(uwl3) && /export function loadSession/.test(uwl3) && /export function clearSession/.test(uwl3), '会话断点的存/取/清三件套');
+  check(/if \(typeof p\.index !== 'number' \|\| p\.index < 0 \|\| p\.index >= p\.order\.length\) return null;/.test(uwl3), '断点读取时校验下标（越界视为失效）');
+  check(/const resumeSession = useCallback/.test(fc), '概览提供"接着上次"');
+  check(/saveSession\(currentLevel, \{ order: session\.order, index: currentIdx/.test(fc), '学习中持续保存断点');
+  check(/clearSession\(currentLevel\); \/\/ 新开一轮/.test(fc), '新开一轮时丢弃旧断点');
+  check(/setRatedKeys\(new Set\(\)\);   \/\/ 必须清空/.test(fc), '新一轮必须清空 ratedKeys（否则卡片会被当成已评、评分按钮不出现）');
+  check(/接着上次（还剩/.test(fc), '续学按钮显示剩余张数');
+
+  // 周报（跨天可回溯）
+  check(/history\?: Record<string, \{ learned: number; reviewed: number; good: number \}>;/.test(uwl3), 'ILearningState 增加 history（可选，老数据免迁移）');
+  check(/const bumpHistory = \(s: ILearningState, isNew: boolean\)/.test(uwl3), '每次评分写入当日 history 桶');
+  check(/s\.history = h;/.test(uwl3) && /bumpHistory\(next, !existing\)/.test(uwl3), 'all 模式与内存态都记 history');
+  check(/const weekHistory = useMemo/.test(fc), '概览聚合最近 7 天');
+  check(/本周学习量/.test(fc) && /记得 \{weekAccuracy\}%/.test(fc), '概览显示本周学习量与正确率');
+
+  // 入口角标
+  check(/export function getGlobalDueCount/.test(uwl3) && /export function useGlobalDueCount/.test(uwl3), '全局到期数（角标）');
+  check(/!p\.suspended && p\.status !== 'new' && p\.nextReview <= now/.test(uwl3), '角标口径：排除屏蔽与未学，只算到期');
+  check(/const dueCount = useGlobalDueCount\(\)/.test(sidebar), '侧边栏读取角标数');
+  check(/item\.path === '\/vocabulary' && dueCount > 0/.test(sidebar), '角标只挂在「词汇」入口');
+  check(/dispatchEvent\(new CustomEvent\(STATE_EVENT\)\)/.test(uwl3), '状态变更广播（角标能自动刷新）');
+}
+
 console.log('');
 console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
 if (fail) {

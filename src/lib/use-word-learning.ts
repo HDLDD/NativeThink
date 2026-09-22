@@ -46,6 +46,12 @@ export interface ILearningState {
   todayLearned: string[];   // word keys learned today
   todayReviewed: string[];  // word keys reviewed today
   lastActiveDate: string;   // YYYY-MM-DD
+  /**
+   * 每日历史（YYYY-MM-DD → 计数）。用于"本周学习量/正确率"这类报告 ——
+   * todayLearned/todayReviewed 只保今天，跨天就没了，无法回溯趋势。
+   * 可选字段，老数据免迁移。
+   */
+  history?: Record<string, { learned: number; reviewed: number; good: number }>;
 }
 
 function todayKey(): string {
@@ -73,8 +79,69 @@ function loadState(level: string): ILearningState {
   } catch { return { progress: {}, todayLearned: [], todayReviewed: [], lastActiveDate: todayKey() }; }
 }
 
+/** 状态变更广播事件 —— 入口角标等多个组件要跟着刷新 */
+const STATE_EVENT = 'nativethink-word-learning-changed';
+
 function saveState(level: string, state: ILearningState) {
   safeStorage.setItem(storageKey(level), JSON.stringify(state));
+  try { window.dispatchEvent(new CustomEvent(STATE_EVENT)); } catch { /* ignore */ }
+}
+
+/**
+ * 全部等级的到期总数 —— 入口角标用（主流 App 都会在入口显示"待复习 N"，制造回访动机）。
+ * 直接扫存储而不是走 hook，避免在侧边栏挂一个完整的学习状态实例。
+ */
+export function getGlobalDueCount(): number {
+  const now = Date.now();
+  let n = 0;
+  for (const lvl of SUB_LEVELS) {
+    for (const p of Object.values(loadState(lvl).progress)) {
+      if (!p.suspended && p.status !== 'new' && p.nextReview <= now) n++;
+    }
+  }
+  return n;
+}
+
+/** 订阅全局到期数（状态一变就重算） */
+export function useGlobalDueCount(): number {
+  const [n, setN] = useState<number>(() => getGlobalDueCount());
+  useEffect(() => {
+    const refresh = () => setN(getGlobalDueCount());
+    window.addEventListener(STATE_EVENT, refresh);
+    refresh();
+    return () => window.removeEventListener(STATE_EVENT, refresh);
+  }, []);
+  return n;
+}
+
+// ── 复习会话的断点续学（中途退出后能接着上次的位置）──
+export interface ISavedSession {
+  order: string[];
+  index: number;
+  savedAt: number;
+}
+
+function sessionKey(level: string): string {
+  return `__nativethink_vocab_session_${level}`;
+}
+
+export function saveSession(level: string, s: ISavedSession): void {
+  try { safeStorage.setItem(sessionKey(level), JSON.stringify(s)); } catch { /* ignore */ }
+}
+
+export function loadSession(level: string): ISavedSession | null {
+  try {
+    const raw = safeStorage.getItem(sessionKey(level));
+    if (!raw) return null;
+    const p = JSON.parse(raw) as ISavedSession;
+    if (!p || !Array.isArray(p.order) || !p.order.length) return null;
+    if (typeof p.index !== 'number' || p.index < 0 || p.index >= p.order.length) return null;
+    return p;
+  } catch { return null; }
+}
+
+export function clearSession(level: string): void {
+  try { safeStorage.removeItem(sessionKey(level)); } catch { /* ignore */ }
 }
 
 function loadDailyQuota(level: string): number {
@@ -247,6 +314,18 @@ export function useWordLearning(level: string) {
       ...updated,
       wrongCount: quality <= 2 ? ((base as any)?.wrongCount || 0) + 1 : 0,
     });
+    // 每日历史（供"本周学习量/正确率"报告回溯）—— 只有当天日期桶，跨天自动分桶
+    const bumpHistory = (s: ILearningState, isNew: boolean) => {
+      const day = todayKey();
+      const h = { ...(s.history || {}) };
+      const cur = h[day] || { learned: 0, reviewed: 0, good: 0 };
+      h[day] = {
+        learned: cur.learned + (isNew ? 1 : 0),
+        reviewed: cur.reviewed + 1,
+        good: cur.good + (quality >= 3 ? 1 : 0),
+      };
+      s.history = h;
+    };
     // For 'all' mode: persist to the word's source level so per-level data stays accurate
     if (isAllLevels) {
       const sourceLevel = word.level && WORDBANK_LEVELS.includes(word.level) ? word.level : (word.level === 'custom' ? 'custom' : 'cet4');
@@ -259,6 +338,7 @@ export function useWordLearning(level: string) {
       sourceState.progress[key] = updated;
       if (!sourceState.todayReviewed.includes(key)) sourceState.todayReviewed = [...sourceState.todayReviewed, key];
       if (!existing && !sourceState.todayLearned.includes(key)) sourceState.todayLearned = [...sourceState.todayLearned, key];
+      bumpHistory(sourceState, !existing);
       saveState(sourceLevel, sourceState);
     }
     // Update in-memory state (works for both 'all' and specific levels)
@@ -268,12 +348,14 @@ export function useWordLearning(level: string) {
         existing || { wordKey: key, status: 'new', easeFactor: 2.5, interval: 0, repetitions: 0, nextReview: 0, lastReview: 0 },
         quality,
       ));
-      return {
+      const next: ILearningState = {
         ...prev,
         progress: { ...prev.progress, [key]: updated },
         todayReviewed: prev.todayReviewed.includes(key) ? prev.todayReviewed : [...prev.todayReviewed, key],
         todayLearned: existing ? prev.todayLearned : prev.todayLearned.includes(key) ? prev.todayLearned : [...prev.todayLearned, key],
       };
+      bumpHistory(next, !existing);
+      return next;
     });
   };
 

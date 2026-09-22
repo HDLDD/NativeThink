@@ -15,6 +15,7 @@ import {
   GraduationCap,
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useGlobalDueCount } from '@/lib/use-word-learning';
 import {
   Sidebar,
   SidebarContent,
@@ -62,6 +63,8 @@ const NAV_ITEMS = [
 
 export default function AppSidebar() {
   const { pathname } = useLocation();
+  // 待复习角标（扫全部等级；学习状态变更会广播刷新）
+  const dueCount = useGlobalDueCount();
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border/70 bg-card/85 backdrop-blur-md">
@@ -109,6 +112,18 @@ export default function AppSidebar() {
                       <span className="group-data-[state=collapsed]:hidden text-xs font-bold uppercase tracking-wider">
                         {item.label}
                       </span>
+                      {/* 待复习角标 —— 入口处提示"还有 N 个到期"，是回访的主要动机之一 */}
+                      {item.path === '/vocabulary' && dueCount > 0 && (
+                        <span
+                          className={cn(
+                            'group-data-[state=collapsed]:hidden ml-auto min-w-5 h-5 px-1.5 rounded-full text-[10px] font-black grid place-items-center tabular-nums',
+                            isActive ? 'bg-white/25 text-white' : 'bg-rose-500/15 text-rose-500',
+                          )}
+                          title={`${dueCount} 个单词待复习`}
+                        >
+                          {dueCount > 99 ? '99+' : dueCount}
+                        </span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

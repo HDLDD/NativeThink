@@ -2,15 +2,16 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import {
   RotateCw, Volume2, Sparkles, XCircle, ArrowLeft, ChevronLeft, ChevronDown, ChevronUp,
-  Link2, BookOpen, Gauge,
+  Link2, BookOpen, Gauge, Flame, PenLine, History,
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { IWordEntry } from '@/data/wordbank/schema';
 import { findWord, getWordCounts, preloadDetail } from '@/data/wordbank';
-import { useWordLearning } from '@/lib/use-word-learning';
+import { useWordLearning, saveSession, loadSession, clearSession } from '@/lib/use-word-learning';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useImmersive } from '@/lib/focus-mode';
 import { FitWord } from '@/components/FitWord';
@@ -22,6 +23,7 @@ import { sfxComplete } from '@/lib/sfx';
 import { decideSwipe, SWIPE_THRESHOLD, SWIPE_QUALITY_UNKNOWN, SWIPE_QUALITY_KNOWN } from '@/lib/vocab-swipe';
 import { createSessionOrder, scheduleRelearn, nextIndex, forecastByDay, MAX_RELEARN, type ISessionOrder } from '@/lib/vocab-session';
 import { useCustomWords, removeCustomWord, toWordEntry, type ICustomWord } from '@/lib/custom-words';
+import { useWordNote, countWordNotes } from '@/lib/word-notes';
 
 const FL_LEVEL_COLORS: Record<string, string> = {
   all: '#00B894', zhongkao: '#EF4444', gaokao: '#F97316', cet4: '#0EA5E9', cet6: '#6C5CE7', ielts: '#F59E0B', toefl: '#EC4899', postgraduate: '#8B5CF6', professional: '#14B8A6', advanced: '#64748B',
@@ -48,6 +50,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const { state, dueForReview, getNewWords, recordReview, setSuspended, suspendedCount, dailyQuota, setDailyQuota } = useWordLearning(currentLevel);
   // 生词本：阅读里收集、词库未收录的词（进度走独立的 'custom' 一路）
   const customList = useCustomWords();
+  /** 生词本列表（resumeSession 里按 key 还原词条时用） */
+  const customWords: ICustomWord[] = customList;
   const tts = useTTS();
 
   const [currentIdx, setIdx] = useState(0);
@@ -63,6 +67,9 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     try { return safeStorage.getItem(AUTO_SPEAK_KEY) === '1'; } catch { return false; }
   });
   const [sessionReviewCount, setSessionReviewCount] = useState(0);
+  // 连对连击：连续 quality>=3 的计数，答错清零（即时正反馈）
+  const [combo, setCombo] = useState(0);
+  const [bestCombo, setBestCombo] = useState(0);
   /** 已评分过的词集合（按 key）—— rated 由它派生：回看上一张时状态才不会错乱 */
   const [ratedKeys, setRatedKeys] = useState<Set<string>>(() => new Set());
   // 本轮统计：已评分张数 / 其中记得的（quality>=3）—— 用于顶部进度条与正确率
@@ -74,6 +81,9 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const dragStart = useRef<number | null>(null);
   const [detailTick, setDetailTick] = useState(0);
   const [showCustom, setShowCustom] = useState(false);
+  // 助记：按当前词读写（useWordNote 内部订阅变更）
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState('');
 
   const toggleAutoSpeak = useCallback(() => {
     setAutoSpeak((v) => {
@@ -202,6 +212,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
    * （见 wordbank.applyDetail），所以 detail 到位后重新 findWord 就能拿到完整内容。
    */
   const shown = useMemo(() => (cw ? (findWord(cw.word) ?? cw) : cw), [cw, detailTick]);
+  // 当前词的助记（必须声明在 shown 之后；切词时 hook 会自动重读）
+  const [note, setNote] = useWordNote(shown?.word ?? '');
 
   // 进入一张卡时确保该词的等级 detail 已加载 —— 否则背面只有释义，没有搭配/例句
   useEffect(() => {
@@ -232,9 +244,28 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     [state.progress],
   );
 
+  /** 断点（概览里显示"接着上次"按钮） */
+  const [savedSession] = useState(() => loadSession(currentLevel));
+
+  /** 本周学习量（最近 7 天，按天聚合 history；老数据没有 history 时全 0） */
+  const weekHistory = useMemo(() => {
+    const out: { date: string; label: string; count: number; good: number }[] = [];
+    const d = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const day = new Date(d.getTime() - i * 86400000);
+      const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+      const h = state.history?.[key];
+      out.push({ date: key, label: '日一二三四五六'[day.getDay()], count: h?.reviewed ?? 0, good: h?.good ?? 0 });
+    }
+    return out;
+  }, [state.history]);
+  const weekTotal = weekHistory.reduce((s, x) => s + x.count, 0);
+  const weekGood = weekHistory.reduce((s, x) => s + x.good, 0);
+  const weekAccuracy = weekTotal > 0 ? Math.round((weekGood / weekTotal) * 100) : 0;
+  const noteCount = countWordNotes();
+
   /** 恢复所有被「不再出现」屏蔽的词 */
-  const restoreSuspended = useCallback(() => {
-    const keys = Object.values(state.progress).filter((p) => p.suspended).map((p) => p.wordKey);
+  const restoreSuspended = useCallback(() => {    const keys = Object.values(state.progress).filter((p) => p.suspended).map((p) => p.wordKey);
     let n = 0;
     for (const k of keys) {
       const w = findWord(k);
@@ -260,7 +291,21 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     recordReview(cw, quality);
     setSessionReviewCount((p) => p + 1);
     setSessionRated((p) => p + 1);
-    if (quality >= 3) setSessionGood((p) => p + 1);
+    if (quality >= 3) {
+      setSessionGood((p) => p + 1);
+      // 连击：连续答对累加；每 5 连给一次反馈
+      setCombo((c) => {
+        const next = c + 1;
+        setBestCombo((b) => Math.max(b, next));
+        if (next > 0 && next % 5 === 0) {
+          sfxComplete();
+          toast.success(`连对 ${next} 个！继续保持`, { duration: 1500 });
+        }
+        return next;
+      });
+    } else {
+      setCombo(0);
+    }
     setRatedKeys((prev) => new Set(prev).add(cw.word.toLowerCase()));
     // 答错立即重排：隔 RELEARN_GAP 张后再出现（最多 MAX_RELEARN 次）—— 这比只记 wrongCount
     // 有用得多，是主流 SRS（Anki learning steps）的即时巩固环节。
@@ -308,9 +353,42 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setSessionEntries(entries);
     setSession(createSessionOrder(entries.map((w) => w.word.toLowerCase())));
     setIdx(0); setFlipped(false); setDir(0); setShowDeep(false);
+    setRatedKeys(new Set());   // 必须清空：否则新一轮里这些卡会被当成"已评"，评分按钮不出现
     setSessionRated(0); setSessionGood(0);
+    setCombo(0); setBestCombo(0);
+    clearSession(currentLevel); // 新开一轮就丢掉旧断点
     setStarted(true);
-  }, []);
+  }, [currentLevel]);
+
+  /** 断点续学：恢复上次没读完的那一轮（顺序与位置都还原） */
+  const resumeSession = useCallback(() => {
+    const saved = loadSession(currentLevel);
+    if (!saved) return;
+    const entries: IWordEntry[] = [];
+    const missing: string[] = [];
+    for (const k of saved.order) {
+      const custom = customWords.find((x) => x.word.toLowerCase() === k);
+      const w = findWord(k) ?? (custom ? toWordEntry(custom) : undefined);
+      if (w) entries.push(w); else missing.push(k);
+    }
+    const order = saved.order.filter((k) => !missing.includes(k));
+    if (!entries.length) { clearSession(currentLevel); toast.info('上次的进度已失效，请重新开始'); return; }
+    const idx = Math.max(0, Math.min(saved.index, order.length - 1));
+    setSessionEntries(entries);
+    setSession({ order, relearnCounts: {} });
+    setIdx(idx);
+    setFlipped(false); setDir(0); setShowDeep(false);
+    setRatedKeys(new Set()); setSessionRated(0); setSessionGood(0);
+    setCombo(0); setBestCombo(0);
+    setStarted(true);
+    toast.success(`接着上次继续 — 还剩 ${order.length - idx} 张`, { duration: 2000 });
+  }, [currentLevel, customWords]);
+
+  /** 本轮断点（顺序 + 当前位置）—— 中途退出后仍可续学 */
+  useEffect(() => {
+    if (!started || !session.order.length) return;
+    saveSession(currentLevel, { order: session.order, index: currentIdx, savedAt: Date.now() });
+  }, [started, currentLevel, session.order, currentIdx]);
 
   /** 已会/不感兴趣 → 屏蔽该词，并从本轮移除 */
   const suspendCurrent = useCallback(() => {
@@ -538,14 +616,49 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
           )}
         </div>
 
-        <div className="flex justify-center pt-2">
+        {/* 本周学习量（来自 history，跨天可回溯）+ 助记数 */}
+        <div className="rounded-2xl border border-border/60 p-3.5 space-y-2">
+          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider">
+            <span className="text-muted-foreground">本周学习量</span>
+            <span className="text-muted-foreground/80 normal-case font-bold">
+              共 {weekTotal} 次 · 记得 {weekAccuracy}%{noteCount > 0 && ` · 助记 ${noteCount} 个`}
+            </span>
+          </div>
+          <div className="flex items-end gap-1.5 h-12">
+            {weekHistory.map((d, i) => {
+              const max = Math.max(1, ...weekHistory.map((x) => x.count));
+              return (
+                <div key={d.date} className="flex-1 flex flex-col items-center gap-1"
+                  title={`${d.date}：复习 ${d.count} 次`}>
+                  <span className="text-[8px] font-black tabular-nums text-muted-foreground">{d.count || ''}</span>
+                  <div className={cn('w-full rounded-t-md transition-all',
+                    i === weekHistory.length - 1 ? 'bg-[#00B894]' : 'bg-muted-foreground/30')}
+                    style={{ height: `${Math.max(2, (d.count / max) * 34)}px` }} />
+                  <span className="text-[8px] font-bold text-muted-foreground/70">{d.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex justify-center gap-2 pt-2 flex-wrap">
           <Button
             onClick={() => { setWrongDrill(false); startSession(queue); }}
             disabled={queue.length === 0}
-            className="bg-[#6C5CE7] hover:bg-[#5A4BD1] text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-violet-200/50 gap-2"
+            className="bg-[#6C5CE7] hover:bg-[#5A4BD1] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-violet-200/50 gap-2"
           >
             <RotateCw className="size-4" />开始复习（{queue.length} 张卡片）
           </Button>
+          {/* 断点续学：上次没读完的那一轮 */}
+          {savedSession && (
+            <Button
+              variant="outline" onClick={resumeSession}
+              className="rounded-2xl px-6 py-4 text-xs font-black uppercase tracking-wider gap-2 border-[#6C5CE7]/40 text-ink-violet"
+              title="恢复上次的顺序与位置"
+            >
+              <History className="size-4" />接着上次（还剩 {Math.max(0, savedSession.order.length - savedSession.index)} 张）
+            </Button>
+          )}
         </div>
 
         {/* 生词本管理：朗读 / 移除（这些词已进复习队列，SM-2 与屏蔽同样适用） */}
@@ -613,6 +726,11 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
               <span className="tabular-nums">{currentIdx + 1}/{session.order.length}</span>
               <span className="tabular-nums">已评 {sessionRated}</span>
               {sessionRated > 0 && <span className={cn('tabular-nums', accuracy >= 70 ? 'text-emerald-600' : 'text-amber-600')}>记得 {accuracy}%</span>}
+              {combo >= 3 && (
+                <span className="flex items-center gap-0.5 text-amber-500 tabular-nums animate-pulse" title="连续答对">
+                  <Flame className="size-3" />连对 {combo}
+                </span>
+              )}
             </div>
           </div>
           {/* 上一个词 —— 回看刚看过的词的具体信息（左滑也可以） */}
@@ -828,6 +946,30 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                       >
                         不再出现
                       </button>
+                    </div>
+
+                    {/* 我的助记 —— 用户自己写的线索记忆效果最好（自我参照效应） */}
+                    <div className="rounded-2xl border border-amber-200/70 bg-amber-50/60 dark:bg-amber-500/5 p-3">
+                      <button
+                        className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-amber-600"
+                        onClick={(e) => { e.stopPropagation(); setEditingNote((v) => !v); }}
+                      >
+                        <span className="flex items-center gap-1"><PenLine className="size-3" />我的助记{note ? '' : '（点这里写一个）'}</span>
+                        {editingNote ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                      </button>
+                      {editingNote ? (
+                        <Textarea
+                          value={noteDraft}
+                          onChange={(e) => setNoteDraft(e.target.value)}
+                          onBlur={() => { setNote(noteDraft); setEditingNote(false); }}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder="写点能让你记住它的东西：拆词、联想、你自己的例句…"
+                          className="mt-2 min-h-[64px] text-xs rounded-xl"
+                          autoFocus
+                        />
+                      ) : note ? (
+                        <p className="mt-1.5 text-xs text-foreground/85 leading-relaxed whitespace-pre-wrap">{note}</p>
+                      ) : null}
                     </div>
                   </div>
                 )}
