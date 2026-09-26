@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useTTS } from '@/lib/use-tts';
 import { safeStorage } from '@/lib/safe-storage';
+import { toast } from 'sonner';
 import { queryWords } from '@/data/wordbank';
 import type { IWordEntry } from '@/data/wordbank/schema';
 import { cn } from '@/lib/utils';
@@ -71,9 +72,16 @@ export function VocabTestTab({ level, levelLabel }: Props) {
       const picks = shuffle(pool).slice(0, PER_BUCKET);
       for (const w of picks) {
         // Distractors: meanings from other words in the same pool
-        const distractors = shuffle(pool.filter((o) => o.word !== w.word))
-          .slice(0, 3)
-          .map((o) => truncate(o.meaning));
+        // 释义去重 —— 两个选项截断后一样的话就出现双"正确项"，选哪个都说不清
+        const seen = new Set<string>([truncate(w.meaning)]);
+        const distractors: string[] = [];
+        for (const o of shuffle(pool.filter((x) => x.word !== w.word))) {
+          const m = truncate(o.meaning);
+          if (seen.has(m)) continue;
+          seen.add(m);
+          distractors.push(m);
+          if (distractors.length >= 3) break;
+        }
         if (distractors.length < 3) continue;
         const answer = Math.floor(Math.random() * 4);
         const options = [...distractors];
@@ -86,7 +94,11 @@ export function VocabTestTab({ level, levelLabel }: Props) {
 
   const start = useCallback(() => {
     const qs = buildQuestions();
-    if (qs.length < 4) return;
+    if (qs.length < 4) {
+      // 不许静默无反应：题目凑不齐要告诉用户原因
+      toast.info('这本词书可出的题目不足，换一本词书再试试', { duration: 2500 });
+      return;
+    }
     setQuestions(qs);
     setQIdx(0);
     setPicked(null);
@@ -121,10 +133,11 @@ export function VocabTestTab({ level, levelLabel }: Props) {
     const isCorrect = idx === current.answer;
     const nextCorrect = correctCount + (isCorrect ? 1 : 0);
     if (isCorrect) setCorrectCount(nextCorrect);
+    // 答对快走，答错多留一会让人看清正确答案
     setTimeout(() => {
       if (qIdx + 1 >= questions.length) finish(nextCorrect);
       else { setQIdx((i) => i + 1); setPicked(null); }
-    }, 850);
+    }, isCorrect ? 850 : 1400);
   };
 
   const grade = (est: number) => {

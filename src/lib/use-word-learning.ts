@@ -304,10 +304,23 @@ export function useWordLearning(level: string) {
     [dailyQuota, state.todayLearned.length],
   );
 
-  // Get new words for today from the word bank（跳过已屏蔽的词）
+  // Get new words for today from the word bank（跳过已屏蔽/已学的词）
+  // 单次随机样本只有 200 个 —— 学到后期大部分都是旧词，一轮抽样常常凑不齐每日目标；
+  // 不够就再抽一轮（最多 5 轮），保证「开始学习」给足当天的量。
   const getNewWords = (count: number): IWordEntry[] => {
-    const all = getRandomWords(200, level === 'all' ? undefined : level);
-    return all.filter((w) => !knownKeys.has(wordKey(w))).slice(0, count);
+    const out: IWordEntry[] = [];
+    const seen = new Set<string>();
+    for (let round = 0; round < 5 && out.length < count; round++) {
+      const batch = getRandomWords(200, level === 'all' ? undefined : level);
+      for (const w of batch) {
+        const k = wordKey(w);
+        if (knownKeys.has(k) || seen.has(k)) continue;
+        seen.add(k);
+        out.push(w);
+        if (out.length >= count) break;
+      }
+    }
+    return out;
   };
 
   /**

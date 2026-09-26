@@ -62,7 +62,9 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const [isFlipped, setFlipped] = useState(false);
   const [dir, setDir] = useState(0);
   const [autoSpeak, setAutoSpeak] = useState(() => {
-    try { return safeStorage.getItem(AUTO_SPEAK_KEY) === '1'; } catch { return false; }
+    // 默认**开**：主流背单词 App 出场即自动发音。此前默认关，用户感知就是"没有自动朗读功能"。
+    // 只有用户显式关过（存 '0'）才保持关闭。
+    try { return safeStorage.getItem(AUTO_SPEAK_KEY) !== '0'; } catch { return true; }
   });
   const [sessionReviewCount, setSessionReviewCount] = useState(0);
   // 连对连击：连续 quality>=3 的计数，答错清零（即时正反馈）
@@ -84,13 +86,12 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const [noteDraft, setNoteDraft] = useState('');
 
   const toggleAutoSpeak = useCallback(() => {
-    setAutoSpeak((v) => {
-      const next = !v;
-      try { safeStorage.setItem(AUTO_SPEAK_KEY, next ? '1' : '0'); } catch { /* ignore */ }
-      toast(next ? '已开启自动发音' : '已关闭自动发音', { duration: 1200 });
-      return next;
-    });
-  }, []);
+    // 持久化/提示放在更新函数**外** —— StrictMode 下更新函数会被调用两次，会双弹提示
+    const next = !autoSpeak;
+    setAutoSpeak(next);
+    try { safeStorage.setItem(AUTO_SPEAK_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+    toast(next ? '已开启自动发音' : '已关闭自动发音', { duration: 1200 });
+  }, [autoSpeak]);
 
   const allCounts = useMemo(() => getWordCounts(), []);
   const totalForLevel = currentLevel === 'all'
@@ -159,6 +160,13 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
 
   const ttsRef = useRef(tts);
   ttsRef.current = tts;
+  /**
+   * 已经自动朗读过的 `${卡片下标}-${正反面}`。
+   *
+   * **每开一轮必须清空**（见 startSession/resumeSession）—— ref 不会随组件重挂载自动归零，
+   * 而每轮都从下标 0 正面开始，于是第二轮起第一张卡的"0-front"永远命中旧 key 被跳过：
+   * 用户看到的现象就是"第一张卡不读单词"（反馈：复习检测只朗读句子、不朗读单词）。
+   */
   const lastSpokenKey = useRef('');
   /**
    * 会话当前词。**必须声明在下面的朗读 effect 之前** —— 否则 `cw` 出现在 effect 的依赖
@@ -209,7 +217,18 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       const next = nk ? findWord(nk) : undefined;
       if (next) ttsRef.current.prewarm(next.word, { rate: 0.85 });
     } else if (word.examples[0]) {
-      const timer = setTimeout(() => { ttsRef.current.speak(cleanText(word.examples[0].en), { rate: 0.85 }); }, 400);
+      /**
+       * 背面：**先读单词，再读例句**。
+       *
+       * 原先只读例句，用户直接反馈「朗读是只朗读句子，不朗读单词」。
+       * 而且拆成两次 speak（单词一次 + 400ms 后例句一次）也有毛病：
+       * speak() 开头就会 stopAudio()，用户快速翻面时会把还没读完的单词掐掉 ——
+       * 听感上仍然"只有句子"。拼成一次 speak 交给 chunkText 顺序播放，
+       * 既保证单词一定先出声，也不存在互相打断。
+       */
+      const timer = setTimeout(() => {
+        ttsRef.current.speak(`${word.word}. ${cleanText(word.examples[0].en)}`, { rate: 0.85 });
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [autoSpeak, currentIdx, isFlipped, cw, session.order]);
@@ -388,6 +407,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setSessionRated(0); setSessionGood(0);
     setCombo(0); setBestCombo(0);
     clearSession(currentLevel); // 新开一轮就丢掉旧断点
+    lastSpokenKey.current = '';  // 新一轮必须忘掉上一轮的朗读记录，否则第一张卡不出声
     setStarted(true);
   }, [currentLevel]);
 
@@ -411,6 +431,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setFlipped(false); setDir(0); setShowDeep(false);
     setRatedKeys(new Set()); setSessionRated(0); setSessionGood(0);
     setCombo(0); setBestCombo(0);
+    lastSpokenKey.current = '';  // 同上：恢复的那一轮也要从第一张卡正常出声
     setStarted(true);
     toast.success(`接着上次继续 — 还剩 ${order.length - idx} 张`, { duration: 2000 });
   }, [currentLevel, customList]);
@@ -529,9 +550,13 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             <div className="size-9 rounded-xl bg-[#6C5CE7]/10 flex items-center justify-center text-ink-violet">
               <RotateCw className="size-4.5" />
             </div>
+            {/*
+              这里**不再重复「复习检测」标题**：页面顶部已经有了同名 H1，
+              再来一个只会在小屏上叠成两行一样的字（用户反馈"顶部看着糊/被遮住"）。
+              保留图标 + 一句说明即可，顺带把首屏那 22px 让给真正的数据。
+            */}
             <div>
-              <h2 className="text-sm font-black italic text-foreground">复习检测</h2>
-              <p className="text-[9px] font-bold text-muted-foreground">SM-2 间隔记忆 · 巩固已学单词</p>
+              <p className="text-[11px] font-black italic text-foreground">SM-2 间隔记忆 · 巩固已学单词</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -602,7 +627,13 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
               明天 {forecast[1] ?? 0} 个
             </span>
           </div>
-          <div className="flex items-end gap-1.5 h-12">
+          {/*
+            图表容器高度必须容得下「数值 + 柱 + 星期」三层 ——
+            原来写死 h-12（48px），而 8px 文字的行盒约 13px：
+            13 + 34(最高柱) + 8(gap) + 13 = 68px > 48px，多出来的部分从顶部溢出，
+            数值就压在标题「未来 7 天复习量 / 明天 N 个」上（用户反馈"单词和文字重叠"）。
+          */}
+          <div className="flex items-end gap-1.5 h-[72px]">
             {forecast.map((n, i) => {
               const max = Math.max(1, ...forecast);
               return (
@@ -661,7 +692,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
               共 {weekTotal} 次 · 记得 {weekAccuracy}%{noteCount > 0 && ` · 助记 ${noteCount} 个`}
             </span>
           </div>
-          <div className="flex items-end gap-1.5 h-12">
+          <div className="flex items-end gap-1.5 h-[72px]">
             {weekHistory.map((d, i) => {
               const max = Math.max(1, ...weekHistory.map((x) => x.count));
               return (
@@ -1038,11 +1069,17 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
           </span>
         </div>
       )}
-      {rated && (
+      {/*
+        评分后**不再有「下一个」按钮** —— 主流背单词 App 点完熟悉程度就自动翻页，
+        多按一次是纯负担。这里只留一条过渡提示（仍在 550/900ms 内可点空白处取消节奏）。
+        回看态不显示：那时停留多久由用户决定。
+      */}
+      {rated && !viewingPast && (
         <div className="flex justify-center">
-          <Button onClick={() => advance()} className="bg-[#6C5CE7] hover:bg-[#5A4BD1] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-violet-200/50">
-            {currentIdx < session.order.length - 1 ? '下一个' : '再来一组'}<RotateCw className="size-4 ml-2" />
-          </Button>
+          <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-muted/60 text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+            <RotateCw className="size-3.5 animate-spin [animation-duration:1.6s]" />
+            即将进入下一张…
+          </span>
         </div>
       )}
     </div>

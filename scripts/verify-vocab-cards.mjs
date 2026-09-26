@@ -34,7 +34,13 @@ const swipeSrc = readFileSync(join(ROOT, 'src/lib/vocab-swipe.ts'), 'utf8');
 // ── ① 自动发音必须有 UI 开关且持久化（否则预合成/自动朗读是死代码）──
 check(/const AUTO_SPEAK_KEY = '/.test(fc), '定义了自动发音的持久化 key');
 check(/safeStorage\.setItem\(AUTO_SPEAK_KEY/.test(fc), '自动发音开关写入 safeStorage');
-check(/safeStorage\.getItem\(AUTO_SPEAK_KEY\) === '1'/.test(fc), '自动发音开关从 safeStorage 读回（初始 useState）');
+/**
+ * 自动发音的**默认值必须是开**。
+ * 这里曾经钉的是 `=== '1'`（默认关），结果用户在真机上体感就是「复习检测没有自动朗读」，
+ * 报了一轮 bug。语义改成"只有显式存过 '0' 才关"，断言必须跟着重新推导，不能照抄旧值。
+ */
+check(/safeStorage\.getItem\(AUTO_SPEAK_KEY\) !== '0'/.test(fc), '自动发音默认开（只有显式关才为关）');
+check(/catch \{ return true; \}/.test(fc), 'localStorage 不可用时自动发音仍默认开');
 check((fc.match(/toggleAutoSpeak/g) ?? []).length >= 3, '自动发音开关接了两个入口（概览 + 学习中）与键盘 S', `出现 ${(fc.match(/toggleAutoSpeak/g) ?? []).length} 次`);
 check(/autoSpeak \? '·开' : '·关'/.test(fc), '概览开关显示当前状态');
 check(/if \(!autoSpeak\) return;/.test(fc), '自动朗读/预合成受开关控制');
@@ -285,6 +291,173 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/\.safe-area-bottom \{ padding-bottom: env\(safe-area-inset-bottom/.test(css), '定义 safe-area-bottom（MobileBottomNav 一直在用但此前从未定义）');
   check(/className="safe-area-top safe-area-left safe-area-right"/.test(layout), '外壳补状态栏/侧边 inset');
   check(/safe-area-bottom/.test(nav), '底部导航补手势条 inset');
+
+  /**
+   * 空 sticky 条会**压在内容上**（真机实测，别再犯）：
+   * `sticky top-20 z-30 bg-background/95` 那个 div 只在浏览 tab 有内容，
+   * 其它 tab 下是纯 pb-3 的 12px 不透明横条，sticky 到 y≈143 正好盖住
+   * 复习检测会话栏的「错词重练中 / 1/14 已评 0」和概览卡片的标题。
+   */
+  const page = readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx'), 'utf8');
+  check(/\{tab === 'browse' && \(\s*<div className="sticky top-20/.test(page), '空 sticky 条只在浏览 tab 渲染（不再遮挡其它模式顶部）');
+  check(!/\{false && \(<TabsList/.test(page), '清掉恒为 false 的死 TabsList');
+  check(/<p className="text-\[11px\] font-black italic text-foreground">SM-2 间隔记忆 · 巩固已学单词<\/p>/.test(fc),
+    '复习检测概览卡用一句说明代替重复标题');
+
+  /**
+   * 两张柱状图（未来 7 天复习量 / 本周学习量）的容器必须容得下「数值+柱+星期」三层。
+   * 原来写死 h-12，8px 文字行盒 ~13px，13+34+8+13=68 > 48 → 数值从顶部溢出压住标题。
+   */
+  const chartBoxes = (fc.match(/flex items-end gap-1\.5 h-\[72px\]/g) ?? []).length;
+  check(chartBoxes >= 2, '两张柱状图容器高度 ≥ 三层文字所需（不再溢出去压标题）', `找到 ${chartBoxes} 处`);
+  check(!/flex items-end gap-1\.5 h-12/.test(fc), '没有残留写死 h-12 的旧图表容器');
+
+  /**
+   * 自动朗读的"已读过的卡"记录必须**每轮清空**。
+   * ref 不随组件重挂载归零，而每轮都从下标 0 正面开始 ——
+   * 不清空就会出现"第二轮起第一张卡不读单词"（用户反馈：只朗读句子不朗读单词）。
+   */
+  const resetCount = (fc.match(/lastSpokenKey\.current = '';/g) ?? []).length;
+  check(resetCount >= 2, 'startSession / resumeSession 都清空朗读记录', `找到 ${resetCount} 处`);
+  check(/clearSession\(currentLevel\);[\s\S]{0,120}lastSpokenKey\.current = '';/.test(fc), '新开一轮时清空（紧跟 clearSession）');
+}
+
+// ── ⑫ 复习检测：取消「下一个」按钮 + 快速闪卡交互补齐 ──
+{
+  // 用户明确要求「下一个按钮去掉」：评分后自动跳转已经足够，多一个按钮只是负担
+  check(!/onClick=\{\(\) => advance\(\)\}/.test(fc), '复习检测不再有「下一个」按钮');
+  check(/即将进入下一张/.test(fc), '评分后改为「即将进入下一张」过渡提示');
+  check(/rated && !viewingPast && \(/.test(fc), '过渡提示只在本次刚评分时显示（回看态不显示）');
+
+  /**
+   * 背面自动朗读必须**先读单词再读例句**（用户反馈「只朗读句子，不朗读单词」）。
+   * 断言用 includes 逐字钉住这一句 —— 正则里的 `${}` 和反引号太容易写歪。
+   */
+  check(
+    fc.includes('`${word.word}. ${cleanText(word.examples[0].en)}`'),
+    '背面自动朗读是「单词 + 例句」一次 speak（保证单词先出声且不被掐断）',
+  );
+  check(!/setTimeout\(\(\) => \{ ttsRef\.current\.speak\(cleanText\(word\.examples\[0\]\.en\)/.test(fc),
+    '去掉了"只读例句"的旧写法');
+
+  const qc = readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/QuickCardMode.tsx'), 'utf8');
+  const hist = readFileSync(join(ROOT, 'src/lib/quickcard-history.ts'), 'utf8');
+
+  // ① 点卡片即翻面（先猜再看才是自测）
+  check(/if \(!revealed\) setRevealed\(true\)/.test(qc), '快速闪卡点卡片即翻面看释义');
+  check(/点卡片看释义/.test(qc), '未翻面时有「点卡片看释义」提示');
+  check(/e\.stopPropagation\(\); speak\(cw\.word\)/.test(qc), '卡片内的发音按钮不复用翻面事件');
+
+  // ② 例句：只在翻面后按需拉 detail；必须用 isDetailReady 兜住死循环
+  check(/const example = cw\.examples\[0\];/.test(qc), '释义面展示第一条例句');
+  check(/preloadDetail\(\[cw\.level\]\)/.test(qc), '翻面后按当前词等级懒加载 detail');
+  check(/if \(isDetailReady\(cw\.level\)\) return;/.test(qc), 'detail 已就绪且无例句时不再重试（否则 tick 死循环）');
+  check(/speak\(example\.en\)/.test(qc), '例句可点读');
+
+  // ③ 上一个（回看上一张，语义与复习检测一致：直接展开释义）
+  check(/const prev = useCallback/.test(qc), '快速闪卡有「上一个」');
+  check(/if \(idx === 0\) return;[\s\S]{0,160}setRevealed\(true\);/.test(qc), '回看上一张时直接展开释义');
+  check(/上一个/.test(qc), '「上一个」有可见入口');
+
+  // ④ 每轮词表留档：完成页列表 + 可重练 + 持久化
+  check(/runWords\.map/.test(qc), '完成页列出本轮词表');
+  check(/absorbQuickCardRun\(level, roundSize, runWords\)/.test(qc), '一轮结束按「选择的数量」切分落档');
+  check(/savedSeqRef\.current === runSeq/.test(qc), '同一轮只落一条记录（幂等）');
+  check(/useQuickCardRuns\(level\)/.test(qc), '留档按当前词书订阅');
+  check(/const drillRun = useCallback\(\(run: IQuickCardRun, onlyUnknown = false\)/.test(qc), '留档可整组重练 / 只重练不认识的');
+  check(/<HistoryPanel/.test(qc), '完成页与游戏中都能打开学习记录');
+
+  check(/const MAX_RUNS = 20;/.test(hist), '留档条数上限（防止 localStorage 无限增长）');
+  check(/const MAX_WORDS_PER_RUN = 300;/.test(hist), '单轮落盘词数上限（「全部」档位可能几千词）');
+  check(/words: run\.words\.slice\(0, MAX_WORDS_PER_RUN\)/.test(hist), '落盘时截断');
+  check(/export function listQuickCardRuns/.test(hist) && /export function saveQuickCardRun/.test(hist), '留档读写导出完整');
+  check(/window\.addEventListener\(EVENT, onChange\)/.test(hist), '留档跨组件广播');
+
+  // ⑤ 「单词上限解开」= 增加不限量档位
+  check(/const ROUND_ALL = 0;/.test(qc), '定义「全部」档位（0 = 不限量）');
+  check(/v === ROUND_ALL \|\| \(ROUND_SIZES as readonly number\[\]\)\.includes\(v\)/.test(qc), '「全部」档位能持久化（0 不被回退成 20）');
+  check(/全部/.test(qc), '「全部」有可见入口');
+
+  // ⑥ 返回必须真的返回：原先 setQueue([]) 会被重建队列的 effect 立刻填回去
+  check(/if \(paused\) return;/.test(qc), '暂停态不自动重建队列');
+  check(/cfgRef\.current === cfg/.test(qc), '配置签名去重（否则从留档重练会被随机队列冲掉）');
+  check(/const exitRun = useCallback/.test(qc), '「返回」走 exitRun（停在起跑页）');
+  check(/onClick=\{exitRun\}/.test(qc), '顶栏返回按钮接到 exitRun');
+
+  // ⑦ 顶部「上一个单词」+ 点开词条详情
+  check(/const prevWord = idx > 0 \? queue\[idx - 1\] : undefined;/.test(qc), '派生上一个单词');
+  check(/上一个单词/.test(qc), '顶部常驻「上一个单词」标签');
+  check(/onClick=\{\(\) => setDetailWord\(prevWord\)\}/.test(qc), '点上一个单词打开详情');
+  check(/\{prevWord\.word\}/.test(qc), '顶部显示的是**具体词面**而不只是"上一个"三个字');
+  check(/const \[detailWord, setDetailWord\] = useState<IWordEntry \| null>\(null\)/.test(qc), '详情弹窗状态');
+  check(/findWord\(detailWord\.word\) \?\? detailWord/.test(qc), '详情按 detailTick 重新 findWord（applyDetail 是就地补字段）');
+  check(/<WordInfoDialog/.test(qc), '渲染词条详情弹窗');
+  check(/entry\.examples\.length > 0 && \(/.test(qc) && /entry\.collocations\.length > 0 && \(/.test(qc)
+    && /entry\.deepExplanation && \(/.test(qc), '详情含例句/搭配/深度解释');
+  check(/entry\.synonyms\.length > 0 && \(/.test(qc) && /entry\.antonyms\.length > 0 && \(/.test(qc), '详情含近义/反义');
+  check(/if \(document\.querySelector\('\[role="dialog"\]'\)\) return;/.test(qc), '弹窗打开时不抢键盘（Esc 不会顺手退出本轮、1/2 不会偷偷评分）');
+  check(/window\.addEventListener\('keydown', onKey, true\);/.test(qc) && /window\.removeEventListener\('keydown', onKey, true\);/.test(qc),
+    '键盘监听在捕获阶段（弹窗关闭由 Radix 同步 flush，冒泡阶段已看不到 dialog）');
+
+  // ⑧ 收藏：卡片 / 词表 / 详情弹窗 / 收藏面板 + 写进收藏页同源数据
+  check(/useFavorites\(\)/.test(qc) && /addFavorite\(\{[\s\S]{0,120}type: 'word'/.test(qc), '收藏走 useFavorites 的 word 类型（与收藏页同源）');
+  check(/const toggleFav = useCallback\(\(w: IWordEntry\)/.test(qc), '有统一的收藏开关');
+  check(/title=\{isFav\(cw\.word\) \? '取消收藏' : '收藏这个单词'\}/.test(qc), '卡片上可收藏（正反面都在）');
+  check(/<WordChip/.test(qc), '词表用带星标的词片');
+  check(/function WordChip\(/.test(qc) && /onToggleFav/.test(qc), 'WordChip 支持收藏');
+  check(/function FavoritesPanel\(/.test(qc), '有收藏面板');
+  check(/只练收藏的词/.test(qc), '收藏可单独成组重练');
+  check(/const drillFavorites = useCallback/.test(qc), '收藏重练回调存在');
+  check(/收藏\{favWords\.length > 0 \? ` \$\{favWords\.length\}` : ''\}/.test(qc), '顶栏收藏入口带数量');
+  const favPage = readFileSync(join(ROOT, 'src/pages/FavoritesPage/FavoritesPage.tsx'), 'utf8');
+  check(/'all', 'vocabulary', 'word'/.test(favPage), '收藏页有「单词」过滤项（否则收藏的词只能在全部里翻）');
+
+  // ⑨ 释义必须带词性
+  check(/cw\.partOfSpeech\}/.test(qc) && /tracking-wider text-ink-violet/.test(qc), '卡片释义行内显示词性');
+  check(/entry\.partOfSpeech\}/.test(qc), '详情弹窗释义行内显示词性');
+
+  // ⑩ 断点续学 + 按数量切分留档
+  const hist2 = readFileSync(join(ROOT, 'src/lib/quickcard-history.ts'), 'utf8');
+  check(/loadQuickCardSession/.test(qc) && /saveQuickCardSession\(\{/.test(qc), '快速闪卡会存/读未学完的那一轮');
+  check(/saveQuickCardSession\(\{[\s\S]{0,220}order: queue\.map\(\(w\) => w\.word\)[\s\S]{0,120}results:/.test(qc), '断点含顺序/位置/每张卡的作答/是否停在起跑页');
+  check(/restoreStateRef/.test(qc) && /restoredRunRef/.test(qc), '恢复与"重建队列"两个 effect 有先后与去重（否则恢复会被随机队列覆盖）');
+  check(/继续本轮（第 \{idx \+ 1\}\/\{queue\.length\} 张）/.test(qc), '起跑页能继续未学完的那一轮');
+  check(/absorbQuickCardRun\(level, roundSize, runWords\)/.test(qc), '学完一轮按「选择的数量」切分留档');
+  check(/while \(rest\.length >= size\)/.test(hist2), '切分逻辑：每满一份就存一条记录');
+  check(/writePending\(rest\.length > 0 \? \{ level, size, words: rest \} : null\)/.test(hist2), '不足一份的余数留在「当前累积」');
+  check(/当前累积 \{pending\.words\.length\}/.test(qc), '学习记录里能看到当前累积');
+  check(/size <= 0[\s\S]{0,200}saveQuickCardRun/.test(hist2), '「全部」档位（size=0）不切分，整轮存一条');
+
+  /**
+   * 词条详情弹窗必须在**三个分支**都渲染：进行中 / 完成页 / 起跑页。
+   * 只在"进行中"渲染过一次，结果完成页和起跑页的词表点了没反应（用户反馈"列表的单词要能点击查看详细信息"）。
+   */
+  check(/const detailDialog = \(/.test(qc), '详情弹窗抽成一个节点复用');
+  const dialogUses = (qc.match(/\{detailDialog\}/g) ?? []).length;
+  check(dialogUses >= 3, '进行中 / 完成页 / 起跑页都渲染详情弹窗', `找到 ${dialogUses} 处`);
+  check(/const favoritesPanel = \(/.test(qc), '收藏面板抽成一个节点复用（完成页与起跑页都能打开）');
+
+  /**
+   * ⑪ 答错的词要「在后面刷词过程中再出现」= 隔 RELEARN_GAP 张重新插回同一轮队列。
+   * queue 与 results 必须同步 splice —— 只插一个会让下标错位，作答结果串到别的词上。
+   */
+  check(/const RELEARN_GAP = 4;/.test(qc) && /const MAX_RELEARN = 2;/.test(qc), '重刷参数（间隔 / 上限）');
+  check(/const scheduleRelearn = useCallback\(\(word: string\)/.test(qc), '有重刷排期函数');
+  check(/const at = Math\.min\(q\.length, idx \+ 1 \+ RELEARN_GAP\);/.test(qc), '插回位置 = 当前 +1 + 间隔');
+  check(/next\.splice\(at, 0, entry\)[\s\S]{0,200}resNext\.splice\(at, 0, null\)/.test(qc), 'queue 与 results 同步插入（下标不错位）');
+  check(/if \(\(relearnCounts\[key\] \?\? 0\) < MAX_RELEARN\)/.test(qc), '同一个词一轮最多重排 MAX_RELEARN 次');
+  check(/这个词稍后会再出现一次/.test(qc), '重排有提示文案');
+
+  // ⑫ 同一个词不重复计入/列出（重刷后统计与词表都要按词去重）
+  check(/const uniqueResults = useMemo/.test(qc), '结果按词去重（取最后一次作答）');
+  check(/const uniqueTotal = useMemo\(\(\) => new Set\(queue\.map\(\(w\) => w\.word\)\)\.size/.test(qc), '分母用不同单词数');
+  check(/const firstSeen = new Map<string, number>\(\)/.test(qc), '完成页词表按首次出现顺序去重');
+  check(/answeredCount\}\/\{uniqueTotal\}/.test(qc), '进度显示 已答/不同单词数（重刷不倒退）');
+
+  // ⑬ 留档去重：同一份词表只留一条
+  check(/export function listSignature/.test(hist2), '词表指纹函数');
+  check(/const rest = read\(\)\.filter\(\(r\) => !\(r\.level === entry\.level && listSignature\(r\.words\) === sig\)\)/.test(hist2),
+    '同一词书 + 同词表 → 替换旧条目而不是新增（列表不重复）');
 }
 
 console.log('');console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);

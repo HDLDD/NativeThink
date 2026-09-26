@@ -2,6 +2,10 @@
 
 
 
+
+## 2026-09-26
+- docs+brand: 交接手册(PROJECT-HANDOVER)接入 AGENTS/README 索引；品牌视觉资产重建(图标/启动图/favicon/icon.ico via gen-app-brand.ps1) (`3444e6e`)
+
 ## 2026-09-23
 - fix(apk,vocab): 顶部被状态栏遮住(缺 viewport-fit=cover → env(safe-area) 恒 0)、评分后自动跳下一张(修 viewingPast 定义把自动跳转挡掉)、词库 5909 处 U+FFFD 乱码清理；图标 emoji→lucide (`40aa80e`)
 

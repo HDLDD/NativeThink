@@ -1,13 +1,16 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
-import { Search, Lightbulb, Target, CheckCircle2, RotateCw, Sparkles, Volume2, BookOpen, ArrowRight, ArrowLeft, XCircle, Edit3, Shuffle, Headphones, Link2, PenLine, ChevronDown } from 'lucide-react';
+import { Search, Lightbulb, Target, CheckCircle2, RotateCw, Sparkles, Volume2, BookOpen, ArrowRight, ArrowLeft, XCircle, Edit3, Shuffle, Headphones, Link2, PenLine, ChevronDown, ChevronLeft, Eye, Flame } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import type { IWordEntry } from '@/data/wordbank/schema';
-import { findWord, getRandomWords, queryWords } from '@/data/wordbank';
+import { findWord, getRandomWords, queryWords, preloadDetail, isDetailReady } from '@/data/wordbank';
+import { useFavorites } from '@/lib/use-favorites';
+import { mergeCollocAiCache, persistCollocAiCache, readCollocAiCache } from '@/lib/colloc-ai-cache';
+import { WordInfoDialog } from './QuickCardMode';
 import { useWordLearning } from '@/lib/use-word-learning';
 import { useTTS } from '@/lib/use-tts';
 import { useImmersive } from '@/lib/focus-mode';
@@ -18,10 +21,17 @@ import { translateWithLocalMt, isLocalMtReady } from '@/lib/local-mt';
 import { useAI } from '@/hooks/use-ai';
 import { FitWord } from '@/components/FitWord';
 import { safeStorage } from '@/lib/safe-storage';
-import { cn } from '@/lib/utils';
+import { cn, cleanText } from '@/lib/utils';
 import { toast } from 'sonner';
 
 type ReviewMode = 'flashcard' | 'choice' | 'spelling' | 'listening' | 'matching' | 'fillblank';
+
+/** 答错的词隔几张再出现（与复习检测 / 快速闪卡同参：vocab-session.ts） */
+const RELEARN_GAP = 4;
+/** 同一个词在一轮里最多重排几次 */
+const MAX_RELEARN = 2;
+/** 自动发音的持久化键 —— 与复习检测/快速闪卡共用：一处关闭，处处安静 */
+const AUTO_SPEAK_KEY = '__nativethink_vocab_autospeak';
 
 // Level color map
 const LEVEL_COLORS: Record<string, { accent: string; bg: string; border: string; light: string; gradient: string; label: string }> = {
@@ -60,6 +70,9 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   const [setupOpen, setSetupOpen] = useState(false); // 学习设置默认折叠
 
   // ── 本书进度：当前词书已学/总数（词库为静态数据，可安全 memo；展示于概览 Hero 底部） ──
+  // 评分只改 progress 的值（ease/interval），只有"学到新词/重置"才增删键 ——
+  // 用键数做 memo 失效依据，避免每张卡都对 'all' 档 7.5 万词全量扫一遍
+  const progressKeyCount = Object.keys(state.progress).length;
   const bookProgress = useMemo(() => {
     const words = queryWords({ level: level === 'all' ? undefined : level });
     const total = words.length;
@@ -67,7 +80,8 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     let learned = 0;
     for (const w of words) if (state.progress[w.word.toLowerCase()]) learned++;
     return { total, learned };
-  }, [level, state.progress]);
+  // 依赖键数而非 progress 对象本身：值变化（ease/interval）不影响已学计数，闭包读到旧对象也无妨
+  }, [level, progressKeyCount]);
 
   const [sessionWords, setSessionWords] = useState<IWordEntry[]>([]);
   const [levelToast, setLevelToast] = useState<string | null>(null);
@@ -96,10 +110,9 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   const [rated, setRated] = useState(false);
 
   // 闪卡背面的搭配短语：中文翻译复用搭配学习页的静态表 + 同一份 AI 缓存
-  const COLLOC_AI_CACHE_KEY = '__nativethink_colloc_ai_tranlations';
-  const [collocCache, setCollocCache] = useState<Record<string, string>>(() => {
-    try { const raw = safeStorage.getItem(COLLOC_AI_CACHE_KEY); return raw ? JSON.parse(raw) : {}; } catch { return {}; }
-  });
+  // （键名/迁移/上限统一在 colloc-ai-cache.ts —— 曾用键有拼写错误，首次读取自动迁移）
+  const [collocCache, setCollocCache] = useState<Record<string, string>>(() => readCollocAiCache());
+  useEffect(() => { persistCollocAiCache(collocCache); }, [collocCache]);
   const [collocTranslating, setCollocTranslating] = useState<string | null>(null);
   const collocZh = (phrase: string): string | null =>
     STATIC_COLLOC_TRANSLATIONS[phrase.toLowerCase()] || collocCache[phrase.toLowerCase()] || null;
@@ -152,11 +165,8 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     }
 
     if (Object.keys(got).length > 0) {
-      setCollocCache((prev) => {
-        const next = { ...prev, ...got };
-        try { safeStorage.setItem(COLLOC_AI_CACHE_KEY, JSON.stringify(next)); } catch { /* quota */ }
-        return next;
-      });
+      // 合并 + 封顶是纯函数；落盘由上面的 persist effect 统一做
+      setCollocCache((prev) => mergeCollocAiCache(prev, got));
     } else {
       toast.error('搭配翻译失败，请稍后重试');
     }
@@ -189,8 +199,12 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   const [matchShuffledWords, setMatchShuffledWords] = useState<string[]>([]);
   const [matchShuffledMeanings, setMatchShuffledMeanings] = useState<string[]>([]);
   const [selectedMatchWord, setSelectedMatchWord] = useState<string | null>(null);
+  const [selectedMatchMeaning, setSelectedMatchMeaning] = useState<string | null>(null);
   const [matchedWordSet, setMatchedWordSet] = useState<Set<string>>(new Set());
   const [matchFlashError, setMatchFlashError] = useState<string | null>(null);
+  // 本轮配对的错配次数与参与的词条 —— 决定完成时的 SM-2 质量与"配错的词"的重排
+  const [matchErrorCount, setMatchErrorCount] = useState(0);
+  const [matchPairEntries, setMatchPairEntries] = useState<IWordEntry[]>([]);
 
   // Fill-blank mode state
   const [fillblankInput, setFillblankInput] = useState('');
@@ -198,12 +212,102 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   const [fillblankCorrect, setFillblankCorrect] = useState(false);
   const [fillblankHint, setFillblankHint] = useState(false);
 
+  // ── 跨模式一致的会话体验 ──
+  /** 自动发音（默认开，只有显式关过才关 —— 与复习检测/快速闪卡共用同一个键） */
+  const [autoSpeak, setAutoSpeak] = useState(() => {
+    try { return safeStorage.getItem(AUTO_SPEAK_KEY) !== '0'; } catch { return true; }
+  });
+  const toggleAutoSpeak = () => {
+    // 持久化/提示必须放在更新函数**外** —— StrictMode 下更新函数会被调用两次，会双弹提示
+    const next = !autoSpeak;
+    setAutoSpeak(next);
+    try { safeStorage.setItem(AUTO_SPEAK_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+    toast(next ? '已开启自动发音' : '已关闭自动发音', { duration: 1200 });
+  };
+  /** 连击：连续答对（quality>=3）计数，答错清零 —— 与复习检测同款即时正反馈 */
+  const [combo, setCombo] = useState(0);
+  /** 答错重排：每个词本轮已重排次数（隔 RELEARN_GAP 张再出现，最多 MAX_RELEARN 次） */
+  const [relearnCounts, setRelearnCounts] = useState<Record<string, number>>({});
+  /** 词条详情弹窗（顶部「上一个单词」点开）—— 复用快速闪卡的 WordInfoDialog */
+  const [detailWord, setDetailWord] = useState<IWordEntry | null>(null);
+  /** detail（例句/搭配）懒加载完成后 +1，强制重渲染把例句画出来 */
+  const [detailTick, setDetailTick] = useState(0);
+  /** 闪卡「本次刚评分」的词 —— 驱动评分后自动进入下一张（答对 550ms / 答错 900ms） */
+  const [ratedNow, setRatedNow] = useState<string | null>(null);
+  const lastQualityRef = useRef(4);
+
   const allWordsForLevel = useMemo(() => {
     return queryWords({ level: level === 'all' ? undefined : level });
   }, [level]);
 
-  // Ref to track if TTS should auto-play on listening mode
-  const ttsPlayedRef = useRef(false);
+  /** 按词性分桶（每级只算一次）—— 选择题干扰项"同词性优先"不再每张卡全池 filter 一遍 */
+  const posPoolByPos = useMemo(() => {
+    const byPos = new Map<string, IWordEntry[]>();
+    for (const w of allWordsForLevel) {
+      const arr = byPos.get(w.partOfSpeech);
+      if (arr) arr.push(w);
+      else byPos.set(w.partOfSpeech, [w]);
+    }
+    return byPos;
+  }, [allWordsForLevel]);
+
+  // ===== 自动朗读 =====
+  // 用 ref 存 tts，避免 tts 对象变化导致 effect 反复触发、中断朗读
+  const ttsRef = useRef(tts);
+  ttsRef.current = tts;
+  /**
+   * 已经自动朗读过的 `${模式}-${下标}-${面}`。
+   * **每开一轮必须清空**（见 startSession / exitSession）—— ref 不随组件重挂载归零，
+   * 而每轮都从下标 0 开始，不清空则第二轮起第一张卡命中旧 key 被静默跳过：
+   * 用户看到的现象就是"新会话第一张卡不读单词"（复习检测/快速闪卡踩过同一个坑）。
+   */
+  const lastSpokenKey = useRef('');
+
+  // 闪卡：正面读单词（预热下一张），背面「单词+例句」一次读完（与复习检测听感一致）
+  useEffect(() => {
+    if (!autoSpeak || reviewMode !== 'flashcard') return;
+    const word = sessionWords[currentIdx];
+    if (!word) return;
+    const side = isFlipped ? 'back' : 'front';
+    const key = `fc-${currentIdx}-${side}`;
+    if (lastSpokenKey.current === key) return;
+    lastSpokenKey.current = key;
+    if (!isFlipped) {
+      ttsRef.current.speak(word.word, { rate: 0.85 });
+      const next = sessionWords[currentIdx + 1];
+      if (next) ttsRef.current.prewarm(next.word, { rate: 0.85 });
+    } else if (word.examples[0]) {
+      // 先读单词再读例句，拼成一次 speak —— 两次 speak 会互相掐断（复习检测同款修法）
+      const timer = setTimeout(() => {
+        ttsRef.current.speak(`${word.word}. ${cleanText(word.examples[0].en)}`, { rate: 0.85 });
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [autoSpeak, reviewMode, currentIdx, isFlipped, sessionWords]);
+
+  // 选择/配对：读题面单词（看词选义、听词配对都需要发音）
+  useEffect(() => {
+    if (!autoSpeak || (reviewMode !== 'choice' && reviewMode !== 'matching')) return;
+    const word = sessionWords[currentIdx];
+    if (!word) return;
+    const key = `${reviewMode}-${currentIdx}-${word.word}`;
+    if (lastSpokenKey.current === key) return;
+    lastSpokenKey.current = key;
+    const timer = setTimeout(() => ttsRef.current.speak(word.word, { rate: 0.85 }), 400);
+    return () => clearTimeout(timer);
+  }, [autoSpeak, reviewMode, currentIdx, sessionWords]);
+
+  // 听写：只读单词（这就是题目）；拼写/填空**绝不自动读** —— 那等于把答案念出来
+  useEffect(() => {
+    if (!autoSpeak || reviewMode !== 'listening') return;
+    const word = sessionWords[currentIdx];
+    if (!word || listeningChecked) return;
+    const key = `listening-${currentIdx}-${word.word}`;
+    if (lastSpokenKey.current === key) return;
+    lastSpokenKey.current = key;
+    const timer = setTimeout(() => ttsRef.current.speak(word.word, { rate: 0.85 }), 500);
+    return () => clearTimeout(timer);
+  }, [autoSpeak, reviewMode, currentIdx, sessionWords, listeningChecked]);
 
   // Reset session when level changes
   const resetAllState = () => {
@@ -211,79 +315,35 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setCurrentIdx(0);
     setFlipped(false);
     setRated(false);
+    setRatedNow(null);
     setChoiceSelected(null);
     setChoiceCorrect(null);
     setSpellingInput('');
     setSpellingChecked(false);
+    setSpellingHint(false);
     setListeningInput('');
     setListeningChecked(false);
     setListeningCorrect(false);
-    ttsPlayedRef.current = false;
+    setListeningHint(false);
     setSelectedMatchWord(null);
+    setSelectedMatchMeaning(null);
     setMatchedWordSet(new Set());
     setMatchFlashError(null);
+    setMatchErrorCount(0);
+    setMatchPairEntries([]);
     setFillblankInput('');
     setFillblankChecked(false);
     setFillblankCorrect(false);
+    setFillblankHint(false);
+    setRelearnCounts({});
+    setCombo(0);
+    setRatedNow(null);
+    setDetailWord(null);
+    lastSpokenKey.current = '';
   };
 
   useEffect(() => { resetAllState(); }, [level]);
   useEffect(() => { resetAllState(); }, [reviewMode]);
-
-  // ===== 自动朗读效果 =====
-  // 用 ref 存 tts，避免 tts 对象变化导致 effect 反复触发、中断朗读
-  const ttsRef = useRef(tts);
-  ttsRef.current = tts;
-  // 记录上一次朗读的内容 key，防止同一内容重复朗读导致中断
-  const lastSpokenKey = useRef('');
-
-  // 闪卡模式：切换界面就停止上一次，读当前界面内容（正面读单词，反面读例句）
-  useEffect(() => {
-    if (reviewMode !== 'flashcard') return;
-    const word = sessionWords[currentIdx];
-    if (!word) return;
-
-    const side = isFlipped ? 'back' : 'front';
-    const key = `${currentIdx}-${side}`;
-    if (lastSpokenKey.current === key) return; // 同一内容不再重复朗读
-    lastSpokenKey.current = key;
-
-    if (!isFlipped) {
-      // 正面：朗读单词 + 预加载下一个单词的音频
-      ttsRef.current.speak(word.word, { rate: 0.85 });
-      const next = sessionWords[currentIdx + 1];
-      if (next) ttsRef.current.prewarm(next.word, { rate: 0.85 });
-    } else if (word.examples[0]) {
-      // 反面：朗读例句（等翻面动画完成）
-      const timer = setTimeout(() => {
-        ttsRef.current.speak(word.examples[0].en, { rate: 0.85 });
-      }, 400);
-      return () => clearTimeout(timer);
-    }
-  }, [reviewMode, currentIdx, isFlipped, sessionWords]);
-
-  // 选择/拼写/配对/填空模式：切换单词时朗读
-  useEffect(() => {
-    if (reviewMode === 'flashcard' || reviewMode === 'listening') return;
-    const word = sessionWords[currentIdx];
-    if (!word) return;
-    // 延迟等卡片动画
-    const timer = setTimeout(() => {
-      ttsRef.current.speak(word.word, { rate: 0.85 });
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [reviewMode, currentIdx, sessionWords]);
-
-  // 听写模式：只在换单词时朗读一次，拼写过程中不中断
-  useEffect(() => {
-    if (reviewMode !== 'listening') return;
-    const word = sessionWords[currentIdx];
-    if (!word || listeningChecked) return;
-    const timer = setTimeout(() => {
-      ttsRef.current.speak(word.word, { rate: 0.85 });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [reviewMode, currentIdx, sessionWords, listeningChecked]);
 
   // Start a new learning session
   const startSession = () => {
@@ -297,31 +357,49 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     const all = [...reviewWords, ...newOnes];
     if (all.length === 0) {
       setSessionWords([]);
+      // 不许静默空转：明确告诉用户为什么没开始、出口在哪
+      if (dueForReview.length === 0 && todayRemaining <= 0) {
+        setSetupOpen(true);
+        toast.info('今日目标已完成 — 想继续学可在学习设置里调大每日学习量', { duration: 3500 });
+      } else {
+        toast.info('暂时没有可学的单词，请稍后再试', { duration: 2500 });
+      }
       return;
     }
     setSessionWords(all);
     sessionStatsRef.current = { review: reviewWords.length, fresh: newOnes.length, startedAt: Date.now() };
-    // 会话预热：预合成前 3 个词，首词朗读零等待
+    // 会话预热：预合成前 5 个词，首词朗读零等待
     all.slice(0, 5).forEach((w, i) => {
       setTimeout(() => ttsRef.current.prewarm(w.word, { rate: 0.85 }), 120 * i);
     });
     setCurrentIdx(0);
     setFlipped(false);
     setRated(false);
+    setRatedNow(null);
     setChoiceSelected(null);
     setChoiceCorrect(null);
     setSpellingInput('');
     setSpellingChecked(false);
+    setSpellingHint(false);
     setListeningInput('');
     setListeningChecked(false);
+    setListeningHint(false);
     setListeningCorrect(false);
-    ttsPlayedRef.current = false;
     setSelectedMatchWord(null);
+    setSelectedMatchMeaning(null);
     setMatchedWordSet(new Set());
     setMatchFlashError(null);
+    setMatchErrorCount(0);
+    setMatchPairEntries([]);
     setFillblankInput('');
     setFillblankChecked(false);
+    setFillblankHint(false);
     setFillblankCorrect(false);
+    setRelearnCounts({});
+    setCombo(0);
+    setRatedNow(null);
+    setDetailWord(null);
+    lastSpokenKey.current = '';  // 新一轮必须忘掉上一轮的朗读记录，否则第一张卡不出声
     // Pre-generate options for choice / matching modes
     if (reviewMode === 'choice') {
       generateChoiceOptions(all[0]);
@@ -332,12 +410,88 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   };
 
   const currentWord = sessionWords[currentIdx];
+  /** 上一个单词（顶部常驻、点开看词条详情）—— 与快速闪卡同款 */
+  const prevWord = currentIdx > 0 ? sessionWords[currentIdx - 1] : undefined;
+
+  // ── 收藏（type='word'，与收藏页同源）—— 词条详情弹窗里用 ──
+  const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
+  const isFav = useCallback((word: string) => isFavorited(word, 'word'), [isFavorited]);
+  const toggleFav = (w: IWordEntry) => {
+    const existing = favorites.find((f) => f.type === 'word' && f.content === w.word);
+    if (existing) {
+      removeFavorite(existing.id);
+      toast.info(`已取消收藏「${w.word}」`, { duration: 1500 });
+    } else {
+      addFavorite({
+        type: 'word',
+        content: w.word,
+        meaning: w.meaning,
+        example: w.examples[0]?.en,
+        category: `每日学习 · ${level === 'all' ? '全部词库' : level}`,
+      });
+      toast.success(`已收藏「${w.word}」`, { duration: 1500 });
+    }
+  };
+
+  /**
+   * 弹窗里的词条：detail（例句/搭配/深度解释）是**懒加载并按原对象就地补齐**的，
+   * 所以到位后重新 findWord 就能拿到完整内容（与快速闪卡同款）。
+   */
+  const detailShown = useMemo(
+    () => (detailWord ? (findWord(detailWord.word) ?? detailWord) : null),
+    [detailWord, detailTick],
+  );
+
+  useEffect(() => {
+    if (!detailShown) return;
+    if (detailShown.examples.length > 0) return;
+    if (isDetailReady(detailShown.level)) return;   // 已就绪且确实没有例句 → 不再重试（否则 tick 死循环）
+    let alive = true;
+    preloadDetail([detailShown.level])
+      .then(() => { if (alive) setDetailTick((t) => t + 1); })
+      .catch(() => { /* 降级：只显示核心字段 */ });
+    return () => { alive = false; };
+  }, [detailShown, detailTick]);
+
+  /** 词条详情弹窗抽成节点复用（进行中/完成庆祝页都能挂） */
+  const detailDialog = (
+    <WordInfoDialog
+      entry={detailShown}
+      onClose={() => setDetailWord(null)}
+      onSpeak={(t) => { try { tts.speak(cleanText(t), { rate: 0.9 }); } catch { /* ignore */ } }}
+      fav={!!detailShown && isFav(detailShown.word)}
+      onToggleFav={() => { if (detailShown) toggleFav(detailShown); }}
+    />
+  );
+
+  /**
+   * 从池中随机抽 n 个：释义互不重复、排除指定词。
+   * 用随机下标抽样而不是全池 sort —— 'all' 档位词库 7 万+，每张卡排一次会明显掉帧。
+   */
+  const sampleFrom = (pool: IWordEntry[], n: number, excludeWords: Set<string>, excludeMeanings: Set<string>): IWordEntry[] => {
+    const picked: IWordEntry[] = [];
+    let guard = 0;
+    while (picked.length < n && guard < 500) {
+      guard++;
+      const w = pool[Math.floor(Math.random() * pool.length)];
+      if (!w || excludeWords.has(w.word) || excludeMeanings.has(w.meaning)) continue;
+      excludeWords.add(w.word);
+      excludeMeanings.add(w.meaning);
+      picked.push(w);
+    }
+    return picked;
+  };
 
   // Generate 4 options for choice mode
   const generateChoiceOptions = (word: IWordEntry) => {
-    const others = allWordsForLevel.filter((w) => w.word !== word.word);
-    const shuffled = [...others].sort(() => Math.random() - 0.5);
-    const wrongs = shuffled.slice(0, 3);
+    // 干扰项优先同词性（更迷惑、更公平），且释义不得与正确项重复 ——
+    // 否则会出现两个"正确"的选项，用户选哪个都算对/都算错
+    const excludeWords = new Set([word.word]);
+    const excludeMeanings = new Set([word.meaning]);
+    const posPool = posPoolByPos.get(word.partOfSpeech) ?? [];
+    const base = posPool.length >= 10 ? posPool : allWordsForLevel;
+    let wrongs = sampleFrom(base, 3, excludeWords, excludeMeanings);
+    if (wrongs.length < 3) wrongs = sampleFrom(allWordsForLevel, 3, excludeWords, excludeMeanings);
     const opts = [word, ...wrongs].sort(() => Math.random() - 0.5);
     setChoiceOptions(opts);
     setChoiceSelected(null);
@@ -346,16 +500,21 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
 
   // Generate matching pairs
   const generateMatchPairs = (word: IWordEntry, pool: IWordEntry[]) => {
-    const others = pool.filter((w) => w.word !== word.word);
-    const shuffledOthers = [...others].sort(() => Math.random() - 0.5);
-    const selected = [word, ...shuffledOthers.slice(0, 3)];
+    // 4 个词的释义必须互不相同，否则配对存在多解
+    const excludeWords = new Set([word.word]);
+    const excludeMeanings = new Set([word.meaning]);
+    const others = sampleFrom(pool, 3, excludeWords, excludeMeanings);
+    const selected = [word, ...others];
+    setMatchPairEntries(selected);
     const pairs = selected.map((w) => ({ word: w.word, meaning: w.meaning }));
     setMatchPairs(pairs);
     setMatchShuffledWords(pairs.map((p) => p.word).sort(() => Math.random() - 0.5));
     setMatchShuffledMeanings(pairs.map((p) => p.meaning).sort(() => Math.random() - 0.5));
     setSelectedMatchWord(null);
+    setSelectedMatchMeaning(null);
     setMatchedWordSet(new Set());
     setMatchFlashError(null);
+    setMatchErrorCount(0);
   };
 
   // Get fill-blank sentence (replace word with ______)
@@ -375,9 +534,38 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     return { sentence: `______ (${word.meaning})`, zh: '' };
   };
 
+  /** 答错的词隔 RELEARN_GAP 张重新插回本轮队列（与复习检测/快速闪卡的即时巩固同参） */
+  const scheduleRelearnWord = (word: IWordEntry) => {
+    const key = word.word.toLowerCase();
+    if ((relearnCounts[key] ?? 0) >= MAX_RELEARN) return;
+    setRelearnCounts((c) => ({ ...c, [key]: (c[key] ?? 0) + 1 }));
+    setSessionWords((prev) => {
+      const at = Math.min(prev.length, currentIdx + 1 + RELEARN_GAP);
+      const next = [...prev];
+      next.splice(at, 0, word);
+      return next;
+    });
+    toast.info('答错的词稍后会再出现一次', { duration: 1200 });
+  };
+
+  /** 连击：连续答对累加，答错清零。每 10 连给一次反馈（toast 不能放进 setState 更新函数 —— StrictMode 会双弹） */
+  const bumpCombo = (quality: number) => {
+    if (quality >= 3) {
+      const n = combo + 1;
+      setCombo(n);
+      if (n % 10 === 0) toast.success(`连对 ${n} 个！状态很好`, { duration: 1500 });
+    } else {
+      setCombo(0);
+    }
+  };
+
   const handleRate = (q: number) => {
     if (!currentWord || rated) return;
     recordReview(currentWord, q);
+    lastQualityRef.current = q;
+    bumpCombo(q);
+    if (q <= 2) scheduleRelearnWord(currentWord);
+    setRatedNow(currentWord.word.toLowerCase());
     setRated(true);
   };
 
@@ -386,8 +574,12 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setChoiceSelected(word);
     const correct = word === currentWord.word;
     setChoiceCorrect(correct);
+    const q = correct ? 5 : 2;
     if (correct) sfxCorrect(); else sfxWrong();
-    recordReview(currentWord, correct ? 5 : 2);
+    recordReview(currentWord, q);
+    lastQualityRef.current = q;
+    bumpCombo(q);
+    if (!correct) scheduleRelearnWord(currentWord);
     setRated(true);
   };
 
@@ -396,8 +588,12 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setSpellingChecked(true);
     const correct = spellingInput.trim().toLowerCase() === currentWord.word.toLowerCase();
     setSpellingCorrect(correct);
+    const q = correct ? 5 : 2;
     if (correct) sfxCorrect(); else sfxWrong();
-    recordReview(currentWord, correct ? 5 : 2);
+    recordReview(currentWord, q);
+    lastQualityRef.current = q;
+    bumpCombo(q);
+    if (!correct) scheduleRelearnWord(currentWord);
     setRated(true);
   };
 
@@ -406,59 +602,77 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setListeningChecked(true);
     const correct = listeningInput.trim().toLowerCase() === currentWord.word.toLowerCase();
     setListeningCorrect(correct);
+    const q = correct ? 5 : 2;
     if (correct) sfxCorrect(); else sfxWrong();
-    recordReview(currentWord, correct ? 5 : 2);
+    recordReview(currentWord, q);
+    lastQualityRef.current = q;
+    bumpCombo(q);
+    if (!correct) scheduleRelearnWord(currentWord);
     setRated(true);
   };
 
 
+  /** 配对：单词/释义两侧都能先点（先点释义再点单词同样成立） */
+  const judgeMatch = (word: string, meaning: string) => {
+    const pair = matchPairs.find((p) => p.meaning === meaning);
+    if (pair && pair.word === word) {
+      sfxTick();
+      const newMatched = new Set(matchedWordSet);
+      newMatched.add(word);
+      setMatchedWordSet(newMatched);
+    } else {
+      sfxWrong();
+      setMatchErrorCount((c) => c + 1);
+      setMatchFlashError(meaning);
+      setTimeout(() => setMatchFlashError(null), 600);
+    }
+    setSelectedMatchWord(null);
+    setSelectedMatchMeaning(null);
+  };
+
   const handleMatchSelectWord = (word: string) => {
     if (matchedWordSet.has(word)) return; // already matched
     setMatchFlashError(null);
-    setSelectedMatchWord(word);
+    if (selectedMatchMeaning) { judgeMatch(word, selectedMatchMeaning); return; }
+    setSelectedMatchWord(word === selectedMatchWord ? null : word);
   };
 
   const handleMatchSelectMeaning = (meaning: string) => {
-    if (!selectedMatchWord) return;
-    // Find which word this meaning belongs to
     const pair = matchPairs.find((p) => p.meaning === meaning);
-    if (!pair) return;
-
-    if (pair.word === selectedMatchWord) {
-      // Correct match!
-      sfxTick();
-      const newMatched = new Set(matchedWordSet);
-      newMatched.add(selectedMatchWord);
-      setMatchedWordSet(newMatched);
-      setSelectedMatchWord(null);
-      setMatchFlashError(null);
-    } else {
-      // Wrong match — flash error
-      sfxWrong();
-      setMatchFlashError(meaning);
-      setTimeout(() => setMatchFlashError(null), 600);
-      setSelectedMatchWord(null);
-    }
+    if (!pair || matchedWordSet.has(pair.word)) return;
+    if (selectedMatchWord) { judgeMatch(selectedMatchWord, meaning); return; }
+    setSelectedMatchMeaning(meaning === selectedMatchMeaning ? null : meaning);
   };
 
   // Check if all matching pairs are matched
   const allMatched = matchPairs.length > 0 && matchedWordSet.size >= matchPairs.length;
 
   useEffect(() => {
-    if (allMatched && !rated) {
-      sfxCorrect();
-      recordReview(currentWord, 5);
-      setRated(true);
+    if (!allMatched || rated || !currentWord) return;
+    sfxCorrect();
+    // 配错过就别给满分：0 错=5，1-2 错=3，更多=1 —— 否则乱点也能全对，SM-2 会把没记住的词排得太远
+    const q = matchErrorCount === 0 ? 5 : matchErrorCount <= 2 ? 3 : 1;
+    lastQualityRef.current = q;
+    // 一轮配对实际练到的是全部 4 个词（不只是"当前词"）—— 都记进度
+    for (const entry of matchPairEntries) {
+      recordReview(entry, q);
+      if (q <= 2 && entry.word === currentWord.word) scheduleRelearnWord(entry);
     }
-  }, [allMatched, rated, currentWord, recordReview]);
+    bumpCombo(q);
+    setRated(true);
+  }, [allMatched, rated, currentWord, matchPairEntries, matchErrorCount, recordReview]);
 
   const handleFillBlankCheck = () => {
     if (fillblankChecked) return;
     setFillblankChecked(true);
     const correct = fillblankInput.trim().toLowerCase() === currentWord.word.toLowerCase();
     setFillblankCorrect(correct);
+    const q = correct ? 5 : 2;
     if (correct) sfxCorrect(); else sfxWrong();
-    recordReview(currentWord, correct ? 5 : 2);
+    recordReview(currentWord, q);
+    lastQualityRef.current = q;
+    bumpCombo(q);
+    if (!correct) scheduleRelearnWord(currentWord);
     setRated(true);
   };
 
@@ -470,6 +684,9 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setSpellingHint(true);
     sfxWrong();
     recordReview(currentWord, 1); // quality 1 = forgot
+    lastQualityRef.current = 1;
+    bumpCombo(1);
+    scheduleRelearnWord(currentWord);
     setRated(true);
   };
   const handleListeningSkip = () => {
@@ -479,6 +696,9 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setListeningHint(true);
     sfxWrong();
     recordReview(currentWord, 1);
+    lastQualityRef.current = 1;
+    bumpCombo(1);
+    scheduleRelearnWord(currentWord);
     setRated(true);
   };
   const handleFillBlankSkip = () => {
@@ -488,6 +708,9 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setFillblankHint(true);
     sfxWrong();
     recordReview(currentWord, 1);
+    lastQualityRef.current = 1;
+    bumpCombo(1);
+    scheduleRelearnWord(currentWord);
     setRated(true);
   };
 
@@ -506,10 +729,12 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       setListeningInput('');
       setListeningChecked(false);
       setListeningCorrect(false);
-      ttsPlayedRef.current = false;
       setSelectedMatchWord(null);
+      setSelectedMatchMeaning(null);
       setMatchedWordSet(new Set());
       setMatchFlashError(null);
+      setMatchErrorCount(0);
+      setMatchPairEntries([]);
       setFillblankInput('');
       setFillblankChecked(false);
       setSpellingHint(false);
@@ -527,6 +752,36 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       setSessionDone(true);
     }
   };
+
+  /** handleNext 的 ref 镜像：自动跳页 effect 用它，避免回调每次重建导致定时器反复重置 */
+  const handleNextRef = useRef(handleNext);
+  handleNextRef.current = handleNext;
+
+  // 换卡时清掉"刚评分"标记。只依赖 currentIdx —— 答错重排会改 sessionWords，
+  // 不能让它顺带清标记（否则答错的自动跳页会被取消）
+  useEffect(() => { setRatedNow(null); }, [currentIdx]);
+
+  // 闪卡：评分后自动进入下一张（答对 550ms / 答错 900ms —— 与复习检测节奏一致）
+  useEffect(() => {
+    if (reviewMode !== 'flashcard' || sessionDone || !ratedNow) return;
+    const delay = lastQualityRef.current >= 3 ? 550 : 900;
+    const t = setTimeout(() => handleNextRef.current(), delay);
+    return () => clearTimeout(t);
+  }, [reviewMode, ratedNow, sessionDone]);
+
+  // 其余方式：答对自动进入下一张（即时正反馈，不让人多点一下）；答错停在看反馈，手动「下一个」
+  useEffect(() => {
+    if (reviewMode === 'flashcard' || sessionDone) return;
+    const correctNow =
+      (reviewMode === 'choice' && !!choiceSelected && choiceCorrect === true) ||
+      (reviewMode === 'spelling' && spellingChecked && spellingCorrect) ||
+      (reviewMode === 'listening' && listeningChecked && listeningCorrect) ||
+      (reviewMode === 'fillblank' && fillblankChecked && fillblankCorrect) ||
+      (reviewMode === 'matching' && allMatched && rated);
+    if (!correctNow) return;
+    const t = setTimeout(() => handleNextRef.current(), 900);
+    return () => clearTimeout(t);
+  }, [reviewMode, sessionDone, choiceSelected, choiceCorrect, spellingChecked, spellingCorrect, listeningChecked, listeningCorrect, fillblankChecked, fillblankCorrect, allMatched, rated]);
 
   const learnedToday = state.todayLearned.length;
   const reviewedToday = state.todayReviewed.length;
@@ -564,16 +819,23 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setCurrentIdx(0);
     setFlipped(false);
     setSessionDone(false);
+    setRatedNow(null);
+    setCombo(0);
+    setDetailWord(null);   // 不清的话下次开会话会立刻弹出上一轮残留的详情弹窗
+    lastSpokenKey.current = '';  // 下一轮的第一张卡要正常出声
   };
 
-  // 专注模式下 ESC 直接退出会话
+  // 专注模式下 ESC 直接退出会话。
+  // 必须**捕获阶段**监听：词条详情弹窗（Radix）在 document 冒泡阶段同步 flush 关闭，
+  // 等冒泡到 window 时弹窗已从 DOM 移除，守卫永远看不到它 ——
+  // 表现就是"按 Esc 关弹窗，会话也被一起退出"（AGENTS.md 坑表同款，快速闪卡同修法）。
   useEffect(() => {
     if (!inSession) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) exitSession();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [inSession]);
 
   // 本轮完成 → 播放完成提示音
@@ -587,6 +849,8 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      // 词条详情弹窗打开时不抢键盘 —— 否则空格/1-5 会在弹窗后面偷偷翻卡、评分
+      if (document.querySelector('[role="dialog"]')) return;
       if (e.code === 'Space') {
         e.preventDefault();
         if (!isFlipped) setFlipped(true);
@@ -600,7 +864,32 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [inSession, sessionDone, reviewMode, isFlipped, rated, currentIdx, sessionWords]);
+    // handleRate 每次渲染重建（闭包含 relearnCounts/combo）—— 必须进依赖，否则按 1-5 时用到旧闭包
+  }, [inSession, sessionDone, reviewMode, isFlipped, rated, currentIdx, sessionWords, handleRate]);
+
+  // 键盘（非闪卡）：选择题 1-4 选选项；判完且答错时 Enter/→ 下一张（答对会自动走）
+  useEffect(() => {
+    if (!inSession || sessionDone || reviewMode === 'flashcard') return;
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      // 弹窗打开时不抢键盘（同上）
+      if (document.querySelector('[role="dialog"]')) return;
+      if (reviewMode === 'choice' && !choiceSelected && ['1', '2', '3', '4'].includes(e.key)) {
+        const opt = choiceOptions[parseInt(e.key, 10) - 1];
+        if (opt) { e.preventDefault(); handleChoiceSelect(opt.word); }
+        return;
+      }
+      const wrongPending =
+        (reviewMode === 'choice' && !!choiceSelected && choiceCorrect === false) ||
+        (reviewMode === 'spelling' && spellingChecked && !spellingCorrect) ||
+        (reviewMode === 'listening' && listeningChecked && !listeningCorrect) ||
+        (reviewMode === 'fillblank' && fillblankChecked && !fillblankCorrect);
+      if (wrongPending && (e.key === 'Enter' || e.key === 'ArrowRight')) { e.preventDefault(); handleNext(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [inSession, sessionDone, reviewMode, choiceSelected, choiceCorrect, choiceOptions, spellingChecked, spellingCorrect, listeningChecked, listeningCorrect, fillblankChecked, fillblankCorrect]);
 
   return (
     <div className="space-y-4">
@@ -781,9 +1070,46 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
             <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] font-black bg-muted text-muted-foreground border-0">
               {currentModeLabel}
             </Badge>
+            {combo >= 3 && (
+              <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black tabular-nums animate-pulse" title="连续答对">
+                <Flame className="size-3" />连对 {combo}
+              </span>
+            )}
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleAutoSpeak}
+            className={cn('rounded-xl size-9 shrink-0', autoSpeak ? 'text-ink-teal' : 'text-muted-foreground/50')}
+            title={`自动发音${autoSpeak ? '（已开）' : '（已关）'} —— 与复习检测/快速闪卡共用此设置`}
+          >
+            <Volume2 className="size-4.5" />
+          </Button>
         </div>
-        <AnimatePresence mode="wait">
+
+        {/*
+          上一个单词 —— 常驻顶部、**显示词面**（"刚刚那个词到底是什么"是最高频的回头需求）。
+          点它打开完整词条详情弹窗（复用快速闪卡的 WordInfoDialog，两个模式长得一样）。
+        */}
+        {prevWord && (
+          <div className="flex items-center gap-2 -mt-1">
+            <span className="shrink-0 text-[9px] font-black uppercase tracking-wider text-muted-foreground/70">
+              上一个单词
+            </span>
+            <button
+              onClick={() => setDetailWord(prevWord)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-border bg-card max-w-[62%] transition-colors hover:border-[#00B894]/40 hover:bg-[#00B894]/5 active:scale-[0.98]"
+              title={`查看「${prevWord.word}」详情`}
+            >
+              <ChevronLeft className="size-3 shrink-0 text-muted-foreground" />
+              <span className="text-[11px] font-black italic text-foreground truncate">{prevWord.word}</span>
+              <Eye className="size-3 shrink-0 text-muted-foreground" />
+            </button>
+            <span className="shrink-0 text-[9px] font-bold text-muted-foreground/50">点开看详情</span>
+          </div>
+        )}
+
+      <AnimatePresence mode="wait">
           <MotionDiv
             key={level + reviewMode}
             initial={{ opacity: 0, y: 16 }}
@@ -920,16 +1246,19 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                       <span className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-black/25 text-[8px] font-black flex items-center justify-center">{i + 1}</span>
                     </button>
                   ))}
-                  <span className="w-full text-center text-[9px] text-muted-foreground font-bold mt-1">键盘：空格 翻面 / 1-5 评分 / → 下一个</span>
+                  <span className="w-full text-center text-[9px] text-muted-foreground font-bold mt-1">键盘：空格 翻面 / 1-5 评分 · 评完自动翻页</span>
                 </div>
               )}
               {rated && (
                 <div className="flex justify-center">
-                  <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
-                    {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
-                    <ArrowRight className="size-4 ml-2" />
-                  </Button>
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-muted/60 text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+                    <RotateCw className="size-3.5 animate-spin [animation-duration:1.6s]" />
+                    即将进入下一张…
+                  </span>
                 </div>
+              )}
+              {!isFlipped && (
+                <p className="text-center text-[9px] text-muted-foreground/60 font-bold">键盘：空格 翻面 / 1-5 评分 · 评完自动翻页 · → 手动下一张</p>
               )}
             </>
           )}
@@ -981,12 +1310,21 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                 </CardContent>
               </Card>
 
-              {choiceSelected && (
+              {/* 答对自动进入下一张；答错停住让人看清正确答案（Enter/→ 也能走） */}
+              {choiceSelected && !choiceCorrect && (
                 <div className="flex justify-center">
                   <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
                     {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                     <ArrowRight className="size-4 ml-2" />
                   </Button>
+                </div>
+              )}
+              {choiceSelected && choiceCorrect && (
+                <div className="flex justify-center">
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-muted/60 text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+                    <RotateCw className="size-3.5 animate-spin [animation-duration:1.6s]" />
+                    即将进入下一张…
+                  </span>
                 </div>
               )}
             </div>
@@ -1060,10 +1398,19 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                   {spellingChecked && (
                     <div className="mt-4 space-y-2">
                       {spellingCorrect ? (
-                        <div className="flex items-center justify-center gap-2 text-emerald-500">
-                          <CheckCircle2 className="size-5" />
-                          <span className="text-sm font-black uppercase tracking-wider">正确！</span>
-                        </div>
+                        <>
+                          <div className="flex items-center justify-center gap-2 text-emerald-500">
+                            <CheckCircle2 className="size-5" />
+                            <span className="text-sm font-black uppercase tracking-wider">正确！</span>
+                          </div>
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="text-sm font-black text-foreground">{currentWord.word}</span>
+                            <span className="text-xs text-muted-foreground">· {currentWord.meaning}</span>
+                            <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.85 })} className="rounded-xl size-7 bg-muted text-muted-foreground hover:text-ink-teal">
+                              <Volume2 className="size-3.5" />
+                            </Button>
+                          </div>
+                        </>
                       ) : (
                         <div className="space-y-2">
                           <div className="flex items-center justify-center gap-2 text-rose-500">
@@ -1085,12 +1432,21 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                 </CardContent>
               </Card>
 
-              {spellingChecked && (
+              {/* 答对自动进入下一张；答错停留看答案（Enter/→ 也能走） */}
+              {spellingChecked && !spellingCorrect && (
                 <div className="flex justify-center">
                   <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
                     {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                     <ArrowRight className="size-4 ml-2" />
                   </Button>
+                </div>
+              )}
+              {spellingChecked && spellingCorrect && (
+                <div className="flex justify-center">
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-muted/60 text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+                    <RotateCw className="size-3.5 animate-spin [animation-duration:1.6s]" />
+                    即将进入下一张…
+                  </span>
                 </div>
               )}
             </div>
@@ -1165,10 +1521,19 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                   {listeningChecked && (
                     <div className="mt-4 space-y-2">
                       {listeningCorrect ? (
-                        <div className="flex items-center justify-center gap-2 text-emerald-500">
-                          <CheckCircle2 className="size-5" />
-                          <span className="text-sm font-black uppercase tracking-wider">正确！</span>
-                        </div>
+                        <>
+                          <div className="flex items-center justify-center gap-2 text-emerald-500">
+                            <CheckCircle2 className="size-5" />
+                            <span className="text-sm font-black uppercase tracking-wider">正确！</span>
+                          </div>
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="text-sm font-black text-foreground">{currentWord.word}</span>
+                            <span className="text-xs text-muted-foreground">· {currentWord.meaning}</span>
+                            <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.85 })} className="rounded-xl size-7 bg-muted text-muted-foreground hover:text-ink-teal">
+                              <Volume2 className="size-3.5" />
+                            </Button>
+                          </div>
+                        </>
                       ) : (
                         <div className="space-y-2">
                           <div className="flex items-center justify-center gap-2 text-rose-500">
@@ -1191,12 +1556,21 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                 </CardContent>
               </Card>
 
-              {listeningChecked && (
+              {/* 答对自动进入下一张；答错停留看答案（Enter/→ 也能走） */}
+              {listeningChecked && !listeningCorrect && (
                 <div className="flex justify-center">
                   <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
                     {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                     <ArrowRight className="size-4 ml-2" />
                   </Button>
+                </div>
+              )}
+              {listeningChecked && listeningCorrect && (
+                <div className="flex justify-center">
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-muted/60 text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+                    <RotateCw className="size-3.5 animate-spin [animation-duration:1.6s]" />
+                    即将进入下一张…
+                  </span>
                 </div>
               )}
             </div>
@@ -1211,7 +1585,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                     {state.progress[currentWord.word.toLowerCase()] ? '复习' : '新学'}
                   </Badge>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-6 text-center">
-                    点击单词，再点击对应释义进行配对
+                    点击单词与对应释义配对（先点释义再点单词也可以）
                   </p>
 
                   {allMatched && (
@@ -1253,6 +1627,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                         const pair = matchPairs.find((p) => p.meaning === meaning);
                         const isMatched = pair && matchedWordSet.has(pair.word);
                         const isError = matchFlashError === meaning;
+                        const isSelected = selectedMatchMeaning === meaning;
                         return (
                           <button
                             key={meaning}
@@ -1262,7 +1637,8 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                               'w-full p-3 rounded-2xl border-2 text-center font-bold text-xs transition-all',
                               isMatched && 'border-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 cursor-default',
                               isError && 'border-rose-400 bg-rose-50 dark:bg-rose-500/15 text-rose-500 animate-pulse',
-                              !isMatched && !isError && 'border-border bg-card hover:border-[#6C5CE7]/40 text-foreground',
+                              isSelected && !isError && 'border-[#6C5CE7] bg-violet-50 dark:bg-violet-500/15 text-ink-violet',
+                              !isMatched && !isError && !isSelected && 'border-border bg-card hover:border-[#6C5CE7]/40 text-foreground',
                             )}
                           >
                             {isMatched ? `${meaning} ✓` : meaning}
@@ -1276,10 +1652,10 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
 
               {allMatched && rated && (
                 <div className="flex justify-center">
-                  <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
-                    {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
-                    <ArrowRight className="size-4 ml-2" />
-                  </Button>
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-muted/60 text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+                    <RotateCw className="size-3.5 animate-spin [animation-duration:1.6s]" />
+                    即将进入下一组…
+                  </span>
                 </div>
               )}
             </div>
@@ -1309,13 +1685,10 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                       )}
                     </div>
 
-                    {/* Hint: meaning */}
+                    {/* Hint: meaning（不放朗读按钮 —— 填空的答案就是这个词，读了等于泄题） */}
                     <div className="flex items-center justify-center gap-2 mb-6">
                       <span className="text-xs font-bold text-muted-foreground">提示：</span>
                       <span className="text-sm font-bold text-ink-violet">{currentWord.partOfSpeech} · {currentWord.meaning}</span>
-                      <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.85 })} className="rounded-xl bg-muted text-muted-foreground hover:text-ink-teal">
-                        <Volume2 className="size-4" />
-                      </Button>
                     </div>
 
                     <div className="flex gap-2 max-w-xs mx-auto">
@@ -1340,7 +1713,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                   {/* Hint + Skip buttons */}
                   {!fillblankChecked && (
                     <div className="flex items-center justify-center gap-2 mt-3">
-                      <Button variant="ghost" size="sm" onClick={() => { setFillblankHint(true); setFillblankInput(currentWord.word[0]); }}
+                      <Button variant="ghost" size="sm" onClick={() => { setFillblankHint(true); if (!fillblankInput) setFillblankInput(currentWord.word[0]); }}
                         className="rounded-xl text-[10px] font-black uppercase tracking-wider bg-amber-50 dark:bg-amber-500/10 text-amber-600 hover:bg-amber-100">
                         <Lightbulb className="size-3 inline" /> 首字母
                       </Button>
@@ -1357,6 +1730,9 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                           <div className="flex items-center justify-center gap-2 text-emerald-500">
                             <CheckCircle2 className="size-5" />
                             <span className="text-sm font-black uppercase tracking-wider">正确！</span>
+                            <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.85 })} className="rounded-xl size-7 bg-muted text-muted-foreground hover:text-ink-teal">
+                              <Volume2 className="size-3.5" />
+                            </Button>
                           </div>
                         ) : (
                           <div className="space-y-2">
@@ -1367,7 +1743,12 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                             <p className="text-lg font-black text-foreground">
                               正确答案：<span className="text-ink-teal italic">{currentWord.word}</span>
                             </p>
-                            <p className="text-sm text-muted-foreground">{currentWord.phonetic}</p>
+                            <div className="flex items-center justify-center gap-2">
+                              <p className="text-sm text-muted-foreground">{currentWord.phonetic}</p>
+                              <Button variant="ghost" size="icon" onClick={() => tts.speak(currentWord.word, { rate: 0.8 })} className="rounded-xl size-7 bg-muted text-muted-foreground hover:text-ink-teal">
+                                <Volume2 className="size-3.5" />
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1375,12 +1756,21 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                   </CardContent>
                 </Card>
 
-                {fillblankChecked && (
+                {/* 答对自动进入下一张；答错停留看答案（Enter/→ 也能走） */}
+                {fillblankChecked && !fillblankCorrect && (
                   <div className="flex justify-center">
                     <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
                       {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                       <ArrowRight className="size-4 ml-2" />
                     </Button>
+                  </div>
+                )}
+                {fillblankChecked && fillblankCorrect && (
+                  <div className="flex justify-center">
+                    <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-muted/60 text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+                      <RotateCw className="size-3.5 animate-spin [animation-duration:1.6s]" />
+                      即将进入下一张…
+                    </span>
                   </div>
                 )}
               </div>
@@ -1431,6 +1821,9 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
             </MotionDiv>
           </div>
         )}
+
+        {/* 词条详情 —— 顶部「上一个单词」/ 各处词表点开都用它 */}
+        {detailDialog}
         </div>
       ) : (
         <div
