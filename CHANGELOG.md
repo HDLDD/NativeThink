@@ -4,6 +4,7 @@
 
 
 ## 2026-09-26
+- fix(vocab): 真机反馈两处 —— 配对模式去掉自动朗读(视觉任务不需要出声)；快速闪卡 FitWord reserve 52→100(朗读+收藏两个按钮的宽度，修长单词被按钮遮住) (`e578105`)
 - docs(changelog): 补记 7d706a2 (`d2ded46`)
 - build(apk): package:apk 补上 version:apk-bump（AGENTS 要求每次打包 versionCode 必递增，此前只在 package:web 里）+ versionCode 68 / versionName 2.0.23 + 日志 (`7d706a2`)
 - docs(changelog): 2026-09-26 开发日志(词汇六方式优化/缓存封顶/全站细节优化/三项遗留优化) (`8df5352`)
