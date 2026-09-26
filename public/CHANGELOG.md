@@ -1,6 +1,10 @@
 # NativeThink 开发日志
 
 
+
+## 2026-09-23
+- fix(apk,vocab): 顶部被状态栏遮住(缺 viewport-fit=cover → env(safe-area) 恒 0)、评分后自动跳下一张(修 viewingPast 定义把自动跳转挡掉)、词库 5909 处 U+FFFD 乱码清理；图标 emoji→lucide (`40aa80e`)
+
 ## 2026-09-22
 - fix(vocab)+style(vocab): 修 all 模式 history 不聚合/角标每次评分全量反序列化/助记框内滑动误评分/断点按钮不刷新/连击副作用在 setState 内；图标 emoji→lucide（继承主题色、跨平台一致） (`c5ba3bf`)
 - feat(vocab): 助记笔记(按词读写/可编辑)、连对连击与每 5 连反馈、复习断点续学(顺序+位置)、本周学习量与正确率报告、侧边栏待复习角标 (`03d8ecf`)

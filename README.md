@@ -1,5 +1,7 @@
 # 项目技术规范
 
+> **接手项目先读 [docs/PROJECT-HANDOVER.md](./docs/PROJECT-HANDOVER.md)**（交接手册：现状 / 命令 / 验证体系 / 真机调试 / 坑表 / 检查清单）；日常约定速查见 [AGENTS.md](./AGENTS.md)。
+
 ## 技术栈
 
 - 前端: React 19 + TypeScript

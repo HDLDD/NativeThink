@@ -1,5 +1,6 @@
 # NativeThink Agent Guide
 
+> **接手项目先读 [docs/PROJECT-HANDOVER.md](./docs/PROJECT-HANDOVER.md)** —— 交接手册（现状/命令/验证体系/坑表/检查清单），本文件是日常约定速查  
 > 产品需求与 UI 规范见 [docs/PRODUCT-SPEC.md](./docs/PRODUCT-SPEC.md)  
 > 开发路线与现状见 [ROADMAP.md](./ROADMAP.md)  
 > 使用说明见 [使用攻略.md](./使用攻略.md)
@@ -25,7 +26,7 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 路由 | react-router-dom v7，页面 `React.lazy` 懒加载 |
 | 状态/数据 | localStorage（`safeStorage`）+ IndexedDB；无后端业务库 |
 | AI | `src/hooks/use-ai.ts` + `src/services/ai-service.ts`（用户自配 Key） |
-| TTS | 多引擎降级：内置离线 Kokoro（11 音色）→ 系统 SpeechSynthesis → 云端 |
+| TTS | 多引擎降级：sherpa-onnx 离线（默认 piper lessac，可选 Kokoro int8 11 音色）→ 系统 SpeechSynthesis → 云端 |
 | 桌面 | Electron（`electron/main.mjs`） |
 | 移动 | Capacitor Android |
 
@@ -67,17 +68,26 @@ node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆�
 ```powershell
 # 朗读进度回归验证（改 TTS 切片上限或阅读器朗读逻辑后必跑）
 node scripts/verify-tts-progress.mjs
+
+# TTS 降级/预合成守卫（改降级链路或预合成后必跑）
+node scripts/verify-tts-hardening.mjs
 ```
 
 ```powershell
 # 书目/SCP 元数据一致性 + 复习词高亮逻辑（改书单、scp.ts、reader-highlight.ts 后必跑）
 node scripts/verify-books-meta.mjs
 
-# 背单词卡片交互契约 + 滑动手势决策表（改 FlashcardMode / vocab-swipe 后必跑）
+# 背单词卡片交互契约 + 滑动手势决策表（改 FlashcardMode / QuickCardMode / vocab-* 后必跑）
 node scripts/verify-vocab-cards.mjs
 
 # 重新抓取 SCP 文章（约 1 req/s，产物 src/data/scp.ts 勿手改）
 node scripts/fetch-scp.cjs
+
+# 清词库 U+FFFD 乱码（幂等）
+node scripts/clean-wordbank-mojibake.mjs
+
+# 品牌视觉资产（APK 图标 / 启动图 / favicon / icon.ico）—— 改字标或配色后重跑
+pwsh -File scripts/gen-app-brand.ps1 -Preview docs/brand-assets-preview.png
 ```
 
 **提交约定**：`npm run typecheck` 通过后再提交。手机端数据只进 localStorage / IndexedDB，不写系统目录。
@@ -122,11 +132,18 @@ src/
 │   └── ui/                 # shadcn 组件
 ├── lib/
 │   ├── use-learning-stats.ts   # 学习统计（权威 storage 读写 + 跨实例广播）
-│   ├── use-tts.ts              # TTS 多引擎
-│   ├── use-favorites.ts
-│   ├── safe-storage.ts
-│   ├── sherpa-tts.ts           # 离线 Kokoro 封装
-│   └── tts-voice-catalog.ts    # 11 音色 speakerId 表
+│   ├── use-word-learning.ts    # SM-2 复习算法 + 词汇进度权威源
+│   ├── use-tts.ts              # TTS 多引擎（切片上限 180）
+│   ├── sherpa-tts.ts           # 离线 sherpa 封装（合成/缓存/在途去重）
+│   ├── tts-voice-catalog.ts    # 音色 speakerId 表
+│   ├── use-favorites.ts        # 收藏（type=word 与背单词共用）
+│   ├── quickcard-history.ts    # 快速闪卡：留档 / 当前累积 / 断点续学
+│   ├── vocab-session.ts        # 复习顺序 + 答错重排（隔 4 张，最多 2 次）
+│   ├── vocab-swipe.ts          # 滑动手势决策表
+│   ├── custom-words.ts         # 生词本（level='custom'）
+│   ├── word-notes.ts           # 每词助记
+│   ├── reader-highlight.ts     # 阅读器复习词高亮
+│   └── safe-storage.ts         # 带用户前缀的 localStorage 封装
 ├── pages/                  # 一页一目录
 ├── data/                   # 语料、词库、语块等 demo/mock 数据
 └── hooks/use-ai.ts
@@ -161,7 +178,7 @@ docs/                       # 设计文档 / PRODUCT-SPEC
   - 成功/地道：`hsl(150 55% 42%)`
   - 警告/中式：`hsl(35 85% 55%)`
   - 错误：低饱和红，克制使用
-- 深浅主题：`tailwind-theme.css` CSS 变量；UI 语言中文
+- 深浅主题：`src/tailwind-theme.css` CSS 变量；UI 语言中文
 - 完整视觉 token 与反模式见 `docs/PRODUCT-SPEC.md`「UI 设计指南」
 
 ---
@@ -177,10 +194,11 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 ### TTS
 
 - 统一走 `use-tts.ts`，不要在页面里直接 `speechSynthesis`
-- 内置离线引擎：Kokoro int8，24000Hz，11 音色；`speakerId` 表在 `tts-voice-catalog.ts`
+- 离线引擎是 sherpa-onnx：**默认 piper lessac**（真机 RTF 0.076），Kokoro int8（11 音色，24000Hz）为音质选项但 RTF≈1.008，长文会断续；`speakerId` 表在 `tts-voice-catalog.ts`
+- **云端上游硬上限恰好 200 字符**（205 → 502）；客户端切片上限 180（`chunkText`），改大整条云端链路失败并静默降级
 - 原生模型注册表（`SherpaTtsPlugin.java` 的 `MODEL_*`）必须与 `scripts/check-tts-voices.cjs` 的 `MODELS` **同步改**
-- 长段落朗读：拆句 + 防双重触发（`onEnd` 与 timeout 不可同时推进）
-- 改音色后跑 `npm run check:tts-voices`
+- 长段落朗读：拆句 + 防双重触发（`onEnd` 与 timeout 不可同时推进）；"读到哪"只能靠 `onChunk(chunkIndex, wordsBefore)`（原生引擎无词级回调）
+- 改音色后跑 `npm run check:tts-voices`；改切片/进度跑 `npm run verify:tts-progress`；改降级链路跑 `verify-tts-hardening.mjs`
 
 ---
 
@@ -192,11 +210,17 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 | 页面永远 loading | `setLoaded(true)` 在 try 内，出错不执行 | `finally { setLoaded(true) }` |
 | 进度环 NaN / 0% | `moduleProgress` 缺 key 或 key 与 MODULES 不一致 | 键对齐；`RingProgress` 对非法值回退 0 |
 | 刷新后记忆丢失 | `safeStorage` 前缀随登录变化 | 用户学习数据用原生 `localStorage` 或带事件同步的 hook |
+| 退出/切 tab/杀 App 后状态丢 | 切 Tab 会卸载组件，state 随之消失 | 显式持久化 + 挂载后恢复（参考 `quickcard-history.ts` 与 `FlashcardMode` 的 `saveSession`） |
+| ref 记录"第一次对、之后静默失效" | **ref 不随组件重挂载归零**（`lastSpokenKey` 一类） | 每轮开始显式清空 |
 | 东八区凌晨日期错一天 | `toISOString().slice(0,10)` | 用 `formatDate()` |
 | 父子双 `onClick` 触发两次 | 事件冒泡重复绑定 | 只保留外层 handler |
 | button 嵌套 DOM 警告 | `<button>` 内再嵌 button | 内层改 `span role="button"` |
+| 顶部内容被一条空条遮住 | 无内容但带 `bg-*` 的 sticky 元素仍占位遮挡 | 只在有内容时渲染（`{tab === 'browse' && (...)}`） |
+| 图表数值压住标题 | 容器高度装不下「值+柱+轴」三层 | 容器高度 ≥ 三层实测高度 |
+| 弹窗打开时按 Esc 连带退出当前流程 | Radix 在 document 冒泡阶段**同步 flush** 关弹窗，window 冒泡监听已看不到 dialog | 键盘监听用**捕获阶段** `addEventListener('keydown', fn, true)` |
 | 维基百科加载失败 | 网络限制 | `origin=*` + `AbortSignal.timeout(10000)` |
 | 朗读卡顿/跳句 | onEnd 与超时双触发 | 只超时驱动 + advanced 标志 |
+| 词库"详情面板空白" | `loadLevel` 内 `try{loadDetail}catch{}` 静默吞错；模块表还会缓存失败结果 | 用 `isDetailReady()` 判断，失败走 `window.location.reload()`（原地重试无效） |
 
 调试入口：`.claude/skills/nativethink-fix.md`（本仓库内完整模式表）。
 
@@ -221,6 +245,7 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 
 | 文件 | 用途 |
 |------|------|
+| [docs/PROJECT-HANDOVER.md](./docs/PROJECT-HANDOVER.md) | **交接手册**：仓库现状、验证体系、真机通道、坑表、检查清单（接手先读） |
 | [docs/PRODUCT-SPEC.md](./docs/PRODUCT-SPEC.md) | 产品需求 + UI 设计指南（原 AGENTS.md 内容） |
 | [ROADMAP.md](./ROADMAP.md) | 现状与下一步 |
 | [使用攻略.md](./使用攻略.md) | 用户向使用说明 |
