@@ -14,18 +14,14 @@ import {
   Trash2,
   Filter,
   Sparkles,
-  Brain,
   Puzzle,
   MessageSquare,
-  Mic,
   Volume2,
   RotateCw,
   Download,
   Upload,
   AlertTriangle,
-  CheckCircle2,
   ExternalLink,
-  X,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -49,7 +45,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { safeStorage } from '@/lib/safe-storage';
 import { exportBackup, importBackup, type IBackupFile } from '@/lib/backup';
 import { WORD_COUNTS } from '@/data/wordbank/meta';
-import { cn, cleanText } from '@/lib/utils';
+import { cn, cleanText, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import FavoriteReviewMode from './components/FavoriteReviewMode';
 import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
@@ -97,7 +93,7 @@ const VOCAB_LEVELS: { key: string; label: string; icon: typeof BookOpen; color: 
 
 export default function ProgressPage() {
   const { stats, calendar, loaded, resetAll } = useLearningStats();
-  const { favorites, removeFavorite } = useFavorites();
+  const { favorites, removeFavorite, addFavorite, clearAll } = useFavorites();
   const { unlocked, definitions, isUnlocked, resetAchievements } = useAchievements();
   const tts = useTTS();
   const navigate = useNavigate();
@@ -148,7 +144,7 @@ export default function ProgressPage() {
 
   /** 生成内容缓存：单词 AI 例句/解析、搭配翻译、AI 题目、每日一句历史之外的缓存 */
   const handleResetAiCaches = () => {
-    for (const k of ['__nativethink_word_ai_data', '__nativethink_colloc_ai_tranlations', '__nativethink_phrase_examples', '__nativethink_sentence_examples', '__nativethink_word_img_v2_', '__nativethink_writing_draft', '__nativethink_quickcard_pos', '__nativethink_browse_memorized']) {
+    for (const k of ['__nativethink_word_ai_data', '__nativethink_colloc_ai_translations', '__nativethink_colloc_ai_tranlations', '__nativethink_phrase_examples', '__nativethink_sentence_examples', '__nativethink_word_img_v2_', '__nativethink_writing_draft', '__nativethink_quickcard_pos', '__nativethink_browse_memorized']) {
       safeStorage.removeItem(k);
     }
     // 单词插图缓存是前缀匹配
@@ -220,7 +216,8 @@ export default function ProgressPage() {
       '__nativethink_custom_translations', '__nativethink_custom_backs',
       '__nativethink_custom_natives', '__nativethink_custom_shadowing',
       '__nativethink_shadowing_extra', '__nativethink_word_ai_data',
-      '__nativethink_colloc_cache', '__nativethink_colloc_ai_tranlations',
+      '__nativethink_colloc_cache', '__nativethink_colloc_ai_translations',
+      '__nativethink_colloc_ai_tranlations',
       '__nativethink_example_trans',
     ];
     keys.forEach((k) => safeStorage.removeItem(k));
@@ -228,7 +225,8 @@ export default function ProgressPage() {
     setShowResetDialog(false); setResetConfirm(null);
   };
   const handleResetFavorites = () => {
-    favorites.forEach((f) => removeFavorite(f.id));
+    // 必须用 clearAll —— 循环调 removeFavorite 会因陈旧闭包只删掉最后一条
+    clearAll();
     toast.success('收藏数据已清除');
     setShowResetDialog(false); setResetConfirm(null);
   };
@@ -245,6 +243,8 @@ export default function ProgressPage() {
   const handleResetAll = () => {
     resetAll();
     resetAchievements();
+    // 同 handleResetFavorites：清空收藏必须走 clearAll（陈旧闭包只删一条）
+    clearAll();
     // Clear all per-level word learning storage
     const LEVELS = ['all', 'zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
     LEVELS.forEach((l) => {
@@ -254,7 +254,6 @@ export default function ProgressPage() {
     // Legacy global keys
     safeStorage.removeItem('__nativethink_word_learning');
     safeStorage.removeItem('__nativethink_daily_quota');
-    favorites.forEach((f) => removeFavorite(f.id));
     const allKeys = [
       '__nativethink_custom_chunks', '__nativethink_chunk_ai_sentences',
       '__nativethink_ai_replacements', '__nativethink_phrase_examples',
@@ -265,7 +264,8 @@ export default function ProgressPage() {
       '__nativethink_shadowing_extra', '__nativethink_word_ai_data',
       '__nativethink_custom_scenarios', '__nativethink_daily_history',
       '__nativethink_achievements',
-      '__nativethink_colloc_cache', '__nativethink_colloc_ai_tranlations',
+      '__nativethink_colloc_cache', '__nativethink_colloc_ai_translations',
+      '__nativethink_colloc_ai_tranlations',
       '__nativethink_colloc_state', '__nativethink_colloc_memorized',
       '__nativethink_level_memory', '__nativethink_feedback_list',
       'vocab-page', 'vocab-search', 'chunk-page', 'chunk-search',
@@ -290,7 +290,7 @@ export default function ProgressPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `nativethink-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `nativethink-backup-${formatDate(new Date())}.json`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success(`已导出 ${localStorageCount} 项数据${idbCount ? ` + ${idbCount} 份翻译缓存` : ''}${idbSkipped ? '（缓存过大已省略，可重新翻译）' : ''}`);
@@ -341,6 +341,10 @@ export default function ProgressPage() {
     vocabulary: '词汇',
     think: '思维训练',
     shadowing: '影子跟读',
+    article: '文章',
+    word: '单词',
+    spelling: '句子拼写',
+    writing_prompt: '写作提示',
   };
 
   const getFavPortal = (type: string): string | null => {
@@ -350,6 +354,10 @@ export default function ProgressPage() {
       chunk: '/chunks',
       vocabulary: '/vocabulary',
       expression: '/vocabulary',
+      word: '/vocabulary',
+      article: '/articles',
+      spelling: '/spelling',
+      writing_prompt: '/writing',
     };
     return portals[type] || null;
   };
@@ -893,6 +901,18 @@ export default function ProgressPage() {
                         <SelectItem value="shadowing" className="text-xs font-bold">
                           影子跟读
                         </SelectItem>
+                        <SelectItem value="article" className="text-xs font-bold">
+                          文章
+                        </SelectItem>
+                        <SelectItem value="word" className="text-xs font-bold">
+                          单词
+                        </SelectItem>
+                        <SelectItem value="spelling" className="text-xs font-bold">
+                          句子拼写
+                        </SelectItem>
+                        <SelectItem value="writing_prompt" className="text-xs font-bold">
+                          写作提示
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -932,7 +952,17 @@ export default function ProgressPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => removeFavorite(item.id)}
+                            onClick={() => {
+                              removeFavorite(item.id);
+                              // 误删可撤销：闭包里还留着完整条目
+                              toast.success(`已删除「${item.content.slice(0, 20)}」`, {
+                                duration: 5000,
+                                action: {
+                                  label: '撤销',
+                                  onClick: () => addFavorite({ type: item.type, content: item.content, meaning: item.meaning, example: item.example, category: item.category }),
+                                },
+                              });
+                            }}
                             className="rounded-xl size-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/15"
                           >
                             <Trash2 className="size-4" />
@@ -946,7 +976,7 @@ export default function ProgressPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => tts.speak(item.content)}
-                            className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
                           >
                             <Volume2 className="size-3.5" />
                           </Button>
@@ -961,7 +991,7 @@ export default function ProgressPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => tts.speak(cleanText(item.example))}
-                              className="rounded-lg size-6 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover/example:opacity-100 transition-opacity"
+                              className="rounded-lg size-6 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover/example:opacity-100 focus-visible:opacity-100 transition-opacity"
                             >
                               <Volume2 className="size-3" />
                             </Button>

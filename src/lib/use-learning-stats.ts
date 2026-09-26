@@ -54,7 +54,9 @@ const DEFAULT_STATS: ILearningStats = {
     sentences: 0,
   },
   totalDays: 0,
-  lastStudyDate: formatDate(new Date()),
+  // 空串 = 还没学过。此前默认填"今天"，导致首次学习当天跨天分支永不触发，
+  // streakDays/totalDays 停在 0（第二天才变 1），与同屏日历"打卡 1 天"自相矛盾。
+  lastStudyDate: '',
 };
 
 /**
@@ -95,7 +97,7 @@ function readStatsFromStorage(): ILearningStats {
   } catch {
     // ignore
   }
-  return { ...DEFAULT_STATS, lastStudyDate: formatDate(new Date()) };
+  return { ...DEFAULT_STATS, moduleProgress: { ...DEFAULT_STATS.moduleProgress } };
 }
 
 function readCalendarFromStorage(): ICalendarRecord[] | null {
@@ -296,9 +298,10 @@ export function useLearningStats() {
   );
 
   const resetAll = useCallback(() => {
+    // lastStudyDate 置空（而非"今天"）——重置后当天再学习同样要计入连胜/累计
     const freshStats: ILearningStats = {
       ...DEFAULT_STATS,
-      lastStudyDate: formatDate(new Date()),
+      moduleProgress: { ...DEFAULT_STATS.moduleProgress },
     };
     saveStats(freshStats);
     const newCalendar = createEmptyCalendar();

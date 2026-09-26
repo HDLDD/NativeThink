@@ -4,15 +4,12 @@ import {
   Heart,
   Volume2,
   Trash2,
-  Sparkles,
   BookOpen,
   ExternalLink,
   Copy,
-  type LucideIcon,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useFavorites } from '@/lib/use-favorites';
 import { useTTS } from '@/lib/use-tts';
 import { cn, cleanText } from '@/lib/utils';
@@ -32,6 +29,7 @@ const TYPE_LABELS: Record<string, string> = {
   article: '文章',
   word: '单词',
   spelling: '句子拼写',
+  writing_prompt: '写作提示',
 };
 
 const TYPE_COLORS: Record<string, { bg: string; badge: string }> = {
@@ -43,16 +41,19 @@ const TYPE_COLORS: Record<string, { bg: string; badge: string }> = {
   article:    { bg: 'bg-teal-50 dark:bg-teal-500/10',      badge: 'bg-teal-100 dark:bg-teal-500/20 text-teal-600' },
   word:       { bg: 'bg-slate-50 dark:bg-slate-500/10',    badge: 'bg-slate-100 dark:bg-slate-500/20 text-slate-600' },
   spelling:   { bg: 'bg-purple-50 dark:bg-purple-500/10',   badge: 'bg-purple-100 dark:bg-purple-500/20 text-purple-600' },
+  writing_prompt: { bg: 'bg-fuchsia-50 dark:bg-fuchsia-500/10', badge: 'bg-fuchsia-100 dark:bg-fuchsia-500/20 text-fuchsia-600' },
 };
 
-const FILTER_TYPES = ['all', 'vocabulary', 'chunk', 'expression', 'think', 'shadowing', 'article', 'spelling'] as const;
+// 'word' 是「快速闪卡/词库」里收藏的单词，'writing_prompt' 是写作页收藏的提示 ——
+// 标签配色齐全，只进过滤列表；此前漏了导致只能从「全部」里翻。
+const FILTER_TYPES = ['all', 'vocabulary', 'word', 'chunk', 'expression', 'think', 'shadowing', 'article', 'spelling', 'writing_prompt'] as const;
 
 // ============================================================
 // Component
 // ============================================================
 export default function FavoritesPage() {
   const navigate = useNavigate();
-  const { favorites, removeFavorite, loaded } = useFavorites();
+  const { favorites, removeFavorite, addFavorite, loaded } = useFavorites();
   const tts = useTTS();
   const [filterType, setFilterType] = useState<string>('all');
   const [reviewMode, setReviewMode] = useState(false);
@@ -71,8 +72,15 @@ export default function FavoritesPage() {
   }, [favorites]);
 
   const handleDelete = (id: string, content: string) => {
+    // 保留完整条目用于撤销 —— removeFavorite 之后 item 数据还在闭包里
+    const item = favorites.find((f) => f.id === id);
     removeFavorite(id);
-    toast.success(`已删除收藏: ${content}`);
+    toast.success(`已删除收藏: ${content}`, {
+      duration: 5000,
+      action: item
+        ? { label: '撤销', onClick: () => addFavorite({ type: item.type, content: item.content, meaning: item.meaning, example: item.example, category: item.category }) }
+        : undefined,
+    });
   };
 
   // ── Review mode ──
@@ -145,34 +153,8 @@ export default function FavoritesPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Type filter tabs */}
-          <div className="flex items-center gap-1 bg-muted rounded-xl p-1 flex-wrap">
-            {([
-              { key: 'all' as const, label: '全部', icon: '📋' },
-              { key: 'vocabulary' as const, label: '词汇', icon: '📗' },
-              { key: 'chunk' as const, label: '语块', icon: '🔗' },
-              { key: 'expression' as const, label: '表达', icon: '💬' },
-              { key: 'article' as const, label: '文章', icon: '📰' },
-              { key: 'shadowing' as const, label: '跟读', icon: '🎤' },
-              { key: 'spelling' as const, label: '拼写', icon: '✍️' },
-            ]).map(({ key, label, icon }) => (
-              <button
-                key={key}
-                onClick={() => setFilterType(key)}
-                className={cn(
-                  'flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap',
-                  filterType === key
-                    ? 'bg-white dark:bg-card text-ink-teal shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <span>{icon}</span> {label}
-                <span className="text-[9px] opacity-60">({typeCounts[key] || 0})</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Review toggle */}
+          {/* 分类筛选用下方的 chips（含全部类型），头部只留「开始回顾」—— 此前头部还有一套
+              emoji tab 行，两套筛选类型集合不一致（tab 行缺 word/think），状态互相矛盾 */}
           <Button
             onClick={() => setReviewMode(true)}
             disabled={filteredFavorites.length === 0}
@@ -246,7 +228,7 @@ export default function FavoritesPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => tts.speak(item.content)}
-                        className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
                       >
                         <Volume2 className="size-3.5" />
                       </Button>
@@ -255,10 +237,16 @@ export default function FavoritesPage() {
                         size="icon"
                         onClick={() => {
                           const text = item.example ? `${item.content}\n${item.example}` : item.content;
-                          try { navigator.clipboard?.writeText(text).then(() => toast.success('已复制')); } catch { /* ignore */ }
+                          try {
+                            navigator.clipboard?.writeText(text)
+                              .then(() => toast.success('已复制'))
+                              .catch(() => toast.error('复制失败，请手动选择文本'));
+                          } catch {
+                            toast.error('复制失败，请手动选择文本');
+                          }
                         }}
                         title="复制"
-                        className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
                       >
                         <Copy className="size-3.5" />
                       </Button>
@@ -275,7 +263,7 @@ export default function FavoritesPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => tts.speak(cleanText(item.example))}
-                          className="rounded-lg size-6 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover/example:opacity-100 transition-opacity"
+                          className="rounded-lg size-6 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover/example:opacity-100 focus-visible:opacity-100 transition-opacity"
                         >
                           <Volume2 className="size-3" />
                         </Button>

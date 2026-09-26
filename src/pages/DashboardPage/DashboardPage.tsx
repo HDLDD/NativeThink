@@ -5,9 +5,7 @@ import {
   Flame,
   Target,
   Brain,
-  Puzzle,
   MessageSquare,
-  Mic,
   BookOpen,
 } from 'lucide-react';
 import {
@@ -58,11 +56,24 @@ export default function DashboardPage() {
     return mockChunks[Math.floor(Math.random() * mockChunks.length)];
   };
   const [dailyChunk, setDailyChunk] = useState<IChunk>(PLACEHOLDER_CHUNK);
-  // Set initial daily chunk once chunks are loaded
+  // 每日一句按**日期**持久化：同一天每次进首页都是同一句。
+  // 此前每次挂载重新随机，且随机结果被写进历史 —— 同一天刷新 N 次就换 N 句，
+  // 日历里"今天"被随机句子灌满（圆点显示 +N），"每日一句"语义失效。
   useEffect(() => {
-    if (mockChunks.length > 0 && dailyChunk.id === '__placeholder__') {
-      setDailyChunk(mockChunks[Math.floor(Math.random() * mockChunks.length)]);
-    }
+    if (mockChunks.length === 0 || dailyChunk.id !== '__placeholder__') return;
+    const today = formatDate(new Date());
+    try {
+      const saved = safeStorage.getItem('__nativethink_daily_chunk');
+      const parsed = saved ? (JSON.parse(saved) as { date: string; chunk: IChunk }) : null;
+      // 校验 chunk 仍在当前词库（语料随版本会变），避免渲染已删除的句子
+      if (parsed && parsed.date === today && parsed.chunk && mockChunks.some((c) => c.id === parsed.chunk.id)) {
+        setDailyChunk(parsed.chunk);
+        return;
+      }
+    } catch { /* ignore */ }
+    const picked = mockChunks[Math.floor(Math.random() * mockChunks.length)];
+    setDailyChunk(picked);
+    try { safeStorage.setItem('__nativethink_daily_chunk', JSON.stringify({ date: today, chunk: picked })); } catch { /* ignore */ }
   }, [mockChunks, dailyChunk]);
   const [chunkLoading, setChunkLoading] = useState(false);
   const [exampleZh, setExampleZh] = useState('');
@@ -324,7 +335,8 @@ export default function DashboardPage() {
           <KpiCard
             icon={BookOpen}
             label="收藏单词"
-            value={`${favorites.filter(f => f.type === 'vocabulary').length} 条`}
+            // 'vocabulary' = 词汇页收藏，'word' = 背单词/快速闪卡/阅读查词收藏 —— 两条线都算
+            value={`${favorites.filter(f => f.type === 'vocabulary' || f.type === 'word').length} 条`}
             color="#6366F1"
             onClick={() => navigate('/progress')}
           />

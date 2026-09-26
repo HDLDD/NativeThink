@@ -10,7 +10,6 @@ import {
   RefreshCw,
   Brain,
   Heart,
-  Bot,
   Wand2,
   Volume2,
   X,
@@ -29,14 +28,14 @@ import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { MOCK_THINK_EXERCISES, type IThinkExercise } from '@/data/thinkexercises';
 import { MOCK_BACK_TRANSLATIONS, type IBackTranslation } from '@/data/backtranslation';
 import { MOCK_NATIVE_TRANSLATES, type INativeTranslate } from '@/data/nativetranslate';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useFavorites } from '@/lib/use-favorites';
 import { useAI } from '@/hooks/use-ai';
 import { useTTS } from '@/lib/use-tts';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { safeStorage } from '@/lib/safe-storage';
-import { cn } from '@/lib/utils';
+import { cn, extractJson } from '@/lib/utils';
+import { useStableShuffle } from '@/lib/use-stable-shuffle';
 
 const EXAMPLE_SENTENCES = [
   'i very like this book.',
@@ -120,19 +119,15 @@ export default function ThinkInEnglishPage() {
 
   // AI generation state
   const [genLoading, setGenLoading] = useState<'translation' | 'back' | 'native' | null>(null);
-  const [showGenDialog, setShowGenDialog] = useState<'translation' | 'back' | 'native' | null>(null);
 
-  const translationExercises = useMemo(
-    () => [...customTranslations, ...MOCK_THINK_EXERCISES.filter((e) => e.type === 'translation')].sort(() => Math.random() - 0.5),
-    [customTranslations],
+  const translationExercises = useStableShuffle(
+    useMemo(() => [...customTranslations, ...MOCK_THINK_EXERCISES.filter((e) => e.type === 'translation')], [customTranslations]),
   );
-  const backExercises = useMemo(
-    () => [...customBacks, ...MOCK_BACK_TRANSLATIONS].sort(() => Math.random() - 0.5),
-    [customBacks],
+  const backExercises = useStableShuffle(
+    useMemo(() => [...customBacks, ...MOCK_BACK_TRANSLATIONS], [customBacks]),
   );
-  const nativeExercises = useMemo(
-    () => [...customNatives, ...MOCK_NATIVE_TRANSLATES].sort(() => Math.random() - 0.5),
-    [customNatives],
+  const nativeExercises = useStableShuffle(
+    useMemo(() => [...customNatives, ...MOCK_NATIVE_TRANSLATES], [customNatives]),
   );
 
   useEffect(() => {
@@ -512,7 +507,9 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
     setCurrentNativeIdx((prev) => (prev + 1) % nativeExercises.length);
     setNativeInput('');
     setNativeResult('');
-    setShowNativeRef(false);
+    // 本 tab 的参考答案开关是 showNativeThinkRef —— 此前误清了 translation tab 的
+    // showNativeRef，导致换题后参考答案保持展开（等于每题自动看答案）
+    setShowNativeThinkRef(false);
   };
 
   const toggleNativeFavorite = () => {
@@ -555,9 +552,10 @@ Make the scenario practical and common in daily life. The nativeExpression shoul
         ],
         { temperature: 0.9, maxTokens: 1024 },
       );
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) { toast.error('AI 返回格式异常'); return; }
-      const parsed = JSON.parse(jsonMatch[0]);
+      // result 为空 = AI 调用失败（use-ai 已 toast），不能再误报"格式异常"
+      if (!result.trim()) return;
+      let parsed: { prompt?: string; nativeExpression?: string; explanation?: string; difficulty?: string; category?: string };
+      try { parsed = extractJson(result); } catch { toast.error('AI 返回格式异常'); return; }
       const newExercise: IThinkExercise = {
         id: `ai_t_${Date.now()}`,
         type: 'translation',
@@ -568,7 +566,6 @@ Make the scenario practical and common in daily life. The nativeExpression shoul
         category: parsed.category || '日常表达',
       };
       setCustomTranslations((prev) => [newExercise, ...prev]);
-      setShowGenDialog(null);
       toast.success('AI 已生成新题目！');
     } catch {
       toast.error('AI 生成失败');
@@ -601,9 +598,9 @@ The keyword should be a practical English chunk, idiom, or phrasal verb.`,
         ],
         { temperature: 0.9, maxTokens: 1024 },
       );
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) { toast.error('AI 返回格式异常'); return; }
-      const parsed = JSON.parse(jsonMatch[0]);
+      if (!result.trim()) return;
+      let parsed: { keyword?: string; meaning?: string; referenceSentence?: string; referenceTranslation?: string; scenarioHint?: string; difficulty?: string };
+      try { parsed = extractJson(result); } catch { toast.error('AI 返回格式异常'); return; }
       const newExercise: IBackTranslation = {
         id: `ai_b_${Date.now()}`,
         keyword: parsed.keyword || 'look into',
@@ -614,7 +611,6 @@ The keyword should be a practical English chunk, idiom, or phrasal verb.`,
         scenarioHint: parsed.scenarioHint || '日常使用',
       };
       setCustomBacks((prev) => [newExercise, ...prev]);
-      setShowGenDialog(null);
       toast.success('AI 已生成新题目！');
     } catch {
       toast.error('AI 生成失败');
@@ -646,9 +642,9 @@ The chineseText should subtly embed English thinking patterns so learners discov
         ],
         { temperature: 0.9, maxTokens: 1024 },
       );
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) { toast.error('AI 返回格式异常'); return; }
-      const parsed = JSON.parse(jsonMatch[0]);
+      if (!result.trim()) return;
+      let parsed: { chineseText?: string; nativeEnglish?: string; thinkingPattern?: string; difficulty?: string; category?: string };
+      try { parsed = extractJson(result); } catch { toast.error('AI 返回格式异常'); return; }
       const newExercise: INativeTranslate = {
         id: `ai_n_${Date.now()}`,
         chineseText: parsed.chineseText || '',
@@ -658,7 +654,6 @@ The chineseText should subtly embed English thinking patterns so learners discov
         category: parsed.category || '思维差异',
       };
       setCustomNatives((prev) => [newExercise, ...prev]);
-      setShowGenDialog(null);
       toast.success('AI 已生成新题目！');
     } catch {
       toast.error('AI 生成失败');

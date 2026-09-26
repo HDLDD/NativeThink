@@ -94,6 +94,11 @@ export function useFavorites() {
     [favorites, persist],
   );
 
+  /** 一键清空 —— 循环调 removeFavorite 会因陈旧闭包只删掉最后一条（ProgressPage 重置踩过） */
+  const clearAll = useCallback(() => {
+    persist([]);
+  }, [persist]);
+
   const isFavorited = useCallback(
     (content: string, type: IFavoriteItem['type']) => {
       return favorites.some((f) => f.content === content && f.type === type);
@@ -106,6 +111,7 @@ export function useFavorites() {
     loaded,
     addFavorite,
     removeFavorite,
+    clearAll,
     isFavorited,
   };
 }

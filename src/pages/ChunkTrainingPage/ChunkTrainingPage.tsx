@@ -51,6 +51,7 @@ import { useFavorites } from '@/lib/use-favorites';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { usePhraseLearning } from '@/lib/use-phrase-learning';
 import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
+import { useStableShuffle } from '@/lib/use-stable-shuffle';
 import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { cn, cleanText, extractJson } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
@@ -95,24 +96,12 @@ const LIBRARY_PAGE_SIZE = 20;
 function getDifficultyLabel(d: string) { return DIFFICULTY_LABELS[d] || d; }
 function getDifficultyAbbr(d: string) { return d === 'beginner' ? '初' : d === 'intermediate' ? '中' : '高'; }
 
-/** Shared helper: call AI, extract JSON, parse, validate */
-async function fetchAIJSON(
-  aiChat: (msgs: { role: string; content: string }[], opts?: Record<string, unknown>) => Promise<string>,
-  systemPrompt: string,
-  userPrompt: string,
-  opts?: Record<string, unknown>,
-): Promise<any> {
-  const result = await aiChat(
-    [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
-    opts,
-  );
-  const match = result.match(/[[{][\s\S]*[}\]]/);
-  if (!match) throw new Error('AI 返回格式异常，请重试');
-  return JSON.parse(match[0]);
-}
+/** 自动发音持久化键 —— 与词汇模块（每日学习/复习检测/快速闪卡）共用：一处关闭，处处安静 */
+const REVIEW_AUTO_SPEAK_KEY = '__nativethink_vocab_autospeak';
+/** 答错的语块隔几张再出现（与词汇模块 vocab-session 同参） */
+const REVIEW_RELEARN_GAP = 4;
+/** 同一语块一轮最多重排几次 */
+const REVIEW_MAX_RELEARN = 2;
 
 // 生成替换练习题目：基于语块例句，把正确语块替换成生硬表达作为题目
 const AWKWARD_MAP: Record<string, string> = {
@@ -205,8 +194,6 @@ export default function ChunkTrainingPage() {
   const [builtinPage, setBuiltinPage] = useState(chunkPosMemory.page || 0);
   const [aiPage, setAiPage] = useState(0);
 
-  // Refresh key for useMemo random shuffles
-  const [refreshKey, setRefreshKey] = useState(0);
 
   // Persist custom chunks to localStorage
   useEffect(() => {
@@ -248,7 +235,11 @@ export default function ChunkTrainingPage() {
       );
       const zh = result.trim().replace(/^["']|["']$/g, '').slice(0, 80);
       if (zh) setExampleTranslations((p) => ({ ...p, [chunk.id]: zh }));
-    } catch { /* ignore */ }
+      else toast.error('AI 服务暂不可用，请稍后重试');
+    } catch {
+      // 不许静默失败 —— 按钮恢复原状但毫无反馈会让用户以为点击无效
+      toast.error('AI 服务暂不可用，请稍后重试');
+    }
     finally { setExampleTransLoading(null); }
   };
 
@@ -311,10 +302,9 @@ export default function ChunkTrainingPage() {
         ],
         { temperature: 0.9, maxTokens: 1536 },
       );
-      const jsonMatch = result.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) { toast.error('AI 返回格式异常'); return; }
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (!Array.isArray(parsed) || parsed.length === 0) return;
+      if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
+      const parsed = extractJson<any[]>(result);
+      if (!Array.isArray(parsed) || parsed.length === 0) { toast.error('AI 返回格式异常'); return; }
       setPhraseExamples((prev) => ({
         ...prev,
         [key]: [...(prev[key] || []), ...parsed.map((e: any) => ({ en: e.en || '', zh: e.zh || '' }))].filter((e) => e.en && e.zh).slice(0, 10),
@@ -379,9 +369,24 @@ export default function ChunkTrainingPage() {
   const [reviewTotal, setReviewTotal] = useState(0);
   const [reviewQuality, setReviewQuality] = useState<number[]>([]); // track quality per card for summary
   const [reviewTtsMode, setReviewTtsMode] = useState<'chunk' | 'example'>('chunk');
+  /** 自动发音开关 —— 与词汇模块共用同一个持久化键：一处关闭，处处安静 */
+  const [reviewAutoSpeak, setReviewAutoSpeak] = useState(() => {
+    try { return safeStorage.getItem(REVIEW_AUTO_SPEAK_KEY) !== '0'; } catch { return true; }
+  });
+  const toggleReviewAutoSpeak = () => {
+    const next = !reviewAutoSpeak;
+    setReviewAutoSpeak(next);
+    try { safeStorage.setItem(REVIEW_AUTO_SPEAK_KEY, next ? '1' : '0'); } catch { /* */ }
+    toast(next ? '已开启自动发音' : '已关闭自动发音', { duration: 1200 });
+  };
+  /** 答错重排计数 —— 同一语块本轮最多重排 2 次（与词汇模块 vocab-session 同参） */
+  const reviewRelearnRef = useRef<Record<string, number>>({});
+  /** 重置短语进度的两段确认 */
+  const [confirmResetProgress, setConfirmResetProgress] = useState(false);
 
   // Auto-speak: new card → always read chunk; flip → read chunk or example based on mode
   useEffect(() => {
+    if (!reviewAutoSpeak) return;
     if (reviewIdx >= reviewQueue.length) return;
     const phrase = reviewQueue[reviewIdx];
     if (!phrase) return;
@@ -396,7 +401,7 @@ export default function ChunkTrainingPage() {
         tts.speak(cleanText(phrase.example), { rate: 0.85 });
       }
     }
-  }, [reviewFlipped, reviewIdx, reviewTtsMode]);
+  }, [reviewAutoSpeak, reviewFlipped, reviewIdx, reviewTtsMode]);
 
   const startReview = (count = 20) => {
     const queue = getReviewQueue(count);
@@ -406,6 +411,13 @@ export default function ChunkTrainingPage() {
     setReviewKnown(0);
     setReviewTotal(0);
     setReviewQuality([]);
+    reviewRelearnRef.current = {};   // 新一轮重排计数清零
+    // 预热前 3 张的首播（离线引擎冷启动后首句明显卡顿）
+    if (reviewAutoSpeak) {
+      queue.slice(0, 3).forEach((c, i) => {
+        setTimeout(() => { try { tts.prewarm(c.content, { rate: 0.85 }); } catch { /* ignore */ } }, 120 * i);
+      });
+    }
   };
 
   // Review memorized (Brain-toggled) chunks specifically
@@ -424,6 +436,12 @@ export default function ChunkTrainingPage() {
     setReviewKnown(0);
     setReviewTotal(0);
     setReviewQuality([]);
+    reviewRelearnRef.current = {};
+    if (reviewAutoSpeak) {
+      queue.slice(0, 3).forEach((c, i) => {
+        setTimeout(() => { try { tts.prewarm(c.content, { rate: 0.85 }); } catch { /* ignore */ } }, 120 * i);
+      });
+    }
   };
 
   const handleReviewMark = (quality: number) => {
@@ -436,14 +454,35 @@ export default function ChunkTrainingPage() {
     setReviewQuality((p) => [...p, quality]);
     setReviewFlipped(false);
     addStudyMinutes(0.2, 'chunks');
-    if (reviewIdx + 1 < reviewQueue.length) {
-      setReviewIdx((p) => p + 1);
-    } else {
-      setReviewIdx((p) => p + 1); // trigger completion screen
+    // 答错立即重排：隔 REVIEW_RELEARN_GAP 张再出现（即时巩固，与词汇模块同参）
+    if (!isCorrect) {
+      const used = reviewRelearnRef.current[phrase.id] ?? 0;
+      if (used < REVIEW_MAX_RELEARN) {
+        reviewRelearnRef.current[phrase.id] = used + 1;
+        setReviewQueue((prev) => {
+          const at = Math.min(prev.length, reviewIdx + 1 + REVIEW_RELEARN_GAP);
+          const next = [...prev];
+          next.splice(at, 0, phrase);
+          return next;
+        });
+        toast.info('答错的语块稍后会再出现一次', { duration: 1200 });
+      }
     }
+    setReviewIdx((p) => p + 1); // 走到队尾即触发完成页
   };
 
-  const staticExercises = useMemo(() => generateReplacementExercises(allChunks), [allChunks, refreshKey]);
+  /** 「随便看看」推荐（未学过的语块随机 5 个）—— memo 化，避免每次敲搜索词推荐区跳序 */
+  const suggestPhrases = useMemo(() => {
+    const pool = allChunks.filter((c) => !phraseState.progress[c.content.toLowerCase()]);
+    const arr = [...pool];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr.slice(0, 5);
+  }, [allChunks, phraseState.progress]);
+
+  const staticExercises = useMemo(() => generateReplacementExercises(allChunks), [allChunks]);
   const replacementExercises = aiReplacements.length > 0 ? aiReplacements : staticExercises;
 
   // Split filtered chunks by source
@@ -538,7 +577,10 @@ export default function ChunkTrainingPage() {
   };
 
   const currentQuestion = replacementExercises[currentQIdx];
-  const chainChunks = useMemo(() => [...allChunks].sort(() => Math.random() - 0.5).slice(0, 10), [allChunks, refreshKey]);
+  // 接龙语块用**稳定洗牌**：此前 useMemo 依赖 allChunks 身份，AI 生成/删除语块都会
+  // 触发重新洗牌 —— 正在接龙的当前语块被悄悄换掉
+  const chainShuffled = useStableShuffle(allChunks);
+  const chainChunks = useMemo(() => chainShuffled.slice(0, 10), [chainShuffled]);
 
   // AI-generated chain challenge
   const [aiChainChallenge, setAiChainChallenge] = useState<{ chunk: string; meaning: string; scenario: string } | null>(null);
@@ -604,7 +646,10 @@ export default function ChunkTrainingPage() {
               role: 'system',
               content: `You are an English chunk/phrase coach. The user must create a sentence using a specific English chunk/phrase. Evaluate their sentence.
 
-Provide ALL responses in BOTH English and Chinese (bilingual). For each section, show the **English version first**, followed by the **中文版本**. Format:
+**The FIRST line of your reply must be exactly one word: PASS or FAIL.**
+PASS = the sentence correctly and naturally uses the chunk. FAIL = wrong usage, unnatural, or the chunk's meaning is distorted.
+
+Then provide ALL responses in BOTH English and Chinese (bilingual). For each section, show the **English version first**, followed by the **中文版本**. Format:
 
 ## 评价
 ✅/⚠️ 简短评价
@@ -636,29 +681,28 @@ Keep it brief — 2-3 bullet points max.`,
 
         feedback = (result as { content?: string })?.content || '';
       }
-      // 判断 AI 是否指出了问题：如果反馈中包含"地道""正确""自然"等正面评价且没有指出明显错误，算通过
-      const hasIssues =
-        feedback.includes('中式') ||
-        feedback.includes('错误') ||
-        feedback.includes('问题') ||
-        feedback.includes('不地道') ||
-        feedback.includes('建议') ||
-        feedback.includes('应该') ||
-        feedback.includes('❌') ||
-        feedback.includes('⚠️');
+      // 判定取模型给出的**结构化结论**（首行 PASS/FAIL）——
+      // 此前用"反馈里是否出现『建议/问题/错误』等词"做启发式，而提示词模板本身就
+      // 固定含「有什么改进建议？」bullet，导致造得正确的句子也永远判不通过。
+      // 首行既非 PASS 也非 FAIL（模型没守格式）时按通过处理，与 catch 分支的宽松降级一致。
+      const verdict = feedback.trimStart().split('\n')[0]?.trim().toUpperCase();
+      const passed = verdict !== 'FAIL';
+      const detail = verdict === 'PASS' || verdict === 'FAIL'
+        ? feedback.trimStart().split('\n').slice(1).join('\n').trim()
+        : feedback;
 
-      if (hasIssues) {
+      if (!passed) {
         setChainFeedback({
           correct: false,
           message: '句子还有可以改进的地方～',
-          detail: feedback,
+          detail,
         });
       } else {
         setChainScore((prev) => prev + 10);
         setChainFeedback({
           correct: true,
           message: `太棒了！正确使用了 "${chunkContent}" +10分`,
-          detail: feedback,
+          detail,
         });
         setTimeout(() => {
           setCurrentChainIdx((prev) => (prev + 1) % chainChunks.length);
@@ -738,10 +782,8 @@ Make chunks practical and commonly used by native speakers. Each chunk should be
         { temperature: 0.9, maxTokens: 2048 },
       );
 
-      const jsonMatch = result.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) { toast.error('AI 返回格式异常，请重试'); return; }
-
-      const parsed = JSON.parse(jsonMatch[0]);
+      if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
+      const parsed = extractJson<any[]>(result);
       if (!Array.isArray(parsed) || parsed.length === 0) { toast.error('AI 未生成有效语块，请重试'); return; }
 
       const newChunks: IChunk[] = parsed.map((item: { content: string; meaning: string; introduction?: string; category: string; difficulty: string; usage: string; example: string; exampleZh?: string }, i: number) => ({
@@ -792,8 +834,10 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
         { temperature: 0.5, maxTokens: 256 },
       );
       setReplacementFeedback(result);
+      if (!result.trim()) toast.error('AI 服务暂不可用，请稍后重试');
     } catch (e) {
       console.warn('Replacement feedback fetch failed:', e);
+      toast.error('AI 服务暂不可用，请稍后重试');
     } finally {
       setFeedbackLoading(false);
     }
@@ -817,7 +861,6 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
         { temperature: 0.9, maxTokens: 1024 },
       );
       const parsed = extractJson<any[]>(result);
-      if (!Array.isArray(parsed) || parsed.length === 0) { toast.error('AI 未生成有效内容'); return; }
       if (!Array.isArray(parsed) || parsed.length === 0) { toast.error('AI 未生成有效例句，请重试'); return; }
       const items = parsed.map((item: { en?: string; zh?: string }) => ({
         en: item.en || '',
@@ -846,8 +889,16 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
     });
   };
 
+  /** 二次点击确认 —— AI 生成的语块误删无法恢复（对比重置进度的确认水准） */
+  const [confirmDeleteChunkId, setConfirmDeleteChunkId] = useState<string | null>(null);
   const handleDeleteCustomChunk = (e: React.MouseEvent, chunkId: string) => {
     e.stopPropagation();
+    if (confirmDeleteChunkId !== chunkId) {
+      setConfirmDeleteChunkId(chunkId);
+      setTimeout(() => setConfirmDeleteChunkId((cur) => (cur === chunkId ? null : cur)), 3000);
+      return;
+    }
+    setConfirmDeleteChunkId(null);
     setCustomChunks((prev) => prev.filter((c) => c.id !== chunkId));
     setDetailOpen(false);
   };
@@ -1059,22 +1110,17 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   </div>
                 ) : (
                   <div className="flex flex-wrap gap-2">
-                    {(() => {
-                      // No due reviews — show random new phrases as suggestions
-                      const newPhrases = allChunks
-                        .filter((c) => !phraseState.progress[c.content.toLowerCase()])
-                        .sort(() => Math.random() - 0.5)
-                        .slice(0, 5);
-                      return newPhrases.map((chunk) => (
-                        <Badge
-                          key={chunk.id}
-                          className="cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium bg-white/70 dark:bg-foreground/10 text-foreground hover:bg-white hover:shadow-sm transition-all border border-orange-100"
-                          onClick={() => openDetail(chunk)}
-                        >
-                          {chunk.content}
-                        </Badge>
-                      ));
-                    })()}
+                    {/* No due reviews — show random new phrases as suggestions.
+                        洗牌 memo 化：此前在渲染期 IIFE 里 sort(random)，输入搜索词时推荐区不断跳序 */}
+                    {suggestPhrases.map((chunk) => (
+                      <Badge
+                        key={chunk.id}
+                        className="cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium bg-white/70 dark:bg-foreground/10 text-foreground hover:bg-white hover:shadow-sm transition-all border border-orange-100"
+                        onClick={() => openDetail(chunk)}
+                      >
+                        {chunk.content}
+                      </Badge>
+                    ))}
                     {phraseStats.totalStarted === 0 && (
                       <span className="text-[10px] text-muted-foreground">还没有开始学习，去复习页开始吧</span>
                     )}
@@ -1332,8 +1378,9 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                 {chunk.id.startsWith('ai_') && (
                                   <button
                                     onClick={(e) => handleDeleteCustomChunk(e, chunk.id)}
-                                    className="p-0.5 rounded-lg text-muted-foreground/30 hover:text-rose-500 transition-colors"
-                                    title="删除"
+                                    className={cn('p-0.5 rounded-lg transition-colors',
+                                      confirmDeleteChunkId === chunk.id ? 'text-rose-500 bg-rose-500/10' : 'text-muted-foreground/30 hover:text-rose-500')}
+                                    title={confirmDeleteChunkId === chunk.id ? '再点一次确认删除' : '删除'}
                                   >
                                     <X className="size-3.5" />
                                   </button>
@@ -2388,6 +2435,19 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                       >{label}</button>
                     ))}
                   </div>
+                  {/* 自动发音开关（与词汇模块共用同一偏好） */}
+                  <button
+                    onClick={toggleReviewAutoSpeak}
+                    className={cn(
+                      'px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border',
+                      reviewAutoSpeak
+                        ? 'border-[#00B894]/40 bg-[#00B894]/10 text-ink-teal'
+                        : 'border-border text-muted-foreground hover:text-foreground',
+                    )}
+                    title="出卡自动朗读 —— 与词汇模块共用此设置"
+                  >
+                    自动发音{reviewAutoSpeak ? '·开' : '·关'}
+                  </button>
                   <Button onClick={() => startMemorizedReview()} variant="outline" size="sm" className="rounded-2xl text-[10px] font-black uppercase tracking-wider gap-1.5 border-[#00B894]/30 text-ink-teal hover:bg-[#00B894]/10">
                     <Brain className="size-3.5" />已记 ({memorizedChunks.size})
                   </Button>
@@ -2453,7 +2513,23 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   </div>
                   <div className="flex items-center gap-2 justify-center mt-4">
                     <Button onClick={() => startReview(20)} variant="outline" size="sm" className="rounded-2xl text-xs font-bold gap-1.5"><Shuffle className="size-3.5" />再来一轮</Button>
-                    <Button onClick={resetPhraseProgress} variant="outline" size="sm" className="rounded-2xl text-[10px] font-bold text-muted-foreground hover:text-rose-500 gap-1.5"><RotateCw className="size-3.5" />重置进度</Button>
+                    {/* 重置不可恢复 —— 两段确认防误触 */}
+                    <Button
+                      onClick={() => {
+                        if (!confirmResetProgress) {
+                          setConfirmResetProgress(true);
+                          setTimeout(() => setConfirmResetProgress(false), 3000);
+                          return;
+                        }
+                        setConfirmResetProgress(false);
+                        resetPhraseProgress();
+                      }}
+                      variant="outline" size="sm"
+                      className={cn('rounded-2xl text-[10px] font-bold gap-1.5',
+                        confirmResetProgress ? 'bg-rose-500/10 text-rose-500 border-rose-300' : 'text-muted-foreground hover:text-rose-500')}
+                    >
+                      <RotateCw className="size-3.5" />{confirmResetProgress ? '再点一次确认重置' : '重置进度'}
+                    </Button>
                   </div>
                 </div>
               ) : (

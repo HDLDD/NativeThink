@@ -28,8 +28,19 @@ interface ProgressChartsProps {
 }
 
 // ── Module config ──
-// 颜色按下标对应 moduleProgress 的键顺序（见 use-learning-stats.ts 的 MODULE_PROGRESS_KEYS）
-const MODULE_COLORS = ['#EC4899', '#0EA5E9', '#F59E0B', '#00B894', '#1F2937', '#6366F1', '#F97316', '#F59E0B', '#8B5CF6'];
+// 颜色按 **key** 取，必须与 DashboardPage/constants.ts 的 MODULES[].color 一致 ——
+// 此前按下标对位数组，错位且 conversation/spelling 同为 #F59E0B，饼图图例无法区分
+const MODULE_COLORS: Record<string, string> = {
+  think: '#00B894',
+  chunks: '#1F2937',
+  conversation: '#6366F1',
+  shadowing: '#F97316',
+  vocabulary: '#EC4899',
+  writing: '#8B5CF6',
+  articles: '#0EA5E9',
+  spelling: '#F43F5E',
+  sentences: '#F59E0B',
+};
 const MODULE_NAMES: Record<string, string> = {
   vocabulary: '词汇深度',
   articles: '文章阅读',
@@ -62,10 +73,10 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
 
   // Pie chart: module distribution
   const pieData = useMemo(() => {
-    return Object.entries(stats.moduleProgress).map(([key, value], idx) => ({
+    return Object.entries(stats.moduleProgress).map(([key, value]) => ({
       name: MODULE_NAMES[key] || key,
       value,
-      color: MODULE_COLORS[idx],
+      color: MODULE_COLORS[key] || '#94A3B8',
     }));
   }, [stats.moduleProgress]);
 

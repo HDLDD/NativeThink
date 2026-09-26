@@ -4,6 +4,7 @@
 
 
 ## 2026-09-26
+- fix(storage): 四个只增不减的 localStorage 缓存统一 FIFO 封顶(搭配释义300/AI例句200/深度解析300/搭配翻译400)；搭配翻译键名 tranlations→translations 带数据迁移并单点归属(colloc-ai-cache)，组件与 ProgressPage 清理清单同步；persist 改走 effect 保持 setState 更新函数纯(StrictMode 双调用)；新增 verify:vocab-caches 回归 21 断言 (`4e7bcfe`)
 - feat(vocab): 每日学习六方式细节优化与扩展 —— 修拼写/填空自动读出答案、lastSpokenKey 每轮清空(修首卡不出声)、答错重排同参接入、配对按错配计分+双向选择、干扰项同词性+释义去重、加练空转给出口、自动发音开关(三模式共键)、连击、答对自动跳页、键盘扩展、getNewWords 多轮采样填满配额、闪卡背面单词+例句一次读、顶部『上一个单词』详情弹窗(复用 WordInfoDialog)、测试干扰项去重+答错留足阅读时间 (`525e555`)
 - docs+brand: 交接手册(PROJECT-HANDOVER)接入 AGENTS/README 索引；品牌视觉资产重建(图标/启动图/favicon/icon.ico via gen-app-brand.ps1) (`3444e6e`)
 

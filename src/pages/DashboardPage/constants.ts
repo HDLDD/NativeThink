@@ -104,7 +104,7 @@ export const MODULES = [
   { key: 'sentences', label: '句子学习', icon: MessagesSquare, color: '#F59E0B' },
   { key: 'vocabulary', label: '词汇深度', icon: BookOpen, color: '#EC4899' },
   { key: 'articles', label: '文章阅读', icon: BookMarked, color: '#0EA5E9' },
-  { key: 'spelling', label: '句子拼写', icon: SpellCheck, color: '#F59E0B' },
+  { key: 'spelling', label: '句子拼写', icon: SpellCheck, color: '#F43F5E' },
   { key: 'think', label: '思维训练', icon: Brain, color: '#00B894' },
   { key: 'chunks', label: '语块训练', icon: Puzzle, color: '#1F2937' },
   { key: 'conversation', label: '对话练习', icon: MessageSquare, color: '#6366F1' },

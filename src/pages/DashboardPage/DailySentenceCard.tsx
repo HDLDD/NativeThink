@@ -127,7 +127,13 @@ function DailySentenceCardInner({
                 title="复制本句"
                 onClick={() => {
                   const text = `${dailyChunk.content}（${dailyChunk.meaning}）\n${cleanText(dailyChunk.example)}${exampleZh ? `\n${exampleZh}` : ''}`;
-                  try { navigator.clipboard?.writeText(text).then(() => toast.success('已复制到剪贴板')); } catch { /* ignore */ }
+                  try {
+                    navigator.clipboard?.writeText(text)
+                      .then(() => toast.success('已复制到剪贴板'))
+                      .catch(() => toast.error('复制失败，请手动选择文本'));
+                  } catch {
+                    toast.error('复制失败，请手动选择文本');
+                  }
                 }}
                 className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal"
               >
