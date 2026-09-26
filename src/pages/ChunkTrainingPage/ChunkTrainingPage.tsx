@@ -471,6 +471,43 @@ export default function ChunkTrainingPage() {
     setReviewIdx((p) => p + 1); // 走到队尾即触发完成页
   };
 
+  // ===== 复习断点续学：中途退出 / 切 tab / 杀 App 后，重新进入能接着上次的位置 =====
+  const REVIEW_BREAKPOINT_KEY = '__nativethink_chunk_review_session';
+  useEffect(() => {
+    try {
+      if (reviewQueue.length > 0 && reviewIdx < reviewQueue.length) {
+        safeStorage.setItem(REVIEW_BREAKPOINT_KEY, JSON.stringify({
+          ids: reviewQueue.map((c) => c.id),
+          index: reviewIdx,
+          savedAt: Date.now(),
+        }));
+      } else if (reviewQueue.length > 0) {
+        // 走完本轮 → 断点作废
+        safeStorage.removeItem(REVIEW_BREAKPOINT_KEY);
+      }
+    } catch { /* ignore */ }
+  }, [reviewQueue, reviewIdx]);
+  const reviewResumeRef = useRef(false);
+  useEffect(() => {
+    if (reviewResumeRef.current) return;
+    reviewResumeRef.current = true;
+    try {
+      const raw = safeStorage.getItem(REVIEW_BREAKPOINT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { ids: string[]; index?: number };
+      if (!Array.isArray(saved?.ids) || saved.ids.length === 0) return;
+      const entries = saved.ids
+        .map((id) => allChunks.find((c) => c.id === id))
+        .filter((c): c is IChunk => !!c);
+      if (entries.length === 0) { safeStorage.removeItem(REVIEW_BREAKPOINT_KEY); return; }
+      const idx = Math.max(0, Math.min(saved.index ?? 0, entries.length - 1));
+      setReviewQueue(entries);
+      setReviewIdx(idx);
+      reviewRelearnRef.current = {};
+      toast.success(`接着上次继续 — 还剩 ${entries.length - idx} 张`, { duration: 2000 });
+    } catch { /* ignore */ }
+  }, [allChunks]);
+
   /** 「随便看看」推荐（未学过的语块随机 5 个）—— memo 化，避免每次敲搜索词推荐区跳序 */
   const suggestPhrases = useMemo(() => {
     const pool = allChunks.filter((c) => !phraseState.progress[c.content.toLowerCase()]);
