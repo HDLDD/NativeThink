@@ -597,6 +597,14 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     [safeSpeak],
   );
 
+  /** ReaderParagraph 的稳定回调适配器：(text, pageIdx, paraIdx) → speakOneParagraph。
+      此前两处传内联闭包，把 ReaderParagraph 的 memo 击穿 —— TTS 每个切片触发
+      setReadPos 都导致整章段落全量重渲染（长章朗读手机上可感卡顿） */
+  const speakParagraphAt = useCallback(
+    (text: string, pageIdx: number, paraIdx: number) => { speakOneParagraph(pageIdx, paraIdx, text); },
+    [speakOneParagraph],
+  );
+
   // Sync refs for the 连读 onEnd closure — 小说模式以"章"为单元，翻页模式以"页"为单元
   modeRef.current = readerMode;
   if (readerMode === 'novel') {
@@ -1057,47 +1065,52 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     return () => { cancelled = true; };
   }, [readerMode, novelChapterIdx, activeContent]);
 
+  // ── 「翻译全部」：复用整书断点队列（translateBook）──
+  // 批合并 + 限流退避 + IndexedDB 断点续传（每批落盘，随时中止，再次点击只补缺失）。
+  // 此前是逐段串行 aiChat、全部结束才一次性落盘 —— 整书翻到一半退出全部白费。
   const translateAllPages = async () => {
     if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
-    // 与单页/单章翻译互斥 —— 两条路径各自基于过期 validPages 快照写 displayContent 会互相覆盖
     if (transLoading) { toast.info('本页/本章翻译正在进行中，请先等它完成'); return; }
+    if (bookTrans) return;
+    const allDone = validPages.every((pg) => pg.paragraphs.every((p) => p.zh));
+    if (allDone) { toast('所有页面已有翻译'); return; }
     setTransAllLoading(true);
-    let count = 0;
-    let failed = 0;
+    const ac = new AbortController();
+    bookAbortRef.current = ac;
     try {
-      const allUntranslated = validPages.flatMap(
-        (p, pi) => p.paragraphs.map((pp, ppi) => ({ en: pp.en, pageIdx: pi, paraIdx: ppi })).filter((x) => !validPages[x.pageIdx].paragraphs[x.paraIdx].zh),
-      );
-      if (allUntranslated.length === 0) { toast('所有页面已有翻译'); return; }
-      const newCache = { ...transCache };
-      let updatedPages = [...validPages];
-      for (const item of allUntranslated) {
-        const result = await aiChat([
-          { role: 'system', content: 'Translate the following English to natural Chinese. Return ONLY the Chinese translation, no extra text.' },
-          { role: 'user', content: item.en.slice(0, 1500) },
-        ], { temperature: 0.3, maxTokens: 1024 });
-        const zh = result.trim();
-        // 空结果 = 该段失败（use-ai 吞错返回 ''）—— 计数并跳过，不能把空串当译文写进正文
-        if (!zh) { failed++; continue; }
-        updatedPages[item.pageIdx] = {
-          ...updatedPages[item.pageIdx],
-          paragraphs: updatedPages[item.pageIdx].paragraphs.map((p, i) =>
-            i === item.paraIdx ? { ...p, zh } : p,
-          ),
-        };
-        count++;
-        const pg = updatedPages[item.pageIdx];
-        newCache[item.pageIdx] = toCacheEntryV2(pg);
-        // 长任务进度反馈（整书可达数百段，此前全程无任何提示）
-        if (count % 5 === 0) toast(`${count}/${allUntranslated.length} 段已翻译…`, { id: 'translate-all', duration: 2000 });
+      const r = await translateBook(activeContent, {
+        signal: ac.signal,
+        onProgress: (pp) => setBookTrans({
+          chaptersDone: pp.chaptersDone,
+          chaptersTotal: pp.chaptersTotal,
+          chapterTitle: pp.chapterTitle,
+          segDone: pp.segDone,
+          segTotal: pp.segTotal,
+        }),
+      });
+      // 完成后按段落原文把已译章节合并进当前翻页正文（与小说模式合并同源）
+      const chapters = splitChapters(activeContent);
+      const zhMap = new Map<string, string>();
+      for (let ci = 0; ci < chapters.length; ci++) {
+        const ch = chapters[ci];
+        const zh = await getChapterTranslation(activeContent.id, ci, ch.paragraphs.length).catch(() => null);
+        if (!zh) continue;
+        ch.paragraphs.forEach((en, i) => { if (zh[i] && en.trim()) zhMap.set(en, zh[i]); });
       }
-      setTransCache(newCache);
-      safeStorage.setItem(TR_CACHE_KEY, JSON.stringify(newCache));
-      setDisplayContent({ ...activeContent, pages: updatedPages });
-      if (count > 0) toast.success(`已翻译 ${count} 个段落${failed ? `，${failed} 段失败可重试` : ''}！`);
-      else toast.error('翻译失败，请稍后重试');
-    } catch { toast.error('批量翻译失败'); }
-    finally { setTransAllLoading(false); }
+      if (zhMap.size > 0) {
+        const updatedPages = validPages.map((pg) => (
+          pg.paragraphs.some((p) => !p.zh && zhMap.has(p.en))
+            ? { ...pg, paragraphs: pg.paragraphs.map((p) => (zhMap.has(p.en) && !p.zh ? { ...p, zh: zhMap.get(p.en)! } : p)) }
+            : pg
+        ));
+        setDisplayContent({ ...activeContent, pages: updatedPages });
+      }
+      if (r.completed) toast.success(`全书预翻译完成 — 已合并到当前阅读（${r.translated} 段新译）`);
+      else toast.info(`预翻译已中止 — 完成 ${r.chaptersDone}/${r.chaptersTotal} 章，进度已保存，再次点击只补缺失`, { duration: 5000 });
+    } catch (e) {
+      toast.error(e instanceof Error && e.message.includes('已在翻译中') ? '全书预翻译正在进行中' : '批量翻译失败，请稍后重试');
+    }
+    finally { setBookTrans(null); setTransAllLoading(false); bookAbortRef.current = null; }
   };
 
   // Translate a single paragraph
@@ -1199,7 +1212,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           onChapterChange={handleNovelChapterChange}
           onProgress={saveNovelProgress}
           onWordClick={handleWordClick}
-          onSpeakPara={(text, pi, qi) => speakOneParagraph(pi, qi, text)}
+          onSpeakPara={speakParagraphAt}
           onTranslatePara={translateParagraph}
           paraTranslating={paraTranslating}
           onToggleParaFav={toggleParaFav}
@@ -1333,7 +1346,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
               paraIdx={i}
               translating={paraTranslating === `${currentPage}-${i}`}
               onWordClick={handleWordClick}
-              onSpeak={(text) => speakOneParagraph(currentPage, i, text)}
+              onSpeakPara={speakParagraphAt}
               onTranslate={translateParagraph}
               onToggleFav={toggleParaFav}
               faved={paraFaved(para.en)}
@@ -1523,9 +1536,15 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                       {readerMode === 'novel' ? '翻译本章' : '翻译本页'}
                     </Button>
                   )}
-                  <Button variant="outline" size="sm" onClick={translateAllPages} disabled={transAllLoading} className="flex-1 rounded-xl text-xs font-bold gap-1">
-                    {transAllLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}翻译全部
-                  </Button>
+                  {bookTrans ? (
+                    <Button variant="outline" size="sm" onClick={stopBookTranslation} className="flex-1 rounded-xl text-xs font-bold gap-1 border-rose-200 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10">
+                      <Loader2 className="size-3.5 animate-spin" />停止翻译（{bookTrans.chaptersDone}/{bookTrans.chaptersTotal} 章）
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={translateAllPages} disabled={transAllLoading} className="flex-1 rounded-xl text-xs font-bold gap-1">
+                      {transAllLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}翻译全部
+                    </Button>
+                  )}
                 </div>
                 <div className="flex gap-2 mt-2">
                   {LEVELS.map(({ key, label, color }) => (
