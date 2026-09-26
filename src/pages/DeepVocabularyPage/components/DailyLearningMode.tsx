@@ -285,9 +285,10 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     }
   }, [autoSpeak, reviewMode, currentIdx, isFlipped, sessionWords]);
 
-  // 选择/配对：读题面单词（看词选义、听词配对都需要发音）
+  // 选择题：读题面单词（看词选义需要发音）。
+  // 配对模式**不自动朗读** —— 配对本身就是视觉任务，出声反而干扰（真机反馈）
   useEffect(() => {
-    if (!autoSpeak || (reviewMode !== 'choice' && reviewMode !== 'matching')) return;
+    if (!autoSpeak || reviewMode !== 'choice') return;
     const word = sessionWords[currentIdx];
     if (!word) return;
     const key = `${reviewMode}-${currentIdx}-${word.word}`;

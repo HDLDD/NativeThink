@@ -4,6 +4,7 @@
 
 
 ## 2026-09-26
+- docs(changelog): 补记 7d706a2 (`d2ded46`)
 - build(apk): package:apk 补上 version:apk-bump（AGENTS 要求每次打包 versionCode 必递增，此前只在 package:web 里）+ versionCode 68 / versionName 2.0.23 + 日志 (`7d706a2`)
 - docs(changelog): 2026-09-26 开发日志(词汇六方式优化/缓存封顶/全站细节优化/三项遗留优化) (`8df5352`)
 - perf(reader): 修 ReaderParagraph memo 被内联闭包击穿 —— onSpeak 改为自带坐标的 onSpeakPara，父级传稳定 useCallback；此前 TTS 每个切片 setReadPos 都导致整章段落全量重渲染(长章朗读手机卡顿) (`9ffddd3`)

@@ -884,7 +884,9 @@ export default function QuickCardMode({ level }: { level: string }) {
               <CardContent className="p-8 text-center space-y-3">
                 <div data-fit-box className="flex items-center justify-center gap-2 max-w-full">
                   <h2 className="text-foreground min-w-0 max-w-full">
-                    <FitWord text={cw.word} maxPx={48} minPx={20} reservePx={52} />
+                    {/* reserve 必须覆盖**两个**按钮（朗读 + 收藏 ≈ 96px）——
+                        此前只留 52px，长单词按 (宽-52) 缩放，右端被按钮盖住（真机反馈） */}
+                    <FitWord text={cw.word} maxPx={48} minPx={20} reservePx={100} />
                   </h2>
                   <Button
                     variant="ghost" size="icon"
