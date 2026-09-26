@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { safeStorage } from '@/lib/safe-storage';
+import { mergeCollocAiCache, persistCollocAiCache, readCollocAiCache } from '@/lib/colloc-ai-cache';
 import { getAllWords, queryWords, getWordCounts } from '@/data/wordbank';
 import STATIC_TRANSLATIONS from '@/data/wordbank/collocation-translations';
 import type { IWordEntry } from '@/data/wordbank/schema';
@@ -381,14 +382,10 @@ export default function CollocationsTab({
 
 
   // ===== Collocation translation: static map → AI cache → AI on-demand =====
-  const AI_CACHE_KEY = '__nativethink_colloc_ai_tranlations';
-
-  const [aiCache, setAiCache] = useState<Record<string, string>>(() => {
-    try {
-      const raw = safeStorage.getItem(AI_CACHE_KEY);
-      return raw ? JSON.parse(raw) : {};
-    } catch { return {}; }
-  });
+  // 缓存键/迁移/上限统一在 colloc-ai-cache.ts（与每日学习的闪卡背面共用同一份，
+  // 旧键 `..._tranlations` 拼写错误由首次读取自动迁移）
+  const [aiCache, setAiCache] = useState<Record<string, string>>(() => readCollocAiCache());
+  useEffect(() => { persistCollocAiCache(aiCache); }, [aiCache]);
 
   const [translating, setTranslating] = useState<string | null>(null);
 
@@ -408,11 +405,8 @@ export default function CollocationsTab({
     setTranslating(key);
     try {
       const zh = await onTranslateColloc(phrase);
-      setAiCache((prev) => {
-        const next = { ...prev, [key]: zh };
-        safeStorage.setItem(AI_CACHE_KEY, JSON.stringify(next));
-        return next;
-      });
+      // 合并 + 封顶是纯函数；落盘由上面的 persist effect 统一做
+      setAiCache((prev) => mergeCollocAiCache(prev, { [key]: zh }));
     } catch { /* user will see no translation — they can click AI detail instead */ }
     finally { setTranslating(null); }
   }
@@ -435,11 +429,7 @@ export default function CollocationsTab({
       setTranslating(key);
       try {
         const zh = await onTranslateColloc(entry.phrase);
-        setAiCache((prev) => {
-          const next = { ...prev, [key]: zh };
-          safeStorage.setItem(AI_CACHE_KEY, JSON.stringify(next));
-          return next;
-        });
+        setAiCache((prev) => mergeCollocAiCache(prev, { [key]: zh }));
         done++;
       } catch { done++; }
       finally { setTranslating(null); }

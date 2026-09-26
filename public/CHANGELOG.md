@@ -4,6 +4,7 @@
 
 
 ## 2026-09-26
+- feat(vocab): 每日学习六方式细节优化与扩展 —— 修拼写/填空自动读出答案、lastSpokenKey 每轮清空(修首卡不出声)、答错重排同参接入、配对按错配计分+双向选择、干扰项同词性+释义去重、加练空转给出口、自动发音开关(三模式共键)、连击、答对自动跳页、键盘扩展、getNewWords 多轮采样填满配额、闪卡背面单词+例句一次读、顶部『上一个单词』详情弹窗(复用 WordInfoDialog)、测试干扰项去重+答错留足阅读时间 (`525e555`)
 - docs+brand: 交接手册(PROJECT-HANDOVER)接入 AGENTS/README 索引；品牌视觉资产重建(图标/启动图/favicon/icon.ico via gen-app-brand.ps1) (`3444e6e`)
 
 ## 2026-09-23

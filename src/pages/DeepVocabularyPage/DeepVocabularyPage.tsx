@@ -14,6 +14,7 @@ import { useWordLearning } from '@/lib/use-word-learning';
 import { WordImage } from '@/components/WordImage';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
+import { cappedPut, persistJson, readJson } from '@/lib/capped-cache';
 import { cn, cleanText, extractJson } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
 import { toast } from 'sonner';
@@ -476,13 +477,8 @@ export default function DeepVocabularyPage() {
 
   const tts = useTTS();
 
-  // AI-generated word content (sentences + deep explanation)
-  const [aiWordData, setAiWordData] = useState<Record<string, IWordAiData>>(() => {
-    try {
-      const saved = safeStorage.getItem('__nativethink_word_ai_data');
-      return saved ? JSON.parse(saved) : {};
-    } catch { return {}; }
-  });
+  // AI-generated word content (sentences + deep explanation) — FIFO 封顶 200 词
+  const [aiWordData, setAiWordData] = useState<Record<string, IWordAiData>>(() => readJson('__nativethink_word_ai_data', {} as Record<string, IWordAiData>));
   const [genSentencesFor, setGenSentencesFor] = useState<string | null>(null);
   const [genExplanationFor, setGenExplanationFor] = useState<string | null>(null);
 
@@ -491,13 +487,11 @@ export default function DeepVocabularyPage() {
   const [collocLoading, setCollocLoading] = useState(false);
   const [collocOpen, setCollocOpen] = useState(false);
 
-  // Cache for collocation lookups (phrase → { meaning, examples })
-  const [collocCache, setCollocCache] = useState<Record<string, { meaning: string; examples: { en: string; zh: string }[] }>>(() => {
-    try {
-      const saved = safeStorage.getItem('__nativethink_colloc_cache');
-      return saved ? JSON.parse(saved) : {};
-    } catch { return {}; }
-  });
+  // Cache for collocation lookups (phrase → { meaning, examples }) — FIFO 封顶 300 条
+  const [collocCache, setCollocCache] = useState<Record<string, { meaning: string; examples: { en: string; zh: string }[] }>>(
+    () => readJson('__nativethink_colloc_cache', {} as Record<string, { meaning: string; examples: { en: string; zh: string }[] }>),
+  );
+  useEffect(() => { persistJson('__nativethink_colloc_cache', collocCache); }, [collocCache]);
 
   const handleLookupCollocation = async (phrase: string) => {
     const key = phrase.toLowerCase();
@@ -532,13 +526,8 @@ export default function DeepVocabularyPage() {
         examples: (parsed.examples || []).filter((e) => e.en && e.zh),
       };
       setCollocDetail(detail);
-      // Save to cache
-      const cacheEntry = { meaning: detail.meaning, examples: detail.examples };
-      setCollocCache((prev) => {
-        const next = { ...prev, [key]: cacheEntry };
-        safeStorage.setItem('__nativethink_colloc_cache', JSON.stringify(next));
-        return next;
-      });
+      // Save to cache（封顶淘汰最旧的；落盘由 persist effect 统一做）
+      setCollocCache((prev) => cappedPut(prev, key, { meaning: detail.meaning, examples: detail.examples }, 300));
       if (!parsed.phrase && !parsed.meaning) toast.error('AI 返回内容不完整');
     } catch (e: any) { toast.error(e?.message || '查询失败'); }
     finally { setCollocLoading(false); }
@@ -565,17 +554,11 @@ export default function DeepVocabularyPage() {
           );
           const parsed = extractJson<{ phrase?: string; meaning?: string; examples?: { en: string; zh: string }[] }>(result);
           if (parsed.meaning || (parsed.examples && parsed.examples.length > 0)) {
-            setCollocCache((prev) => {
-              const next = {
-                ...prev,
-                [key]: {
-                  meaning: parsed.meaning || '暂无释义',
-                  examples: (parsed.examples || []).filter((e) => e.en && e.zh),
-                },
-              };
-              safeStorage.setItem('__nativethink_colloc_cache', JSON.stringify(next));
-              return next;
-            });
+            const entry = {
+              meaning: parsed.meaning || '暂无释义',
+              examples: (parsed.examples || []).filter((e) => e.en && e.zh),
+            };
+            setCollocCache((prev) => cappedPut(prev, key, entry, 300));
           }
         } catch { /* pre-fetch failures are silent */ }
       }
@@ -599,15 +582,14 @@ export default function DeepVocabularyPage() {
   };
 
   useEffect(() => {
-    safeStorage.setItem('__nativethink_word_ai_data', JSON.stringify(aiWordData));
+    persistJson('__nativethink_word_ai_data', aiWordData);
   }, [aiWordData]);
 
   const wordKey = (w: IWordEntry) => w.word.toLowerCase();
 
-  // ── AI 深度解析（词根/联想/易混淆）— 按词缓存 ──
-  const [deepData, setDeepData] = useState<Record<string, string>>(() => {
-    try { return JSON.parse(safeStorage.getItem('__nativethink_word_deep') || '{}'); } catch { return {}; }
-  });
+  // ── AI 深度解析（词根/联想/易混淆）— 按词缓存，FIFO 封顶 300 条 ──
+  const [deepData, setDeepData] = useState<Record<string, string>>(() => readJson('__nativethink_word_deep', {} as Record<string, string>));
+  useEffect(() => { persistJson('__nativethink_word_deep', deepData); }, [deepData]);
   const [deepLoading, setDeepLoading] = useState(false);
   const handleGenerateDeep = async (w: IWordEntry) => {
     if (!isConfigured || deepLoading) return;
@@ -620,11 +602,7 @@ export default function DeepVocabularyPage() {
       ], { temperature: 0.6, maxTokens: 400 });
       const text = (result || '').trim();
       if (text) {
-        setDeepData((prev) => {
-          const next = { ...prev, [key]: text };
-          try { safeStorage.setItem('__nativethink_word_deep', JSON.stringify(next)); } catch { /* quota */ }
-          return next;
-        });
+        setDeepData((prev) => cappedPut(prev, key, text, 300));
       } else toast.error('生成失败，请重试');
     } catch { toast.error('AI 服务暂不可用'); }
     finally { setDeepLoading(false); }
@@ -678,10 +656,7 @@ export default function DeepVocabularyPage() {
         .map((item) => ({ en: item.en || '', zh: item.zh || '' }))
         .filter((item) => item.en && item.zh);
       if (items.length === 0) { toast.error('AI 未生成有效例句'); return; }
-      setAiWordData((prev) => ({
-        ...prev,
-        [key]: { ...prev[key], sentences: [...(prev[key]?.sentences || []), ...items].slice(0, 10) },
-      }));
+      setAiWordData((prev) => cappedPut(prev, key, { ...prev[key], sentences: [...(prev[key]?.sentences || []), ...items].slice(0, 10) }, 200));
       toast.success(`AI 已生成 ${items.length} 条例句！`);
     } catch (e: any) { toast.error(e?.message || 'AI 生成失败'); }
     finally { setGenSentencesFor(null); }
@@ -700,10 +675,7 @@ export default function DeepVocabularyPage() {
         { temperature: 0.6, maxTokens: 1024 },
       );
       if (!result || result.trim().length < 20) { toast.error('AI 返回内容过短，请重试'); return; }
-      setAiWordData((prev) => ({
-        ...prev,
-        [key]: { ...prev[key], explanation: result.trim() },
-      }));
+      setAiWordData((prev) => cappedPut(prev, key, { ...prev[key], explanation: result.trim() }, 200));
       toast.success('AI 深度解析已生成！');
     } catch { toast.error('AI 生成失败'); }
     finally { setGenExplanationFor(null); }
@@ -995,6 +967,14 @@ export default function DeepVocabularyPage() {
       {!showWizard && immersed && (
       <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
         {/* Sticky header: browse level scroller + filter chips + tab buttons */}
+        {/*
+          Sticky header：只在「词库浏览」里才有内容（等级滚轮 + 筛选 chip）。
+          踩过的坑：原先这个 div 无条件渲染，其它 tab 下它是一个**纯 pb-3 的 12px 空条**，
+          又带 bg-background/95 + z-30，`sticky top-20` 把它钉在 y=80（沉浸态没有全局 Header
+          时正好落在内容区顶部）→ 压住复习检测会话栏的「错词重练中 / 1/14 已评 0」，
+          表现就是"顶部和已复习单词数被遮住"。空条不该存在。
+        */}
+        {tab === 'browse' && (
         <div className="sticky top-20 z-30 bg-background/95 backdrop-blur-md pb-3 -mx-1 px-1">
           {/* 等级筛选滚轮 — only in browse mode */}
           {tab === 'browse' && (
@@ -1058,14 +1038,8 @@ export default function DeepVocabularyPage() {
             </div>
             </>
           )}
-          {false && (<TabsList className="bg-muted p-1.5 rounded-3xl h-auto">
-          <TabsTrigger value="daily" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-emerald-500 data-[state=active]:shadow-sm"><Brain className="size-4 mr-2" />学习</TabsTrigger>
-          <TabsTrigger value="flashcard" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-violet data-[state=active]:shadow-sm"><RotateCw className="size-4 mr-2" />复习</TabsTrigger>
-          <TabsTrigger value="browse" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-sky-500 data-[state=active]:shadow-sm"><BookOpen className="size-4 mr-2" />词库浏览</TabsTrigger>
-          <TabsTrigger value="collocations" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-amber-500 data-[state=active]:shadow-sm"><Link2 className="size-4 mr-2" />搭配学习</TabsTrigger>
-          <TabsTrigger value="vocabtest" className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-rose-500 data-[state=active]:shadow-sm"><Target className="size-4 mr-2" />测词汇量</TabsTrigger>
-        </TabsList>)}
-        </div>{/* end sticky header */}
+        </div>
+        )}{/* end sticky header（仅浏览 tab） */}
 
         <TabsContent value="daily" className="mt-0">
           <DailyLearningMode level={selectedLevel} counts={counts} />
