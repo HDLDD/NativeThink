@@ -533,7 +533,7 @@ export default function NovelReader({
                     paraIdx={it.paraIdx}
                     translating={paraTranslating === `${it.pageIdx}-${it.paraIdx}`}
                     onWordClick={onWordClick}
-                    onSpeak={(text) => onSpeakPara(text, it.pageIdx, it.paraIdx)}
+                    onSpeakPara={onSpeakPara}
                     onTranslate={onTranslatePara}
                     onToggleFav={onToggleParaFav}
                     faved={isParaFaved(it.para.en)}

@@ -23,7 +23,13 @@ interface ReaderParagraphProps {
   paraIdx: number;
   translating: boolean;
   onWordClick: (e: React.MouseEvent, word: string) => void;
-  onSpeak: (text: string) => void;
+  /**
+   * 朗读段落 —— 签名带 pageIdx/paraIdx，组件内部自行补坐标。
+   * 此前是 `(text) => void`，父级只能传内联闭包 `onSpeak={(t) => onSpeakPara(t, pi, qi)}`，
+   * 每次渲染都是新函数把 memo 击穿：TTS 每个切片触发 setReadPos → 整章段落全量重渲染
+   * （长章朗读在手机上可感卡顿）。改为坐标参数后父级传稳定 useCallback，memo 生效。
+   */
+  onSpeakPara: (text: string, pageIdx: number, paraIdx: number) => void;
   onTranslate?: (pageIdx: number, paraIdx: number) => void;
   onToggleFav: (para: IParagraph) => void;
   faved: boolean;
@@ -42,7 +48,7 @@ function ReaderParagraphImpl({
   paraIdx,
   translating,
   onWordClick,
-  onSpeak,
+  onSpeakPara,
   onTranslate,
   onToggleFav,
   faved,
@@ -123,7 +129,7 @@ function ReaderParagraphImpl({
               */}
               <div className="absolute right-0 top-0 flex items-center gap-1">
                 <button
-                  onClick={(e) => { e.stopPropagation(); onSpeak(cleanText(displayEn)); }}
+                  onClick={(e) => { e.stopPropagation(); onSpeakPara(cleanText(displayEn), pageIdx, paraIdx); }}
                   className="shrink-0 size-7 rounded-lg bg-background border border-border/70 shadow-sm flex items-center justify-center text-muted-foreground hover:text-ink-teal hover:border-ink-teal/50 transition-colors"
                   title="朗读段落"
                 >
