@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Mic,
@@ -42,7 +42,7 @@ import { useFavorites } from '@/lib/use-favorites';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
 import { usePageMemory } from '@/lib/use-page-memory';
-import { cn } from '@/lib/utils';
+import { cn, extractJson } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
 import { toast } from 'sonner';
 
@@ -74,7 +74,17 @@ export default function ShadowingPage() {
   const [currentSentenceIdx, setCurrentSentenceIdx] = useState(0);
   const [isLooping, setIsLooping] = useState(false);
   const [playbackRate, setPlaybackRate] = usePageMemory('shadowing-rate', 1);
-  const [completedSentences, setCompletedSentences] = useState<Set<string>>(new Set());
+  /** 已完成句子（键 = 语料id-句序）—— 持久化（此前切 tab/刷新即丢） */
+  const COMPLETED_KEY = '__nativethink_shadowing_completed';
+  const [completedSentences, setCompletedSentences] = useState<Set<string>>(() => {
+    try {
+      const s = safeStorage.getItem(COMPLETED_KEY);
+      return s ? new Set(JSON.parse(s) as string[]) : new Set();
+    } catch { return new Set(); }
+  });
+  useEffect(() => {
+    try { safeStorage.setItem(COMPLETED_KEY, JSON.stringify([...completedSentences])); } catch { /* ignore */ }
+  }, [completedSentences]);
 
   // AI generation state
   const [customMaterials, setCustomMaterials] = useState<IShadowingMaterial[]>(() => {
@@ -156,9 +166,8 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
         ],
         { temperature: 0.9, maxTokens: 1536 },
       );
-      const jsonMatch = result.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) { toast.error('AI 返回格式异常，请重试'); return; }
-      const parsed = JSON.parse(jsonMatch[0]);
+      if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
+      const parsed = extractJson<any[]>(result);
       if (!Array.isArray(parsed) || parsed.length === 0) { toast.error('AI 未生成有效句子'); return; }
       const newSentences: IShadowingSentence[] = parsed.map((s: { text: string; annotatedText: string; translation: string }, i: number) => ({
         id: `ext_${Date.now()}_${i}`,
@@ -185,6 +194,8 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
   // Voice recording + recognition state
   const [recordingVoice, setRecordingVoice] = useState(false);
   const [userTranscript, setUserTranscript] = useState('');
+  /** 识别实例 ref —— 卸载/切句时 abort，避免麦克风被持续占用 */
+  const recognitionRef = useRef<{ abort: () => void } | null>(null);
 
   const allMaterials = [...customMaterials, ...MOCK_SHADOWING_MATERIALS];
 
@@ -205,28 +216,80 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
     ? [...selectedCorpus.sentences, ...(extraSentences[selectedCorpus.id] || [])]
     : [];
   const totalSentences = allSentences.length;
-  const totalCompleted = completedSentences.size;
-  const progressPercent = totalSentences > 0 ? (totalCompleted / totalSentences) * 100 : 0;
+  // 只统计**当前语料**的完成数 —— 此前用全局 Set 的 size 除以当前语料句数，
+  // 在 A 语料完成几句后切到 B，进度条直接虚高甚至超过 100%
+  const totalCompleted = useMemo(
+    () => (selectedCorpus ? [...completedSentences].filter((k) => k.startsWith(`${selectedCorpus.id}-`)).length : 0),
+    [completedSentences, selectedCorpus],
+  );
+  const progressPercent = totalSentences > 0 ? Math.min(100, (totalCompleted / totalSentences) * 100) : 0;
 
   const currentSentence = allSentences[currentSentenceIdx];
 
   const skipAdvanceRef = useRef(false);
+  const allSentencesRef = useRef(allSentences);
+  allSentencesRef.current = allSentences;
+  const rateRef = useRef(playbackRate);
+  rateRef.current = playbackRate;
+  /** 单句循环的重播入口 —— onEnd 闭包创建时 tts 还不存在，经 ref 桥接（advanceRef 同款模式） */
+  const loopSpeakRef = useRef<() => void>(() => {});
+  /** 「我读完了」的 400ms 自动前进定时器 —— 手动切句/切语料时必须取消 */
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelPendingAdvance = useCallback(() => {
+    if (advanceTimerRef.current) {
+      clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
+  }, []);
+
+  // 卸载清理：停掉可能还在跑的语音识别与待执行的自动前进
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+      cancelPendingAdvance();
+    };
+  }, [cancelPendingAdvance]);
 
   // Shared TTS hook with auto-advance on sentence end
   const tts = useTTS({
     onEnd: () => {
       if (skipAdvanceRef.current) { skipAdvanceRef.current = false; return; }
-      if (!isLoopingRef.current) {
-        const idx = currentIdxRef.current;
-        if (idx < allSentences.length - 1) {
-          setCurrentSentenceIdx(idx + 1);
-        }
+      if (isLoopingRef.current) {
+        // 单句循环：重新朗读当前句 —— 此前 onEnd 直接 return，"循环"实际只是播完停住
+        loopSpeakRef.current();
+        return;
+      }
+      const idx = currentIdxRef.current;
+      if (idx < allSentencesRef.current.length - 1) {
+        setCurrentSentenceIdx(idx + 1);
       }
     },
   });
 
   const isSpeakingRef = useRef(false);
   isSpeakingRef.current = tts.isSpeaking;
+
+  // 单句循环重播：经 ref 桥接拿到最新的 tts 与语料
+  loopSpeakRef.current = () => {
+    const s = allSentencesRef.current[currentIdxRef.current];
+    const corpus = selectedCorpusRef.current;
+    if (s) {
+      tts.speak(s.text, { lang: corpus?.accent === 'UK' ? 'en-GB' : 'en-US', rate: rateRef.current });
+    }
+  };
+
+  // 预热当前与下一句 —— 跟读是逐句连续播放场景，离线引擎冷启动后首播延迟明显
+  useEffect(() => {
+    if (!currentSentence) return;
+    const t1 = setTimeout(() => { try { tts.prewarm(currentSentence.text, { rate: playbackRate }); } catch { /* ignore */ } }, 80);
+    const nxt = allSentences[currentSentenceIdx + 1];
+    const t2 = nxt
+      ? setTimeout(() => { try { tts.prewarm(nxt.text, { rate: playbackRate }); } catch { /* ignore */ } }, 240)
+      : null;
+    return () => { clearTimeout(t1); if (t2) clearTimeout(t2); };
+    // 只跟句面/序/速率挂钩，避免 allSentences 引用每渲染变化反复触发
+  }, [currentSentence?.text, currentSentenceIdx, playbackRate]);
 
   const togglePlay = useCallback(() => {
     if (isSpeakingRef.current) {
@@ -263,26 +326,26 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
 
   const prevSentence = useCallback(() => {
     tts.cancel();
+    cancelPendingAdvance();
     setAutoPlay(false);
     if (currentSentenceIdx > 0) {
       setCurrentSentenceIdx(currentSentenceIdx - 1);
     }
-  }, [currentSentenceIdx, tts.cancel]);
+  }, [currentSentenceIdx, tts.cancel, cancelPendingAdvance]);
 
   const nextSentence = useCallback(() => {
     tts.cancel();
+    cancelPendingAdvance();
     setAutoPlay(false);
     if (currentSentenceIdx < allSentences.length - 1) {
       setCurrentSentenceIdx(currentSentenceIdx + 1);
     }
-  }, [currentSentenceIdx, tts.cancel, allSentences.length]);
+  }, [currentSentenceIdx, tts.cancel, allSentences.length, cancelPendingAdvance]);
 
   const toggleLoop = useCallback(() => {
-    setIsLooping((prev) => {
-      toast.success(prev ? '已关闭单句循环' : '已开启单句循环');
-      return !prev;
-    });
-  }, []);
+    setIsLooping((prev) => !prev);
+    toast.success(isLooping ? '已关闭单句循环' : '已开启单句循环');
+  }, [isLooping]);
 
   const markCompleted = useCallback(() => {
     if (!selectedCorpus) return;
@@ -294,20 +357,23 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
     });
     addStudyMinutes(0.5, 'shadowing');
     toast.success('这句已完成！');
+    cancelPendingAdvance();
     if (currentSentenceIdx < allSentences.length - 1) {
-      setTimeout(() => {
+      advanceTimerRef.current = setTimeout(() => {
+        advanceTimerRef.current = null;
         setCurrentSentenceIdx((prev) => prev + 1);
         setAutoPlay(true);
       }, 400);
     }
-  }, [selectedCorpus, currentSentenceIdx, addStudyMinutes, allSentences.length]);
+  }, [selectedCorpus, currentSentenceIdx, addStudyMinutes, allSentences.length, cancelPendingAdvance]);
 
   const selectCorpus = useCallback((id: string) => {
     tts.cancel();
+    cancelPendingAdvance();
     setAutoPlay(false);
     setSelectedId(id);
     setCurrentSentenceIdx(0);
-  }, [tts.cancel]);
+  }, [tts.cancel, cancelPendingAdvance]);
 
   const validateMaterial = (material: { sentences: { text: string; annotatedText: string; translation: string }[] }): { errors: string[]; warnings: string[] } => {
     const errors: string[] = [];
@@ -381,16 +447,14 @@ Make sentences realistic and conversational. Mark 1-2 stressed words per sentenc
         { temperature: 0.9, maxTokens: 2048 },
       );
 
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) { toast.error('AI 返回格式异常，请重试'); return; }
-
-      const parsed = JSON.parse(jsonMatch[0]);
+      if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
+      const parsed = extractJson<{ title?: string; category?: string; difficulty?: string; accent?: string; description?: string; sentences?: { text: string; annotatedText: string; translation: string }[] }>(result);
       const newMaterial: IShadowingMaterial = {
         id: `ai_${Date.now()}`,
         title: parsed.title || `AI 语料 - ${genTopic || catLabel}`,
-        category: parsed.category || genCategory,
-        difficulty: parsed.difficulty || genDifficulty,
-        accent: parsed.accent || 'US',
+        category: (parsed.category || genCategory) as IShadowingMaterial['category'],
+        difficulty: (parsed.difficulty || genDifficulty) as IShadowingMaterial['difficulty'],
+        accent: (parsed.accent || 'US') as IShadowingMaterial['accent'],
         totalDuration: (parsed.sentences || []).length * 3,
         description: parsed.description || `AI 生成的${catLabel}跟读语料`,
         sentences: (parsed.sentences || []).map((s: { text: string; annotatedText: string; translation: string }, i: number) => ({
@@ -411,7 +475,8 @@ Make sentences realistic and conversational. Mark 1-2 stressed words per sentenc
       setCustomMaterials((prev) => [newMaterial, ...prev]);
       setSelectedId(newMaterial.id);
       setCurrentSentenceIdx(0);
-      setCompletedSentences(new Set());
+      // 不清 completedSentences —— 完成记录按语料 id 键控，新语料天然从 0 开始，
+      // 此前整表清空会把用户在其它语料的进度一并抹掉
 
       if (validation.errors.length > 0) {
         // Keep dialog open to show errors
@@ -496,6 +561,7 @@ Keep it concise and practical.`,
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
+    recognitionRef.current = recognition;
 
     let finalTranscript = '';
 
@@ -511,7 +577,17 @@ Keep it concise and practical.`,
       setUserTranscript(finalTranscript + interim);
     };
 
-    recognition.onerror = () => { setRecordingVoice(false); toast.error('语音识别失败，请重试'); };
+    recognition.onerror = (e: { error?: string }) => {
+      setRecordingVoice(false);
+      // 分支提示：权限被拒 / 没说话 / 其它，用户才知道去哪里修
+      if (e?.error === 'not-allowed' || e?.error === 'service-not-allowed') {
+        toast.error('麦克风权限被拒绝 —— 请在浏览器地址栏允许麦克风后重试', { duration: 5000 });
+      } else if (e?.error === 'no-speech') {
+        toast.error('未检测到语音输入');
+      } else {
+        toast.error('语音识别失败，请重试');
+      }
+    };
 
     recognition.onend = async () => {
       setRecordingVoice(false);

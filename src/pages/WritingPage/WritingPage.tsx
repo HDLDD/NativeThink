@@ -43,7 +43,7 @@ import { useAI } from '@/hooks/use-ai';
 import { useTTS } from '@/lib/use-tts';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { safeStorage } from '@/lib/safe-storage';
-import { cn } from '@/lib/utils';
+import { cn, extractJson } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 
@@ -371,7 +371,8 @@ export default function WritingPage() {
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
-  const [selectedHistoryIdx, setSelectedHistoryIdx] = useState<number | null>(null);
+  /** 正在查看的历史作文（点击历史条目打开） */
+  const [viewingHistory, setViewingHistory] = useState<{ prompt: string; essay: string; feedback: string; date: number } | null>(null);
 
   // ── 草稿自动保存：刷新/意外退出不丢作文 ──
   const DRAFT_KEY = '__nativethink_writing_draft';
@@ -561,6 +562,14 @@ Suggest 2-3 more advanced or natural alternatives to words used in the essay.`,
         }
       }
 
+      // 流式正常结束但内容为空 = AI 调用失败（use-ai 内部吞错只 toast）。
+      // 此前这里仍会写入一条**空反馈历史**并删掉草稿 —— 用户作文直接丢失。
+      if (!full.trim()) {
+        toast.error('AI 服务暂不可用，请稍后重试（草稿已保留）', { duration: 4000 });
+        setFeedback('> ⚠️ AI 写作反馈服务暂不可用。你的草稿已自动保留，可稍后重新提交。');
+        return;
+      }
+
       // Save to history
       setHistory((prev) => [
         ...prev,
@@ -623,13 +632,13 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
       );
 
       // Extract JSON from response
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
+      if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
+      try {
+        const parsed = extractJson<{ title?: string; description?: string; category?: string; wordLimit?: { min: number; max: number }; difficulty?: string; tips?: string[] }>(result);
         const newPrompt: IWritingPrompt = {
           id: `ai_${Date.now()}`,
-          title: parsed.title,
-          description: parsed.description,
+          title: parsed.title || '未命名题目',
+          description: parsed.description || '',
           category: parsed.category || genCategory,
           wordLimit: parsed.wordLimit || { min: 25, max: 9999 },
           difficulty: parsed.difficulty || genDifficulty,
@@ -641,7 +650,7 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
         toast.success('AI 题目已生成！');
         // Auto-start the new prompt
         startWriting(newPrompt);
-      } else {
+      } catch {
         toast.error('AI 返回格式异常，请重试');
       }
     } catch {
@@ -855,8 +864,9 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
                 {history.slice(-5).reverse().map((item, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setSelectedHistoryIdx(history.length - 1 - idx)}
+                    onClick={() => setViewingHistory({ ...item })}
                     className="w-full text-left p-4 rounded-2xl bg-muted/30 border border-transparent hover:bg-muted hover:border-border transition-all"
+                    title="点击查看这篇作文与反馈"
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-foreground">{item.prompt}</span>
@@ -870,6 +880,23 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
             </CardContent>
           </Card>
         )}
+
+        {/* 历史作文查看器 —— 此前历史条目点击只写一个从不读取的 state，看起来像卡死 */}
+        <Dialog open={!!viewingHistory} onOpenChange={(o) => { if (!o) setViewingHistory(null); }}>
+          <DialogContent className="max-w-2xl rounded-[28px] max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-base font-black">{viewingHistory?.prompt}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-4 rounded-2xl bg-muted/40 border border-border whitespace-pre-wrap text-sm text-foreground/85 leading-relaxed">
+                {viewingHistory?.essay}
+              </div>
+              <div className="p-4 rounded-2xl bg-violet-50/50 dark:bg-violet-500/10 border border-violet-100 dark:border-violet-500/20 whitespace-pre-wrap text-sm text-foreground/85 leading-relaxed">
+                {viewingHistory?.feedback || '（无反馈记录）'}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
       </div>
     );
@@ -938,6 +965,18 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
           {/* 写作区 */}
           <Card className="rounded-[32px] border-border shadow-sm">
             <CardContent className="p-6">
+              {/* 恢复草稿提示 + 放弃入口 —— 此前只 toast 一次，想丢弃只能手动全删 */}
+              {draftRestored && (
+                <div className="mb-3 flex items-center justify-between gap-2 p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
+                  <span className="text-xs font-bold text-amber-600">已恢复上次未完成的草稿（自动保存中）</span>
+                  <button
+                    onClick={discardDraft}
+                    className="shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider text-amber-600 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                  >
+                    放弃草稿
+                  </button>
+                </div>
+              )}
               <Textarea
                 value={essay}
                 onChange={(e) => setEssay(e.target.value)}

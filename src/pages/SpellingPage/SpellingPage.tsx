@@ -387,6 +387,16 @@ export default function SpellingPage() {
   const [mode, setMode] = useState<SpellingMode>('dictation');
   const [audioMode, setAudioMode] = useState<SpellingAudioMode>('sentence');
 
+  // ── 逐词播放 ──
+  // 此前「逐词」模式只改按钮文案，点击仍是整句朗读（死功能）。
+  // 引擎没有词级回调，只能按词长估算间隔串播；先到先播、切句即取消。
+  const wordPlayTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const cancelWordPlay = useCallback(() => {
+    wordPlayTimersRef.current.forEach(clearTimeout);
+    wordPlayTimersRef.current = [];
+  }, []);
+  useEffect(() => cancelWordPlay, [cancelWordPlay]);
+
   // Session state
   const [sessionQueue, setSessionQueue] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -399,6 +409,17 @@ export default function SpellingPage() {
   const currentSentenceRef = useRef(currentSentenceMemo);
   currentSentenceRef.current = currentSentenceMemo || currentSentenceRef.current;
   const currentSentence = currentSentenceRef.current;
+
+  // 逐词播放的串播逻辑放在 currentSentence 声明之后（依赖它）
+  const playWordByWord = useCallback(() => {
+    if (!currentSentence) return;
+    cancelWordPlay();
+    let t = 0;
+    for (const w of getWords(currentSentence.en)) {
+      wordPlayTimersRef.current.push(setTimeout(() => { try { tts.speak(w, { rate: 0.8 }); } catch { /* ignore */ } }, t));
+      t += Math.min(900, 300 + w.length * 60);
+    }
+  }, [currentSentence, tts, cancelWordPlay]);
 
   // Input state
   const [dictationInputs, setDictationInputs] = useState<string[]>([]);  // per-word inputs for 句子拼写
@@ -413,6 +434,9 @@ export default function SpellingPage() {
   const [showFavorites, setShowFavorites] = useState(false);
   const [showAIDialog, setShowAIDialog] = useState(false);
   const [showManageDialog, setShowManageDialog] = useState(false);
+  /** 危险操作的两段确认（清空完成标记 / 重置全部进度不可恢复） */
+  const [confirmRequeue, setConfirmRequeue] = useState(false);
+  const [confirmResetAll, setConfirmResetAll] = useState(false);
   const [completionShown, setCompletionShown] = useState(false);
   const [autoRead, setAutoRead] = useState(true);         // 自动朗读
   const [recording, setRecording] = useState(false);       // 语音输入中
@@ -728,13 +752,31 @@ export default function SpellingPage() {
       setRecording(false);
     };
 
-    recognition.onerror = () => { setRecording(false); toast.error('语音识别失败，请重试'); };
+    recognition.onerror = (e: { error?: string }) => {
+      setRecording(false);
+      // 分支提示：权限被拒 / 没说话 / 其它 —— 用户才知道去哪里修
+      if (e?.error === 'not-allowed' || e?.error === 'service-not-allowed') {
+        toast.error('麦克风权限被拒绝 —— 请在浏览器地址栏允许麦克风后重试', { duration: 5000 });
+      } else if (e?.error === 'no-speech') {
+        toast.error('未检测到语音输入');
+      } else {
+        toast.error('语音识别失败，请重试');
+      }
+    };
     recognition.onend = () => setRecording(false);
 
     recognitionRef.current = recognition;
     setRecording(true);
     recognition.start();
   }, [currentSentence, recording, mode, dictationInputs, fillInputs, fillParts]);
+
+  // 卸载时中止识别（此前从不 abort，麦克风可能被持续占用）
+  useEffect(() => {
+    return () => {
+      try { recognitionRef.current?.abort?.(); } catch { /* ignore */ }
+      recognitionRef.current = null;
+    };
+  }, []);
   /** Load a specific sentence from favorites */
   const handleLoadFavorite = useCallback(
     (sentence: ISpellingSentence) => {
@@ -959,6 +1001,8 @@ export default function SpellingPage() {
         setAutoEntering(true);
         try {
           if (saved.activeLevel === 'all') {
+            // 「全部词库」同样要带上断点位置 —— 此前只重建词库，位置丢失回到第 1 句
+            pendingResumeIndex.current = saved.currentIndex ?? 0;
             await handleBuildDatabase();
           } else {
             pendingResumeIndex.current = saved.currentIndex ?? 0;
@@ -1406,7 +1450,11 @@ export default function SpellingPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => tts.speak(currentSentence?.en || '')}
+              onClick={() => {
+                cancelWordPlay();
+                if (audioMode === 'word') playWordByWord();
+                else tts.speak(currentSentence?.en || '');
+              }}
               className="rounded-xl font-bold gap-2"
             >
               <Volume2 className="size-4" />
@@ -1630,12 +1678,19 @@ export default function SpellingPage() {
             variant="ghost"
             size="sm"
             onClick={() => {
+              // 两段确认：清空完成标记不可恢复
+              if (!confirmRequeue) {
+                setConfirmRequeue(true);
+                setTimeout(() => setConfirmRequeue(false), 3000);
+                return;
+              }
+              setConfirmRequeue(false);
               resetCompletedAll();
               setImportDirty(c => c + 1);
             }}
-            className="rounded-xl gap-1 text-muted-foreground"
+            className={cn('rounded-xl gap-1 text-muted-foreground', confirmRequeue && 'text-rose-500')}
           >
-            <RefreshCw className="size-3.5" /> 重新排队
+            <RefreshCw className="size-3.5" /> {confirmRequeue ? '再点一次确认' : '重新排队'}
           </Button>
           <Button
             variant="ghost"
@@ -1718,16 +1773,24 @@ export default function SpellingPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
+                  // 两段确认：全部 SM-2 进度清空不可恢复
+                  if (!confirmResetAll) {
+                    setConfirmResetAll(true);
+                    setTimeout(() => setConfirmResetAll(false), 3000);
+                    return;
+                  }
+                  setConfirmResetAll(false);
                   resetAllProgress();
                   resetCompletedAll();
                   setShowManageDialog(false);
                   setImportDirty(c => c + 1);
                   toast.success('学习记录已重置');
                 }}
-                className="rounded-xl font-bold gap-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:border-rose-800 dark:hover:bg-rose-950/30"
+                className={cn('rounded-xl font-bold gap-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:border-rose-800 dark:hover:bg-rose-950/30',
+                  confirmResetAll && 'bg-rose-500/10')}
               >
                 <RotateCcw className="size-4" />
-                重置所有学习记录
+                {confirmResetAll ? '再点一次确认重置' : '重置所有学习记录'}
               </Button>
               <p className="text-[10px] text-muted-foreground/60 mt-2">
                 清除所有进度和完成记录，句子库不受影响
@@ -1758,12 +1821,17 @@ export default function SpellingPage() {
                 {favorites
                   .filter((f) => f.type === 'spelling')
                   .map((fav) => {
-                    const sentence = sentences.find((s) => s.en === fav.content);
+                    // 练习词库例句（source='word_example'）只存在于 WB 缓存，不在 hook 的
+                    // sentences 里 —— 此前这里查不到就把 onClick 短路，收藏项点了没反应
+                    const sentence = sentences.find((s) => s.en === fav.content)
+                      || getWBSentences().find((s) => s.en === fav.content);
                     return (
                       <button
                         key={fav.id}
                         onClick={() => sentence && handleLoadFavorite(sentence)}
-                        className="w-full text-left p-3 rounded-xl hover:bg-muted/70 transition-colors border border-transparent hover:border-border group"
+                        className={cn('w-full text-left p-3 rounded-xl hover:bg-muted/70 transition-colors border border-transparent hover:border-border group',
+                          !sentence && 'opacity-50 cursor-not-allowed')}
+                        title={sentence ? '点击练习' : '该句已不在当前句库中'}
                       >
                         <p className="text-xs font-bold text-foreground/80 leading-relaxed line-clamp-2">
                           {fav.content}

@@ -268,8 +268,17 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const [lookupLoading, setLookupLoading] = useState(false);
 
   // Translation cache
+  // v2 schema：{ v: 2, byIdx: { 段落索引: 译文 } } —— 按**段落索引**精确回填。
+  // 旧版是"顺序 zh 列表"，内容升级后页构成一变就整页错位；旧条目只在
+  // 「缓存条数 == 本页缺译段数」完全吻合时才按序回填，否则宁可不显示也不贴错。
   const TR_CACHE_KEY = `__reader_trans_${content.id}`;
-  const [transCache, setTransCache] = useState<Record<number, string[]>>(() => {
+  type TransCacheEntry = { v: 2; byIdx: Record<number, string> };
+  const toCacheEntryV2 = (page: { paragraphs: { zh?: string }[] }): TransCacheEntry => {
+    const byIdx: Record<number, string> = {};
+    page.paragraphs.forEach((p, i) => { if (p.zh) byIdx[i] = p.zh; });
+    return { v: 2, byIdx };
+  };
+  const [transCache, setTransCache] = useState<Record<number, TransCacheEntry | string[]>>(() => {
     try { const r = safeStorage.getItem(TR_CACHE_KEY); return r ? JSON.parse(r) : {}; } catch { return {}; }
   });
   const [transLoading, setTransLoading] = useState(false);
@@ -453,6 +462,8 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   }, [content.id, novelChapters, validPages.length]);
 
   const handleNovelChapterChange = useCallback((idx: number) => {
+    // 切章先停朗读 —— 此前上一章的朗读继续播，悬浮条与段落高亮停在已滚走的旧章节
+    stopSpeaking();
     novelChapterIdxRef.current = idx;
     setNovelChapterIdx(idx);
   }, []);
@@ -775,17 +786,21 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
   // Keyboard navigation: ←/→/PageUp/PageDown 翻页（仅翻页模式）, Esc 关闭
   // （依赖里带上 currentPage — 旧实现闭包过期导致翻一页后按键失效）
+  // 必须**捕获阶段**监听 + 弹窗守卫：查词/目录/设置弹窗（Radix）在 document 冒泡阶段
+  // 同步关闭后，等事件冒泡到 window 时弹窗已不在 DOM —— 不加守卫的话，
+  // 用户在弹窗里按 Esc 想只关弹窗，会把整个阅读器一起关掉（AGENTS.md 坑表同款）。
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (document.querySelector('[role="dialog"]')) return;   // 弹窗开着时不抢键盘
       if (e.key === 'Escape') { onClose(); return; }
       if (modeRef.current === 'novel') return; // 小说模式自然滚动 — 方向键交给浏览器
       if (e.key === 'ArrowLeft' || e.key === 'PageUp') goPrev();
       else if (e.key === 'ArrowRight' || e.key === 'PageDown') goNext();
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
   }, [goPrev, goNext, onClose]);
 
   // Word click — lookup Chinese + English definitions
@@ -902,19 +917,24 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       };
       await Promise.all(Array.from({ length: Math.min(2, queue.length) }, worker));
 
-      const zhResults = untranslatedIdx.map((i) => results.get(i) || '').filter(Boolean);
-      if (zhResults.length > 0) {
-        const newCache = { ...transCache, [currentPage]: zhResults };
-        setTransCache(newCache);
-        safeStorage.setItem(TR_CACHE_KEY, JSON.stringify(newCache));
+      // 按段索引**对号回填** —— 此前 filter(Boolean) 把失败段剔掉后按"成功顺序"贴回，
+      // 第 2 段失败第 3 段成功时，第 3 段的译文会错位贴到第 2 段下面
+      const zhResults = untranslatedIdx.map((i) => results.get(i) || '');
+      const okCount = zhResults.filter(Boolean).length;
+      if (okCount > 0) {
         const updatedPages = [...validPages];
-        let zi = 0;
         updatedPages[currentPage] = {
           ...currentPageData,
-          paragraphs: currentPageData.paragraphs.map((p) => (!p.zh && zi < zhResults.length ? { ...p, zh: zhResults[zi++] } : p)),
+          paragraphs: currentPageData.paragraphs.map((p, i) => {
+            const pos = untranslatedIdx.indexOf(i);
+            return pos >= 0 && zhResults[pos] ? { ...p, zh: zhResults[pos] } : p;
+          }),
         };
+        const newCache = { ...transCache, [currentPage]: toCacheEntryV2(updatedPages[currentPage]) };
+        setTransCache(newCache);
+        safeStorage.setItem(TR_CACHE_KEY, JSON.stringify(newCache));
         setDisplayContent({ ...activeContent, pages: updatedPages });
-        toast.success(`本页翻译完成（${zhResults.length}/${total} 段）`);
+        toast.success(okCount === total ? `本页翻译完成（${total} 段）` : `本页翻译完成（${okCount}/${total} 段，失败段可重试）`);
       } else {
         toast.error('翻译失败，请稍后重试');
       }
@@ -959,8 +979,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         currentNovelChapter.items.forEach((it) => {
           const pg = updatedPages[it.pageIdx];
           if (!pg) return;
-          const zhList = pg.paragraphs.filter((p) => p.zh).map((p) => p.zh);
-          if (zhList.length > 0) newCache[it.pageIdx] = zhList;
+          if (pg.paragraphs.some((p) => p.zh)) newCache[it.pageIdx] = toCacheEntryV2(pg);
         });
         setTransCache(newCache);
         safeStorage.setItem(TR_CACHE_KEY, JSON.stringify(newCache));
@@ -1040,8 +1059,11 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
 
   const translateAllPages = async () => {
     if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
+    // 与单页/单章翻译互斥 —— 两条路径各自基于过期 validPages 快照写 displayContent 会互相覆盖
+    if (transLoading) { toast.info('本页/本章翻译正在进行中，请先等它完成'); return; }
     setTransAllLoading(true);
     let count = 0;
+    let failed = 0;
     try {
       const allUntranslated = validPages.flatMap(
         (p, pi) => p.paragraphs.map((pp, ppi) => ({ en: pp.en, pageIdx: pi, paraIdx: ppi })).filter((x) => !validPages[x.pageIdx].paragraphs[x.paraIdx].zh),
@@ -1055,6 +1077,8 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           { role: 'user', content: item.en.slice(0, 1500) },
         ], { temperature: 0.3, maxTokens: 1024 });
         const zh = result.trim();
+        // 空结果 = 该段失败（use-ai 吞错返回 ''）—— 计数并跳过，不能把空串当译文写进正文
+        if (!zh) { failed++; continue; }
         updatedPages[item.pageIdx] = {
           ...updatedPages[item.pageIdx],
           paragraphs: updatedPages[item.pageIdx].paragraphs.map((p, i) =>
@@ -1063,12 +1087,15 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         };
         count++;
         const pg = updatedPages[item.pageIdx];
-        newCache[item.pageIdx] = pg.paragraphs.filter((p) => p.zh).map((p) => p.zh);
+        newCache[item.pageIdx] = toCacheEntryV2(pg);
+        // 长任务进度反馈（整书可达数百段，此前全程无任何提示）
+        if (count % 5 === 0) toast(`${count}/${allUntranslated.length} 段已翻译…`, { id: 'translate-all', duration: 2000 });
       }
       setTransCache(newCache);
       safeStorage.setItem(TR_CACHE_KEY, JSON.stringify(newCache));
       setDisplayContent({ ...activeContent, pages: updatedPages });
-      toast.success(`已翻译 ${count} 个段落！`);
+      if (count > 0) toast.success(`已翻译 ${count} 个段落${failed ? `，${failed} 段失败可重试` : ''}！`);
+      else toast.error('翻译失败，请稍后重试');
     } catch { toast.error('批量翻译失败'); }
     finally { setTransAllLoading(false); }
   };
@@ -1118,17 +1145,26 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   useEffect(() => {
     if (!currentPageData || transMode === 'en') return;
     const cached = transCache[currentPage];
-    if (cached && cached.length > 0) {
+    if (!cached) return;
+    const updatedPages = [...validPages];
+    const commit = (updated: (typeof currentPageData.paragraphs)) => {
+      if (!updated.some((p, i) => p.zh !== currentPageData.paragraphs[i]?.zh)) return;
+      updatedPages[currentPage] = { ...currentPageData, paragraphs: updated };
+      setDisplayContent((prev) => ({ ...prev, pages: updatedPages }));
+    };
+    // v2：按段落索引精确回填
+    if (!Array.isArray(cached) && cached.v === 2) {
+      const byIdx = cached.byIdx;
+      commit(currentPageData.paragraphs.map((p, i) => (!p.zh && byIdx[i] ? { ...p, zh: byIdx[i] } : p)));
+      return;
+    }
+    // 旧版顺序列表：只在「缓存条数 == 本页缺译段数」完全吻合时才按序回填 ——
+    // 内容升级后页构成会变，不吻合的旧缓存宁可不显示，也不能把译文贴错段
+    if (Array.isArray(cached)) {
+      const missing = currentPageData.paragraphs.filter((p) => !p.zh).length;
+      if (cached.length !== missing) return;
       let ci = 0;
-      const updated = currentPageData.paragraphs.map((p) => {
-        if (!p.zh && ci < cached.length) return { ...p, zh: cached[ci++] };
-        return p;
-      });
-      if (updated.some((p, i) => p.zh !== currentPageData.paragraphs[i]?.zh)) {
-        const updatedPages = [...validPages];
-        updatedPages[currentPage] = { ...currentPageData, paragraphs: updated };
-        setDisplayContent((prev) => ({ ...prev, pages: updatedPages }));
-      }
+      commit(currentPageData.paragraphs.map((p) => (!p.zh && ci < cached.length ? { ...p, zh: cached[ci++] } : p)));
     }
   }, [currentPage, transMode]);
 

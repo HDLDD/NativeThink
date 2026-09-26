@@ -1,10 +1,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Upload,
-  FileText, Sparkles, Languages, BookOpen, Volume2, RefreshCw, Loader2,
+  Upload, Sparkles, BookOpen, Loader2,
   Search, ExternalLink, X, Globe, Library, Mic, Wand2, BookMarked,
-  GraduationCap, Clock, RotateCw, History, Newspaper, ChevronLeft, ChevronRight, Play, HelpCircle, ShieldAlert,
+  Clock, History, Newspaper, HelpCircle, ShieldAlert,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -532,9 +531,12 @@ export default function ArticlePage() {
       // Delay to ensure speechMeta is loaded
       setTimeout(() => loadSpeech(speechId), 100);
     } else if (bookId) {
-      // Books can only be reopened from the books tab
-      const book = books?.find((b) => b.id === bookId);
+      // 依次查：导入书/内置书（allBooks）→ SCP 文章。此前只查内置 books，
+      // SCP 与导入书籍的历史条目点开毫无反应（此分支也是唯一没有未找到提示的分支）
+      const book = allBooks?.find((b) => b.id === bookId)
+        || SCP_ARTICLES.find((a) => a.id === bookId);
       if (book) { openReader(book); }
+      else toast.error('文章内容未找到，可能已被删除');
     } else if (pubId) {
       const pub = PUBLICATIONS.find((p) => p.id === pubId);
       if (pub?.pages?.length) { openReader(pub); }
@@ -614,7 +616,7 @@ export default function ArticlePage() {
       setGenDialogOpen(false);
     } catch { toast.error('生成失败'); }
     finally { setAiLoading(false); }
-  }, [isConfigured, genType, genTopic, genLevel, genChapters, aiChat]);
+  }, [isConfigured, genType, genTopic, genLevel, genChapters, genWordCount, aiChat]);
 
     // ── Speech ──
   const loadSpeech = useCallback(async (speechId: string) => {

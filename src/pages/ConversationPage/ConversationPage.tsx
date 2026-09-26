@@ -173,6 +173,11 @@ export default function ConversationPage() {
   }, [messages]);
 
   const startScenario = (scenario: IScenario) => {
+    // 切场景先打断在途流并复位 isLoading —— 此前场景 A 的开场白流会继续
+    // setMessages，把 A 的开场白写进 B 的聊天窗，且 B 的输入框卡在禁用态
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsLoading(false);
     setSelectedScenario(scenario);
     setMessages([]);
     setAnalysis('');
@@ -181,9 +186,10 @@ export default function ConversationPage() {
     requestOpening(scenario);
   };
 
-  /** 让 AI 角色生成场景开场白；失败则静默回到空状态 */
+  /** 让 AI 角色生成场景开场白；失败必须给提示（不许静默回到空态） */
   const requestOpening = async (scenario: IScenario) => {
-    if (!isConfigured || isLoading) return;
+    if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
+    if (isLoading) return;
     setIsLoading(true);
     const controller = new AbortController();
     abortRef.current = controller;
@@ -216,9 +222,13 @@ export default function ConversationPage() {
         if (autoRead) { try { tts.speak(full); } catch { /* ignore */ } }
       } else {
         setMessages([]);
+        toast.error('开场白生成失败，请点击「换一个场景」或重新进入重试', { duration: 4000 });
       }
     } catch {
-      if (mountedRef.current) setMessages([]);
+      if (mountedRef.current) {
+        setMessages([]);
+        toast.error('AI 服务暂不可用，请稍后重试');
+      }
     } finally {
       if (mountedRef.current) setIsLoading(false);
       abortRef.current = null;
@@ -315,6 +325,8 @@ export default function ConversationPage() {
 
     setAnalyzing(true);
     setShowAnalysis(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       const history = messages
@@ -374,7 +386,7 @@ export default function ConversationPage() {
               content: `Scenario: ${selectedScenario?.name || 'Conversation'}\n\nConversation:\n${history}`,
             },
           ],
-          { temperature: 0.4 },
+          { temperature: 0.4, signal: controller.signal },
         );
 
         for await (const chunk of stream) {
@@ -400,12 +412,20 @@ export default function ConversationPage() {
           }
         }
       }
+      // 流式正常结束但为空 = AI 调用失败（use-ai 吞错只 toast）——
+      // 不许把用户留在一张空分析弹窗里
+      if (!full.trim()) {
+        toast.error('AI 服务暂不可用，请稍后重试');
+        setShowAnalysis(false);
+        return;
+      }
     } catch (err) {
       console.error('Conversation analysis failed:', err);
       toast.error('分析服务暂不可用');
       setAnalysis('> ⚠️ 分析服务连接失败，请稍后重试。');
     } finally {
       setAnalyzing(false);
+      abortRef.current = null;
     }
   };
 
@@ -464,6 +484,10 @@ export default function ConversationPage() {
   };
 
   const goBack = () => {
+    // 返回也打断在途流并复位 isLoading（与 startScenario 同款防护）
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsLoading(false);
     setSelectedScenario(null);
     setMessages([]);
     setAnalysis('');
@@ -854,27 +878,27 @@ export default function ConversationPage() {
             {messages.filter((m) => m.role === 'user').length} 轮对话
           </Badge>
           <Dialog open={showAnalysis} onOpenChange={setShowAnalysis}>
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={endConversation}
-                disabled={analyzing}
-                className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
-              >
-                {analyzing ? (
-                  <>
-                    <Loader2 className="size-3.5 mr-1.5 animate-spin" />
-                    分析中...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="size-3.5 mr-1.5" />
-                    地道度分析
-                  </>
-                )}
-              </Button>
-            </DialogTrigger>
+            {/* 不用 DialogTrigger 自动开 —— endConversation 在对话不足两轮时只提示不分析，
+                触发器无条件开弹窗会让分析弹窗空转圈；改为校验通过后受控打开 */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={endConversation}
+              disabled={analyzing}
+              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+            >
+              {analyzing ? (
+                <>
+                  <Loader2 className="size-3.5 mr-1.5 animate-spin" />
+                  分析中...
+                </>
+              ) : (
+                <>
+                  <FileText className="size-3.5 mr-1.5" />
+                  地道度分析
+                </>
+              )}
+            </Button>
             <DialogContent className="max-w-2xl rounded-[32px] p-0 overflow-hidden">
               <div className="p-6 border-b border-border">
                 <DialogHeader>
