@@ -4,6 +4,7 @@
 
 
 ## 2026-09-26
+- docs(changelog): 2026-09-26 开发日志(词汇六方式优化/缓存封顶/全站细节优化/三项遗留优化) (`8df5352`)
 - perf(reader): 修 ReaderParagraph memo 被内联闭包击穿 —— onSpeak 改为自带坐标的 onSpeakPara，父级传稳定 useCallback；此前 TTS 每个切片 setReadPos 都导致整章段落全量重渲染(长章朗读手机卡顿) (`9ffddd3`)
 - feat(reader): 「翻译全部」改用整书断点队列 translateBook —— 批合并+限流退避+IndexedDB 每批落盘(此前逐段串行、全部结束才落盘，中途退出全白费)，随时中止，再次点击只补缺失；完成后按段落原文合并进翻页正文；按钮运行中变为可停止(显示 N/M 章) (`d68b975`)
 - feat(chunks): 短语复习断点续学 —— 队列+位置落盘，中途退出/切 tab/杀 App 后重新进入自动接续(提示还剩几张)，走完本轮断点作废 (`69fd847`)
