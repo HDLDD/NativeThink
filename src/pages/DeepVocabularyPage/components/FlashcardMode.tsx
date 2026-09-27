@@ -133,6 +133,9 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     const cappedDue = dueWords.slice(0, MAX_DUE);
     const otherWords: IWordEntry[] = [];
     for (const key of Object.keys(state.progress)) {
+      // 屏蔽（不再出现）的词**必须**跳过 —— 此前只滤了 dueForReview，
+      // 屏蔽过的词以"其他已学词"身份每轮照常出卡，屏蔽承诺失效
+      if (state.progress[key].suspended) continue;
       if (!seen.has(key)) {
         const w = findWord(key);
         if (w) { seen.add(key); otherWords.push(w); }
@@ -466,6 +469,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || !cw) return;
+      // 生词本管理等弹窗打开时不抢键盘 —— 否则空格会在弹窗后面直接开始一轮复习
+      if (document.querySelector('[role="dialog"]')) return;
       if (!started) { if (e.code === 'Space') { e.preventDefault(); startSession(queue); } return; }
       if (e.code === 'Space') {
         e.preventDefault();

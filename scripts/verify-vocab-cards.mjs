@@ -442,9 +442,18 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
    * queue 与 results 必须同步 splice —— 只插一个会让下标错位，作答结果串到别的词上。
    */
   check(/const RELEARN_GAP = 4;/.test(qc) && /const MAX_RELEARN = 2;/.test(qc), '重刷参数（间隔 / 上限）');
-  check(/const scheduleRelearn = useCallback\(\(word: string\)/.test(qc), '有重刷排期函数');
-  check(/const at = Math\.min\(q\.length, idx \+ 1 \+ RELEARN_GAP\);/.test(qc), '插回位置 = 当前 +1 + 间隔');
-  check(/next\.splice\(at, 0, entry\)[\s\S]{0,200}resNext\.splice\(at, 0, null\)/.test(qc), 'queue 与 results 同步插入（下标不错位）');
+  /**
+   * 2026-09 重构断言重新推导：scheduleRelearn 改为**事件层用 queueRef/resultsRef
+   * 一次性算好**（签名 word: IWordEntry）。旧实现有两个真 bug 被修掉：
+   *  ① setState updater 里嵌套 setState + 改 ref —— StrictMode 双调用把词插两遍、results 错位；
+   *  ② 完成判定用闭包 queue.length —— 最后一张卡答错因重排插入前的旧长度被直接判完成。
+   * 不变量保持：插回位置 = 当前 +1 + 间隔；queue 与 results 同步插入。
+   */
+  check(/const scheduleRelearn = useCallback\(\(word: IWordEntry\)/.test(qc), '有重刷排期函数（事件层 ref 计算，IWordEntry 签名）');
+  check(/const at = Math\.min\(queueRef\.current\.length, idx \+ 1 \+ RELEARN_GAP\);/.test(qc), '插回位置 = 当前 +1 + 间隔');
+  check(/nextQueue\.splice\(at, 0, word\)[\s\S]{0,200}resNext\.splice\(at, 0, null\)/.test(qc), 'queue 与 results 同步插入（下标不错位）');
+  check(/idx \+ 1 >= queueRef\.current\.length/.test(qc), '完成判定用 queueRef 最新长度（最后一张卡答错仍会重排）');
+  check(!/setRelearnCounts\(\(c\) => \{[\s\S]{0,120}setQueue\(/.test(qc), '重排计数 updater 内无嵌套 setState（StrictMode 约定）');
   check(/if \(\(relearnCounts\[key\] \?\? 0\) < MAX_RELEARN\)/.test(qc), '同一个词一轮最多重排 MAX_RELEARN 次');
   check(/这个词稍后会再出现一次/.test(qc), '重排有提示文案');
 

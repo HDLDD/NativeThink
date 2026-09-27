@@ -474,6 +474,11 @@ export default function WritingPage() {
   });
 
   const startWriting = (prompt: IWritingPrompt) => {
+    // 打断在途的批改流 —— 否则旧流完成后会清掉**新题目**刚自动保存的草稿、
+    // 并把旧作文的反馈写进新题目的反馈面板
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsSubmitting(false);
     setSelectedPrompt(prompt);
     setEssay('');
     setFeedback('');
@@ -579,6 +584,8 @@ Suggest 2-3 more advanced or natural alternatives to words used in the essay.`,
       try { safeStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
       setDraftRestored(false);
     } catch (err) {
+      // 用户主动重置/换题而中止 —— 静默（此时报"服务不可用"是误报）
+      if (controller.signal.aborted) return;
       toast.error('AI 服务暂不可用，请稍后重试');
       setFeedback('> ⚠️ AI 写作反馈服务暂不可用。以下是一些自检建议：\n\n1. 检查你的文章是否有明显的拼写或语法错误\n2. 确认你是否使用了提示中建议的要点\n3. 尝试大声朗读你的文章来检测不自然的表达');
     } finally {
@@ -588,6 +595,10 @@ Suggest 2-3 more advanced or natural alternatives to words used in the essay.`,
   };
 
   const reset = () => {
+    // 打断在途批改流（同 startWriting —— 旧流完成回调会误清新草稿）
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsSubmitting(false);
     setSelectedPrompt(null);
     setEssay('');
     setFeedback('');

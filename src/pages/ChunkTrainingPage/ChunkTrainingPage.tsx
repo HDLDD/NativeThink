@@ -654,8 +654,8 @@ export default function ChunkTrainingPage() {
     const input = chainInput.trim();
     if (!input || chainLoading) return;
 
-    const chunkContent = aiChainChallenge ? aiChainChallenge.chunk : chainChunks[currentChainIdx].content;
-    const chunkMeaning = aiChainChallenge ? aiChainChallenge.meaning : chainChunks[currentChainIdx].meaning;
+    const chunkContent = aiChainChallenge ? aiChainChallenge.chunk : chainChunks[currentChainIdx]?.content || "";
+    const chunkMeaning = aiChainChallenge ? aiChainChallenge.meaning : chainChunks[currentChainIdx]?.meaning || "";
     const containsChunk = input.toLowerCase().includes(chunkContent.toLowerCase());
 
     if (!containsChunk) {
@@ -2082,19 +2082,19 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                 </p>
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <p className="text-3xl font-black italic text-foreground tracking-tight">
-                    {aiChainChallenge ? aiChainChallenge.chunk : chainChunks[currentChainIdx].content}
+                    {aiChainChallenge ? aiChainChallenge.chunk : chainChunks[currentChainIdx]?.content || '—'}
                   </p>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => tts.speak(aiChainChallenge ? aiChainChallenge.chunk : chainChunks[currentChainIdx].content)}
+                    onClick={() => tts.speak(aiChainChallenge ? aiChainChallenge.chunk : chainChunks[currentChainIdx]?.content || '')}
                     className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal shrink-0"
                   >
                     <Volume2 className="size-4.5" />
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground font-medium">
-                  {aiChainChallenge ? aiChainChallenge.meaning : chainChunks[currentChainIdx].meaning}
+                  {aiChainChallenge ? aiChainChallenge.meaning : chainChunks[currentChainIdx]?.meaning}
                 </p>
                 {aiChainChallenge?.scenario && (
                   <div className="mt-3 p-3 rounded-2xl bg-violet-50/50 border border-violet-100 text-left">

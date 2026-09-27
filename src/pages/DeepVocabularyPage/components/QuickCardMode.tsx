@@ -193,11 +193,20 @@ export default function QuickCardMode({ level }: { level: string }) {
     if (restoreStateRef.current !== 'pending') return;
     if (allWords.length === 0) return;   // 等词库就绪再恢复（否则 findWord 全落空）
     restoreStateRef.current = 'done';
-    const saved = loadQuickCardSession();
-    if (!saved || saved.level !== level) return;
-    const entries = saved.order.map((k) => findWord(k)).filter((w): w is IWordEntry => !!w);
+    const saved = loadQuickCardSession(level);
+    if (!saved) return;
+    // 恢复结果必须按**原下标**对齐：词库换版导致 findWord 落空的词，
+    // 连同它的作答结果一起剔除 —— 此前 filter 压缩后按下标取，第一个缺失词
+    // 之后的所有结果整体前移一位，认识/不认识贴错词
+    const entries: IWordEntry[] = [];
+    const res: (boolean | null)[] = [];
+    saved.order.forEach((k, i) => {
+      const w = findWord(k);
+      if (!w) return;
+      entries.push(w);
+      res.push(typeof saved.results[i] === 'boolean' ? saved.results[i] : null);
+    });
     if (entries.length === 0) return;
-    const res = entries.map((_, i) => (typeof saved.results[i] === 'boolean' ? saved.results[i] : null));
     resultsRef.current = res;
     setResults(res);
     setQueue(entries);
@@ -318,16 +327,23 @@ export default function QuickCardMode({ level }: { level: string }) {
     setResults(next);
   }, []);
 
+  /** 队列的 ref 镜像 —— 完成判定与答错重排都用它拿**最新**长度/内容 */
+  const queueRef = useRef<IWordEntry[]>([]);
+  queueRef.current = queue;
+
   const next = useCallback(() => {
     setRevealed(false);
-    if (idx + 1 >= queue.length) {
+    // 用 ref 里的最新长度判定完成 —— 答错重排在**同一事件里**先插词再推进，
+    // 闭包里的 queue.length 是插入前的旧值：最后一卡答错会被直接判成完成，
+    // 重排的词永远不出现（toast 却承诺"稍后会再出现"）
+    if (idx + 1 >= queueRef.current.length) {
       setDone(true);
       sfxComplete();
     } else {
       setIdx((i) => i + 1);
       setPos((p) => p + 1);
     }
-  }, [idx, queue.length]);
+  }, [idx]);
 
   /** 上一个：回看上一张，直接展开释义（没作答的保持未作答，作答过的可重评） */
   const prev = useCallback(() => {
@@ -340,27 +356,26 @@ export default function QuickCardMode({ level }: { level: string }) {
   /**
    * 答错的词隔 RELEARN_GAP 张**重新插回同一轮队列**（"在后面刷词过程中再出现一次"）。
    * queue 与 results 必须同步 splice，否则下标错位、作答结果会串到别的词上。
+   * 全部在事件层用 ref 一次性算好 —— 此前在 setState updater 里再调 setState + 改 ref，
+   * StrictMode 下 updater 双调用会把词插两遍、results 错位（更新函数必须纯）。
    */
-  const scheduleRelearn = useCallback((word: string) => {
-    const key = word.toLowerCase();
-    setRelearnCounts((c) => {
-      const used = c[key] ?? 0;
-      if (used >= MAX_RELEARN) return c;
-      setQueue((q) => {
-        const entry = q.find((x) => x.word.toLowerCase() === key);
-        if (!entry) return q;
-        const at = Math.min(q.length, idx + 1 + RELEARN_GAP);
-        const next = [...q];
-        next.splice(at, 0, entry);
-        const resNext = [...resultsRef.current];
-        resNext.splice(at, 0, null);
-        resultsRef.current = resNext;
-        setResults(resNext);
-        return next;
-      });
-      return { ...c, [key]: used + 1 };
-    });
-  }, [idx]);
+  const scheduleRelearn = useCallback((word: IWordEntry) => {
+    const key = word.word.toLowerCase();
+    const used = relearnCounts[key] ?? 0;
+    if (used >= MAX_RELEARN) return;
+    // 该词在当前位置之后已经有排期的不重复插
+    if (queueRef.current.slice(idx + 1).some((x) => x.word.toLowerCase() === key)) return;
+    const at = Math.min(queueRef.current.length, idx + 1 + RELEARN_GAP);
+    const nextQueue = [...queueRef.current];
+    nextQueue.splice(at, 0, word);
+    const resNext = [...resultsRef.current];
+    resNext.splice(at, 0, null);
+    queueRef.current = nextQueue;
+    resultsRef.current = resNext;
+    setQueue(nextQueue);
+    setResults(resNext);
+    setRelearnCounts((c) => ({ ...c, [key]: used + 1 }));
+  }, [idx, relearnCounts]);
 
   const markKnown = useCallback(() => {
     if (!cw) return;
@@ -381,7 +396,7 @@ export default function QuickCardMode({ level }: { level: string }) {
       addStudyMinutes(0.15, 'vocabulary');
       const key = cw.word.toLowerCase();
       if ((relearnCounts[key] ?? 0) < MAX_RELEARN) {
-        scheduleRelearn(cw.word);
+        scheduleRelearn(cw);
         toast.info('这个词稍后会再出现一次', { duration: 1500 });
       }
     }
@@ -406,6 +421,16 @@ export default function QuickCardMode({ level }: { level: string }) {
     setShowHistory(false);
     setRunToken((t) => t + 1);
   }, []);
+
+  /**
+   * 继续未学完的那一轮。必须把当前配置登记为"已处理" ——
+   * 否则暂停页改过每轮数量后点继续，effect ② 会因 cfg 变化重建随机队列，
+   * 把刚承诺续学的断点轮整轮覆盖掉。
+   */
+  const resumeRun = useCallback(() => {
+    cfgRef.current = `${level}|${roundSize}|${allWords.length}|${runToken}`;
+    setPaused(false);
+  }, [level, roundSize, allWords.length, runToken]);
 
   // 键盘：1/← 不认识，2/→ 认识，空格 翻面/下一个，Backspace 上一个，Esc 返回
   useEffect(() => {
@@ -472,9 +497,12 @@ export default function QuickCardMode({ level }: { level: string }) {
     clearQuickCardSession(level);   // 这一轮已经结算成记录，断点作废
   }, [done, runSeq, runWords, level, roundSize]);
 
-  /** 断点续学：把"没学完的那一轮"存下来（顺序 + 位置 + 每张卡的作答 + 是否停在起跑页） */
+  /** 断点续学：把"没学完的那一轮"存下来（顺序 + 位置 + 每张卡的作答 + 是否停在起跑页）。
+      切词书的同一帧本 effect 会先于队列重建跑（新 level + 旧队列）——
+      断点已按词书分键，这里再挡一层队列归属，避免把旧词书写进新书的名下 */
   useEffect(() => {
     if (done || queue.length === 0) return;
+    if (level !== 'all' && queue[0] && queue[0].level !== level) return;
     saveQuickCardSession({
       level,
       order: queue.map((w) => w.word),
@@ -694,7 +722,7 @@ export default function QuickCardMode({ level }: { level: string }) {
             {/* 断点续学：上次没学完的那一轮还在（退出/切 tab/杀 App 都保留） */}
             {queue.length > 0 && idx < queue.length && (
               <Button
-                onClick={() => setPaused(false)}
+                onClick={resumeRun}
                 className="rounded-2xl bg-[#6C5CE7] hover:bg-[#5A4BD1] text-white text-xs font-black px-6 py-4"
               >
                 <History className="size-4 mr-1.5" />继续本轮（第 {idx + 1}/{queue.length} 张）

@@ -232,6 +232,10 @@ export function useQuickCardRuns(level?: string): {
 
 const SESSION_KEY = '__nativethink_quickcard_session';
 
+/** 断点按**词书分键**：单键时切词书的同一帧会以"新 level + 旧词表"写脏数据，
+ *  把另一本书的续学进度永久覆盖掉（SM-2 复习检测早已是 per-level 键）。 */
+const sessionKeyOf = (level: string) => `${SESSION_KEY}_${level || 'all'}`;
+
 export interface IQuickCardSession {
   level: string;
   /** 出卡顺序（词面） */
@@ -244,9 +248,9 @@ export interface IQuickCardSession {
   at: number;
 }
 
-export function loadQuickCardSession(): IQuickCardSession | null {
+export function loadQuickCardSession(level: string): IQuickCardSession | null {
   try {
-    const raw = safeStorage.getItem(SESSION_KEY);
+    const raw = safeStorage.getItem(sessionKeyOf(level));
     if (!raw) return null;
     const s = JSON.parse(raw);
     if (!s || !Array.isArray(s.order) || s.order.length === 0) return null;
@@ -263,16 +267,10 @@ export function loadQuickCardSession(): IQuickCardSession | null {
 }
 
 export function saveQuickCardSession(s: Omit<IQuickCardSession, 'at'>): void {
-  try { safeStorage.setItem(SESSION_KEY, JSON.stringify({ ...s, at: Date.now() })); } catch { /* quota */ }
+  try { safeStorage.setItem(sessionKeyOf(s.level), JSON.stringify({ ...s, at: Date.now() })); } catch { /* quota */ }
 }
 
-/** 只清当前词书的断点（切词书时不误删别的） */
-export function clearQuickCardSession(level?: string): void {
-  try {
-    if (level) {
-      const cur = loadQuickCardSession();
-      if (cur && cur.level !== level) return;
-    }
-    safeStorage.removeItem(SESSION_KEY);
-  } catch { /* ignore */ }
+/** 清掉该词书的断点 */
+export function clearQuickCardSession(level: string): void {
+  try { safeStorage.removeItem(sessionKeyOf(level)); } catch { /* ignore */ }
 }

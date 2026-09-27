@@ -18,7 +18,17 @@ export function useStableShuffle<T extends { id: string }>(items: T[]): T[] {
   const byId = useMemo(() => new Map(items.map((it) => [it.id, it])), [items]);
   // 顺序信号：只跟"有哪些 id"挂钩，与数组身份/内容细节无关
   const sig = useMemo(() => items.map((it) => it.id).join('\n'), [items]);
-  const [order, setOrder] = useState<string[]>([]);
+  // 首渲染**同步**初始化顺序 —— 此前初始为 []，首帧恒返回空数组：
+  // 经 usePageMemory 恢复到「接龙/翻译练习」等 tab 的用户，挂载首渲染就访问
+  // items[currentIdx].xxx → TypeError 白屏（ErrorBoundary 都救不回来，重试还是首帧空）
+  const [order, setOrder] = useState<string[]>(() => {
+    const ids = items.map((it) => it.id);
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    return ids;
+  });
 
   useEffect(() => {
     setOrder((prev) => {
@@ -28,14 +38,7 @@ export function useStableShuffle<T extends { id: string }>(items: T[]): T[] {
       const kept = prev.filter((id) => byId.has(id));
       // 2) 新条目追加到末尾（不打乱当前题的位置）
       const added = [...byId.keys()].filter((id) => !prevSet.has(id));
-      let next = [...kept, ...added];
-      // 3) 首次填充才洗牌
-      if (prev.length === 0 && next.length > 1) {
-        for (let i = next.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [next[i], next[j]] = [next[j], next[i]];
-        }
-      }
+      const next = [...kept, ...added];
       if (next.length === prev.length && next.every((id, i) => prev[i] === id)) return prev;
       return next;
     });

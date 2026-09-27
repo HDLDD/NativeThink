@@ -133,6 +133,20 @@ export default function ShadowingPage() {
   }, [extraSentences]);
 
   const handleDeleteSentence = (corpusId: string, sentenceIdx: number) => {
+    // 完成键 = `${corpusId}-${句序}`：删除中间句后，其后句子的完成标记要**整体前移一位**，
+    // 否则进度虚高/虚低且绿勾指到错误的句子
+    setCompletedSentences((prev) => {
+      const next = new Set<string>();
+      const prefix = `${corpusId}-`;
+      for (const key of prev) {
+        if (!key.startsWith(prefix)) { next.add(key); continue; }
+        const i = Number(key.slice(prefix.length));
+        if (i < sentenceIdx) next.add(key);
+        else if (i > sentenceIdx) next.add(`${corpusId}-${i - 1}`);
+        // i === sentenceIdx 的完成标记随句子一起删除
+      }
+      return next;
+    });
     setExtraSentences((prev) => {
       const updated = { ...prev };
       if (!updated[corpusId]) return prev;
@@ -1163,6 +1177,33 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
+                  {/* 语料完成成就横幅 —— 100% 时给一次仪式感（与拼写页的完成横幅对齐） */}
+                  {totalSentences > 0 && totalCompleted >= totalSentences && (
+                    <div className="mb-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-teal-500/10 p-4 flex items-center gap-3">
+                      <CheckCircle2 className="size-6 text-emerald-500 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-black text-foreground">本语料已完成！</p>
+                        <p className="text-[11px] text-muted-foreground">全部 {totalSentences} 句都跟读过了 — 换一段语料继续，或再来一遍巩固</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (!selectedCorpus) return;
+                          setCompletedSentences((prev) => {
+                            const next = new Set(prev);
+                            [...next].filter((k) => k.startsWith(`${selectedCorpus.id}-`)).forEach((k) => next.delete(k));
+                            return next;
+                          });
+                          setCurrentSentenceIdx(0);
+                          toast.info('本语料完成标记已重置，开始新的一遍吧', { duration: 2000 });
+                        }}
+                        className="rounded-xl text-[10px] font-black shrink-0"
+                      >
+                        再来一遍
+                      </Button>
+                    </div>
+                  )}
                   <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
                     {allSentences.map((s, idx) => {
                       const key = `${selectedCorpus.id}-${idx}`;

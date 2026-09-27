@@ -4,6 +4,7 @@
 
 
 ## 2026-09-26
+- chore(dev): 真机 WebView 调试小工具 device-eval.mjs —— 走 adb forward 的 CDP 通道做截图/求值/点击(无线 adb 无 INJECT_EVENTS 时的替代通道)，坐标按物理像素自动折算 (`39557fb`)
 - build(apk): versionCode 69 / 2.0.24 + 日志 (`d3a5ba1`)
 - fix(vocab): 真机反馈两处 —— 配对模式去掉自动朗读(视觉任务不需要出声)；快速闪卡 FitWord reserve 52→100(朗读+收藏两个按钮的宽度，修长单词被按钮遮住) (`e578105`)
 - docs(changelog): 补记 7d706a2 (`d2ded46`)
