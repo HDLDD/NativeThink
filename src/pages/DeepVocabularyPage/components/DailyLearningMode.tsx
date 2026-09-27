@@ -60,7 +60,7 @@ const MODE_COLORS: Record<ReviewMode, { accent: string; bg: string; gradient: st
 interface LevelInfo { key: string; label: string; }
 export default function DailyLearningMode({ level, onLevelChange, levels, counts, simple }: { level: string; onLevelChange?: (key: string) => void; levels?: LevelInfo[]; counts?: Record<string, number>; simple?: boolean }) {
   const { LazyMotionDiv: MotionDiv, LazyAnimatePresence: AnimatePresence } = useFramerMotion();
-  const { state, dailyQuota, setDailyQuota, todayRemaining, dueForReview, getNewWords, recordReview, resetProgress } = useWordLearning(level);
+  const { state, dailyQuota, setDailyQuota, todayRemaining, dueForReview, getNewWords, recordReview, resetProgress, setSuspended } = useWordLearning(level);
   const tts = useTTS();
   // 学习时长统计（供仪表盘/学习记录的连续打卡与时长展示）
   const { addStudyMinutes } = useLearningStats();
@@ -85,6 +85,8 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
 
   const [sessionWords, setSessionWords] = useState<IWordEntry[]>([]);
   const [levelToast, setLevelToast] = useState<string | null>(null);
+  /** 重置进度的两段确认（'全部'档位一键清空 9 本词书且不可恢复） */
+  const [confirmResetProgress, setConfirmResetProgress] = useState(false);
 
   const levelColor = LEVEL_COLORS[level] || LEVEL_COLORS.all;
   const modeColor = MODE_COLORS[reviewMode];
@@ -801,6 +803,59 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   // 学习中 → 隐藏概览（标题/KPI/进度/设置），只保留学习卡片 + 左上返回
   const inSession = sessionWords.length > 0 && !!currentWord;
 
+  // ===== 断点续学：每日学习此前是唯一不能续的主模式（复习检测/快速闪卡/语块复习都能）=====
+  const dailyBreakpointKey = `__nativethink_daily_session_${level}`;
+  const [dailyResumed, setDailyResumed] = useState(false);
+  useEffect(() => { setDailyResumed(false); }, [level]);   // 切词书允许对新断点恢复一次
+  useEffect(() => {
+    if (dailyResumed || inSession) return;
+    try {
+      const raw = safeStorage.getItem(dailyBreakpointKey);
+      if (!raw) { setDailyResumed(true); return; }
+      const saved = JSON.parse(raw) as { words: string[]; index: number; mode: ReviewMode };
+      if (!Array.isArray(saved?.words) || saved.words.length === 0) { setDailyResumed(true); return; }
+      const entries = saved.words.map((k) => findWord(k)).filter((w): w is IWordEntry => !!w);
+      const idx = Math.max(0, Math.min(saved.index ?? 0, entries.length - 1));
+      if (entries.length === 0 || saved.index >= entries.length) {
+        safeStorage.removeItem(dailyBreakpointKey);
+        setDailyResumed(true);
+        return;
+      }
+      setReviewMode(saved.mode || 'flashcard');
+      setSessionWords(entries);
+      setCurrentIdx(idx);
+      setFlipped(false);
+      setRated(false);
+      lastSpokenKey.current = '';
+      setDailyResumed(true);
+      toast.success(`接着上次继续 — ${MODE_LABEL_MAP[saved.mode || 'flashcard']}还剩 ${entries.length - idx} 张`, { duration: 2500 });
+    } catch { setDailyResumed(true); }
+  }, [dailyResumed, inSession, dailyBreakpointKey]);
+  useEffect(() => {
+    try {
+      if (sessionDone) { safeStorage.removeItem(dailyBreakpointKey); return; }   // 走完本轮 → 断点作废
+      if (inSession && currentWord) {
+        safeStorage.setItem(dailyBreakpointKey, JSON.stringify({
+          words: sessionWords.map((w) => w.word.toLowerCase()),
+          index: currentIdx,
+          mode: reviewMode,
+          savedAt: Date.now(),
+        }));
+      }
+    } catch { /* ignore */ }
+  }, [inSession, sessionDone, sessionWords, currentIdx, currentWord, reviewMode, dailyBreakpointKey]);
+
+  /** 屏蔽当前词（不再出现）—— 与复习检测对齐的出口；带撤销 */
+  const suspendCurrent = () => {
+    if (!currentWord) return;
+    const word = currentWord;
+    setSuspended(word, true);
+    toast.success(`已把「${word.word}」移出学习队列`, {
+      duration: 5000,
+      action: { label: '撤销', onClick: () => setSuspended(word, false) },
+    });
+  };
+
   /** 搭配区出现时自动补译（本地就绪则瞬时；否则一次批量请求） */
   const collocAutoRef = useRef<string>('');
   useEffect(() => {
@@ -1223,6 +1278,17 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                                 </div>
                               </div>
                             )}
+
+                            {/* 不再出现出口 —— 与复习检测对齐：熟练用户被简单词反复占时间的出口 */}
+                            <div className="pt-3 border-t border-indigo-100 dark:border-indigo-500/20">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); suspendCurrent(); }}
+                                className="text-[9px] font-black uppercase tracking-wider text-muted-foreground hover:text-rose-500 transition-colors"
+                                title="已会 / 不感兴趣 —— 移出学习队列（可撤销）"
+                              >
+                                不再出现
+                              </button>
+                            </div>
                           </>
                         )}
                       </CardContent>
@@ -1867,8 +1933,22 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                   <Button onClick={startSession} className="bg-white px-7 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-xl" style={{ color: modeColor.accent }}>
                     继续加练
                   </Button>
-                  <Button onClick={resetProgress} variant="ghost" className="rounded-2xl text-[10px] font-black uppercase tracking-wider text-white/80 hover:text-white hover:bg-white/10">
-                    <RotateCw className="size-3.5 mr-1" />重置进度
+                  <Button
+                    onClick={() => {
+                      // 两段确认：'全部'档位一键清空 9 本词书进度且不可恢复
+                      if (!confirmResetProgress) {
+                        setConfirmResetProgress(true);
+                        setTimeout(() => setConfirmResetProgress(false), 3000);
+                        return;
+                      }
+                      setConfirmResetProgress(false);
+                      resetProgress();
+                    }}
+                    variant="ghost"
+                    className={cn('rounded-2xl text-[10px] font-black uppercase tracking-wider text-white/80 hover:text-white hover:bg-white/10',
+                      confirmResetProgress && 'bg-rose-500/30 text-white')}
+                  >
+                    <RotateCw className="size-3.5 mr-1" />{confirmResetProgress ? '再点一次确认' : '重置进度'}
                   </Button>
                 </div>
               </>
