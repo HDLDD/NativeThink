@@ -80,6 +80,9 @@ node scripts/verify-books-meta.mjs
 # 背单词卡片交互契约 + 滑动手势决策表（改 FlashcardMode / QuickCardMode / vocab-* 后必跑）
 node scripts/verify-vocab-cards.mjs
 
+# 词汇缓存基建契约（capped-cache / colloc-ai-cache 接线改动后必跑）
+node scripts/verify-vocab-caches.mjs
+
 # 重新抓取 SCP 文章（约 1 req/s，产物 src/data/scp.ts 勿手改）
 node scripts/fetch-scp.cjs
 
@@ -88,6 +91,13 @@ node scripts/clean-wordbank-mojibake.mjs
 
 # 品牌视觉资产（APK 图标 / 启动图 / favicon / icon.ico）—— 改字标或配色后重跑
 pwsh -File scripts/gen-app-brand.ps1 -Preview docs/brand-assets-preview.png
+
+# 真机 WebView 调试（无线 adb 无 INJECT_EVENTS 时的标准通道）
+# 先建转发：adb forward tcp:9223 localabstract:webview_devtools_remote_<pid>
+# （socket 名：adb shell cat /proc/net/unix | grep webview_devtools_remote）
+node scripts/device-eval.mjs eval "document.title"   # 求值
+node scripts/device-eval.mjs tap 400 1630            # 点击（物理像素，自动折算 CSS）
+node scripts/device-eval.mjs shot .screen.png        # 截图
 ```
 
 **提交约定**：`npm run typecheck` 通过后再提交。手机端数据只进 localStorage / IndexedDB，不写系统目录。
@@ -143,6 +153,9 @@ src/
 │   ├── custom-words.ts         # 生词本（level='custom'）
 │   ├── word-notes.ts           # 每词助记
 │   ├── reader-highlight.ts     # 阅读器复习词高亮
+│   ├── use-stable-shuffle.ts   # 稳定洗牌 hook（洗牌列表+下标定位当前题必须用它，防漂移）
+│   ├── capped-cache.ts         # localStorage JSON 缓存统一读写 + FIFO 封顶 + 键迁移
+│   ├── colloc-ai-cache.ts      # 搭配 AI 翻译缓存单点归属（键名/迁移/400 上限）
 │   └── safe-storage.ts         # 带用户前缀的 localStorage 封装
 ├── pages/                  # 一页一目录
 ├── data/                   # 语料、词库、语块等 demo/mock 数据
@@ -166,6 +179,8 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 - 日期一律用 `formatDate()`（本地日期），禁止 `toISOString().slice(0,10)`（东八区凌晨会错天）。
 - `moduleProgress` 键必须与 `DashboardPage/constants.ts` 的 `MODULES[].key` 一一对应。
 - 练习完成处调用：`addStudyMinutes(minutes, moduleKey)`。
+- 各实例须订阅 `STATE_EVENT` 重读（hook 内已接，带防回环：重读回来的同内容不回写）——否则模式首页角标在学完一轮后不刷新。
+- 断点续学键按（模式, level）分：`__nativethink_vocab_session_<level>`（复习检测）、`__nativethink_daily_session_<level>`（每日学习）、`__nativethink_quickcard_session_<level>`（快速闪卡）、`__nativethink_chunk_review_session`（语块复习）。新增续学模式照此模式，勿混用全局键。
 
 ---
 
@@ -199,6 +214,7 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 - 原生模型注册表（`SherpaTtsPlugin.java` 的 `MODEL_*`）必须与 `scripts/check-tts-voices.cjs` 的 `MODELS` **同步改**
 - 长段落朗读：拆句 + 防双重触发（`onEnd` 与 timeout 不可同时推进）；"读到哪"只能靠 `onChunk(chunkIndex, wordsBefore)`（原生引擎无词级回调）
 - 改音色后跑 `npm run check:tts-voices`；改切片/进度跑 `npm run verify:tts-progress`；改降级链路跑 `verify-tts-hardening.mjs`
+- 词汇模块自动发音共用持久化键 `__nativethink_vocab_autospeak`（每日学习/复习检测/快速闪卡/语块复习：一处关闭处处安静）。**配对模式不自动朗读**（视觉任务，真机反馈）；拼写/填空不自动朗读（会念出答案）
 
 ---
 
@@ -220,6 +236,18 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 | 弹窗打开时按 Esc 连带退出当前流程 | Radix 在 document 冒泡阶段**同步 flush** 关弹窗，window 冒泡监听已看不到 dialog | 键盘监听用**捕获阶段** `addEventListener('keydown', fn, true)` |
 | 维基百科加载失败 | 网络限制 | `origin=*` + `AbortSignal.timeout(10000)` |
 | 朗读卡顿/跳句 | onEnd 与超时双触发 | 只超时驱动 + advanced 标志 |
+| 洗牌列表 + 下标定位当前题，AI 出题/删题后当前题悄悄漂移 | `useMemo(() => shuffle(items), [items])` 依赖数组身份 | 用 `use-stable-shuffle.ts`（首帧同步初始化 + 只增量增删）；接入点索引加守卫 |
+| 恢复到某个 tab 时挂载即白屏 | 洗牌 hook 首帧返回空数组，`items[currentIdx].field` 崩 | hook 首帧同步初始化顺序（已修）；接入点保留 `?.` |
+| setState updater 里再调 setState / 改 ref | StrictMode 双调用使副作用翻倍（词插两遍、results 错位） | 副作用提到事件层，用 ref 拿最新状态各 set 一次（参考 QuickCardMode `scheduleRelearn`） |
+| 最后一卡答错被直接判完成，重排词永不出现 | 完成判定用闭包 `queue.length`，重排插入后是旧值 | 完成判定读 ref 镜像的最新长度（`queueRef.current.length`） |
+| 断点续学被另一本书覆盖 | 切词书同帧"新 level + 旧队列"先于重建落盘 | 断点按 level 分键 + 落盘前校验队列归属 |
+| 屏蔽（不再出现）的词又回来了 | 只在 dueForReview 里过滤，别的出卡路径漏滤 | 所有出卡路径统一过滤 `suspended`（复习检测 `otherWords` 曾漏） |
+| 整页/整章翻译错位一行 | 失败段被 filter 后按"成功顺序"回填 | 翻译缓存 v2 按段索引 byIdx 精确回填；旧顺序缓存段数不吻合宁可不显示 |
+| 长任务结束时覆盖运行期间的新数据 | 用点击时的陈旧快照直接 set | 合并用 `setX((prev) => ...)` 函数式；长任务与其它写路径互斥守卫 |
+| 按词累积的缓存撑爆 localStorage | 只增不减（AI 例句/搭配翻译/深度解析） | 新缓存一律走 `capped-cache.ts`（FIFO 封顶）；落盘走 persist effect，updater 保持纯 |
+| AI 生成内容填充后"格式异常"误报 | use-ai 失败返回 `''`，页面把空串当解析失败 | 先判 `result.trim()` 为空 → 服务不可用（hook 已 toast）；解析一律 `extractJson` |
+| 无线 adb 无法注入输入（`input tap` 报 SecurityException） | 该 ROM 不给 TLS shell INJECT_EVENTS | 用 `scripts/device-eval.mjs`（CDP 截图/求值/点击，坐标给物理像素自动折算） |
+| 重装 APK 后部分本地数据"消失" | WebView localStorage 在该 ROM 上可能随更新被清 | 重装前用「学习记录 → 导出」备份；重要数据登录走云同步 |
 | 词库"详情面板空白" | `loadLevel` 内 `try{loadDetail}catch{}` 静默吞错；模块表还会缓存失败结果 | 用 `isDetailReady()` 判断，失败走 `window.location.reload()`（原地重试无效） |
 
 调试入口：`.claude/skills/nativethink-fix.md`（本仓库内完整模式表）。
