@@ -11,6 +11,8 @@ import {
   ChevronUp,
   Clock,
   Shield,
+  RotateCw,
+  Check,
 } from 'lucide-react';
 import {
   Dialog,
@@ -52,10 +54,12 @@ const TYPE_LABELS: Record<IFeedbackItem['type'], string> = {
 };
 
 export default function FeedbackDialog() {
-  const { feedbacks, addFeedback, deleteFeedback } = useFeedback();
+  const { feedbacks, addFeedback, deleteFeedback, markSynced } = useFeedback();
 
   const [open, setOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  /** 正在重试提交的条目 id（避免同一行被点两次） */
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   // Form state
   const [type, setType] = useState<IFeedbackItem['type']>('general');
@@ -85,7 +89,7 @@ export default function FeedbackDialog() {
     // Honeypot check — bots will fill this hidden field
     if (honeypot.trim() !== '') {
       // Silently reject — don't tell the bot it was caught
-      toast.success('感谢你的反馈！💚', {
+      toast.success('感谢你的反馈！', {
         description: '你的意见会帮助我们改进应用体验。',
       });
       resetForm();
@@ -111,22 +115,39 @@ export default function FeedbackDialog() {
       rating,
     });
 
-    // Send to server proxy (hides webhook URL from client)
-    const sentToFeishu = await submitFeedbackToServer(item);
+    // 服务端代理（飞书 webhook 不进前端包），返回三档真实状态
+    const res = await submitFeedbackToServer(item);
+    markSynced(item.id, res.status !== 'failed');
 
-    setTimeout(() => {
-      if (sentToFeishu) {
-        toast.success('反馈已提交！💚', {
-          description: '我们会尽快查看并处理。',
-        });
-      } else {
-        toast.success('感谢你的反馈！💚', {
-          description: '你的意见会帮助我们改进应用体验。',
-        });
-      }
-      resetForm();
-      setOpen(false);
-    }, 300);
+    if (res.status === 'delivered') {
+      toast.success('反馈已提交', { description: '已送达开发者，我们会尽快查看。' });
+    } else if (res.status === 'stored') {
+      toast.success('反馈已收到', {
+        description: '已存到服务端留档（即时通知通道暂未开通），我们仍会看到它。',
+      });
+    } else {
+      // 没送出去：内容已经在本机历史里并标了「未送达」，清空表单让用户改，而不是留在输入框里
+      toast.error('反馈暂未送出', {
+        description: '内容已保存在本机「历史反馈」，可在里面点重试；离线时也会自动留着。',
+      });
+    }
+
+    resetForm();
+    setOpen(false);
+  };
+
+  /** 重试历史里未送达的条目 —— 不重新入库，只再走一次服务端 */
+  const handleRetry = async (fb: IFeedbackItem) => {
+    if (retryingId) return;
+    setRetryingId(fb.id);
+    const res = await submitFeedbackToServer(fb);
+    markSynced(fb.id, res.status !== 'failed');
+    setRetryingId(null);
+    if (res.status === 'failed') {
+      toast.error('还是没送出去', { description: `原因：${res.reason}；稍后再试或换网络。` });
+    } else {
+      toast.success(res.status === 'delivered' ? '重试成功，已送达' : '重试成功，已存留档');
+    }
   };
 
   const formatDate = (iso: string) => {
@@ -320,12 +341,32 @@ export default function FeedbackDialog() {
                         <div className="flex items-center gap-2">
                           <span className="font-bold">{TYPE_LABELS[fb.type]}</span>
                           {fb.title && <span className="truncate font-medium">{fb.title}</span>}
+                          {fb.synced === true && (
+                            <span className="flex items-center gap-0.5 text-[10px] opacity-60 shrink-0">
+                              <Check className="size-3" />
+                              已送达
+                            </span>
+                          )}
                           <span className="ml-auto flex items-center gap-1 text-[10px] opacity-60 shrink-0">
                             <Clock className="size-3" />
                             {formatDate(fb.createdAt)}
                           </span>
                         </div>
                         <p className="mt-0.5 opacity-80 line-clamp-2">{fb.description}</p>
+                        {/* 送达状态：旧数据没有这个字段（undefined），不显示标签，避免误标成"未送达" */}
+                        {fb.synced === false && (
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span className="text-[10px] font-bold opacity-70">未送达 · 已存本机</span>
+                            <button
+                              onClick={() => handleRetry(fb)}
+                              disabled={!!retryingId}
+                              className="inline-flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-[10px] font-bold bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors disabled:opacity-50"
+                            >
+                              <RotateCw className={cn('size-3', retryingId === fb.id && 'animate-spin')} />
+                              {retryingId === fb.id ? '重试中' : '重试'}
+                            </button>
+                          </div>
+                        )}
                         {fb.rating > 0 && (
                           <div className="flex items-center gap-0.5 mt-1">
                             {Array.from({ length: fb.rating }).map((_, i) => (

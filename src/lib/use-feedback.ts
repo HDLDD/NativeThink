@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { safeStorage } from './safe-storage';
+import { APP_VERSION, platformTag } from './app-env';
 
 const FEEDBACK_KEY = '__nativethink_feedback_list';
 const RATE_LIMIT_KEY = '__nativethink_feedback_ratelimit';
@@ -84,6 +85,11 @@ export interface IFeedbackItem {
   rating: number; // 0 = no rating, 1-5
   createdAt: string; // ISO timestamp
   appVersion?: string;
+  /**
+   * 服务端接收状态：undefined = 历史数据（旧版本没有这个字段，不显示状态标签）；
+   * false = 已存本地但服务端没收到（可在历史列表重试）；true = 服务端已接住。
+   */
+  synced?: boolean;
 }
 
 // --- Hook ---
@@ -105,14 +111,19 @@ export function useFeedback() {
     }
   }, []);
 
-  const persist = useCallback((items: IFeedbackItem[]) => {
-    setFeedbacks(items);
+  /**
+   * 落盘走 effect：状态更新函数保持纯（StrictMode 会双调用 updater，
+   * 在里面写 storage 等于写两遍）。`loaded` 之前不写 ——
+   * 否则首帧的空数组会把磁盘上的历史反馈抹掉。
+   */
+  useEffect(() => {
+    if (!loaded) return;
     try {
-      safeStorage.setItem(FEEDBACK_KEY, JSON.stringify(items));
+      safeStorage.setItem(FEEDBACK_KEY, JSON.stringify(feedbacks));
     } catch {
-      // ignore
+      // 配额满：保留内存态，不炸页面
     }
-  }, []);
+  }, [feedbacks, loaded]);
 
   const addFeedback = useCallback(
     (item: Omit<IFeedbackItem, 'id' | 'createdAt'>) => {
@@ -128,122 +139,79 @@ export function useFeedback() {
         ...sanitized,
         id: `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         createdAt: new Date().toISOString(),
+        // 版本由 hook 统一盖章（调用方不该各写各的口径）
+        appVersion: APP_VERSION || undefined,
+        synced: false,
       };
 
-      persist([newItem, ...feedbacks]);
+      // 函数式合并：提交是异步的，用点击时的旧数组回写会盖掉期间新增的反馈
+      setFeedbacks((prev) => [newItem, ...prev]);
       recordSubmission();
       return newItem;
     },
-    [feedbacks, persist],
+    [],
   );
 
-  const deleteFeedback = useCallback(
-    (id: string) => {
-      persist(feedbacks.filter((f) => f.id !== id));
-    },
-    [feedbacks, persist],
-  );
+  /** 服务端接收结果回写 —— 只有真的被接住才标 synced=true，失败时保持 false 好让用户重试 */
+  const markSynced = useCallback((id: string, synced = true) => {
+    setFeedbacks((prev) => prev.map((f) => (f.id === id ? { ...f, synced } : f)));
+  }, []);
+
+  const deleteFeedback = useCallback((id: string) => {
+    setFeedbacks((prev) => prev.filter((f) => f.id !== id));
+  }, []);
 
   return {
     feedbacks,
     loaded,
     addFeedback,
     deleteFeedback,
+    markSynced,
   };
 }
 
-// --- Webhook ---
+// --- Server submission ---
 /**
- * Build-time webhook URL (from VITE_FEISHU_WEBHOOK_URL env var).
- * @deprecated Use submitFeedbackToServer() instead to avoid exposing webhook URL in frontend.
+ * 提交结果分三档，UI 必须如实区分（以前只回 boolean，"服务端根本没配反馈通道"
+ * 也被显示成提交成功，用户以为意见发出去了）：
+ *  - delivered：服务端已推给即时通道（飞书群）；
+ *  - stored：服务端已留档但没能即时推送 —— 反馈没丢，开发者仍能看到；
+ *  - failed：请求没成功（离线、503、解析失败），本地已存，可重试。
  */
-export function getBuildWebhookUrl(): string {
-  try {
-    return (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_FEISHU_WEBHOOK_URL) || '';
-  } catch {
-    return '';
-  }
-}
+export type FeedbackSubmitResult =
+  | { status: 'delivered' }
+  | { status: 'stored' }
+  | { status: 'failed'; reason: string };
 
-/** Submit feedback via server proxy (preferred — hides webhook URL from client) */
-export async function submitFeedbackToServer(feedback: IFeedbackItem): Promise<boolean> {
+export async function submitFeedbackToServer(feedback: IFeedbackItem): Promise<FeedbackSubmitResult> {
   try {
     const resp = await fetch('/api/feedback/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      // 带上运行环境，便于定位"只有手机上出问题"这类反馈
       body: JSON.stringify({
         type: feedback.type,
         title: feedback.title,
         description: feedback.description,
         rating: feedback.rating,
+        platform: platformTag(),
+        appVersion: feedback.appVersion || APP_VERSION || undefined,
+        locale: typeof navigator !== 'undefined' ? navigator.language || '' : '',
       }),
-    });
-    return resp.ok;
-  } catch {
-    return false;
-  }
-}
-
-/** Send a feedback item to a Feishu webhook */
-export async function sendToFeishu(feedback: IFeedbackItem, webhookUrl: string): Promise<boolean> {
-  const TYPE_EMOJI: Record<string, string> = {
-    bug: '🐛',
-    feature: '💡',
-    general: '💬',
-  };
-  const TYPE_TEXT: Record<string, string> = {
-    bug: 'Bug 报告',
-    feature: '功能建议',
-    general: '一般反馈',
-  };
-  const RATING_STARS = feedback.rating > 0 ? '⭐'.repeat(feedback.rating) : '';
-
-  // Build safe user agent string (truncated, no special chars)
-  const ua = (navigator.userAgent || '').replace(/[<>"'&]/g, '').slice(0, 80);
-  const lang = (navigator.language || 'unknown').replace(/[<>"'&]/g, '').slice(0, 10);
-
-  try {
-    const resp = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        msg_type: 'interactive',
-        card: {
-          header: {
-            title: {
-              tag: 'plain_text',
-              content: `${TYPE_EMOJI[feedback.type]} ${TYPE_TEXT[feedback.type]}: ${feedback.title || feedback.description.slice(0, 30)}`,
-            },
-            template: feedback.type === 'bug' ? 'red' : feedback.type === 'feature' ? 'blue' : 'wathet',
-          },
-          elements: [
-            {
-              tag: 'div',
-              text: { tag: 'lark_md', content: feedback.description },
-            },
-            ...(feedback.rating > 0
-              ? [{ tag: 'div' as const, text: { tag: 'lark_md' as const, content: `**评分:** ${RATING_STARS} (${feedback.rating}/5)` } }]
-              : []),
-            {
-              tag: 'hr',
-            },
-            {
-              tag: 'note',
-              elements: [
-                {
-                  tag: 'plain_text',
-                  content: `📅 ${new Date(feedback.createdAt).toLocaleString('zh-CN')} | 🌐 ${lang} | 🔧 ${ua}`,
-                },
-              ],
-            },
-          ],
-        },
-      }),
+      signal: AbortSignal.timeout(15_000),
     });
 
-    const result = await resp.json() as { code?: number; msg?: string };
-    return result.code === 0;
-  } catch {
-    return false;
+    if (!resp.ok) return { status: 'failed', reason: `http_${resp.status}` };
+
+    // 服务端返回 { delivered, archived }。响应不是 JSON（网关改写等）时保守判成
+    // stored —— 请求确实被服务端 2xx 接住了，不谎报 delivered，也不吓唬用户重试。
+    let data: { delivered?: boolean; archived?: boolean } | null = null;
+    try { data = await resp.json(); } catch { data = null; }
+    if (!data) return { status: 'stored' };
+    if (data.delivered) return { status: 'delivered' };
+    if (data.archived) return { status: 'stored' };
+    return { status: 'failed', reason: 'server_rejected' };
+  } catch (e) {
+    return { status: 'failed', reason: e instanceof Error ? e.message : 'network' };
   }
 }

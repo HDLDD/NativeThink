@@ -90,6 +90,20 @@ function fixHtmlPlaceholders(): Plugin {
   }
 }
 
+// ── 应用版本号 ──
+// 与 APK 身份同源：读 android/version.properties 的 versionName（npm run version:apk-bump 写的），
+// 读不到再退回 package.json。反馈上报、诊断信息用它，保证和 aapt dump badging 一个口径。
+let appVersion = ''
+try {
+  const props = fs.readFileSync(path.resolve(process.cwd(), 'android', 'version.properties'), 'utf8')
+  appVersion = (props.match(/versionName=([\w.]+)/) || [])[1] || ''
+} catch { /* 非安卓工程 —— 走 package.json */ }
+if (!appVersion) {
+  try {
+    appVersion = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8')).version || ''
+  } catch { /* 版本留空，不谎报 */ }
+}
+
 export default defineConfig({
   base: process.env.CLIENT_BASE_PATH || '/',
   // 让 dev 模式（普通浏览器，无 Node 环境）下 src/index.tsx 里的 process.env 可用；构建时 esbuild 本就会替换
@@ -97,6 +111,8 @@ export default defineConfig({
     'process.env.CLIENT_BASE_PATH': JSON.stringify(process.env.CLIENT_BASE_PATH || '/'),
     // 出厂内置 API Key（可为空 — scripts/.apikey 不存在时）
     '__FACTORY_API_KEY__': JSON.stringify(factoryApiKey),
+    // 应用版本（2.0.25 这种；读不到时是 package.json 的版本）
+    '__APP_VERSION__': JSON.stringify(appVersion),
   },
   plugins: [tailwindcss(), mockVirtualCapabilities(), fixHtmlPlaceholders(), serveBundledModels()],
   resolve: {
