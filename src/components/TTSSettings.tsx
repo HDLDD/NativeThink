@@ -218,19 +218,28 @@ export default function TTSSettings() {
           <Volume2 className="size-4.5" />
         </Button>
       </PopoverTrigger>
+      {/*
+        面板必须自己滚动：手机上（APK 与移动端网页）视口只有 ~850 CSS px，而内容
+        有音色三选一 + 语速 + 测试 + 自检 + 提示音效这么多段，
+        旧写法只有 `overflow-hidden` 又没有高度上限 —— 底部的语速/测试/自检被裁在屏幕外，
+        而 Popover 是 portal 定位的浮层，页面滚动也救不了它，表现为"无法下滑、调不了语速"。
+        现在按 Radix 提供的可用高度变量夹住整块，标题固定、正文内部滚动。
+      */}
       <PopoverContent
         align="end"
         sideOffset={12}
-        className="w-72 rounded-[24px] border-border shadow-lg p-0 overflow-hidden"
+        collisionPadding={12}
+        className="w-72 max-w-[calc(100vw-1.5rem)] max-h-[calc(var(--radix-popover-content-available-height)-1.5rem)] rounded-[24px] border-border shadow-lg p-0 overflow-hidden flex flex-col"
       >
-        <div className="p-5 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10">
+        <div className="p-5 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 shrink-0">
           <h4 className="text-sm font-black text-foreground flex items-center gap-2">
             <Volume2 className="size-4 text-ink-teal" />
             TTS 朗读设置
           </h4>
         </div>
 
-        <div className="p-5 space-y-5">
+        {/* overscroll-contain：滚到底不再带动背后的页面，避免手势被外层吃掉 */}
+        <div className="p-5 space-y-5 flex-1 min-h-0 overflow-y-auto overscroll-contain">
           {/* Voice selector —— 手机（Android WebView）没有浏览器语音，隐藏以免误导 */}
           <div className={cn('space-y-2', isNative && 'hidden')}>
             <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
@@ -287,7 +296,7 @@ export default function TTSSettings() {
             <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
               朗读声音 · 内置在线语音 <span className="text-muted-foreground/60 normal-case font-bold">推荐 · 音质好 · 需联网</span>
             </label>
-            <div className="grid grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-0.5">
+            <div className="grid grid-cols-2 gap-1.5 pr-0.5">
               {EDGE_VOICE_CATALOG.map((v) => {
                 const active = settings.selectedVoiceURI === v.id;
                 return (
@@ -364,7 +373,7 @@ export default function TTSSettings() {
                   不联网 · Lessac 最流畅 · Kokoro 音质更佳但长文可能断续
                 </span>
               </label>
-              <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
+              <div className="grid grid-cols-2 gap-1.5 pr-0.5">
                 {listLocalVoices().map((v) => {
                   const active = settings.selectedVoiceURI === v.id;
                   return (

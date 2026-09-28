@@ -257,6 +257,7 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 | 功能"两端都写了却点不到"（反馈曾如此） | 组件与云端函数都存在，但没有任何页面挂载组件；静态检查看不出断线 | 挂载点写进回归脚本断言（`npm run verify:feedback-loop` 检查 Header 是否渲染 `<FeedbackDialog />`）；新功能的入口必须真机/真页面验证可达 |
 | 提交类操作谎报成功 | 后端只用一个 boolean，`503`（通道未配）与网络失败都归成"没成功"，UI 却一律 toast 成功 | 结果分档返回（`delivered`/`stored`/`failed`），UI 按档给不同提示；失败保留条目并提供重试入口 |
 | 全站 toast 提示不出现（无报错、无界面变化） | `ui/sonner.tsx` 有 `Toaster` 但**没有任何地方挂载它**，`toast()` 调用全静默 | 唯一出口挂在 `src/index.tsx`（`position="top-center"` + `offset`/`mobileOffset` 避让 sticky 头与状态栏）；新页面不要再挂第二个，`verify:feedback-loop` 会断言挂载存在 |
+| 手机上浮层"无法下滑"，底部控件（语速/测试/自检）永远点不到 | Popover 是 portal 浮层，**页面滚动救不了它**；旧写法只有 `overflow-hidden` 又没有高度上限，内容一超过视口就被裁掉 | 外层 `max-h-[calc(var(--radix-popover-content-available-height)-1.5rem)] flex flex-col`，标题 `shrink-0`，正文 `flex-1 min-h-0 overflow-y-auto overscroll-contain`；**正文里的嵌套小滚动（如音色网格）在移动端应去掉 `max-h + overflow-y-auto`**，否则手势被它吃掉 |
 
 调试入口：`.claude/skills/nativethink-fix.md`（本仓库内完整模式表）。
 

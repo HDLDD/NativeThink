@@ -320,6 +320,7 @@ node scripts/device-eval.mjs back
 | 词库"详情面板空白" | `loadLevel` 内 `try{loadDetail}catch{}` 静默吞错 | 用 `isDetailReady()` 判断，失败提示 `window.location.reload()`（模块表会缓存失败结果，原地重试无效） |
 | 维基百科加载失败 | 网络限制 | `origin=*` + `AbortSignal.timeout(10000)` |
 | 主包体积想优化 | TTS 栈**无法**懒加载（首屏多处引用 + 入口同步自检） | 已实测为负优化，别再试；优先级低于 wordbank 分片 |
+| 手机上浮层"无法下滑"，底部控件（语速/测试/自检）永远点不到（2026-09-28 已修 `TTSSettings`） | Popover 是 portal 浮层，**页面滚动救不了它**；旧写法只有 `overflow-hidden` 又没有高度上限，超出视口的部分被直接裁掉 | 外层 `max-h-[calc(var(--radix-popover-content-available-height)-1.5rem)]` + `flex flex-col`，标题 `shrink-0`、正文 `flex-1 min-h-0 overflow-y-auto overscroll-contain`；正文里嵌套的 `max-h + overflow-y-auto` 小滚动要拿掉，否则手势被它吃掉 |
 
 **2026-09 两轮全站质量优化新增的坑**（下表只列最容易复发的，完整表以 `AGENTS.md`「已知坑」为准）：
 
