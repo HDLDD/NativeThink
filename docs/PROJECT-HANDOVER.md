@@ -352,13 +352,17 @@ node scripts/device-eval.mjs back
 - **反馈链路对接补全（2026-09-28）**：入口挂上 `Header`，后端改为「先 KV 留档、再可选推飞书」，返回三档真实状态（`delivered`/`stored`/`failed`），失败可在历史里重试；新增 `src/lib/app-env.ts` 统一版本与平台上报，新增守卫 `npm run verify:feedback-loop`（53 断言，含正对照）。详见 §3.4。
 
 ### 未完成 / 已知短板
-1. **学习提醒**（Capacitor 本地通知）刻意推迟未做 —— `android/app/src/main/assets/capacitor.plugins.json` 里目前只有 `@capacitor-community/text-to-speech`（`SherpaTts` 是仓库内原生插件，在 `MainActivity` 里 `registerPlugin`，不进这张表）。
-2. **词库真人发音包**：单词集合有限，可预录（ROADMAP 第 3 项）。
-3. 句子语料/语法/导入书离线翻译仍有待回填项（见 ROADMAP）。
-4. `.githooks/post-commit` 仍会在插入日期标题时带固定空行（`CHANGELOG.md` 头部已堆 4 行空行，无害）；日期标题 `###`/`##` 那条**已修**。
-5. **反馈通道尚未开通**：代码链路已通，但线上 Pages 项目只有 `JWT_SECRET` 一个 secret —— 要让反馈真的送达开发者，需加 `FEISHU_WEBHOOK_URL`（飞书群机器人）和/或确认 KV 绑定生效；否则用户看到的一直是"暂未送出，可重试"。
-6. **文档债（仍在）**：`src/components/HelpGuide.tsx` 是应用内帮助中心，内容比代码旧 —— FAQ 还写"必须自备 API Key、推荐 DeepSeek"（现在出厂免费档可直接用）、"聚合所有五个等级"（现在九档）、"数据不会上传到任何服务器"（现在可登录云同步）。`使用攻略.md` 已于 2026-09-28 重写。
-7. 仓库根有 2 个真机截图残留未跟踪（`.screen1.png` / `.screen2.png`），别 commit，要清就删。
+1. **切换词书必须多走一步「学习方式」**（2026-09-29 用户报，未修）。
+   机制：顶栏「点击切换词书」与沉浸态那个小按钮都只调 `handleOpenWizard`（`DeepVocabularyPage.tsx:398`）→ 向导**总是从 step 0 重新开始**且 `chosenLevel` 初始为空；点某本书只走 `handleBookSelect`（同文件 98-101 行：仅 `setChosenLevel` + `setStep(1)`），**真正写回页面状态的只有 `handleWizardComplete` → `setSelectedLevel`**（400-409 行）。而 `handleModeSelect`（103-109 行）里只有 `daily`/`flashcard` 会进 step 2，其余方式当场 `onComplete` —— 于是"换本书继续学"这条高频路径被迫走完整个首启三步向导，中途关掉就等于没换。
+   建议修法：把两条路径拆开 —— 已在用词书时点「切换词书」应当**一步生效**（`onComplete(level, 保持当前 tab/模式)`），三步向导只留给首次设置；顺带清理 862/880 行 `selectedLevel === 'all' ? 'cet4' : selectedLevel` 这个兜底（选"全部"时按钮上显示"四级"，会误导）。
+   验证要点：改完必须真机/真页面点一次（这类"入口在但状态不写回"的问题，静态检查看不出来 —— 与第 8 节"两端都写了却点不到"同类）。
+2. **学习提醒**（Capacitor 本地通知）刻意推迟未做 —— `android/app/src/main/assets/capacitor.plugins.json` 里目前只有 `@capacitor-community/text-to-speech`（`SherpaTts` 是仓库内原生插件，在 `MainActivity` 里 `registerPlugin`，不进这张表）。
+3. **词库真人发音包**：单词集合有限，可预录（ROADMAP 第 3 项）。
+4. 句子语料/语法/导入书离线翻译仍有待回填项（见 ROADMAP）。
+5. `.githooks/post-commit` 仍会在插入日期标题时带固定空行（`CHANGELOG.md` 头部已堆 4 行空行，无害）；日期标题 `###`/`##` 那条**已修**。
+6. **反馈通道尚未开通**：代码链路已通，但线上 Pages 项目只有 `JWT_SECRET` 一个 secret —— 要让反馈真的送达开发者，需加 `FEISHU_WEBHOOK_URL`（飞书群机器人）和/或确认 KV 绑定生效；否则用户看到的一直是"暂未送出，可重试"。
+7. **文档债（仍在）**：`src/components/HelpGuide.tsx` 是应用内帮助中心，内容比代码旧 —— FAQ 还写"必须自备 API Key、推荐 DeepSeek"（现在出厂免费档可直接用）、"聚合所有五个等级"（现在九档）、"数据不会上传到任何服务器"（现在可登录云同步）。`使用攻略.md` 已于 2026-09-28 重写。
+8. 仓库根有 2 个真机截图残留未跟踪（`.screen1.png` / `.screen2.png`），别 commit，要清就删。
 
 ### 下一步建议顺序
 1. 学习提醒（本地通知）—— 目前唯一还缺的系统级能力。

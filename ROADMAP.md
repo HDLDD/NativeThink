@@ -19,13 +19,14 @@
 
 ## 下一步
 
-1. **学习提醒**（Capacitor 本地通知）—— 系统级能力里唯一的缺口。npm 侧目前只注册了 `@capacitor-community/text-to-speech`（仓库内的 `SherpaTts` 是原生插件，不走 npm），没有任何通知插件。
-2. **词库真人发音包**：单词集合有限，可预录；先定体积方案（大文件绝不能进 `public/`，会同时拖累 web/APK/桌面三份产物）。
-3. **11 个 Kokoro 音色逐个真机试听**，核对 `src/lib/tts-voice-catalog.ts` 的 `speakerId`（名不符实只改前端表，不必动原生）。
-4. **语料回填**：语法条目继续扩、导入书离线翻译、书籍译文仍有待回填空段（口径沿用上一版 ROADMAP）。
-5. **开通反馈通道**：链路已接好（入口在顶栏，后端先写 KV 留档、再推飞书），但线上 Pages 项目目前只有 `JWT_SECRET` 一个 secret，实测 POST 仍回 503 `Webhook not configured`。加 `FEISHU_WEBHOOK_URL`（飞书群机器人）和/或确认 KV 绑定生效，用户看到的才从「暂未送出」变成「已送达」。
-6. **文档债**：应用内帮助中心 `src/components/HelpGuide.tsx` 比代码旧（FAQ 仍写"必须自备 API Key"、"五个等级"、"数据不会上传任何服务器"）。`使用攻略.md` 已于 2026-09-28 重写。
-7. 顺手项：`.githooks/post-commit` 插入日期标题时带固定空行（`CHANGELOG.md` 头部已堆 4 行，无害）。
+1. **修「切换词书要多点一步」**（2026-09-29 用户报）：换书这条高频路径被绑在首启三步向导上 —— 点书只 `setChosenLevel` + 跳下一步，真正写回页面状态的只有走完「选学习方式」之后的 `onComplete`，中途关掉等于没换。机制与修法见交接手册 §9 第 1 条。
+2. **学习提醒**（Capacitor 本地通知）—— 系统级能力里唯一的缺口。npm 侧目前只注册了 `@capacitor-community/text-to-speech`（仓库内的 `SherpaTts` 是原生插件，不走 npm），没有任何通知插件。
+3. **词库真人发音包**：单词集合有限，可预录；先定体积方案（大文件绝不能进 `public/`，会同时拖累 web/APK/桌面三份产物）。
+4. **11 个 Kokoro 音色逐个真机试听**，核对 `src/lib/tts-voice-catalog.ts` 的 `speakerId`（名不符实只改前端表，不必动原生）。
+5. **语料回填**：语法条目继续扩、导入书离线翻译、书籍译文仍有待回填空段（口径沿用上一版 ROADMAP）。
+6. **开通反馈通道**：链路已接好（入口在顶栏，后端先写 KV 留档、再推飞书），但线上 Pages 项目目前只有 `JWT_SECRET` 一个 secret，实测 POST 仍回 503 `Webhook not configured`。加 `FEISHU_WEBHOOK_URL`（飞书群机器人）和/或确认 KV 绑定生效，用户看到的才从「暂未送出」变成「已送达」。
+7. **文档债**：应用内帮助中心 `src/components/HelpGuide.tsx` 比代码旧（FAQ 仍写"必须自备 API Key"、"五个等级"、"数据不会上传任何服务器"）。`使用攻略.md` 已于 2026-09-28 重写。
+8. 顺手项：`.githooks/post-commit` 插入日期标题时带固定空行（`CHANGELOG.md` 头部已堆 4 行，无害）。
 
 ## 打包
 
