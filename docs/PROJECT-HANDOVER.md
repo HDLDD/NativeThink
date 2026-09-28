@@ -65,7 +65,7 @@
 | 分支 | `main`，HEAD = `3dcee7e`。**与 `origin/main` 完全同步**（`git rev-list --count origin/main..HEAD` = 0） |
 | 未提交改动 | 稳态两条：`M CHANGELOG.md` + `M public/CHANGELOG.md`（上一条提交的日志落入这一条，**是预期**）。反馈链路一轮（未提交）：`M src/index.tsx`（挂 Toaster）`M src/components/{Header,FeedbackDialog}.tsx` `M src/lib/use-feedback.ts` `?? src/lib/app-env.ts` `M functions/api/feedback/submit.js` `M functions/_lib/kv.js` `M vite.config.ts` `M package.json` `?? scripts/verify-feedback-loop.mjs` + 本轮文档（AGENTS/ROADMAP/交接手册/使用攻略）。另有 2 个真机截图残留未跟踪：`.screen1.png`、`.screen2.png`（别 commit） |
 | 远端 | `ssh://git@ssh.github.com:443/HDLDD/NativeThink.git`（**HTTPS 通道在本机不可用**：SSL unable to get local issuer certificate）。`core.sshCommand` 已指向系统 ssh，普通 `git push` 可用 |
-| 部署 | Cloudflare Pages 从 `main` 构建 —— **本地坏不影响线上，一旦 push 会让 CI 立刻失败**，push 前务必跑过 typecheck + guards。注意 `.github/workflows` 里 `deploy-cf.yml` 与 `deploy.yml`（GitHub Pages）**都在 main push 时触发**，两条通道会同时构建 |
+| 部署 | **Cloudflare Pages 的 Git 集成**从 `main` 构建并直接上 production（`nativethink.pages.dev`）—— 证据：Pages 部署记录里 production 那条的 Source 就是刚推的 commit sha，而 2026-09-28 那次 push 的两条 GitHub Actions 全是红的，线上照样更新。**仓库内不再有部署 workflow**（`deploy-cf.yml` 与 `deploy.yml` 已于 2026-09-28 删除：前者缺 `CLOUDFLARE_API_TOKEN` 长期失败、且与 Git 集成重复；后者指向从来没启用的 GitHub Pages，`hdlld.github.io/NativeThink` 实测 404）。**push 即上线**，所以 push 前必须跑过 typecheck + guards + 相关 verify 脚本 |
 | Git 钩子 | `core.hooksPath=.githooks`。`pre-commit` 跑 `npm run precommit`（typecheck + eslint，失败即阻断，**不要 `--no-verify`**）；`post-commit` 把提交标题追加进 `CHANGELOG.md` + `public/CHANGELOG.md` 并 `git add` |
 | 已知钩子缺陷 | 日期标题 `###`/`##` 不一致的那条**已修**（现在写与查都是 `## $COMMIT_DATE`）。仍存：插入日期标题时带固定空行 → `CHANGELOG.md` 文件头累积了 4 行空行（无害，看着难受） |
 | 稳态现象 | 工作树长期保留 **1 条已暂存的 CHANGELOG 行**（提交 N 的日志落入提交 N+1），这是预期，不要"清理干净" |
@@ -143,7 +143,7 @@ docs/                       设计与交接文档
 
 ### 3.3 网站与云端 functions（APK 的后端，另一条主战场）
 
-- **部署**：Cloudflare Pages 项目 `nativethink` → `nativethink.pages.dev`；`wrangler.toml` 里 `pages_build_output_dir = "dist/client"`，KV 绑定名必须是 `KV`（当前 id `68391cb5146345739b4ca78181141017`）。SPA 路由兜底靠**构建时把 `index.html` 复制成 `404.html`** + `public/_redirects`（`/api/* 200` 透传、`/models/* 404` 是**故意**的 —— 404 让 transformers 回落远程下载、`/* → /index.html`）。`public/_headers` 给 COOP/COEP 头（多线程 WASM 需要）。
+- **部署**：Cloudflare Pages 项目 `nativethink` → `nativethink.pages.dev`，**由 Pages 自己的 Git 集成从 `main` 构建**（仓库内已无部署 workflow，见第 2 节）。`wrangler.toml` 里 `pages_build_output_dir = "dist/client"`，KV 绑定名必须是 `KV`（wrangler.toml 写的 id 是 `68391cb5146345739b4ca78181141017`；**该 id 与 Pages 项目实际绑定的命名空间是否同一个仍待核** —— 线上写进去的键在这个命名空间里查不到）。SPA 路由兜底靠**构建时把 `index.html` 复制成 `404.html`** + `public/_redirects`（`/api/* 200` 透传、`/models/* 404` 是**故意**的 —— 404 让 transformers 回落远程下载、`/* → /index.html`）。`public/_headers` 给 COOP/COEP 头（多线程 WASM 需要）。
 - **APK 为什么依赖站点**：`index.html` 头部脚本 `if (window.Capacitor)` 把 `/api/*` 重写成 `https://nativethink.pages.dev/api/*`，`functions/_lib/cors.js` 为 APK 的 `https://localhost` 源补 CORS 头 + OPTIONS 预检。**少任何一个 `withCors` 包一层，手机端该类请求就全挂**，而网页版照常 —— 极易误判成"只有手机有问题"。
 - **端点清单**（`functions/api/`）：`ai/chat`（SSE 流式；8 个 provider；GLM 免费档按 `[task 主选, 请求模型, glm-4-flash-250414, glm-4-flash, glm-4v-flash, glm-4.7-flash]` 链式降级，只在 429/5xx 重试）、`ai/passage`、`ai/transcribe`、`tts`（代理 Google TTS，**上游硬上限 200 字符**，边缘缓存 1 年 immutable）、`auth/register|login|me`、`data/sync`（KV 批量 upsert/delete + 按前缀 list 下载）、`feedback/submit`、`gutenberg`、`wikipedia`、`word-image`、`bilibili-info|subtitle|transcribe`。公共层 `functions/_lib/`：`cors.js` / `jwt.js`（HS256，**`JWT_SECRET` 缺失直接抛错**，30 天有效）/ `auth.js`（Bearer → verify）/ `kv.js`（`users:data:<userId>:<key>`）/ `crypto.js`。
 - **Key 的来源与优先级**：`api/ai/chat` 取 `客户端 body.apiKey` → `env[AI_KEY_<PROVIDER 大写>]` → `env.SERVER_AI_KEY`，都没有就返回 503（前端会提示"服务端 AI Key 未配置"）。出厂 Key 走另一条路：`vite.config.ts` 读 gitignore 的 `scripts/.apikey` 注入 `__FACTORY_API_KEY__`，**不进仓库**，换 Key 只改该文件重新打包。
@@ -158,7 +158,7 @@ docs/                       设计与交接文档
 - **服务端必做的收敛**：`type` 白名单、`title≤100` / `description≤1000`、`rating` 钳到 0..5、HTML 标签与控制符清洗、蜜罐 `hp` 命中则假装成功且不落库；飞书即使回 200 也要看 body 的 `code`，非 0 不算送达。
 - **`use-feedback` 的写入规则**（照仓库既有约定）：`setFeedbacks` 用函数式合并，落盘走 `useEffect([feedbacks, loaded])`，且 `loaded` 之前绝不写 —— 否则首帧空数组会抹掉本机历史。
 - **版本与平台**：`src/lib/app-env.ts` 单一来源（`__APP_VERSION__` 由 `vite.config.ts` 从 `android/version.properties` 注入，读不到退回 `package.json`），随反馈一起上报，用来区分"只有手机上出问题"。
-- **线上现状（2026-09-28 实测）**：`wrangler pages secret list --project-name=nativethink` 只列出 `JWT_SECRET`，**没有 `FEISHU_WEBHOOK_URL`**；直接 POST 线上返回 `503 {"error":"Webhook not configured"}`。所以要让反馈真的送达开发者，二选一或都做：在 Pages 项目加 `FEISHU_WEBHOOK_URL` secret，和/或确认该项目的 KV 绑定生效（新代码只要 KV 可用就会返回 `archived:true`，前端提示"已留档"）。验证办法：应用内提交一条，然后 `wrangler kv key list --namespace-id=68391cb5146345739b4ca78181141017` 看有没有 `feedback:` 开头的键。
+- **线上现状（2026-09-28 实测）**：`wrangler pages secret list --project-name=nativethink` 只列出 `JWT_SECRET`，**没有 `FEISHU_WEBHOOK_URL`**，所以飞书那一路必然不通；但新版函数已上线 —— POST 线上回 `200 {"ok":true,"delivered":false,"archived":true,...,"detail":"webhook_not_configured"}`，反馈不再被丢弃。**待核**：用本账号能列出的唯一命名空间（`68391cb5146345739b4ca78181141017`，title `KV`，也就是 `wrangler.toml` 里那个）查不到任何键 —— `kv key list --binding=KV --prefix=feedback` 返回 `[]`，按返回 id 反推的键名 `kv key get` 也 "Value not found"。说明 Pages 项目实际绑的命名空间可能不是这个 id，去 Pages → Settings → Functions → KV namespace bindings 核对后再回填本节。要真"送达"自己，加 `FEISHU_WEBHOOK_URL` secret：`npx wrangler pages secret put FEISHU_WEBHOOK_URL --project-name=nativethink`。
 - **回归防线**：`npm run verify:feedback-loop`（56 断言）—— 用**忠实的 KV / webhook 替身真实执行 handler**（留档顺序、飞书业务码、蜜罐、截断、CORS、405/400/503 全覆盖），并断言挂载点存在。正对照已实测会报红：把 `<FeedbackDialog />` 从 Header 摘掉、或把 `<Toaster />` 的 `position` 改掉，脚本立刻 FAIL。
 - **顺带修掉的全站缺陷**：`src/components/ui/sonner.tsx` 里有 shadcn 的 `Toaster`，但**过去没有任何地方挂载它**（全项目搜不到 `<Toaster`）—— 于是几十处 `toast.*`（AI 不可用、每日目标、音色回退、朗读降级提示、反馈结果…）全部静默。现在 `src/index.tsx` 挂唯一出口：`position="top-center"`、`offset.top=88px`（避开 sticky 头）、`mobileOffset.top=calc(env(safe-area-inset-top)+84px)`（APK edge-to-edge 不被状态栏吃掉）。**新页面不要再挂第二个 Toaster**。
 - **真浏览器验收（2026-09-28，无头 Chrome + CDP 打预览服 4173）**：顶栏按钮存在 → 弹出「用户反馈」→ 填描述 → 提交 → 因线上无接收通道，实测 toast 为「反馈暂未送出 / 内容已保存在本机「历史反馈」，可在里面点重试」；本机 `feedback_list` 该条 `synced:false`、`appVersion:"2.0.25"`，历史区显示「未送达 · 已存本机」+「重试」。限流同样实测生效（紧接着第二次提交被"请等待 N 秒后再提交"挡住）。
@@ -264,7 +264,7 @@ adb install -r release/NativeThink-mobile-debug.apk
 ### 6.5 打包
 - `versionCode` 每次打包**必须递增**，否则 Android 拒绝升级安装（要求先卸载 → 丢数据）。
 - `post-commit` 会改 CHANGELOG，工作树有 1 条已暂存 CHANGELOG 是稳态。
-- 未明确要求**不要 push**。2026-09-28 起本地与 `origin/main` 已同步（不再有"本地领先 N 个提交"这回事）；一旦 push，`deploy-cf.yml` 与 `deploy.yml` 两条 CI 都会跑，坏代码会立刻让线上构建失败。
+- 未明确要求**不要 push**。仓库里已经没有部署 workflow（2026-09-28 删除），**push 就等于直接改线上**：Cloudflare Pages 的 Git 集成会自动构建并切 production。真要恢复 CI 部署，在 GitHub 加 `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` secret，并从提交 `28a51f9` 取回 `.github/workflows/deploy-cf.yml`（缺 token 时该步会报 `In a non-interactive environment…CLOUDFLARE_API_TOKEN`）。
 
 ---
 

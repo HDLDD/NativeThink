@@ -16,7 +16,7 @@ description: |
 
 NativeThink 是 React 19 + TypeScript + Vite 8 + Tailwind CSS v4 的英语学习 SPA。
 包含 AI 集成、词汇学习、语块训练、听力影子跟读等功能模块。
-部署在 GitHub Pages，使用 localStorage (safeStorage) 持久化。
+部署在 Cloudflare Pages（nativethink.pages.dev，由 Pages 的 Git 集成从 main 构建；仓库内没有部署 workflow），使用 localStorage (safeStorage) 持久化。
 
 ## 问题模式速查表
 

@@ -12,7 +12,7 @@
 NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式英语，通过思维训练、语块、句子精讲、跟读、对话等方式建立母语者表达路径。
 
 **形态**：Web SPA + Electron 桌面 + Capacitor Android  
-**部署**：Cloudflare Pages（`nativethink.pages.dev`）  
+**部署**：Cloudflare Pages（`nativethink.pages.dev`）—— 由 **Pages 自己的 Git 集成**从 `main` 构建上线，仓库内**没有部署 workflow**（2026-09-28 删掉两条长期失败的冗余 Actions；push 即改线上，先跑验证）  
 **界面语言**：中文（学习内容为英文）
 
 ---
