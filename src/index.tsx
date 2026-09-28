@@ -5,6 +5,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import { AuthProvider } from "./lib/auth-provider";
 import CloudSyncProvider from "./components/CloudSyncProvider";
 import { FocusModeProvider } from "./lib/focus-mode";
+import { Toaster } from "@/components/ui/sonner";
 import App from "./app";
 import "./index.css";
 import { checkBundledEngineHealth } from "./lib/sherpa-tts";
@@ -65,6 +66,17 @@ function SafeShell({ children }: { children: React.ReactNode }) {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter basename={process.env.CLIENT_BASE_PATH || "/"}>
+      {/*
+        全站唯一的 toast 出口。以前只 import 了 sonner 的 toast() 却从未挂载 <Toaster />，
+        所以所有提示（AI 不可用、目标已设、音色回退、反馈是否送达…）都是静默的。
+        位置 top-center：桌面避开 sticky 头（h-20=80px），APK 里 edge-to-edge 必须再让开状态栏。
+      */}
+      <Toaster
+        position="top-center"
+        visibleToasts={3}
+        offset={{ top: '88px', right: 16, left: 16 }}
+        mobileOffset={{ top: 'calc(env(safe-area-inset-top, 0px) + 84px)', right: 12, left: 12 }}
+      />
       <SafeShell>
         <FocusModeProvider>
         <AuthProvider>
