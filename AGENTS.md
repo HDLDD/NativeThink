@@ -258,6 +258,7 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 | 提交类操作谎报成功 | 后端只用一个 boolean，`503`（通道未配）与网络失败都归成"没成功"，UI 却一律 toast 成功 | 结果分档返回（`delivered`/`stored`/`failed`），UI 按档给不同提示；失败保留条目并提供重试入口 |
 | 全站 toast 提示不出现（无报错、无界面变化） | `ui/sonner.tsx` 有 `Toaster` 但**没有任何地方挂载它**，`toast()` 调用全静默 | 唯一出口挂在 `src/index.tsx`（`position="top-center"` + `offset`/`mobileOffset` 避让 sticky 头与状态栏）；新页面不要再挂第二个，`verify:feedback-loop` 会断言挂载存在 |
 | 手机上浮层"无法下滑"，底部控件（语速/测试/自检）永远点不到 | Popover 是 portal 浮层，**页面滚动救不了它**；旧写法只有 `overflow-hidden` 又没有高度上限，内容一超过视口就被裁掉 | 外层 `max-h-[calc(var(--radix-popover-content-available-height)-1.5rem)] flex flex-col`，标题 `shrink-0`，正文 `flex-1 min-h-0 overflow-y-auto overscroll-contain`；**正文里的嵌套小滚动（如音色网格）在移动端应去掉 `max-h + overflow-y-auto`**，否则手势被它吃掉 |
+| 词书卡写 7,404、快速闪卡只能出 2,127 张（九本全载时考研池子=**0**） | ①`ensureIndexes()` 用一个 `seen` 贯穿所有等级 → 先遍历到的书独占该词，池子大小还随"哪几本被加载"变；②计数表填的是**词条数**而非**去重词数**；③"全部"用各本书数字相加（词书是累积式的，相加会重复计数） | 去重分两层：**书内去重**决定每本书池子，**全局去重**只用于 `_allWordsCache`（全部模式一词一卡）；显示数用 `WORD_COUNTS`（=池子，由 `verify-wordbank-loading.mjs` 从数据实测复核），词条数看 `WORD_ENTRIES`；"全部"总数一律 `getTotalLearnableCount()`，**不要把各本相加** |
 
 调试入口：`.claude/skills/nativethink-fix.md`（本仓库内完整模式表）。
 

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { IWordEntry } from '@/data/wordbank/schema';
-import { findWord, getWordCounts, preloadDetail } from '@/data/wordbank';
+import { findWord, getWordCounts, getTotalLearnableCount, preloadDetail } from '@/data/wordbank';
 import { useWordLearning, saveSession, loadSession, clearSession, type ISavedSession } from '@/lib/use-word-learning';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useImmersive } from '@/lib/focus-mode';
@@ -94,9 +94,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   }, [autoSpeak]);
 
   const allCounts = useMemo(() => getWordCounts(), []);
-  const totalForLevel = currentLevel === 'all'
-    ? Object.values(allCounts).reduce((a, b) => a + b, 0)
-    : (allCounts[currentLevel] || 0);
+  // 「全部」用按词去重的总数（一词一张卡，跨书不重复）；单本词书用该书的池子
+  const totalForLevel = currentLevel === 'all' ? getTotalLearnableCount() : (allCounts[currentLevel] || 0);
 
   // ── 错词重练队列 ──
   const [wrongDrill, setWrongDrill] = useState(false);

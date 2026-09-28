@@ -50,7 +50,9 @@
 
 ### 1.2 语料规模（改数据前先看这里）
 
-- **词库**：75,113 词，9 个等级 —— 中考 3,223 / 高考 6,008 / 四级 4,542 / 六级 7,404 / 雅思 6,609 / 托福 10,367 / 考研 9,602 / 专业 8,887 / 高阶 18,471。
+- **词库**：**9 本词书共 75,113 条词条**（同一词会在多本书里各有一条），去重后**跨书 21,736 个不同单词**。
+  每本词书「可学去重词数」（= 词书卡显示值 = 各模式池子）：中考 1,987 / 高考 3,743 / 四级 4,542 / 六级 7,404 / 雅思 6,609 / 托福 10,367 / 考研 5,047 / 专业 4,464 / 高阶 18,470。
+  原始词条数（只用于说明规模，**不许当分母**）见 `meta.ts` 的 `WORD_ENTRIES`；两份表都由 `verify-wordbank-loading.mjs` 从数据实测复核。
   数据在 `src/data/wordbank/data/<level>.ts`（仅核心字段）+ `<level>.detail.ts`（搭配/例句/深度解释，按需加载）。
 - **书库**：22 本公版书（`src/data/books.ts`，635KB，含中文对照），中文对照离线随包。
 - **SCP 文章**：20 篇 / 约 27.9k 词（`src/data/scp.ts`，由 `scripts/fetch-scp.cjs` 抓取，CC BY-SA 3.0，**勿手改**）。
@@ -320,6 +322,7 @@ node scripts/device-eval.mjs back
 | 词库"详情面板空白" | `loadLevel` 内 `try{loadDetail}catch{}` 静默吞错 | 用 `isDetailReady()` 判断，失败提示 `window.location.reload()`（模块表会缓存失败结果，原地重试无效） |
 | 维基百科加载失败 | 网络限制 | `origin=*` + `AbortSignal.timeout(10000)` |
 | 主包体积想优化 | TTS 栈**无法**懒加载（首屏多处引用 + 入口同步自检） | 已实测为负优化，别再试；优先级低于 wordbank 分片 |
+| 词书卡显示 7,404、快速闪卡只出 2,127 张（九本全载时考研池子=0，2026-09-29 已修） | `ensureIndexes()` 原来用一个 `seen` 贯穿所有等级 → 先遍历到的书独占该词，池子还随"哪几本被加载"变；计数表填的是词条数；"全部"用各本相加 | 书内去重决定池子、全局去重只用于 `_allWordsCache`；`WORD_COUNTS`=池子（守卫从数据实测复核），`WORD_ENTRIES`=词条数；"全部"用 `getTotalLearnableCount()` |
 | 手机上浮层"无法下滑"，底部控件（语速/测试/自检）永远点不到（2026-09-28 已修 `TTSSettings`） | Popover 是 portal 浮层，**页面滚动救不了它**；旧写法只有 `overflow-hidden` 又没有高度上限，超出视口的部分被直接裁掉 | 外层 `max-h-[calc(var(--radix-popover-content-available-height)-1.5rem)]` + `flex flex-col`，标题 `shrink-0`、正文 `flex-1 min-h-0 overflow-y-auto overscroll-contain`；正文里嵌套的 `max-h + overflow-y-auto` 小滚动要拿掉，否则手势被它吃掉 |
 
 **2026-09 两轮全站质量优化新增的坑**（下表只列最容易复发的，完整表以 `AGENTS.md`「已知坑」为准）：

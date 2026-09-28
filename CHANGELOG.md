@@ -6,6 +6,7 @@
 
 
 ## 2026-09-28
+- build(apk): versionCode 72 / 2.0.27 —— 从当前 HEAD 重打的干净包 (`3b6f8b0`)
 - chore(ci): 删除两条冗余部署 workflow，文档改为真实部署链路 (`77ef498`)
 - build(apk): versionCode 71 / 2.0.26 + 日志 (`47ddcdb`)
 - fix(tts): 朗读设置面板在手机视口内可滚到底 —— 语速/测试声音/朗读自检不再被裁在屏外 (`bb7795e`)

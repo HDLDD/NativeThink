@@ -38,6 +38,10 @@ const tr = (src) => ts.transpileModule(src, {
 let wb = fs.readFileSync(path.join(ROOT, 'wordbank.ts'), 'utf8');
 wb = wb.replace(/^import \{ idbGet, idbSet \} from '@\/lib\/idb';$/m,
   'const idbGet = async () => null; const idbSet = async () => {};');
+// meta.ts 是纯常量（无数据依赖），照样桩成 .mjs 再导入
+fs.writeFileSync(path.join(OUT, 'meta.mjs'),
+  tr(fs.readFileSync(path.join(ROOT, 'meta.ts'), 'utf8')));
+wb = wb.replace(/from '\.\/meta'/g, "from './meta.mjs'");
 for (const lv of LEVELS) wb = wb.split(`'./data/${lv}'`).join(`'./data/${lv}.mjs'`);
 // 注意等级名含数字（cet4/cet6），字符类必须包含 0-9
 wb = wb.replace(/'(\.\/data\/[a-z0-9]+)\.detail'/g, "'$1.detail.mjs'");
@@ -127,6 +131,66 @@ const retriedOk = wbmod.isDetailReady('ielts');
 ok(retriedOk === false,
   '失败模块被模块表缓存：原地重试不会重新求值（故 UI 用「刷新页面」而非原地重试）',
   `isDetailReady(ielts)=${retriedOk}`);
+
+// ⑧ 池子与词书数字同源 —— 锁住「词书写 7,404、快速闪卡只有 2,127」这个 bug 的修法。
+//    旧算法只用一个 `seen` 贯穿所有等级，谁先遍历到谁独占该词：
+//    九本全载时 考研池子=0、六级只剩 2,127，而且数字随"哪几本被加载"变化。
+{
+  const meta = await import(pathToFileURL(path.join(OUT, 'meta.mjs')).href);
+  // 从数据文件独立算出"书内唯一词数"与"跨书唯一词数"，作为不依赖被测代码的参照
+  const own = {};
+  const globalWords = new Set();
+  for (const lv of LEVELS) {
+    const m = await import(pathToFileURL(path.join(OUT, 'data', `${lv}.mjs`)).href);
+    const arr = m[Object.keys(m).find((k) => /WORDS/.test(k))];
+    const set = new Set(arr.map((w) => String(w.word).toLowerCase()));
+    own[lv] = set.size;
+    for (const w of set) globalWords.add(w);
+  }
+
+  // 只加载一本时的池子
+  await wbmod.preloadCoreOnly(['professional']);
+  const alone = wbmod.queryWords({ level: 'professional', limit: 99999 }).length;
+  ok(alone === own.professional, `只加载「专业」时池子 = 书内唯一词数 ${own.professional}`, `实际 ${alone}`);
+
+  // 再把九本全加载：新逻辑下每本都不许被别人抢走
+  await wbmod.preloadCoreOnly(LEVELS);
+  const pools = {};
+  for (const lv of LEVELS) pools[lv] = wbmod.queryWords({ level: lv, limit: 99999 }).length;
+
+  for (const lv of LEVELS) {
+    ok(pools[lv] === own[lv], `${lv} 池子 = 书内唯一词数`, `池 ${pools[lv]} / 唯一 ${own[lv]}`);
+    ok(meta.WORD_COUNTS[lv] === own[lv], `${lv} 词书卡显示数 WORD_COUNTS = 唯一词数`, `表 ${meta.WORD_COUNTS[lv]} / 实际 ${own[lv]}`);
+  }
+  ok(pools.professional === alone,
+    '九本全载后「专业」池子不缩水（跨书去重已改为书内去重）', `${alone} → ${pools.professional}`);
+  ok(pools.postgraduate > 0,
+    '正对照：考研池子不再是 0（旧算法九本全载时它是 0）', `实际 ${pools.postgraduate}`);
+  ok(pools.cet6 === 7404,
+    '用户报的具体症状：六级闪卡池子 = 词书显示的 7,404', `实际 ${pools.cet6}`);
+
+  // 「全部」= 跨书一词一卡，不能是各本相加
+  const total = wbmod.getTotalLearnableCount();
+  const allArr = wbmod.getAllWords();
+  const allSet = new Set(allArr.map((w) => String(w.word).toLowerCase()));
+  const sum = LEVELS.reduce((a, lv) => a + pools[lv], 0);
+  ok(total === globalWords.size, `全部模式池子 = 数据算出的跨书唯一词数 ${globalWords.size}`, `实际 ${total}`);
+  ok(allArr.length === total, 'getTotalLearnableCount ≡ getAllWords().length', `${total} vs ${allArr.length}`);
+  ok(allSet.size === allArr.length, '全部模式内不含重复词卡', `唯一 ${allSet.size} / 总 ${allArr.length}`);
+  ok(total < sum, '全部 ≠ 各本相加（词书是累积式的，相加会重复计数）', `全部 ${total} / 相加 ${sum}`);
+  ok(total === meta.TOTAL_UNIQUE_WORDS, `全部 = 表列唯一词数 ${meta.TOTAL_UNIQUE_WORDS}`, `实际 ${total}`);
+
+  // 反证：旧算法确实会产生这些错值（证明本脚本的判据有鉴别力，不是恒真）
+  const legacySeen = new Set(); const legacy = {};
+  for (const lv of LEVELS) {
+    legacy[lv] = 0;
+    const arr = wbmod.getWordsByLevel()[lv] || [];
+    for (const w of arr) { const k = String(w.word).toLowerCase(); if (!legacySeen.has(k)) { legacySeen.add(k); legacy[lv]++; } }
+  }
+  ok(legacy.postgraduate === 0 && legacy.cet6 < 3000,
+    '正对照可复现：旧口径下考研=0、六级<3000（说明新断言真的在区分两种行为）',
+    `旧 考研=${legacy.postgraduate} 六级=${legacy.cet6}`);
+}
 
 let failed = 0;
 for (const r of results) {

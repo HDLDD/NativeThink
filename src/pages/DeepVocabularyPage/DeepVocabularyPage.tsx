@@ -19,7 +19,7 @@ import { cn, cleanText, extractJson } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
 import { toast } from 'sonner';
 import type { IWordEntry } from '@/data/wordbank/schema';
-import { queryWords, preloadLevels, isLevelReady, WORD_COUNTS, ALL_PARTS_OF_SPEECH } from '@/data/wordbank';
+import { queryWords, preloadLevels, isLevelReady, WORD_COUNTS, TOTAL_UNIQUE_WORDS, ALL_PARTS_OF_SPEECH } from '@/data/wordbank';
 import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
 import DailyLearningMode from './components/DailyLearningMode';
 import FlashcardMode from './components/FlashcardMode';
@@ -157,7 +157,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
             ))}
             <button onClick={() => handleBookSelect('all')}
               className="col-span-full rounded-[24px] p-4 text-center transition-all border-2 border-dashed border-border/50 hover:border-[#00B894] hover:bg-emerald-50/30 dark:hover:bg-emerald-500/5">
-              <p className="text-sm font-black text-muted-foreground flex items-center justify-center gap-1.5"><Library className="size-4" />全部词库 · {Object.values(counts).reduce((a, b) => a + b, 0).toLocaleString()} 词</p>
+              <p className="text-sm font-black text-muted-foreground flex items-center justify-center gap-1.5"><Library className="size-4" />全部词库 · {TOTAL_UNIQUE_WORDS.toLocaleString()} 词</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">加载较慢，建议选择单本词书</p>
             </button>
           </div>
@@ -172,7 +172,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
         <div className="max-w-sm mx-auto space-y-6">
           <div className="text-center space-y-1">
             <p className="text-xs font-bold text-muted-foreground">已选词书</p>
-            <p className="text-sm font-black text-foreground flex items-center justify-center gap-1.5">{selectedBook && <selectedBook.icon className="size-4" style={{ color: selectedBook.color }} />}{selectedBook?.label} · {counts[chosenLevel]?.toLocaleString() || Object.values(counts).reduce((a, b) => a + b, 0).toLocaleString()} 词</p>
+            <p className="text-sm font-black text-foreground flex items-center justify-center gap-1.5">{selectedBook && <selectedBook.icon className="size-4" style={{ color: selectedBook.color }} />}{selectedBook?.label} · {(chosenLevel === 'all' ? TOTAL_UNIQUE_WORDS : counts[chosenLevel])?.toLocaleString()} 词</p>
           </div>
 
           <div className="space-y-2">
@@ -300,7 +300,8 @@ export default function DeepVocabularyPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const wordListRef = useRef<HTMLDivElement>(null);
   const counts = WORD_COUNTS;
-  const totalWordCount = useMemo(() => Object.values(WORD_COUNTS).reduce((a, b) => a + b, 0), []);
+  // 「全部」= 跨书按词去重的池子大小，不是各本书词数相加（词书是累积式的，同一个词会同时属于中考和六级）
+  const totalWordCount = TOTAL_UNIQUE_WORDS;
 
   // Per-level memory: remember selected word & scroll position for each level
   const [levelMemory, setLevelMemory] = useState<Record<string, { word: string; scrollTop: number }>>(() => {

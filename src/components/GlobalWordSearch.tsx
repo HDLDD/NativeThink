@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
 import { useFavorites, type IFavoriteItem } from '@/lib/use-favorites';
-import { queryWords, preloadCoreOnly, preloadDetail, isDetailReady, getEssentialLevels, isAllReady, getWordCounts, WORD_COUNTS } from '@/data/wordbank';
+import { queryWords, preloadCoreOnly, preloadDetail, isDetailReady, getEssentialLevels, isAllReady, getTotalLearnableCount } from '@/data/wordbank';
 import type { IWordEntry } from '@/data/wordbank';
 
 // ============================================================
@@ -101,8 +101,8 @@ export default function GlobalWordSearch() {
 
   const totalWords = useMemo(() => {
     if (!dataReady) return 0;
-    const counts = getWordCounts();
-    return Object.values(counts).reduce((a, b) => a + b, 0);
+    // 跨书按词去重（词书是累积式的，各本相加会把同一个词数好几遍）
+    return getTotalLearnableCount();
   }, [dataReady]);
 
   // 展开某词时才加载该等级的 detail（幂等；已加载则同步就绪）。

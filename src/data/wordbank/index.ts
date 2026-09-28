@@ -2,9 +2,9 @@
 export type { IWordEntry, IWordQuery, IExample, IWordDetail, IWordDetailMap } from './schema';
 export {
   queryWords, getAllWords, getAllTopics, getWordsByLevel,
-  getWordCounts, getRandomWords, findWord,
+  getWordCounts, getTotalLearnableCount, getRandomWords, findWord,
   preloadLevels, isLevelReady, isAllReady, preloadAll,
   preloadProgressive, getUserLevel, getEssentialLevels,
   preloadCoreOnly, preloadDetail, isDetailReady,
-  WORD_COUNTS, ALL_PARTS_OF_SPEECH,
+  WORD_COUNTS, TOTAL_UNIQUE_WORDS, ALL_PARTS_OF_SPEECH,
 } from './wordbank';

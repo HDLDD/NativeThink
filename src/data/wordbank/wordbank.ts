@@ -5,16 +5,19 @@ import type { IWordEntry, IWordQuery, IWordDetailMap } from './schema';
 import { idbGet, idbSet } from '@/lib/idb';
 
 // ── Pre-computed constants (no data loading needed) ──
-export const WORD_COUNTS: Record<string, number> = {
-  zhongkao: 3223, gaokao: 6008, cet4: 4542, cet6: 7404, ielts: 6609, toefl: 10367, postgraduate: 9602, professional: 8887, advanced: 18471,
-};
+// 计数表只有一个来源：meta.ts（词书卡片、进度分母、快速闪卡概览都用它）。
+// 以前 wordbank.ts 里另抄了一份，两边各自演进过 —— 现在只转发，不再重复定义。
+// 语义：WORD_COUNTS = 该词书**可学的去重单词数**（书内同形词只算一个），
+//       与 queryWords({level}) 的池子严格相等；词条原文数见 WORD_ENTRIES。
+import { WORD_COUNTS, TOTAL_UNIQUE_WORDS, ALL_LEVELS as META_ALL_LEVELS } from './meta';
+export { WORD_COUNTS, TOTAL_UNIQUE_WORDS };
 
 export const ALL_PARTS_OF_SPEECH: string[] = [
   'adj', 'adv', 'art', 'aux', 'conj', 'det', 'int', 'n', 'num', 'pref', 'prep', 'pron', 'suf', 'v',
 ];
 
 // ── Dynamic level loaders ──
-const ALL_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] as const;
+const ALL_LEVELS = META_ALL_LEVELS;
 
 const CACHE_VERSION = 3; // v3: detail 拆分为独立文件 + 词条新增 hasCollocations
 const LS_PREFIX = '__nativethink_wb_';
@@ -87,17 +90,37 @@ function invalidateIndexes() {
   _levelIndex.clear();
 }
 
+/**
+ * 建派生索引。
+ *
+ * ⚠️ 去重必须**分两层**，这是「词书显示 7,404 但快速闪卡只有 2,127」那个 bug 的根因：
+ * 以前只用一个 `seen` 贯穿所有等级，谁先被遍历到谁独占这个词 ——
+ * 中考/高考/四级先走过一遍后，六级里剩下的全是"没被别人抢走的"，
+ * 考研更惨：九本书都加载时它的池子是 **0**。而且池子大小随"哪几本被加载"变化
+ * （预取顺序、鼠标划过侧边栏都会改变它），所以用户看到的数字每次都不一样。
+ *
+ * 现在的语义：
+ *  - `_levelIndex[level]` = 该书**书内去重**的完整词表 → 与词书卡上显示的词数一致，
+ *    一个词合理地同时属于中考和六级（词书本来就是累积式的），两本书里都能出卡；
+ *  - `_allWordsCache`（「全部」模式）仍按全局一词一对象去重 → 不会重复出卡；
+ *  - 两处推入的都是 `_levelCache` 里的**同一批对象引用**，所以 applyDetail 就地补齐
+ *    依然穿透（见 applyDetail 的注释）。
+ */
 function ensureIndexes() {
   if (!_indexesDirty) return;
-  const seen = new Set<string>();
+  const globalSeen = new Set<string>();
   const all: IWordEntry[] = [];
   for (const lvl of ALL_LEVELS) {
     const words = _levelCache[lvl];
     if (!words) continue;
     const deduped: IWordEntry[] = [];
+    const bookSeen = new Set<string>();      // 只防同一本书里的同形词条重复出卡
     for (const w of words) {
       const key = w.word.toLowerCase();
-      if (!seen.has(key)) { seen.add(key); deduped.push(w); all.push(w); }
+      if (bookSeen.has(key)) continue;
+      bookSeen.add(key);
+      deduped.push(w);
+      if (!globalSeen.has(key)) { globalSeen.add(key); all.push(w); }
     }
     _levelIndex.set(lvl, deduped);
   }
@@ -291,9 +314,27 @@ function getAllWords(): IWordEntry[] {
   return _allWordsCache!;
 }
 
+/**
+ * 「全部」模式的可学单词总数 —— 跨书按词去重（一词只算一次），只统计已加载的等级。
+ *
+ * ⚠️ 不要把 `getWordCounts()` 的各本书数字相加来当"全部"：词书是累积式的
+ * （同一个词同时属于中考和六级），相加会得到 62,633，而真正能出的卡是 21,736 张。
+ */
+export function getTotalLearnableCount(): number {
+  ensureIndexes();
+  return _allWordsCache ? _allWordsCache.length : 0;
+}
+
+/**
+ * 运行时"这本书有多少词" —— 返回**池子大小**（书内去重后），与 queryWords({level}) 一致。
+ * 以前返回的是 `_levelCache[lvl].length`（原始词条数），于是"词书卡片写 A、闪卡能出 B 张"，
+ * 同一个界面里两套口径并存。未加载的等级仍是 0。
+ * 跨书的"全部"总数请用 `getAllWords().length`（一词一次），别把这些数字相加。
+ */
 export function getWordCounts(): Record<string, number> {
+  ensureIndexes();
   const counts: Record<string, number> = {};
-  for (const lvl of ALL_LEVELS) { counts[lvl] = (_levelCache[lvl] || []).length; }
+  for (const lvl of ALL_LEVELS) { counts[lvl] = (_levelIndex.get(lvl) || []).length; }
   return counts;
 }
 
