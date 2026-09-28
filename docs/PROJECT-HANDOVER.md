@@ -1,7 +1,7 @@
 # NativeThink 项目交接手册（Agent Handover）
 
 > 面向**接手的 AI agent / 新同事**：只读这一份就能开工。
-> 最后校准：2026-09-25（对应 APK 2.0.20 / versionCode 65，本地 main 40aa80e + 未提交工作树）。
+> 最后校准：2026-09-28（对应 APK 2.0.25 / versionCode 70，main HEAD = `3dcee7e`，**已与 origin/main 同步**，工作树只剩 CHANGELOG 稳态改动）。
 > 相关文档：`AGENTS.md`（日常约定速查）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
 
 ---
@@ -11,13 +11,14 @@
 | 问题 | 答案 |
 |---|---|
 | 这是什么 | 面向中文母语者的**英语思维训练 App**（摆脱中式英语）：思维训练、语块、句精讲、跟读、对话、文章精读、词汇深度、拼写 |
-| 形态 | Web SPA + Electron 桌面 + Capacitor Android（**同一份前端**，无业务后端） |
+| 形态 | Web SPA + Electron 桌面 + Capacitor Android（**同一份前端**）；没有独立业务服务，云端只有 Cloudflare Pages Functions + KV |
+| 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
-| 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读） |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 6 个 `scripts/verify-*.mjs` 断言脚本 |
-| 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 830MB，装一次 1~2 分钟） |
-| 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"` |
-| 最容易踩的坑 | ①改动 TTS 切片上限会让云端链路静默失败 ②ref 不随组件重挂载归零 ③`public/` 不能放大文件 ④推送用 SSH over 443 |
+| 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-09 两轮全站质量优化已把拼写/跟读/写作/对话/语块也扫过一遍 |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 7 个 `scripts/verify-*.mjs` 断言脚本（14 / 202 / 225 / 21 / 6175 / 10 / 56，2026-09-28 全绿） |
+| 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
+| 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
+| 最容易踩的坑 | ①改动 TTS 切片上限会让云端链路静默失败 ②ref 不随组件重挂载归零 ③`public/` 不能放大文件 ④推送用 SSH over 443 ⑤洗牌列表 + 下标定位当前题必须用 `use-stable-shuffle`（否则当前题悄悄漂移） |
 
 ---
 
@@ -61,14 +62,14 @@
 
 | 项 | 现状 |
 |---|---|
-| 分支 | `main`，HEAD = `40aa80e`。**本地领先 origin/main 13 个提交** |
-| 未提交改动 | 背单词模块最近一轮（APK 2.0.20 已验证并装机）：<br>`M src/pages/DeepVocabularyPage/{DeepVocabularyPage.tsx, components/FlashcardMode.tsx, components/QuickCardMode.tsx}`<br>`M src/pages/FavoritesPage/FavoritesPage.tsx`（补 'word' 过滤）<br>`M scripts/verify-vocab-cards.mjs`（135 → 223 断言）<br>`?? src/lib/quickcard-history.ts`（新文件）<br>`M AGENTS.md` / `M README.md` / `?? docs/PROJECT-HANDOVER.md`（本次交接文档）<br>`M android/version.properties`（versionCode 60→65） |
+| 分支 | `main`，HEAD = `3dcee7e`。**与 `origin/main` 完全同步**（`git rev-list --count origin/main..HEAD` = 0） |
+| 未提交改动 | 稳态两条：`M CHANGELOG.md` + `M public/CHANGELOG.md`（上一条提交的日志落入这一条，**是预期**）。反馈链路一轮（未提交）：`M src/index.tsx`（挂 Toaster）`M src/components/{Header,FeedbackDialog}.tsx` `M src/lib/use-feedback.ts` `?? src/lib/app-env.ts` `M functions/api/feedback/submit.js` `M functions/_lib/kv.js` `M vite.config.ts` `M package.json` `?? scripts/verify-feedback-loop.mjs` + 本轮文档（AGENTS/ROADMAP/交接手册/使用攻略）。另有 2 个真机截图残留未跟踪：`.screen1.png`、`.screen2.png`（别 commit） |
 | 远端 | `ssh://git@ssh.github.com:443/HDLDD/NativeThink.git`（**HTTPS 通道在本机不可用**：SSL unable to get local issuer certificate）。`core.sshCommand` 已指向系统 ssh，普通 `git push` 可用 |
-| 部署 | Cloudflare Pages 从 `main` 构建 —— **本地坏不影响线上，一旦 push 会让 CI 立刻失败**，push 前务必跑过 typecheck + guards |
+| 部署 | Cloudflare Pages 从 `main` 构建 —— **本地坏不影响线上，一旦 push 会让 CI 立刻失败**，push 前务必跑过 typecheck + guards。注意 `.github/workflows` 里 `deploy-cf.yml` 与 `deploy.yml`（GitHub Pages）**都在 main push 时触发**，两条通道会同时构建 |
 | Git 钩子 | `core.hooksPath=.githooks`。`pre-commit` 跑 `npm run precommit`（typecheck + eslint，失败即阻断，**不要 `--no-verify`**）；`post-commit` 把提交标题追加进 `CHANGELOG.md` + `public/CHANGELOG.md` 并 `git add` |
-| 已知钩子缺陷 | ①`TODAY_HEADER` 写成 `### 日期` 但写入的是 `## 日期` → grep 永不命中，**每次提交都插新日期标题**，CHANGELOG 有重复日期块 ②按日期插入时带固定空行，文件头已累积约 10 行空行 |
+| 已知钩子缺陷 | 日期标题 `###`/`##` 不一致的那条**已修**（现在写与查都是 `## $COMMIT_DATE`）。仍存：插入日期标题时带固定空行 → `CHANGELOG.md` 文件头累积了 4 行空行（无害，看着难受） |
 | 稳态现象 | 工作树长期保留 **1 条已暂存的 CHANGELOG 行**（提交 N 的日志落入提交 N+1），这是预期，不要"清理干净" |
-| 版本线 | APK **2.x**（当前 2.0.20 / versionCode 65）。`android/version.properties` 的 `versionCode` 每次打包必须递增 |
+| 版本线 | APK **2.x**（当前 2.0.25 / versionCode 70）。`android/version.properties` 的 `versionCode` 每次打包必须递增 |
 
 ### 2.1 APK / 桌面产物约定
 
@@ -78,6 +79,7 @@
   `"$env:LOCALAPPDATA\Android\Sdk\build-tools\36.1.0\aapt.exe" dump badging <apk> | Select-String "^package:"`
 - `release/CetThink-mobile.apk`（227.8MB）是**正式发布产物**（另仓 CetThink 的安装包，含离线朗读模型），合法，别删；但它**绝不能进 `public/`**。
 - **禁止往 `public/` 放 APK 或大二进制**：Vite 会把 `public/` 原样拷进 `dist/client`，导致 web / 主 APK / 桌面三份产物各白背体积（历史事故：227.5MB 的 CetThink apk 回流进 public，主 APK 里又套一个 APK）。
+- **当前 APK 体积构成**（2.0.25 实测，`node scripts/report-apk-size.cjs`，包内占用 = 压缩后）：离线小模型 541.3MB（未压 877.9MB）+ Kokoro 113.0MB + Piper 音色 65.1MB + web 产物 40.3MB + 原生库 29.3MB + dex/res 14.7MB = **803.7MB**。要减体积先动 `models-bundled`（离线 LLM/翻译模型），别去动 TTS 栈。
 
 ---
 
@@ -115,6 +117,9 @@ docs/                       设计与交接文档
 | `vocab-session.ts` | 复习会话顺序：`createSessionOrder` / `scheduleRelearn`（答错隔 4 张重排，最多 2 次）/ `forecastByDay` |
 | `vocab-swipe.ts` | 滑动手势决策表（阈值 80，左滑=不认识，右滑=认识） |
 | `quickcard-history.ts` | **快速闪卡持久化**：每轮留档（`_runs`）、当前累积桶（`_pending`）、断点续学（`_session`）。切分与去重规则见文件头注释 |
+| `use-stable-shuffle.ts` | 稳定洗牌 hook。**凡是「洗牌列表 + 下标定位当前题」的地方都必须用它**（首帧同步初始化 + 只增量增删），否则 AI 出题/删题后当前题悄悄漂移；首帧返空数组还会让恢复挂载直接白屏 |
+| `capped-cache.ts` | localStorage JSON 缓存的统一读写 + FIFO 封顶 + 键迁移。**按词累积的新缓存一律走它**（曾有四个只增不减的库把配额撑爆） |
+| `colloc-ai-cache.ts` | 搭配 AI 翻译缓存的单点归属（键名 / 旧键迁移 / 400 上限），页面不要再自己拼键名 |
 | `custom-words.ts` | 生词本（词库未收录的词），`level: 'custom'` 走独立进度 |
 | `word-notes.ts` | 每词助记笔记（`_word_notes`） |
 | `reader-highlight.ts` | 阅读器复习词高亮（6 色，`matchesHighlight`） |
@@ -128,14 +133,35 @@ docs/                       设计与交接文档
 
 `src/pages/DeepVocabularyPage/`：
 - `DeepVocabularyPage.tsx` —— 页面骨架：词书/方式向导、模式切换、顶部 sticky（**只在 browse tab 渲染**，见坑表）、词库浏览、搭配、词汇量测试。
-- `components/DailyLearningMode.tsx` —— 每日学习（SM-2 主推路径）。
+- `components/DailyLearningMode.tsx` —— 每日学习（SM-2 主推路径）：**六方式**（闪卡/选择/拼写/听写/配对/填空）+ 断点续学（`_daily_session_<level>`，2026-09-27 补齐）+ 背面『不再出现』+ 我的助记。
 - `components/FlashcardMode.tsx`（约 1100 行）—— **复习检测**：五档评分、冻结本轮顺序、答错即时重排、屏蔽/恢复、未来 7 天预测、本周报告、连击、助记、生词本、断点续学、自动朗读（默认开）、卡片背面"单词+例句"连读。
-- `components/QuickCardMode.tsx`（约 1400 行）—— **快速闪卡**：点卡片翻面、上一个单词（常驻顶部可点开详情）、收藏（各处 ★）、完成页词表、学习记录留档 + 当前累积 + 重练、重刷算法、断点续学、"全部"档位。
-- `components/CollocationsTab.tsx` / `VocabTestTab.tsx`。
+- `components/QuickCardMode.tsx`（约 1400 行）—— **快速闪卡**：点卡片翻面、上一个单词（常驻顶部可点开详情）、收藏（各处 ★）、完成页词表、学习记录留档 + 当前累积 + 重练、重刷算法、断点续学、"全部"档位。状态机三连修的教训见坑表（StrictMode 双插 / 最后一卡答错 / 继续本轮被覆盖）。
+- `components/WordInfoDialog` —— **不是独立文件**，它是 `QuickCardMode.tsx` 里 `export function WordInfoDialog`（约第 1042 行起）；`DailyLearningMode.tsx` 通过 `import { WordInfoDialog } from './QuickCardMode'` 复用，内含『我的助记』读写与生词本入口。
+- `components/CollocationsTab.tsx` / `VocabTestTab.tsx`（后者含近 10 次词汇量趋势条）。
 
----
+其它模块（2026-09 两轮优化的落点，改动时注意同源约定）：`SpellingPage`（错词重练入口、听写语速滑杆）、`ShadowingPage`（100% 完成成就横幅）、`WritingPage`（reset/换题打断在途批改流）、`ArticlePage`（整书翻译断点队列 + 翻译缓存 v2 按段索引回填）、`ChunkTrainingPage`（语块复习断点续学 + 自动发音共键）。
 
-## 4. 常用命令
+### 3.3 网站与云端 functions（APK 的后端，另一条主战场）
+
+- **部署**：Cloudflare Pages 项目 `nativethink` → `nativethink.pages.dev`；`wrangler.toml` 里 `pages_build_output_dir = "dist/client"`，KV 绑定名必须是 `KV`（当前 id `68391cb5146345739b4ca78181141017`）。SPA 路由兜底靠**构建时把 `index.html` 复制成 `404.html`** + `public/_redirects`（`/api/* 200` 透传、`/models/* 404` 是**故意**的 —— 404 让 transformers 回落远程下载、`/* → /index.html`）。`public/_headers` 给 COOP/COEP 头（多线程 WASM 需要）。
+- **APK 为什么依赖站点**：`index.html` 头部脚本 `if (window.Capacitor)` 把 `/api/*` 重写成 `https://nativethink.pages.dev/api/*`，`functions/_lib/cors.js` 为 APK 的 `https://localhost` 源补 CORS 头 + OPTIONS 预检。**少任何一个 `withCors` 包一层，手机端该类请求就全挂**，而网页版照常 —— 极易误判成"只有手机有问题"。
+- **端点清单**（`functions/api/`）：`ai/chat`（SSE 流式；8 个 provider；GLM 免费档按 `[task 主选, 请求模型, glm-4-flash-250414, glm-4-flash, glm-4v-flash, glm-4.7-flash]` 链式降级，只在 429/5xx 重试）、`ai/passage`、`ai/transcribe`、`tts`（代理 Google TTS，**上游硬上限 200 字符**，边缘缓存 1 年 immutable）、`auth/register|login|me`、`data/sync`（KV 批量 upsert/delete + 按前缀 list 下载）、`feedback/submit`、`gutenberg`、`wikipedia`、`word-image`、`bilibili-info|subtitle|transcribe`。公共层 `functions/_lib/`：`cors.js` / `jwt.js`（HS256，**`JWT_SECRET` 缺失直接抛错**，30 天有效）/ `auth.js`（Bearer → verify）/ `kv.js`（`users:data:<userId>:<key>`）/ `crypto.js`。
+- **Key 的来源与优先级**：`api/ai/chat` 取 `客户端 body.apiKey` → `env[AI_KEY_<PROVIDER 大写>]` → `env.SERVER_AI_KEY`，都没有就返回 503（前端会提示"服务端 AI Key 未配置"）。出厂 Key 走另一条路：`vite.config.ts` 读 gitignore 的 `scripts/.apikey` 注入 `__FACTORY_API_KEY__`，**不进仓库**，换 Key 只改该文件重新打包。
+- **dev 侧**：`vite.config.ts` 把 `/api/*` 全部代理到线上 pages.dev —— **新加 functions 端点要同时在这里补一条 proxy**，否则 dev 环境该功能静默 404（历史上插图接口就这么漏配过）。
+- **端侧兜底**：`src/lib/local-llm.ts`（Qwen2.5-0.5B-Instruct，q4）+ `local-mt.ts`（Xenova/opus-mt-en-zh，q8）。APK/桌面从同源 `/models/` 零下载（`assets/public/models` 878MB），网页版回落 hf-mirror 现下；`streamChat/chat` 在云端失败、且自动回落开关（`__nativethink_local_llm_auto`）打开、小模型已就位时才切端侧，否则原样抛错并 toast 提示可下载离线备用模型。设置入口在 `components/AISettings.tsx` 的「离线备用小模型」卡片。
+
+### 3.4 反馈链路（2026-09-28 补全前后端对接）
+
+`src/components/FeedbackDialog.tsx`（弹窗，自带触发按钮）→ `src/lib/use-feedback.ts`（本地历史 + 限流 + 提交）→ `functions/api/feedback/submit.js`（服务端）→ 两条出路：**先写 KV 留档**（`feedback:<13位毫秒时间戳>:<id>`，见 `functions/_lib/kv.js` 的 `feedbackKey`），**再推飞书群机器人**（`FEISHU_WEBHOOK_URL`，可选通道）。
+
+- **曾经的真相**：组件和函数都写好了，但**没有任何页面挂载弹窗**，而且提交失败一律 toast 成功。现在入口挂在 `Header.tsx` 工具栏（`<FeedbackDialog />`，非沉浸模式下可见），后端返回 `{delivered, archived, id}` 三档真实状态，前端分别提示；失败条目留在「历史反馈」里可**重试**。
+- **服务端必做的收敛**：`type` 白名单、`title≤100` / `description≤1000`、`rating` 钳到 0..5、HTML 标签与控制符清洗、蜜罐 `hp` 命中则假装成功且不落库；飞书即使回 200 也要看 body 的 `code`，非 0 不算送达。
+- **`use-feedback` 的写入规则**（照仓库既有约定）：`setFeedbacks` 用函数式合并，落盘走 `useEffect([feedbacks, loaded])`，且 `loaded` 之前绝不写 —— 否则首帧空数组会抹掉本机历史。
+- **版本与平台**：`src/lib/app-env.ts` 单一来源（`__APP_VERSION__` 由 `vite.config.ts` 从 `android/version.properties` 注入，读不到退回 `package.json`），随反馈一起上报，用来区分"只有手机上出问题"。
+- **线上现状（2026-09-28 实测）**：`wrangler pages secret list --project-name=nativethink` 只列出 `JWT_SECRET`，**没有 `FEISHU_WEBHOOK_URL`**；直接 POST 线上返回 `503 {"error":"Webhook not configured"}`。所以要让反馈真的送达开发者，二选一或都做：在 Pages 项目加 `FEISHU_WEBHOOK_URL` secret，和/或确认该项目的 KV 绑定生效（新代码只要 KV 可用就会返回 `archived:true`，前端提示"已留档"）。验证办法：应用内提交一条，然后 `wrangler kv key list --namespace-id=68391cb5146345739b4ca78181141017` 看有没有 `feedback:` 开头的键。
+- **回归防线**：`npm run verify:feedback-loop`（56 断言）—— 用**忠实的 KV / webhook 替身真实执行 handler**（留档顺序、飞书业务码、蜜罐、截断、CORS、405/400/503 全覆盖），并断言挂载点存在。正对照已实测会报红：把 `<FeedbackDialog />` 从 Header 摘掉、或把 `<Toaster />` 的 `position` 改掉，脚本立刻 FAIL。
+- **顺带修掉的全站缺陷**：`src/components/ui/sonner.tsx` 里有 shadcn 的 `Toaster`，但**过去没有任何地方挂载它**（全项目搜不到 `<Toaster`）—— 于是几十处 `toast.*`（AI 不可用、每日目标、音色回退、朗读降级提示、反馈结果…）全部静默。现在 `src/index.tsx` 挂唯一出口：`position="top-center"`、`offset.top=88px`（避开 sticky 头）、`mobileOffset.top=calc(env(safe-area-inset-top)+84px)`（APK edge-to-edge 不被状态栏吃掉）。**新页面不要再挂第二个 Toaster**。
+- **真浏览器验收（2026-09-28，无头 Chrome + CDP 打预览服 4173）**：顶栏按钮存在 → 弹出「用户反馈」→ 填描述 → 提交 → 因线上无接收通道，实测 toast 为「反馈暂未送出 / 内容已保存在本机「历史反馈」，可在里面点重试」；本机 `feedback_list` 该条 `synced:false`、`appVersion:"2.0.25"`，历史区显示「未送达 · 已存本机」+「重试」。限流同样实测生效（紧接着第二次提交被"请等待 N 秒后再提交"挡住）。
 
 ```powershell
 # 开发 / 构建
@@ -150,10 +176,13 @@ node scripts/verify-wordbank-loading.mjs     # 词库加载层集成验证（14 
 node scripts/verify-wordbank-split.mjs --baseline <out.json>   # 数据层拆分校验（先采基线）
 node scripts/verify-wordbank-split.mjs --check <in.json>
 npm run verify:books-meta        # 书目/SCP 元数据 + 复习词高亮 + 乱码（202 断言）
-npm run verify:vocab-cards       # 背单词卡片交互契约（223 断言）
+npm run verify:vocab-cards       # 背单词卡片交互契约（225 断言）
+npm run verify:vocab-caches      # 词汇缓存基建契约（capped-cache / colloc-ai-cache 接线，21 断言）
+npm run verify:feedback-loop     # 反馈链路契约（挂载点 + 三档状态 + 后端 KV/飞书替身真实执行，53 断言）
 npm run verify:tts-progress      # 朗读切片/进度（6175 断言）
 node scripts/verify-tts-hardening.mjs        # TTS 降级/预合成守卫（10 项）
 npm run check:tts-voices         # 音色与模型资产一致性（package:apk 前置）
+npm run wordbank:split           # 改词库后必跑：把 detail 拆出主文件（幂等）
 
 # 语料
 node scripts/fetch-scp.cjs               # 重抓 SCP 文章（约 1 req/s，产物勿手改）
@@ -163,7 +192,7 @@ node scripts/clean-wordbank-mojibake.mjs # 清 U+FFFD 乱码（幂等）
 pwsh -File scripts/gen-app-brand.ps1 -Preview docs/brand-assets-preview.png
 
 # 打包（版本号必须先递增！）
-npm run version:apk-bump    # 只 +patch，如 2.0.20 → 2.0.21
+npm run version:apk-bump    # 只 +patch，如 2.0.25 → 2.0.26
 npm run package:apk         # 校验音色 → capacitor copy → 拷模型 → gradle → 落 release/
 npm run package:desktop
 npm run package:all         # web 只构建一次，APK 与桌面并行（约 45s）
@@ -181,14 +210,14 @@ adb install -r release/NativeThink-mobile-debug.apk
 |---|---|---|
 | 静态 | `npm run typecheck` + `npm run lint:eslint` | 全量；pre-commit 强制 |
 | 构建 | `npm run build:web` | 打包可行性 + chunk 体积 |
-| 契约 | 6 个 `scripts/verify-*.mjs` | 词库加载/拆分、书目元数据、背单词卡片、TTS 切片与进度、TTS 降级 |
+| 契约 | 7 个 `scripts/verify-*.mjs` | 词库加载/拆分、书目元数据、背单词卡片、背单词缓存、TTS 切片与进度、TTS 降级、反馈链路（前后端对接 + 后端替身执行） |
 | 真机 | adb + CDP（见第 7 节） | 只能在设备上发现的：safe-area、原生 TTS、手势、持久化 |
 
 **写守卫脚本的经验（血泪）**：
 1. **断言要重新推导，不能照抄**。改语义时必须连断言一起改 —— 历史上 `viewingPast = rated && isFlipped` 这个**错误定义被断言一起锁死**，导致"评分后自动跳转"永远不触发却一直是绿的。
 2. 断言里加**脚手架自检**（例如"解析到的条目数必须等于源文件条目数"），否则正则会静默漏项（曾漏掉含撇号的书名）。
 3. 数据文件混用单/双引号，正则要写 `(?:[^"\\]|\\.)*`；解析 TS 数据优先用 `ts.transpileModule` 而不是正则。
-4. 断言数会随功能增长（`verify-vocab-cards` 从 135 → 223），**只增不减**，除非删功能。
+4. 断言数会随功能增长（`verify-vocab-cards` 从 135 → 225），**只增不减**，除非删功能。
 
 ---
 
@@ -206,9 +235,13 @@ adb install -r release/NativeThink-mobile-debug.apk
 - 日期一律 `formatDate()`；禁用 `toISOString().slice(0,10)`。
 - `moduleProgress` 的 key 必须与 `DashboardPage/constants.ts` 的 `MODULES[].key` 一一对应。
 - 主要 storage key 前缀 `__nativethink_`，例如：
-  `_learning_stats` / `_calendar` / `_word_learning` / `_vocab_session_<level>` / `_daily_quota` /
-  `_quickcard_runs` / `_quickcard_pending` / `_quickcard_session` / `_custom_words` / `_word_notes` /
-  `_favorites` / `_tts_settings` / `_sherpa_off` / `_spelling_progress` / `_achievements` / `_theme`。
+  `_learning_stats` / `_calendar` / `_word_learning` / `_daily_quota` / `_favorites` / `_word_notes` /
+  `_custom_words` / `_tts_settings` / `_sherpa_off` / `_sherpa_try` / `_spelling_progress` / `_achievements` / `_theme`。
+  **断点续学键按（模式, level）分**，勿混用全局键：`_vocab_session_<level>`（复习检测）、`_daily_session_<level>`（每日学习）、
+  `_quickcard_session_<level>`（快速闪卡）、`_chunk_review_session`（语块复习）。
+  自动发音共键：`_vocab_autospeak`（每日/复习检测/快速闪卡/语块复习一处关闭处处安静）。
+  快速闪卡留档三件套：`_quickcard_runs` / `_quickcard_pending` / `_quickcard_session*`。
+  要完整清单就 `grep -rho "__nativethink_[a-z_]*" src | sort -u`（当前 90 多个不同键）—— 这里刻意不列全，列全会过期（缓存类的封顶规则见 `capped-cache.ts` / `colloc-ai-cache.ts`）。
 
 ### 6.3 TTS（最脆弱，改前必读）
 - 云端上游（Google Translate TTS，经 `functions/api/tts.js`）硬上限**恰好 200 字符**（205 → 502）；客户端切片上限 **180**，改大整条云端链路失败并静默降级。
@@ -231,7 +264,7 @@ adb install -r release/NativeThink-mobile-debug.apk
 ### 6.5 打包
 - `versionCode` 每次打包**必须递增**，否则 Android 拒绝升级安装（要求先卸载 → 丢数据）。
 - `post-commit` 会改 CHANGELOG，工作树有 1 条已暂存 CHANGELOG 是稳态。
-- 未明确要求**不要 push**（本地长期领先 origin 是常态）。
+- 未明确要求**不要 push**。2026-09-28 起本地与 `origin/main` 已同步（不再有"本地领先 N 个提交"这回事）；一旦 push，`deploy-cf.yml` 与 `deploy.yml` 两条 CI 都会跑，坏代码会立刻让线上构建失败。
 
 ---
 
@@ -239,20 +272,28 @@ adb install -r release/NativeThink-mobile-debug.apk
 
 设备：Redmi 25053RT47C / HyperOS / Android 16（SDK 36），CSS 视口 393×851，dpr 3.256，safe-area 顶 **47px** / 底 **16px**。
 
+**日常首选 `scripts/device-eval.mjs`**（它把 forward + CDP 都包好了，端口默认 9223，可用 `CDP_PORT` 覆盖）：
+
 ```powershell
 $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 & $adb devices -l                     # 若同一台机器出现两条（IP:port + mDNS），先 disconnect 掉重复那条
 & $adb shell pidof com.nativethink.app
-& $adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>
-Invoke-RestMethod http://127.0.0.1:9222/json      # 拿 webSocketDebuggerUrl
+& $adb forward tcp:9223 localabstract:webview_devtools_remote_<pid>   # socket 名：adb shell cat /proc/net/unix | grep webview_devtools_remote
+node scripts/device-eval.mjs eval "document.title"   # 求值（awaitPromise 已开）
+node scripts/device-eval.mjs tap 400 1630            # 点击，坐标给**物理像素**，内部按 innerWidth 折算
+node scripts/device-eval.mjs shot .screen.png        # 截图（落在仓库根的 .screen*.png 属调试残留，别 commit）
+node scripts/device-eval.mjs back
 ```
 
+要自己发 CDP 时才用底层通道：`Invoke-RestMethod http://127.0.0.1:9223/json` 拿 `webSocketDebuggerUrl`。
+
 **关键限制与对策**
+0. **先报备再动手机** —— 走查/装机/点击都会干扰用户真机，动手前先在对话里说清要做什么；走查收尾必须 `force-stop` 归位。
 1. **HyperOS 禁止 `adb shell input`**（`SecurityException: INJECT_EVENTS`）—— tap/keyevent 全不可用。改用 **CDP** 驱动 WebView：
    - `Runtime.evaluate` 执行 `el.click()` 驱动 React（合成 click 可用；**合成 TouchEvent 不可靠**，滑动验证请用真手指）。
    - 键盘交互可用 `window.dispatchEvent(new KeyboardEvent('keydown', {...}))`，但注意**在 window 上派发的事件不会传播到 document**（Radix 的 Esc 处理挂在 document 上，所以这样测"Esc 关弹窗"会假失败）。
-2. 坐标：CDP 是 CSS px，`adb exec-out screencap` 是物理 px（物理 = CSS × dpr）。
-3. `Page.reload` / force-stop 后 pid 会变，需重建 forward。
+2. 坐标：CDP 是 CSS px，`adb exec-out screencap` 是物理 px（物理 = CSS × dpr）；`device-eval.mjs tap` 已自动折算，直接给截图上量到的像素即可。
+3. `Page.reload` / force-stop 后 pid 会变，需重建 forward；忘了重建会报 `no page target` 或 CDP 调用超时（脚本给的提示是"页面可能在后台被冻结，把 App 调到前台再试"）。
 4. 读 safe-area 真值：探针 div + `getComputedStyle().paddingTop`（`env()` 不能直接读）。
 5. 无线调试会掉线，需要手机上重新出 6 位配对码。
 6. 长参数/JCJK 表达式走**文件**（`node evalfile.mjs expr.js`），别用 PowerShell 拼字符串（解析器会吃掉引号和 emoji）。
@@ -280,52 +321,74 @@ Invoke-RestMethod http://127.0.0.1:9222/json      # 拿 webSocketDebuggerUrl
 | 维基百科加载失败 | 网络限制 | `origin=*` + `AbortSignal.timeout(10000)` |
 | 主包体积想优化 | TTS 栈**无法**懒加载（首屏多处引用 + 入口同步自检） | 已实测为负优化，别再试；优先级低于 wordbank 分片 |
 
+**2026-09 两轮全站质量优化新增的坑**（下表只列最容易复发的，完整表以 `AGENTS.md`「已知坑」为准）：
+
+| 现象 | 真正原因 | 修法 |
+|---|---|---|
+| 洗牌列表 + 下标定位当前题，AI 出题/删题后当前题悄悄漂移 | `useMemo(() => shuffle(items), [items])` 依赖数组身份，每次重算都换顺序 | 用 `use-stable-shuffle.ts`（首帧同步初始化 + 只增量增删）；接入点索引加守卫 |
+| 恢复到某个 tab 时挂载即白屏 | 洗牌 hook 首帧返回空数组，`items[currentIdx].field` 崩 | hook 首帧同步初始化顺序（已修）；接入点保留 `?.` |
+| StrictMode 下副作用翻倍（词插两遍、results 错位） | setState updater 里再调 setState / 改 ref，双调用把副作用跑了两遍 | 副作用提到事件层，用 ref 拿最新状态各 set 一次（参考 QuickCardMode `scheduleRelearn`） |
+| 最后一卡答错被直接判完成，重排词永不出现 | 完成判定用闭包 `queue.length`，重排插入后是旧值 | 读 ref 镜像的最新长度（`queueRef.current.length`） |
+| 断点续学被另一本书覆盖 | 切词书同帧"新 level + 旧队列"先于重建落盘 | 断点按 level 分键 + 落盘前校验队列归属 |
+| 屏蔽（不再出现）的词又回来了 | 只在一个出卡路径过滤 `suspended`，别的漏滤 | **所有**出卡路径统一过滤（复习检测 `otherWords` 曾漏） |
+| 整页/整章翻译错位一行 | 失败段被 filter 后按"成功顺序"回填 | 翻译缓存 v2 按段索引 byIdx 精确回填；旧顺序缓存段数不吻合宁可不显示 |
+| 长任务结束时覆盖运行期间的新数据 | 用点击时的陈旧快照直接 set | 合并用 `setX((prev) => ...)` 函数式；与其它写路径互斥守卫 |
+
 ---
 
 ## 9. 当前进度与未完成事项
 
-### 已完成（近三周）
-- **阅读器 + 朗读**：22 本书离线可用、三级 TTS 降级、切片进度上报、"读到哪"高亮、段落/整篇朗读、复习词彩色高亮（6 色可选）。
-- **词汇深度**：SM-2 五档复习、快速闪卡（本轮大改）、每日学习、词库浏览、搭配学习、词汇量测试。
-- **快速闪卡（最新一轮，APK 2.0.20）**：点卡片翻面 + 例句、上一个单词（顶部常驻可点开词条详情）、各处单词收藏（与收藏页同源）、完成页词表、学习记录留档 + 当前累积 + 重练、按选择数量切分留档、相同词表去重、答错隔 4 张重刷（最多 2 次）、断点续学（切 tab / 杀 App 都恢复）、"全部"档位。
-- **系统层**：Android 15+ edge-to-edge 适配（`viewport-fit=cover` + safe-area 工具类）、词库 5,909 处 U+FFFD 乱码清理、emoji → lucide 图标。
+### 已完成（到 2.0.25 / `3dcee7e`）
+- **阅读器 + 朗读**：22 本公版书离线可用、三级 TTS 降级（内置 sherpa 离线 → 系统 → 云端）、切片进度上报、"读到哪"高亮、段落/整篇朗读、复习词彩色高亮（6 色可选）、整书翻译断点队列（批合并 + 每批落盘 + 随时中止）、翻译缓存 v2 按段索引回填。
+- **词汇深度**：SM-2 五档复习、词库浏览、搭配学习、词汇量测试（含近 10 次趋势条）。
+- **快速闪卡**：点卡片翻面 + 例句、上一个单词（顶部常驻可点开词条详情）、各处单词收藏（与收藏页同源）、完成页词表、学习记录留档 + 当前累积 + 重练、按选择数量切分留档、相同词表去重、答错隔 4 张重刷（最多 2 次）、断点续学（切 tab / 杀 App 都恢复）、"全部"档位。
+- **每日学习（六方式）2026-09-27 一轮**：断点续学补齐（**四个主模式现已全部可续学**：复习检测 / 每日学习 / 快速闪卡 / 语块复习）、闪卡背面『不再出现』（与复习检测对齐、可撤销）、词条详情弹窗读写『我的助记』（复用快速闪卡的 `WordInfoDialog`）、配对不再自动朗读（视觉任务）、自动发音四模式共键。
+- **全站两轮质量优化**（`4f45167` / `e33a780`）：`useStableShuffle` 统一洗牌、快速闪卡状态机三连修、断点按词书分键、屏蔽词全路径过滤、写作 reset/换题打断在途批改流、拼写错词重练入口 + 听写语速滑杆、跟读 100% 完成成就横幅、复习检测键盘弹窗守卫、危险操作两段确认、四个只增不减的缓存 FIFO 封顶 + 键迁移（`capped-cache` / `colloc-ai-cache`）、模式首页角标订阅刷新、贪婪正则换 `extractJson`、emoji 图标换 lucide。
+- **系统层**：Android 15+ edge-to-edge 适配（`viewport-fit=cover` + safe-area 工具类）、词库 5,909 处 U+FFFD 乱码清理、品牌视觉资产重建（`gen-app-brand.ps1`）、真机 CDP 通道 `device-eval.mjs`。
+- **反馈链路对接补全（2026-09-28）**：入口挂上 `Header`，后端改为「先 KV 留档、再可选推飞书」，返回三档真实状态（`delivered`/`stored`/`failed`），失败可在历史里重试；新增 `src/lib/app-env.ts` 统一版本与平台上报，新增守卫 `npm run verify:feedback-loop`（53 断言，含正对照）。详见 §3.4。
 
 ### 未完成 / 已知短板
-1. **每日学习（DailyLearningMode）没有断点续学** —— 切 tab 会丢当前位置（复习检测与快速闪卡都有）。
-2. **学习提醒**（Capacitor 本地通知）刻意推迟未做。
-3. **词库真人发音包**：单词集合有限，可预录（ROADMAP 第 3 项）。
-4. 句子语料/语法/导入书离线翻译仍有待回填项（见 ROADMAP）。
-5. 本地 main 领先 origin 13 个提交且工作树有一批未提交改动 —— **接手第一件事：确认这些改动是否已随 APK 验证并需要提交**。
-6. `.githooks/post-commit` 的两个缺陷未修（日期标题 `###`/`##` 不一致、空行累积）。
+1. **学习提醒**（Capacitor 本地通知）刻意推迟未做 —— `android/app/src/main/assets/capacitor.plugins.json` 里目前只有 `@capacitor-community/text-to-speech`（`SherpaTts` 是仓库内原生插件，在 `MainActivity` 里 `registerPlugin`，不进这张表）。
+2. **词库真人发音包**：单词集合有限，可预录（ROADMAP 第 3 项）。
+3. 句子语料/语法/导入书离线翻译仍有待回填项（见 ROADMAP）。
+4. `.githooks/post-commit` 仍会在插入日期标题时带固定空行（`CHANGELOG.md` 头部已堆 4 行空行，无害）；日期标题 `###`/`##` 那条**已修**。
+5. **反馈通道尚未开通**：代码链路已通，但线上 Pages 项目只有 `JWT_SECRET` 一个 secret —— 要让反馈真的送达开发者，需加 `FEISHU_WEBHOOK_URL`（飞书群机器人）和/或确认 KV 绑定生效；否则用户看到的一直是"暂未送出，可重试"。
+6. **文档债（仍在）**：`src/components/HelpGuide.tsx` 是应用内帮助中心，内容比代码旧 —— FAQ 还写"必须自备 API Key、推荐 DeepSeek"（现在出厂免费档可直接用）、"聚合所有五个等级"（现在九档）、"数据不会上传到任何服务器"（现在可登录云同步）。`使用攻略.md` 已于 2026-09-28 重写。
+7. 仓库根有 2 个真机截图残留未跟踪（`.screen1.png` / `.screen2.png`），别 commit，要清就删。
 
 ### 下一步建议顺序
-1. 提交并推送现有改动（先跑全量验证，push 会触发 Cloudflare CI）。
-2. 给每日学习补断点续学（照抄 `quickcard-history.ts` 的三段式 + `FlashcardMode` 的 `saveSession`）。
-3. 全局"学习提醒"。
-4. 词库真人发音包。
+1. 学习提醒（本地通知）—— 目前唯一还缺的系统级能力。
+2. 词库真人发音包（预录 + 打包体积方案要先定，`public/` 不能塞大文件）。
+3. ROADMAP 里的语料回填项（语法条数、导入书离线翻译、待回填空段）。
+4. 顺手项：把 `使用攻略.md` 更到当前功能面；`post-commit` 的空行治理。
 
 ---
 
 ## 10. 交接检查清单
 
 **开工前**
-- [ ] `git log --oneline -5` + `git status` 看清未提交改动（它们可能已装在设备上）
+- [ ] `git log --oneline -5` + `git status` 看清工作树（稳态只有 2 条已暂存的 CHANGELOG；调试残留别 commit）
 - [ ] `npm run typecheck && npm run lint:eslint` 确认基线是绿的
 - [ ] 读本文件第 6、8 节（约定 + 坑表）再动代码
 
 **改完代码**
 - [ ] `npm run typecheck`、`npm run lint:eslint`、`npm run build:web`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言
-- [ ] 真机装机验证（涉及 safe-area / 原生 TTS / 手势 / 持久化的改动**必须**真机验）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言（7 个脚本 2026-09-28 全绿：14 / 202 / 225 / 21 / 6175 / 10 / 56）
+- [ ] 改过词库文件 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
+- [ ] 真机装机验证（涉及 safe-area / 原生 TTS / 手势 / 持久化的改动**必须**真机验；动手前先报备，收尾 `force-stop`）
 
 **交付前**
 - [ ] `npm run version:apk-bump` 后再 `package:apk`（versionCode 必须递增）
 - [ ] `aapt dump badging` 核验内嵌版本
 - [ ] 确认没有大文件进 `public/`
+- [ ] 确认站点 functions 没被改坏 —— APK 的 `/api/*` 打的就是线上站点
 - [ ] 回复里给：结论 + 关键数字 + 文件路径 + 下一步需要用户做什么
 
 **禁止事项**
 - ❌ 往 `public/` 放大文件（APK/模型） ❌ 用 `--no-verify` 绕过钩子
+- ❌ 用 `useMemo(() => shuffle(items), [items])` 现洗（依赖数组身份 → 当前题漂移），一律 `use-stable-shuffle`
+- ❌ 把断点续学写成全局单键（切词书会互相覆盖），按 level 分键 + 落盘前校验队列归属
+- ❌ 新增按词累积的 localStorage 缓存不走 `capped-cache.ts`（会把配额撑爆）
 - ❌ 直接改 `src/data/wordbank/data/*.ts`（跑 `npm run wordbank:split` 恢复拆分）
 - ❌ 直接改 `src/data/scp.ts` / `books.ts`（生成物；改生成器 + 跑守卫）
 - ❌ 在页面里直接调 `speechSynthesis`（走 `use-tts.ts`）

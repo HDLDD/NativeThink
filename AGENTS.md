@@ -83,6 +83,10 @@ node scripts/verify-vocab-cards.mjs
 # 词汇缓存基建契约（capped-cache / colloc-ai-cache 接线改动后必跑）
 node scripts/verify-vocab-caches.mjs
 
+# 反馈链路契约（FeedbackDialog / use-feedback / functions/api/feedback/submit.js 改动后必跑；
+# 后端 handler 用忠实 KV + webhook 替身真实执行，含正对照）
+npm run verify:feedback-loop
+
 # 重新抓取 SCP 文章（约 1 req/s，产物 src/data/scp.ts 勿手改）
 node scripts/fetch-scp.cjs
 
@@ -156,6 +160,7 @@ src/
 │   ├── use-stable-shuffle.ts   # 稳定洗牌 hook（洗牌列表+下标定位当前题必须用它，防漂移）
 │   ├── capped-cache.ts         # localStorage JSON 缓存统一读写 + FIFO 封顶 + 键迁移
 │   ├── colloc-ai-cache.ts      # 搭配 AI 翻译缓存单点归属（键名/迁移/400 上限）
+│   ├── app-env.ts              # 版本与运行平台单一来源（反馈上报、诊断；版本取自 android/version.properties）
 │   └── safe-storage.ts         # 带用户前缀的 localStorage 封装
 ├── pages/                  # 一页一目录
 ├── data/                   # 语料、词库、语块等 demo/mock 数据
@@ -249,6 +254,9 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 | 无线 adb 无法注入输入（`input tap` 报 SecurityException） | 该 ROM 不给 TLS shell INJECT_EVENTS | 用 `scripts/device-eval.mjs`（CDP 截图/求值/点击，坐标给物理像素自动折算） |
 | 重装 APK 后部分本地数据"消失" | WebView localStorage 在该 ROM 上可能随更新被清 | 重装前用「学习记录 → 导出」备份；重要数据登录走云同步 |
 | 词库"详情面板空白" | `loadLevel` 内 `try{loadDetail}catch{}` 静默吞错；模块表还会缓存失败结果 | 用 `isDetailReady()` 判断，失败走 `window.location.reload()`（原地重试无效） |
+| 功能"两端都写了却点不到"（反馈曾如此） | 组件与云端函数都存在，但没有任何页面挂载组件；静态检查看不出断线 | 挂载点写进回归脚本断言（`npm run verify:feedback-loop` 检查 Header 是否渲染 `<FeedbackDialog />`）；新功能的入口必须真机/真页面验证可达 |
+| 提交类操作谎报成功 | 后端只用一个 boolean，`503`（通道未配）与网络失败都归成"没成功"，UI 却一律 toast 成功 | 结果分档返回（`delivered`/`stored`/`failed`），UI 按档给不同提示；失败保留条目并提供重试入口 |
+| 全站 toast 提示不出现（无报错、无界面变化） | `ui/sonner.tsx` 有 `Toaster` 但**没有任何地方挂载它**，`toast()` 调用全静默 | 唯一出口挂在 `src/index.tsx`（`position="top-center"` + `offset`/`mobileOffset` 避让 sticky 头与状态栏）；新页面不要再挂第二个，`verify:feedback-loop` 会断言挂载存在 |
 
 调试入口：`.claude/skills/nativethink-fix.md`（本仓库内完整模式表）。
 
