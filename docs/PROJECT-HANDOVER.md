@@ -356,13 +356,39 @@ node scripts/device-eval.mjs back
    机制：顶栏「点击切换词书」与沉浸态那个小按钮都只调 `handleOpenWizard`（`DeepVocabularyPage.tsx:398`）→ 向导**总是从 step 0 重新开始**且 `chosenLevel` 初始为空；点某本书只走 `handleBookSelect`（同文件 98-101 行：仅 `setChosenLevel` + `setStep(1)`），**真正写回页面状态的只有 `handleWizardComplete` → `setSelectedLevel`**（400-409 行）。而 `handleModeSelect`（103-109 行）里只有 `daily`/`flashcard` 会进 step 2，其余方式当场 `onComplete` —— 于是"换本书继续学"这条高频路径被迫走完整个首启三步向导，中途关掉就等于没换。
    建议修法：把两条路径拆开 —— 已在用词书时点「切换词书」应当**一步生效**（`onComplete(level, 保持当前 tab/模式)`），三步向导只留给首次设置；顺带清理 862/880 行 `selectedLevel === 'all' ? 'cet4' : selectedLevel` 这个兜底（选"全部"时按钮上显示"四级"，会误导）。
    验证要点：改完必须真机/真页面点一次（这类"入口在但状态不写回"的问题，静态检查看不出来 —— 与第 8 节"两端都写了却点不到"同类）。
-2. **学习提醒**（Capacitor 本地通知）刻意推迟未做 —— `android/app/src/main/assets/capacitor.plugins.json` 里目前只有 `@capacitor-community/text-to-speech`（`SherpaTts` 是仓库内原生插件，在 `MainActivity` 里 `registerPlugin`，不进这张表）。
-3. **词库真人发音包**：单词集合有限，可预录（ROADMAP 第 3 项）。
-4. 句子语料/语法/导入书离线翻译仍有待回填项（见 ROADMAP）。
-5. `.githooks/post-commit` 仍会在插入日期标题时带固定空行（`CHANGELOG.md` 头部已堆 4 行空行，无害）；日期标题 `###`/`##` 那条**已修**。
-6. **反馈通道尚未开通**：代码链路已通，但线上 Pages 项目只有 `JWT_SECRET` 一个 secret —— 要让反馈真的送达开发者，需加 `FEISHU_WEBHOOK_URL`（飞书群机器人）和/或确认 KV 绑定生效；否则用户看到的一直是"暂未送出，可重试"。
-7. **文档债（仍在）**：`src/components/HelpGuide.tsx` 是应用内帮助中心，内容比代码旧 —— FAQ 还写"必须自备 API Key、推荐 DeepSeek"（现在出厂免费档可直接用）、"聚合所有五个等级"（现在九档）、"数据不会上传到任何服务器"（现在可登录云同步）。`使用攻略.md` 已于 2026-09-28 重写。
-8. 仓库根有 2 个真机截图残留未跟踪（`.screen1.png` / `.screen2.png`），别 commit，要清就删。
+2. **快速闪卡两个提示要求去掉**（2026-09-29 用户报，未修）：点「不认识」时不再弹
+   「这个词稍后会再出现一次」；收藏 / 取消收藏时不再弹「已收藏「xxx」/已取消收藏「xxx」」。
+   位置 `QuickCardMode.tsx`：收藏 `toggleFav` 内 149 / 158 行、`markUnknown` 内 400 行。
+   视觉反馈本来就在卡片上（★ 填充、翻面显示释义、红标），不依赖 toast；重刷机制照常生效，
+   只是不再播报。改完在 `verify-vocab-cards.mjs` 补静默契约断言（这三个提示不许再出现）。
+3. **学习提醒**（Capacitor 本地通知）刻意推迟未做 —— `android/app/src/main/assets/capacitor.plugins.json` 里目前只有 `@capacitor-community/text-to-speech`（`SherpaTts` 是仓库内原生插件，在 `MainActivity` 里 `registerPlugin`，不进这张表）。
+4. **词库真人发音包**：单词集合有限，可预录（ROADMAP 第 3 项）。
+5. 句子语料/语法/导入书离线翻译仍有待回填项（见 ROADMAP）。
+6. `.githooks/post-commit` 仍会在插入日期标题时带固定空行（`CHANGELOG.md` 头部已堆 4 行空行，无害）；日期标题 `###`/`##` 那条**已修**。
+7. **反馈通道尚未开通**：代码链路已通，但线上 Pages 项目只有 `JWT_SECRET` 一个 secret —— 要让反馈真的送达开发者，需加 `FEISHU_WEBHOOK_URL`（飞书群机器人）和/或确认 KV 绑定生效；否则用户看到的一直是"暂未送出，可重试"。
+8. **文档债（仍在）**：`src/components/HelpGuide.tsx` 是应用内帮助中心，内容比代码旧 —— FAQ 还写"必须自备 API Key、推荐 DeepSeek"（现在出厂免费档可直接用）、"聚合所有五个等级"（现在九档）、"数据不会上传到任何服务器"（现在可登录云同步）。`使用攻略.md` 已于 2026-09-28 重写。
+9. 仓库根有 2 个真机截图残留未跟踪（`.screen1.png` / `.screen2.png`），别 commit，要清就删。
+10. **`/api/tts-voices` 是死调用**（2026-09-28 实测，未修）：`TTSSettings.tsx:143` 在挂载时 fetch
+    `/api/tts-voices`，注释写"Desktop build only"，但 `src`/`functions`/`electron`/`scripts` 全域
+    没有任何实现 —— **每条路由都产生一次 404**（已在无头 Chrome 里逐路由复现，全站仅此一个错误）。
+    APK 更糟：`index.html` 把 `/api/*` 重写到线上站点，等于手机端每个页面多一次真实网络往返。
+    功能有兜底（`r.ok ? r.json() : null` + catch）所以不影响使用，但属于该清理的死代码。
+    建议：用 `app-env.ts` 的 `platformTag() === 'desktop'` 把这段 fetch 圈起来（保留桌面意图），或整段删除。
+11. **AI 设置浮层在窄视口顶部被裁**（2026-09-28 实测，未修）：393×600 下量到 `top=-42`
+    （Radix 把它翻到触发器上方后仍然超出视口顶部 42px）。与第 8 节"手机上浮层无法下滑"同一类，
+    修法同 TTSSettings：夹可用高度 + 内部滚动 + 去掉嵌套小滚动。
+12. **`verify-wordbank-split.mjs` 只能在"拆分前"采基线**（工具语义缺陷，未修）：
+    `--baseline` 记录的是"主文件里 `collocations` 数组是否非空"（第 72 行），
+    `--check` 比对的却是主文件的 `hasCollocations` 布尔字段（第 104 行）。
+    词库一旦处于拆分后状态（数组已清空、只留标记），事后重采基线必然得到"全 false"的期望，
+    `--check` 就大面积报红 —— 也就是说这脚本无法在拆分完成后重建基线。
+    建议：`--baseline` 规范化取「数组非空 **或** hasCollocations 为真」，让基线可在任意时刻重建。
+    （注意这是改断言语义，得连带用数据实测复核，不许靠放宽断言变绿。）
+13. **2.0.28 真机侧尚未确认**（2026-09-29）：手机已装 73/2.0.28，但按用户要求当时停了验证 ——
+    唯一一次尝试因我用 `pushState` 跳转没落到预期界面而读数全空，等于没验。
+    待确认两件事：词书卡是否显示 六级 7,404 / 考研 5,047 且考研能开出卡；朗读设置能否手指滑到底
+    点到语速与自检。现有一切结论都只有本机证据（`verify-wordbank-loading` 42 项 + 无头 Chrome 读 DOM）。
+
 
 ### 下一步建议顺序
 1. 学习提醒（本地通知）—— 目前唯一还缺的系统级能力。
