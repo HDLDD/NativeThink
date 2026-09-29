@@ -1,7 +1,7 @@
 # NativeThink 项目交接手册（Agent Handover）
 
 > 面向**接手的 AI agent / 新同事**：只读这一份就能开工。
-> 最后校准：2026-09-28（对应 APK 2.0.25 / versionCode 70，main HEAD = `3dcee7e`，**已与 origin/main 同步**，工作树只剩 CHANGELOG 稳态改动）。
+> 最后校准：2026-09-29（已装机 APK 2.0.28 / versionCode 73；本轮词汇向导改动**尚未打包**，下一版 74 / 2.0.29）。
 > 相关文档：`AGENTS.md`（日常约定速查）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
 
 ---
@@ -15,7 +15,7 @@
 | 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
 | 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-09 两轮全站质量优化已把拼写/跟读/写作/对话/语块也扫过一遍 |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 7 个 `scripts/verify-*.mjs` 断言脚本（14 / 202 / 225 / 21 / 6175 / 10 / 56，2026-09-28 全绿） |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 8 个 `scripts/verify-*.mjs` 断言脚本（42 / 202 / 246 / 21 / 6175 / 15 / 56 / 16，2026-09-29 全绿） |
 | 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
 | 最容易踩的坑 | ①改动 TTS 切片上限会让云端链路静默失败 ②ref 不随组件重挂载归零 ③`public/` 不能放大文件 ④推送用 SSH over 443 ⑤洗牌列表 + 下标定位当前题必须用 `use-stable-shuffle`（否则当前题悄悄漂移） |
@@ -71,7 +71,7 @@
 | Git 钩子 | `core.hooksPath=.githooks`。`pre-commit` 跑 `npm run precommit`（typecheck + eslint，失败即阻断，**不要 `--no-verify`**）；`post-commit` 把提交标题追加进 `CHANGELOG.md` + `public/CHANGELOG.md` 并 `git add` |
 | 已知钩子缺陷 | 日期标题 `###`/`##` 不一致的那条**已修**（现在写与查都是 `## $COMMIT_DATE`）。仍存：插入日期标题时带固定空行 → `CHANGELOG.md` 文件头累积了 4 行空行（无害，看着难受） |
 | 稳态现象 | 工作树长期保留 **1 条已暂存的 CHANGELOG 行**（提交 N 的日志落入提交 N+1），这是预期，不要"清理干净" |
-| 版本线 | APK **2.x**（当前 2.0.25 / versionCode 70）。`android/version.properties` 的 `versionCode` 每次打包必须递增 |
+| 版本线 | APK **2.x**（已装 2.0.28 / versionCode 73）。`android/version.properties` 的 `versionCode` 每次打包必须递增 |
 
 ### 2.1 APK / 桌面产物约定
 
@@ -174,15 +174,16 @@ npm run build:web           # 生产构建 → dist/client（同时生成 404.ht
 npm run preview             # 本地预览构建产物（:4173）
 
 # 验证（本项目没有测试框架，这些就是回归防线）
-node scripts/verify-wordbank-loading.mjs     # 词库加载层集成验证（14 项）
-node scripts/verify-wordbank-split.mjs --baseline <out.json>   # 数据层拆分校验（先采基线）
+node scripts/verify-wordbank-loading.mjs     # 词库加载层集成验证（42 项：显示数=出卡池子、九本全载不互抢）
+node scripts/verify-wordbank-split.mjs --baseline <out.json>   # 数据层拆分校验：采基线（拆分前后都能采）
 node scripts/verify-wordbank-split.mjs --check <in.json>
 npm run verify:books-meta        # 书目/SCP 元数据 + 复习词高亮 + 乱码（202 断言）
-npm run verify:vocab-cards       # 背单词卡片交互契约（225 断言）
+npm run verify:vocab-cards       # 背单词卡片交互契约（246 断言）
 npm run verify:vocab-caches      # 词汇缓存基建契约（capped-cache / colloc-ai-cache 接线，21 断言）
-npm run verify:feedback-loop     # 反馈链路契约（挂载点 + 三档状态 + 后端 KV/飞书替身真实执行，53 断言）
+npm run verify:feedback-loop     # 反馈链路契约（挂载点 + 三档状态 + 后端 KV/飞书替身真实执行，56 断言）
+npm run verify:overlay-fit       # 窄视口浮层契约（Dialog 基座夹高度 + 朗读/AI 设置内部滚动，16 断言）
 npm run verify:tts-progress      # 朗读切片/进度（6175 断言）
-node scripts/verify-tts-hardening.mjs        # TTS 降级/预合成守卫（10 项）
+node scripts/verify-tts-hardening.mjs        # TTS 降级/预合成守卫 + 设置面板网络卫生（15 项）
 npm run check:tts-voices         # 音色与模型资产一致性（package:apk 前置）
 npm run wordbank:split           # 改词库后必跑：把 detail 拆出主文件（幂等）
 
@@ -219,7 +220,7 @@ adb install -r release/NativeThink-mobile-debug.apk
 1. **断言要重新推导，不能照抄**。改语义时必须连断言一起改 —— 历史上 `viewingPast = rated && isFlipped` 这个**错误定义被断言一起锁死**，导致"评分后自动跳转"永远不触发却一直是绿的。
 2. 断言里加**脚手架自检**（例如"解析到的条目数必须等于源文件条目数"），否则正则会静默漏项（曾漏掉含撇号的书名）。
 3. 数据文件混用单/双引号，正则要写 `(?:[^"\\]|\\.)*`；解析 TS 数据优先用 `ts.transpileModule` 而不是正则。
-4. 断言数会随功能增长（`verify-vocab-cards` 从 135 → 225），**只增不减**，除非删功能。
+4. 断言数会随功能增长（`verify-vocab-cards` 135 → 225 → 246），**只增不减**，除非删功能。
 
 ---
 
@@ -342,7 +343,7 @@ node scripts/device-eval.mjs back
 
 ## 9. 当前进度与未完成事项
 
-### 已完成（到 2.0.25 / `3dcee7e`）
+### 已完成（到 2.0.28 / `f1ddeb7`，另有 2026-09-29 未打包改动）
 - **阅读器 + 朗读**：22 本公版书离线可用、三级 TTS 降级（内置 sherpa 离线 → 系统 → 云端）、切片进度上报、"读到哪"高亮、段落/整篇朗读、复习词彩色高亮（6 色可选）、整书翻译断点队列（批合并 + 每批落盘 + 随时中止）、翻译缓存 v2 按段索引回填。
 - **词汇深度**：SM-2 五档复习、词库浏览、搭配学习、词汇量测试（含近 10 次趋势条）。
 - **快速闪卡**：点卡片翻面 + 例句、上一个单词（顶部常驻可点开词条详情）、各处单词收藏（与收藏页同源）、完成页词表、学习记录留档 + 当前累积 + 重练、按选择数量切分留档、相同词表去重、答错隔 4 张重刷（最多 2 次）、断点续学（切 tab / 杀 App 都恢复）、"全部"档位。
@@ -350,17 +351,17 @@ node scripts/device-eval.mjs back
 - **全站两轮质量优化**（`4f45167` / `e33a780`）：`useStableShuffle` 统一洗牌、快速闪卡状态机三连修、断点按词书分键、屏蔽词全路径过滤、写作 reset/换题打断在途批改流、拼写错词重练入口 + 听写语速滑杆、跟读 100% 完成成就横幅、复习检测键盘弹窗守卫、危险操作两段确认、四个只增不减的缓存 FIFO 封顶 + 键迁移（`capped-cache` / `colloc-ai-cache`）、模式首页角标订阅刷新、贪婪正则换 `extractJson`、emoji 图标换 lucide。
 - **系统层**：Android 15+ edge-to-edge 适配（`viewport-fit=cover` + safe-area 工具类）、词库 5,909 处 U+FFFD 乱码清理、品牌视觉资产重建（`gen-app-brand.ps1`）、真机 CDP 通道 `device-eval.mjs`。
 - **反馈链路对接补全（2026-09-28）**：入口挂上 `Header`，后端改为「先 KV 留档、再可选推飞书」，返回三档真实状态（`delivered`/`stored`/`failed`），失败可在历史里重试；新增 `src/lib/app-env.ts` 统一版本与平台上报，新增守卫 `npm run verify:feedback-loop`（53 断言，含正对照）。详见 §3.4。
+- **词汇向导「少点一步」两修（2026-09-29）**：① 换书与首启拆成两条路 —— 已选过词书的人点任意一本书**一步生效**（保持当前学习方式、不清该书今日配额），三步进度条只在首启出现，「全部」不再拿四级图标冒充；② 走完向导（含点「开始学习」与「继续上次的选择」）**直接落进所选模式**，不再退回模式列表逼用户点第二下。`verify-vocab-cards.mjs` 补 21 条断言（含三条变异正对照），并用本机无头 Chrome + CDP 把 A/B/C/D 四段路径真实点了一遍（23 项行为断言全绿，截图见下条）。
 
 ### 未完成 / 已知短板
-1. **切换词书必须多走一步「学习方式」**（2026-09-29 用户报，未修）。
-   机制：顶栏「点击切换词书」与沉浸态那个小按钮都只调 `handleOpenWizard`（`DeepVocabularyPage.tsx:398`）→ 向导**总是从 step 0 重新开始**且 `chosenLevel` 初始为空；点某本书只走 `handleBookSelect`（同文件 98-101 行：仅 `setChosenLevel` + `setStep(1)`），**真正写回页面状态的只有 `handleWizardComplete` → `setSelectedLevel`**（400-409 行）。而 `handleModeSelect`（103-109 行）里只有 `daily`/`flashcard` 会进 step 2，其余方式当场 `onComplete` —— 于是"换本书继续学"这条高频路径被迫走完整个首启三步向导，中途关掉就等于没换。
-   建议修法：把两条路径拆开 —— 已在用词书时点「切换词书」应当**一步生效**（`onComplete(level, 保持当前 tab/模式)`），三步向导只留给首次设置；顺带清理 862/880 行 `selectedLevel === 'all' ? 'cet4' : selectedLevel` 这个兜底（选"全部"时按钮上显示"四级"，会误导）。
-   验证要点：改完必须真机/真页面点一次（这类"入口在但状态不写回"的问题，静态检查看不出来 —— 与第 8 节"两端都写了却点不到"同类）。
-2. **快速闪卡两个提示要求去掉**（2026-09-29 用户报，未修）：点「不认识」时不再弹
-   「这个词稍后会再出现一次」；收藏 / 取消收藏时不再弹「已收藏「xxx」/已取消收藏「xxx」」。
-   位置 `QuickCardMode.tsx`：收藏 `toggleFav` 内 149 / 158 行、`markUnknown` 内 400 行。
-   视觉反馈本来就在卡片上（★ 填充、翻面显示释义、红标），不依赖 toast；重刷机制照常生效，
-   只是不再播报。改完在 `verify-vocab-cards.mjs` 补静默契约断言（这三个提示不许再出现）。
+1. ~~**切换词书必须多走一步「学习方式」**~~（2026-09-29 用户报，**已修**）。
+   根因留档：换书与首启共用同一个三步向导，而点书只 `setChosenLevel` + `setStep(1)`，真正写回页面状态的
+   只有走完「选方式」后的 `handleWizardComplete → setSelectedLevel` —— 中途关向导等于没换。
+   现在 `onSwitchBook`（一步换书、保持方式、不清该书今日配额）与首启三步是两条路，且向导完成即 `setImmersed(true)` 落进所选模式。
+   验收方式值得复用：这类"入口在但状态不写回"的缺陷静态检查看不出来，本次用**本机无头 Chrome + CDP 真点**四段路径（首启 / 沉浸态换书 / 首页换书 / 全部词库），23 项行为断言全绿。
+2. ~~**快速闪卡两个提示要求去掉**~~（2026-09-29 用户报，**已修** `fdc9075`）：点「不认识」与收藏 / 取消收藏不再弹 toast，
+   视觉反馈由卡片本身承担（★ 填充、翻面显释义、红标），答错隔 4 张重刷的机制照常生效；
+   `verify-vocab-cards.mjs` 已补静默契约断言（含"重排仍在、只是不播报"的正对照）。
 3. **学习提醒**（Capacitor 本地通知）刻意推迟未做 —— `android/app/src/main/assets/capacitor.plugins.json` 里目前只有 `@capacitor-community/text-to-speech`（`SherpaTts` 是仓库内原生插件，在 `MainActivity` 里 `registerPlugin`，不进这张表）。
 4. **词库真人发音包**：单词集合有限，可预录（ROADMAP 第 3 项）。
 5. 句子语料/语法/导入书离线翻译仍有待回填项（见 ROADMAP）。
@@ -368,26 +369,45 @@ node scripts/device-eval.mjs back
 7. **反馈通道尚未开通**：代码链路已通，但线上 Pages 项目只有 `JWT_SECRET` 一个 secret —— 要让反馈真的送达开发者，需加 `FEISHU_WEBHOOK_URL`（飞书群机器人）和/或确认 KV 绑定生效；否则用户看到的一直是"暂未送出，可重试"。
 8. **文档债（仍在）**：`src/components/HelpGuide.tsx` 是应用内帮助中心，内容比代码旧 —— FAQ 还写"必须自备 API Key、推荐 DeepSeek"（现在出厂免费档可直接用）、"聚合所有五个等级"（现在九档）、"数据不会上传到任何服务器"（现在可登录云同步）。`使用攻略.md` 已于 2026-09-28 重写。
 9. 仓库根有 2 个真机截图残留未跟踪（`.screen1.png` / `.screen2.png`），别 commit，要清就删。
-10. **`/api/tts-voices` 是死调用**（2026-09-28 实测，未修）：`TTSSettings.tsx:143` 在挂载时 fetch
-    `/api/tts-voices`，注释写"Desktop build only"，但 `src`/`functions`/`electron`/`scripts` 全域
-    没有任何实现 —— **每条路由都产生一次 404**（已在无头 Chrome 里逐路由复现，全站仅此一个错误）。
-    APK 更糟：`index.html` 把 `/api/*` 重写到线上站点，等于手机端每个页面多一次真实网络往返。
-    功能有兜底（`r.ok ? r.json() : null` + catch）所以不影响使用，但属于该清理的死代码。
-    建议：用 `app-env.ts` 的 `platformTag() === 'desktop'` 把这段 fetch 圈起来（保留桌面意图），或整段删除。
-11. **AI 设置浮层在窄视口顶部被裁**（2026-09-28 实测，未修）：393×600 下量到 `top=-42`
-    （Radix 把它翻到触发器上方后仍然超出视口顶部 42px）。与第 8 节"手机上浮层无法下滑"同一类，
-    修法同 TTSSettings：夹可用高度 + 内部滚动 + 去掉嵌套小滚动。
-12. **`verify-wordbank-split.mjs` 只能在"拆分前"采基线**（工具语义缺陷，未修）：
-    `--baseline` 记录的是"主文件里 `collocations` 数组是否非空"（第 72 行），
-    `--check` 比对的却是主文件的 `hasCollocations` 布尔字段（第 104 行）。
-    词库一旦处于拆分后状态（数组已清空、只留标记），事后重采基线必然得到"全 false"的期望，
-    `--check` 就大面积报红 —— 也就是说这脚本无法在拆分完成后重建基线。
-    建议：`--baseline` 规范化取「数组非空 **或** hasCollocations 为真」，让基线可在任意时刻重建。
-    （注意这是改断言语义，得连带用数据实测复核，不许靠放宽断言变绿。）
+10. ~~**`/api/tts-voices` 是死调用**~~（2026-09-29 已修）：`TTSSettings.tsx` 原来无条件 fetch `/api/tts-voices`
+    —— 网页版每条路由吃一次 404，APK 里 `index.html` 把 `/api/*` 重写到线上站点，等于手机每个页面多一次真实网络往返。
+    现在用 `platformTag() === 'desktop'` 圈住：桌面照旧，web/APK 一个请求都不发。
+    **更正此前的错误记录**：这条路由**不是**没有实现 —— `server/local-server.mjs:671` 就实现了它
+    （枚举 Windows SAPI / OneCore 音色），由 `electron/main.mjs` 的 `startServer` 带起来。
+    当时我只搜了 `src`/`functions`/`electron`/`scripts`，漏了 `server/` 目录，于是把"桌面专属"误判成"死代码"。
+    教训：判定"全域没有实现"之前，先 `git ls-files | wc -l` 看清顶层目录清单，别按印象列范围。
+    验收（本机无头 Chrome 逐 12 条路由）：web UA 4xx/5xx = **0**（原来每路由 1 条），APK UA = **0**，
+    Electron UA 正对照 = 仍发 12 次（说明桌面那条路没被顺手砍掉）。守卫见 `verify-tts-hardening.mjs` C1-C4。
+11. ~~**AI 设置浮层在窄视口顶部被裁**~~（2026-09-29 已修）：393×600 实测面板高 687px，
+    **上下各被裁 43px**（先前记的 `top=-42` 是同一次测量，方向判断错了 —— 它不是 Radix 翻转到上方，
+    而是 `ui/dialog.tsx` 的基座用 `translate-y-[-50%]` 居中，内容比视口高时**两头一起溢出**，
+    而模态框锁住了背后页面的滚动，用户救不回来）。
+    修法：`DialogContent` 基座加 `max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain` 兜底，
+    AI 设置自身改竖排（标题 `shrink-0` + 正文 `flex-1 min-h-0 overflow-y-auto`）；
+    顺带修同屏另一个问题 —— 393px 塞两列把「智谱免费·出厂」压成一字一行，改成 `grid-cols-1 sm:grid-cols-2`。
+    复量：无头 Chrome 逐 6 个顶栏浮层在 393×600 / 393×500 / 1280×800 三档，被裁数 **0/6**（改前 1/6）。
+    新增守卫 `npm run verify:overlay-fit`（16 断言，6 处变异全部验红）。
+12. ~~**`verify-wordbank-split.mjs` 只能在"拆分前"采基线**~~（工具语义缺陷，2026-09-29 已修）：
+    旧 `--baseline` 只记"主文件里 `collocations` 数组是否非空"，而 `--check` 比的是 `hasCollocations` 标记
+    —— 词库处于拆分后状态（数组已清空、只留标记）时重采基线必然得到"全 false"的期望，`--check` 大面积报红。
+    现在基线取"当前数据里最权威的那个来源"（有标记用标记，否则用数组），**任何时刻都能重建**；
+    同时把「标记 ↔ detail 真值」的分歧清单钉进基线，`--check` 要求逐条相同（多一条、少一条、换了谁都红）。
+    顺带查出并钉住 **3 条历史分歧**：postgraduate 的 "transistor"（重复词条，标记 true 而 detail 无搭配 ×2）
+    与 advanced 的 "dexterity"（标记 false 而 detail 有搭配）—— 根因是 detail 映射按词键控、同词重复条目只能留一份。
+    另修一处连带断裂：`wordbank.ts` 现在从 `./meta` 取常量，`--check` 的 ④ 把 wordbank 转译到临时目录时
+    没带上 `meta.mjs`，直接 `ERR_MODULE_NOT_FOUND`（1625dba 起就坏了，因为没人跑过 `--check`）。
+    三条变异全部验红（改标记 / 抹 detail 搭配 / 喂老基线），还原后 `--check` 全绿。
 13. **2.0.28 真机侧尚未确认**（2026-09-29）：手机已装 73/2.0.28，但按用户要求当时停了验证 ——
     唯一一次尝试因我用 `pushState` 跳转没落到预期界面而读数全空，等于没验。
     待确认两件事：词书卡是否显示 六级 7,404 / 考研 5,047 且考研能开出卡；朗读设置能否手指滑到底
     点到语速与自检。现有一切结论都只有本机证据（`verify-wordbank-loading` 42 项 + 无头 Chrome 读 DOM）。
+14. **新用户一进「词汇」就被两个引导抢位**（2026-09-29 无头 Chrome 复现，未修）：
+    `src/components/HelpGuide.tsx:239` 在挂载 800ms 后对没看过指南的用户自动 `setOpen(true)`，
+    而它是**模态** Radix Dialog（遮罩吃掉指针事件）—— 于是 `/vocabulary` 的首启三步向导还铺在下面，
+    "使用指南"就先盖了上来，新人必须先关掉它才能选词书。
+    本次验收是在代码里先关掉这个弹窗才继续的（等于绕过了新人路径的第一屏）。
+    建议：自动弹出只在 `/`（首页）触发，或页面自身有更强的首启流程（如 `!setupDone` 的词汇向导）时抑制；
+    顺带把第 8 条的文档债一起清（同一个组件）。
 
 
 ### 下一步建议顺序
@@ -407,7 +427,7 @@ node scripts/device-eval.mjs back
 
 **改完代码**
 - [ ] `npm run typecheck`、`npm run lint:eslint`、`npm run build:web`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言（7 个脚本 2026-09-28 全绿：14 / 202 / 225 / 21 / 6175 / 10 / 56）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言（8 个脚本 2026-09-29 全绿：42 / 202 / 246 / 21 / 6175 / 15 / 56 / 16）
 - [ ] 改过词库文件 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 真机装机验证（涉及 safe-area / 原生 TTS / 手势 / 持久化的改动**必须**真机验；动手前先报备，收尾 `force-stop`）
 

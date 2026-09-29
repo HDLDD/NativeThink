@@ -62,7 +62,7 @@ npm run check:tts-voices
 
 # 词库回归验证（本项目无测试框架，这两个脚本就是它的回归防线；改词库或加载层后必跑）
 node scripts/verify-wordbank-loading.mjs          # 加载层集成验证（无需浏览器）
-node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆分校验，须先用 --baseline 采集
+node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆分校验（基线任意时刻可重采）
 ```
 
 ```powershell
@@ -82,6 +82,9 @@ node scripts/verify-vocab-cards.mjs
 
 # 词汇缓存基建契约（capped-cache / colloc-ai-cache 接线改动后必跑）
 node scripts/verify-vocab-caches.mjs
+
+# 窄视口浮层契约（改 ui/dialog 基座、朗读设置/AI 设置面板结构后必跑）
+node scripts/verify-overlay-fit.mjs
 
 # 反馈链路契约（FeedbackDialog / use-feedback / functions/api/feedback/submit.js 改动后必跑；
 # 后端 handler 用忠实 KV + webhook 替身真实执行，含正对照）
@@ -237,6 +240,7 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 | 父子双 `onClick` 触发两次 | 事件冒泡重复绑定 | 只保留外层 handler |
 | button 嵌套 DOM 警告 | `<button>` 内再嵌 button | 内层改 `span role="button"` |
 | 顶部内容被一条空条遮住 | 无内容但带 `bg-*` 的 sticky 元素仍占位遮挡 | 只在有内容时渲染（`{tab === 'browse' && (...)}`） |
+| 向导/设置"选完了却没开始" | 状态确实写回了（tab/level），但视图另由 `immersed` 一类开关把关，用户被留在原列表上 | 完成路径与"点卡片进入"走同一个函数（`handleTabChange` + `setImmersed(true)`）；换书这类保持上下文的操作则**不要**动那个开关 |
 | 图表数值压住标题 | 容器高度装不下「值+柱+轴」三层 | 容器高度 ≥ 三层实测高度 |
 | 弹窗打开时按 Esc 连带退出当前流程 | Radix 在 document 冒泡阶段**同步 flush** 关弹窗，window 冒泡监听已看不到 dialog | 键盘监听用**捕获阶段** `addEventListener('keydown', fn, true)` |
 | 维基百科加载失败 | 网络限制 | `origin=*` + `AbortSignal.timeout(10000)` |
@@ -257,7 +261,7 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 | 功能"两端都写了却点不到"（反馈曾如此） | 组件与云端函数都存在，但没有任何页面挂载组件；静态检查看不出断线 | 挂载点写进回归脚本断言（`npm run verify:feedback-loop` 检查 Header 是否渲染 `<FeedbackDialog />`）；新功能的入口必须真机/真页面验证可达 |
 | 提交类操作谎报成功 | 后端只用一个 boolean，`503`（通道未配）与网络失败都归成"没成功"，UI 却一律 toast 成功 | 结果分档返回（`delivered`/`stored`/`failed`），UI 按档给不同提示；失败保留条目并提供重试入口 |
 | 全站 toast 提示不出现（无报错、无界面变化） | `ui/sonner.tsx` 有 `Toaster` 但**没有任何地方挂载它**，`toast()` 调用全静默 | 唯一出口挂在 `src/index.tsx`（`position="top-center"` + `offset`/`mobileOffset` 避让 sticky 头与状态栏）；新页面不要再挂第二个，`verify:feedback-loop` 会断言挂载存在 |
-| 手机上浮层"无法下滑"，底部控件（语速/测试/自检）永远点不到 | Popover 是 portal 浮层，**页面滚动救不了它**；旧写法只有 `overflow-hidden` 又没有高度上限，内容一超过视口就被裁掉 | 外层 `max-h-[calc(var(--radix-popover-content-available-height)-1.5rem)] flex flex-col`，标题 `shrink-0`，正文 `flex-1 min-h-0 overflow-y-auto overscroll-contain`；**正文里的嵌套小滚动（如音色网格）在移动端应去掉 `max-h + overflow-y-auto`**，否则手势被它吃掉 |
+| 手机上浮层"无法下滑"，底部控件（语速/测试/自检）永远点不到 | Popover 是 portal 浮层，**页面滚动救不了它**；旧写法只有 `overflow-hidden` 又没有高度上限，内容一超过视口就被裁掉（Dialog 同理且更隐蔽：基座 `translate-y-[-50%]` 居中，超高时**上下两头一起溢出**） | 外层 `max-h-[calc(var(--radix-popover-content-available-height)-1.5rem)] flex flex-col`，标题 `shrink-0`，正文 `flex-1 min-h-0 overflow-y-auto overscroll-contain`；**正文里的嵌套小滚动（如音色网格）在移动端应去掉 `max-h + overflow-y-auto`**，否则手势被它吃掉 |
 | 词书卡写 7,404、快速闪卡只能出 2,127 张（九本全载时考研池子=**0**） | ①`ensureIndexes()` 用一个 `seen` 贯穿所有等级 → 先遍历到的书独占该词，池子大小还随"哪几本被加载"变；②计数表填的是**词条数**而非**去重词数**；③"全部"用各本书数字相加（词书是累积式的，相加会重复计数） | 去重分两层：**书内去重**决定每本书池子，**全局去重**只用于 `_allWordsCache`（全部模式一词一卡）；显示数用 `WORD_COUNTS`（=池子，由 `verify-wordbank-loading.mjs` 从数据实测复核），词条数看 `WORD_ENTRIES`；"全部"总数一律 `getTotalLearnableCount()`，**不要把各本相加** |
 
 调试入口：`.claude/skills/nativethink-fix.md`（本仓库内完整模式表）。

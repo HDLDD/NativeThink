@@ -7,6 +7,7 @@
 
 
 ## 2026-09-29
+- fix(tools): verify-wordbank-split 的基线可在任意时刻重建，并修好 --check 的模块断裂 (`af11954`)
 - fix(ui): AI 模型设置窄视口不再被裁，Dialog 基座补高度兜底 (`a8f71ee`)
 - fix(tts): /api/tts-voices 只在桌面版调用，web/APK 不再吃 404 与白发的网络往返 (`ae8274a`)
 - fix(vocab): 切换词书一步生效，且走完向导直接落进所选模式 (`de0077e`)
