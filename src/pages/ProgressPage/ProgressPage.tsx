@@ -134,7 +134,8 @@ export default function ProgressPage() {
     keys.forEach((k) => { try { localStorage.removeItem(k); } catch { /* ignore */ } });
     // IndexedDB 里的整书翻译缓存
     try {
-      const books = (await import('@/data/books')).ALL_BOOKS;
+      // 清整书翻译缓存只需要书的 id 清单 —— 用元数据模块，别为拿 id 去下载 22 本书正文
+      const books = (await import('@/data/books-meta')).BOOK_META;
       const { clearBookTranslation } = await import('@/data/book-translation');
       await Promise.all(books.map((b) => clearBookTranslation(b.id).catch(() => {})));
     } catch { /* ignore */ }

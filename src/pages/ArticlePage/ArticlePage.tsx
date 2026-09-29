@@ -19,6 +19,7 @@ import { cn, cleanText, extractJson } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
 import { toast } from 'sonner';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
+import type { IBookMeta } from '@/data/books-meta';
 import { buildPages } from '@/data/reading';
 import { loadImportedBooks, importBookFromText, deleteImportedBook, IMPORTED_ID_PREFIX } from '@/data/imported-books';
 import { loadBookStats, type IBookStat } from '@/data/book-stats';
@@ -30,6 +31,12 @@ import type { SpeechMeta } from '@/data/speeches';
 // ── Types ──
 type Level = 'beginner' | 'intermediate' | 'advanced';
 type MainTab = 'books' | 'webnovels' | 'scp' | 'publications' | 'ai' | 'speeches' | 'wikipedia';
+/**
+ * 书单列表项：内置书是**元数据**（books-meta，不含正文），导入书是完整内容（IndexedDB 里本来就有）。
+ * 两者字段同名，只有页数来源不同 —— 用 pageCountOf 取，别在列表里碰 .pages。
+ */
+type IBookListItem = IReadingContent | IBookMeta;
+const pageCountOf = (b: IBookListItem) => ('pageCount' in b ? b.pageCount : b.pages?.length ?? 0);
 
 const LEVELS: { key: Level; label: string; color: string; desc: string }[] = [
   { key: 'beginner', label: '初级', color: '#00B894', desc: '简单句式，常用词汇' },
@@ -199,7 +206,12 @@ export default function ArticlePage() {
   };
 
   // ── Lazy-loaded data (books & speeches are large, load on tab switch) ──
-  const [books, setBooks] = useState<IReadingContent[] | null>(null);
+  /**
+   * 书单只装**元数据**（books-meta，5KB），不再装 22 本书的正文（books.ts，611KB 源码 / 231KB gzip）。
+   * 正文在真正点开某本书时才由 openBookFromList 拉（且阅读器随后会升级到
+   * public/books/<id>.txt 的随包全文）。
+   */
+  const [books, setBooks] = useState<IBookMeta[] | null>(null);
   const [booksLoaded, setBooksLoaded] = useState(false);
   /** 内置书真实规模（全文词数/章数），随全文一起发布 */
   const [bookStats, setBookStats] = useState<Record<string, IBookStat>>({});
@@ -252,8 +264,25 @@ export default function ArticlePage() {
   useEffect(() => {
     if (mainTab !== 'books' || booksLoaded) return;
     setBooksLoaded(true);
-    import('@/data/books').then((m) => setBooks(m.ALL_BOOKS)).catch(() => setBooks([]));
+    import('@/data/books-meta').then((m) => setBooks(m.BOOK_META)).catch(() => setBooks([]));
   }, [mainTab, booksLoaded]);
+
+  /**
+   * 从书单打开一本书：导入书与 SCP 直接开；内置书平时只有元数据，
+   * 这一刻才去下载正文 chunk（节选兜底），随后阅读器会升级到随包全文。
+   */
+  const openBookFromList = async (item: IBookListItem): Promise<boolean> => {
+    if (!('pageCount' in item)) {
+      if (item.pages?.length) { openReader(item); return true; }
+      return false;
+    }
+    try {
+      const m = await import('@/data/books');
+      const full = m.ALL_BOOKS.find((b) => b.id === item.id);
+      if (full?.pages?.length) { openReader(full); return true; }
+    } catch { /* 正文 chunk 拉不下来（离线/网络中断） */ }
+    return false;
+  };
 
   // 真实规模清单：books.ts 的 totalWords 是压缩节选词数，书单要用全文词数
   useEffect(() => { loadBookStats().then(setBookStats); }, []);
@@ -354,7 +383,8 @@ export default function ArticlePage() {
         try {
           if (tab === 'books' && books?.length) {
             const book = books.find((b) => b.id === articleId);
-            if (book?.pages?.length) { openReader(book); return true; }
+            // 内置书此刻才去取正文，故"已发起打开"即算命中；失败会 toast
+            if (book) { void openBookFromList(book).then((ok) => { if (!ok) toast.error('书本内容加载失败'); }); return true; }
           }
           if (tab === 'publications') {
             const pub = PUBLICATIONS.find((p) => p.id === articleId);
@@ -535,7 +565,7 @@ export default function ArticlePage() {
       // SCP 与导入书籍的历史条目点开毫无反应（此分支也是唯一没有未找到提示的分支）
       const book = allBooks?.find((b) => b.id === bookId)
         || SCP_ARTICLES.find((a) => a.id === bookId);
-      if (book) { openReader(book); }
+      if (book) { void openBookFromList(book).then((ok) => { if (!ok) toast.error('文章内容未找到，可能已被删除'); }); }
       else toast.error('文章内容未找到，可能已被删除');
     } else if (pubId) {
       const pub = PUBLICATIONS.find((p) => p.id === pubId);
@@ -775,12 +805,12 @@ export default function ArticlePage() {
           <div className="stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {allBooks.map((book) => {
               const progress = getBookProgress(book.id);
-              const pct = progress ? progressPct(progress, book.id, book.pages.length) : 0;
+              const pct = progress ? progressPct(progress, book.id, pageCountOf(book)) : 0;
               return (
               <Card
                 key={book.id}
                 className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => { openReader(book); saveToHistory(book.zhTitle, '', 'books', { bookId: book.id }); }}
+                onClick={() => { void openBookFromList(book).then((ok) => { if (!ok) toast.error('书本内容加载失败，请重试'); }); saveToHistory(book.zhTitle, '', 'books', { bookId: book.id }); }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">

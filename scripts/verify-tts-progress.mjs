@@ -84,15 +84,18 @@ const assembled = ts.transpileModule(
 const tmpDir = join(process.env.TEMP || process.env.TMP || '/tmp', 'nt-tts-progress');
 mkdirSync(tmpDir, { recursive: true });
 
-// 真实书籍数据：books.ts 只依赖 ./reading
+// 真实书籍数据：books.ts 依赖 ./reading 与 ./book-clean（2026-09-29 把清洗函数拆出去了）
 async function transpileData(file, outName) {
   const src = readFileSync(join(ROOT, file), 'utf8');
   const out = ts.transpileModule(src, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-  }).outputText.replace(/from\s+['"]\.\/reading['"]/g, `from './reading.mjs'`);
+  }).outputText
+    .replace(/from\s+['"]\.\/reading['"]/g, `from './reading.mjs'`)
+    .replace(/from\s+['"]\.\/book-clean['"]/g, `from './book-clean.mjs'`);
   writeFileSync(join(tmpDir, outName), out, 'utf8');
 }
 await transpileData('src/data/reading.ts', 'reading.mjs');
+await transpileData('src/data/book-clean.ts', 'book-clean.mjs');
 await transpileData('src/data/books.ts', 'books.mjs');
 writeFileSync(join(tmpDir, 'tts-core.mjs'), assembled, 'utf8');
 

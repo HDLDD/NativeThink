@@ -7,7 +7,7 @@
  */
 
 import { buildPages, type IPage, type IParagraph } from './reading';
-import { cleanBookParagraphs } from './books';
+import { cleanBookParagraphs } from './book-clean';
 import { idbGet, idbSet } from '@/lib/idb';
 
 export interface FullBookResult {

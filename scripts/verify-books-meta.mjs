@@ -298,6 +298,63 @@ check(
   check(files.length > 0, '自检：读到词库数据文件', `n=${files.length}`);
   check(bad === 0, '词库数据无 U+FFFD 乱码（改生成逻辑后重跑 clean-wordbank-mojibake.mjs）', offenders.join(','));
 }
+// ── ⑤ 书库拆分：元数据 / 正文 / 清洗函数三者不许再互相拖累（2026-09-29 性能体检） ──
+{
+  const cleanSrc = readFileSync(join(ROOT, 'src/data/book-clean.ts'), 'utf8');
+  const metaSrc = readFileSync(join(ROOT, 'src/data/books-meta.ts'), 'utf8');
+  const fulltext = readFileSync(join(ROOT, 'src/data/book-fulltext.ts'), 'utf8');
+
+  check(/export function cleanBookParagraphs/.test(cleanSrc), 'book-clean.ts 导出 cleanBookParagraphs');
+  check(!/_p\d+: string\[\]/.test(cleanSrc), 'book-clean.ts 是纯函数模块，不含任何书的正文');
+  check(/import \{ cleanBookParagraphs \} from '\.\/book-clean';/.test(dataSrc) && !/^function cleanBookParagraphs/m.test(dataSrc),
+    'books.ts 从 book-clean 取清洗函数，自己不再内联一份');
+  check(/from '\.\/book-clean'/.test(fulltext) && !/from '\.\/books'/.test(fulltext),
+    'book-fulltext 只依赖 book-clean —— 阅读器不必为一个纯函数下载整个书库（231KB gzip）');
+  check(!/from '\.\/books'/.test(metaSrc) && !/pages:/.test(metaSrc),
+    'books-meta.ts 不引用正文模块，也不带 pages 数组');
+
+  // 真把两个模块跑起来对账（不是比字符串）：元数据必须与 ALL_BOOKS 逐项吻合
+  const TMP = join(process.env.TEMP || '/tmp', 'nt-books-split-check');
+  const { mkdirSync, rmSync } = await import('node:fs');
+  rmSync(TMP, { recursive: true, force: true });
+  mkdirSync(TMP, { recursive: true });
+  const toCjs = (src) => ts.transpileModule(src, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText
+    // CJS 不认无扩展名的相对 require，补上 .cjs
+    .replace(/require\((["'])\.\/(reading|book-clean|books-meta)\1\)/g, 'require("./$2.cjs")');
+  writeFileSync(join(TMP, 'reading.cjs'), toCjs(readFileSync(join(ROOT, 'src/data/reading.ts'), 'utf8')), 'utf8');
+  writeFileSync(join(TMP, 'book-clean.cjs'), toCjs(cleanSrc), 'utf8');
+  writeFileSync(join(TMP, 'books.cjs'), toCjs(dataSrc), 'utf8');
+  writeFileSync(join(TMP, 'books-meta.cjs'), toCjs(metaSrc), 'utf8');
+  const books = require(join(TMP, 'books.cjs')).ALL_BOOKS;
+  const meta = require(join(TMP, 'books-meta.cjs')).BOOK_META;
+  check(Array.isArray(books) && books.length === 22, `正文模块解析成功且为 22 本（实际 ${books ? books.length : 'null'}）`);
+  check(books.length === meta.length, `元数据条数 = 正文条数（${meta.length}）`);
+  let mismatch = 0, first = '';
+  books.forEach((b, i) => {
+    const m = meta[i];
+    const ok = m && m.id === b.id && m.title === b.title && m.zhTitle === b.zhTitle
+      && m.zhAuthor === b.zhAuthor && m.totalWords === b.totalWords
+      && m.pageCount === (b.pages || []).length && m.difficulty === b.difficulty;
+    if (!ok) {
+      mismatch++;
+      if (!first) first = `${b.id}: meta=${JSON.stringify(m)} vs 正文=${b.title}/${(b.pages || []).length}页/${b.totalWords}词`;
+    }
+  });
+  check(mismatch === 0, 'BOOK_META 与 ALL_BOOKS 逐字段一致（id/书名/译者/词数/页数/难度）', first);
+  rmSync(TMP, { recursive: true, force: true });
+
+  // 消费方必须走元数据；正文只能在"点开某本书"时动态取
+  const page = readFileSync(join(ROOT, 'src/pages/ArticlePage/ArticlePage.tsx'), 'utf8');
+  check(/import\('@\/data\/books-meta'\)/.test(page), 'ArticlePage 的书单从 books-meta 取');
+  check(!/^\s*import .* from '@\/data\/books'/m.test(page),
+    'ArticlePage 不静态引入正文模块（只允许点开某本书时 import()）');
+  const progress = readFileSync(join(ROOT, 'src/pages/ProgressPage/ProgressPage.tsx'), 'utf8');
+  check(/@\/data\/books-meta/.test(progress) && !/import\('@\/data\/books'\)/.test(progress),
+    'ProgressPage 清翻译缓存用元数据，不下载书库');
+}
+
 // ── 输出 ──
 console.log('');
 console.log(`生成器条目=${genBooks.length}  数据条目=${dataBooks.size}`);
