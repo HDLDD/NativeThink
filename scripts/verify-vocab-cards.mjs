@@ -337,12 +337,32 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '向导完成走和首页点卡片同一条进模式路径（含 browse 滚动恢复等副作用）');
   check(/setImmersed\(true\);/.test(completeBody), '向导完成即进入沉浸态，不再停在模式列表');
   check(!/^\s*setTab\(mode\);/m.test(completeBody), '正对照：没有残留裸 setTab(mode)（那正是"回到列表要点第二下"的根因）');
-  check(/\{!showWizard && immersed && \(/.test(page), '模式内容仍由 immersed 把关（上面那句 setImmersed 才有意义）');
+  check(/immersed && dataReady/.test(page), '模式内容仍由 immersed 把关（上面那句 setImmersed 才有意义）');
   const continueBody = (page.match(/const handleWizardContinue = \(\) => \{[\s\S]{0,600}?\n  \};/) || [])[0] || '';
   check(/handleTabChange\(lastTab\);/.test(continueBody) && /setImmersed\(true\);/.test(continueBody),
     '「继续上次的选择」同样直接进上次的模式');
   check(!/setImmersed/.test(switchBody),
     '一步换书不动沉浸态：在模式里换书留在该模式，在首页换书仍留在首页');
+
+  /**
+   * 首启向导阶段一本都不许预载（2026-09-29 性能体检）。
+   * selectedLevel 默认 'all'，挂载 effect 以前会把 9 本书连 detail 全拉进来 ——
+   * 实测全新 profile 进 /vocabulary：18 个词库 chunk / 3.16MB（压缩后 ≈40MB 源码）、
+   * 15 个长任务合计 1.6s、堆 69MB，而用户连一本都还没选。
+   * 现在：没 setupDone 直接 return；模式子树等 dataReady 才挂载（否则渲染期用
+   * queryWords() 算出来的派生数据是空的，而 memo 依赖里没有"数据到位"这一项，
+   * 晚到的数据不会让它重算 —— 表现就是"选了书、本书进度整块消失"）。
+   */
+  const preloadEffect = (page.match(/useEffect\(\(\) => \{[\s\S]{0,900}?preloadLevels\(levels\)[\s\S]{0,300}?\}, \[selectedLevel, setupDone\]\);/) || [])[0] || '';
+  check(preloadEffect.length > 0, '脚手架自检：抓到 [selectedLevel, setupDone] 预载 effect');
+  check(/if \(!setupDone\) return;/.test(preloadEffect), '首启向导挂着时不做任何预载');
+  check(/\.catch\([\s\S]{0,240}\)\s*\.finally\(/.test(preloadEffect),
+    '预载失败也放行（finally 放开 dataReady），不会把人永久卡在"加载中"');
+  check(/\{!showWizard && immersed && dataReady && \(/.test(page),
+    '模式子树等 dataReady 才挂载（防"数据晚到但 memo 不重算"）');
+  check((page.match(/preloadLevels\(/g) || []).length === 1,
+    'preloadLevels 只剩一个真正调用点：向导完成 / 继续 / 换书都交给同一个 effect（不再各调一遍）',
+    `实际 ${(page.match(/preloadLevels\(/g) || []).length} 处`);
 
   /**
    * 两张柱状图（未来 7 天复习量 / 本周学习量）的容器必须容得下「数值+柱+星期」三层。

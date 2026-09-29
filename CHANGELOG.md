@@ -7,6 +7,7 @@
 
 
 ## 2026-09-29
+- docs: 同步本轮四条修复与验证口径，并登记「使用指南抢位首启向导」 (`782bea6`)
 - fix(tools): verify-wordbank-split 的基线可在任意时刻重建，并修好 --check 的模块断裂 (`af11954`)
 - fix(ui): AI 模型设置窄视口不再被裁，Dialog 基座补高度兜底 (`a8f71ee`)
 - fix(tts): /api/tts-voices 只在桌面版调用，web/APK 不再吃 404 与白发的网络往返 (`ae8274a`)

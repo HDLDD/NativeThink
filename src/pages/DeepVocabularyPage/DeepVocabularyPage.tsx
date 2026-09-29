@@ -389,10 +389,22 @@ export default function DeepVocabularyPage() {
   const [dataReady, setDataReady] = useState(() => levelReady(selectedLevel));
   const [dataVersion, setDataVersion] = useState(0);
   useEffect(() => {
+    /**
+     * 首启向导还挂着（没选过词书）时**一本都不预载**。
+     * selectedLevel 的默认值是 'all'，以前挂载即把 9 本书连 detail 一起拉进来 ——
+     * 实测全新 profile 进 /vocabulary：18 个词库 chunk / 3.16MB（压缩后 ≈40MB 源码）、
+     * 15 个长任务合计 1.6s，而此时用户连一本都还没点。
+     * 选完书由向导的完成路径（handleWizardComplete / handleWizardContinue）按需预载那一本；
+     * 换书路径靠下面 setupDone 变 true 后本 effect 重跑接上（幂等）。
+     */
+    if (!setupDone) return;
     if (levelReady(selectedLevel)) { setDataReady(true); setDataVersion((v) => v + 1); return; }
     const levels = selectedLevel === 'all' ? ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] : [selectedLevel];
-    preloadLevels(levels).then(() => { setDataReady(true); setDataVersion((v) => v + 1); });
-  }, [selectedLevel]);
+    // 失败也放行（下面 finally）：不能把人永久卡在"加载中"，模式内部各自还有空数据兜底
+    preloadLevels(levels)
+      .catch(() => { /* 网络/解析失败：仍进入界面，功能按空数据降级 */ })
+      .finally(() => { setDataReady(true); setDataVersion((v) => v + 1); });
+  }, [selectedLevel, setupDone]);
 
   // 选中单词即预热（点击朗读/自动朗读命中缓存，首播 1.2s → ~10ms）
   useEffect(() => {
@@ -427,8 +439,8 @@ export default function DeepVocabularyPage() {
     if (revMode) { setReviewMode(revMode); try { safeStorage.setItem('__nativethink_review_mode', revMode); } catch { /* ignore */ } }
     markSetupDone();
     setShowWizard(false);
-    const levels = level === 'all' ? ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] : [level];
-    preloadLevels(levels).then(() => setDataReady(true));
+    // 预载交给 [selectedLevel, setupDone] 那个 effect（markSetupDone 会让它立刻重跑）——
+    // 这里不再自己调一遍，否则同一次选书会并发触发两份 preloadLevels。
   };
 
   /**
@@ -454,8 +466,7 @@ export default function DeepVocabularyPage() {
     setImmersed(true);
     markSetupDone();
     setShowWizard(false);
-    const levels = lastLevel === 'all' ? ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] : [lastLevel];
-    preloadLevels(levels).then(() => setDataReady(true));
+    // 预载同样交给 [selectedLevel, setupDone] 的 effect，这里不重复调
   };
 
   // Active filter count + reset
@@ -998,13 +1009,20 @@ export default function DeepVocabularyPage() {
       )}
 
       {!showWizard && !dataReady && immersed && (
-        <div className="flex items-center gap-2 px-4 py-2 mb-2 rounded-xl bg-[#00B894]/5 border border-[#00B894]/20">
+        <div className="flex items-center justify-center gap-2 px-4 py-8 mb-2 rounded-xl bg-[#00B894]/5 border border-[#00B894]/20">
           <Loader2 className="size-4 text-ink-teal animate-spin shrink-0" />
-          <span className="text-xs font-bold text-ink-teal">词库加载中，部分功能暂不可用…</span>
+          <span className="text-xs font-bold text-ink-teal">词库加载中…</span>
         </div>
       )}
 
-      {!showWizard && immersed && (
+      {/*
+        数据没到位前**不挂载模式子树**。这些模式在渲染期就用 queryWords() 算派生数据，
+        而 memo 的依赖里不含"数据是否到位"（每日学习的「本书进度」只依赖 progressKeyCount）——
+        晚到的词库不会让它们重算，于是出现"书选了、进度条整块没了"。
+        等 dataReady 再挂载就一次到位；加载失败时下面那个 catch 会把 dataReady 放开，
+        退回"能用多少算多少"，不会把人永久卡在加载提示上。
+      */}
+      {!showWizard && immersed && dataReady && (
       <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
         {/* Sticky header: browse level scroller + filter chips + tab buttons */}
         {/*
