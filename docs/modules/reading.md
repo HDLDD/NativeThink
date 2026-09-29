@@ -1,0 +1,103 @@
+# 阅读（`/articles`）
+
+> 状态栏里叫「阅读」，路由是 `/articles`，模块 key 是 `articles`。
+> 这是全仓**代码量最大**的一块：列表页 1494 行 + 阅读器 1749 行 + 小说视图 903 行，外加 5 个数据层模块。
+
+## 1. 功能
+
+一套阅读器吃下五种来源，读者在同一条路径上完成「读 → 点词查词 → 段落中文对照 → 章内进度续读」。
+
+| 来源 | `type` | 数据 | 体量 |
+|------|--------|------|------|
+| 公版书 | `book` | `src/data/books.ts`（22 本，随包全文在 `public/books/`） | 627KB 源码 + 23MB txt |
+| 站内刊物 | `publication` | `publications.ts` / `publications-extra.ts` | — |
+| 演讲 | `speech` | `src/data/speeches.ts`（30 篇） | — |
+| 网文选段 | `webnovel` | `src/data/webnovels.ts` | — |
+| SCP 基金会 | `wikipedia`/`publication` | `src/data/scp.ts`（CC BY-SA，必须带 `sourceUrl`） | 188KB |
+| AI 生成 | `ai` | 页面即时生成，不落盘 | — |
+| 复习词汇文章 | `review-words` | 用当前到期复习词生成（`ArticlePage.tsx:690`） | — |
+| 用户导入 | `book` | `src/data/imported-books.ts`，`IMPORTED_ID_PREFIX` | localStorage |
+
+阅读器两种视图，同一份数据骨架：
+
+- **小说模式**（默认）：章节制滚动，像起点读书，记「每章滚到哪儿」。
+- **翻页模式**：保留的旧实现，左右翻页。
+
+## 2. 实现方法
+
+### 2.1 内容类型与切页
+
+`src/data/reading.ts` 定义 `IReadingContent`（`pages: IPage[]`，`IPage = { paragraphs: [{en, zh}], pageNumber }`）与 `buildPages()`。**`##CHAPTER##` 前缀是全仓的章节定界约定**：段落 `en` 以它开头即为章标题行，渲染时剥掉前缀当标题（`ReaderParagraph.tsx:59-60`），翻译时只定界不翻译。
+
+书籍数据分三层，改任何一层都要知道另外两层：
+
+```
+src/data/books.ts        # 1723 行，22 本书的压缩节选（每本约 4800 词）
+src/data/book-clean.ts   # 古腾堡 txt → 段落数组 + 章节标记（182 行纯函数）
+src/data/books-meta.ts   # 只含元数据，由 scripts/gen-books-meta.cjs 生成
+```
+
+列表页只读 `BOOK_META`，点开书才 `import('@/data/books')`（`ArticlePage.tsx:274` `openBookFromList`）—— 这是首屏从 1055KB 降到 376KB 的关键。**生成 `books-meta.ts` 时必须用真实 `buildPages`**，用 stub 会把 `pageCount` 算错。
+
+### 2.2 运行时全文升级
+
+`books.ts` 里是节选，打开书后 `fetchFullBook()`（`src/data/book-fulltext.ts:60`）把它换成古腾堡完整版：
+
+1. 先查 IndexedDB `book-full-v2-<gutenbergId>`；
+2. **首选随包文件** `public/books/<id>.txt`（`loadBundledText`，零网络）；
+3. 包里没有才联网 `loadRemoteText`；
+4. `cleanBookParagraphs` + `buildPages` → 结果落 IDB；
+5. 成功后 `setDisplayContent` 覆盖 pages，并 toast「已加载完整版 · N 章 · Mk 词」（`PageReader.tsx:326-334`）。
+
+`loadBundledText` 有三道真实性检查（长度 ≥5000、非空、**以 `<!doctype`/`<html` 开头就判为失败**）—— 因为静态托管在文件缺失时会用 SPA 兜底、以 200 返回 `index.html`，那会被当成一本书解析进去。
+
+### 2.3 章节切分有两套实现，必须对齐
+
+| | `buildNovelChapters`（界面章号） | `splitChapters`（译文章号） |
+|---|---|---|
+| 位置 | `components/reader-shared.ts:71` | `data/book-translation.ts:136` |
+| 空章判定 | `bodyItemCount(ch) > 0`（`:66`） | `paragraphs.length > 0`（`:140`） |
+| 编号 | `chapters.length` 连续 | 末尾 `.map((c,i) => ({...c, index:i}))` 重排 |
+
+两者刻意做了同构（`reader-shared.ts:75-80` 注释：**基督山伯爵实测 244 章 vs 124 章**那次事故留下的），译文是按 `splitChapters` 的章号索引存的，界面章号一旦和它错开，表现就是**中文贴到别章、章节像缺了几章**。
+
+### 2.4 批量翻译
+
+`src/data/book-translation.ts`（841 行）把「逐段翻译太慢」改成按章组织：
+
+- 每批 4 段（`DEFAULT_BATCH_SIZE`），system prompt 要求「编号严格一一对应」+ 只输出 `{"t":[{"i":1,"zh":"…"}]}`；
+- 章内 2 并发、全书串行；失败退避 3s → 8s → 15s，全失败则跳过该段；
+- 单段送 AI 前截断 1500 字符（`MAX_SEGMENT_CHARS`）；
+- 产物落 IndexedDB `booktrans-<bookId>-ch<idx>`（数组下标 = `splitChapters` 顺序）+ `booktrans-<bookId>-index` 清单，支持中止与断点续传；
+- `parseBatchTranslation` 容忍代码栅栏、前后夹说明文字、缺项错号，解析失败返回空 Map，调用方**退化为逐段翻译**；
+- 引擎侧优先端侧 opus-mt（`local-mt.ts`），AI 兜底。
+
+「翻译本章」（`PageReader.tsx:961`）与「翻译全部」（`:1081`）复用同一个 `translateBook` 队列。
+
+### 2.5 进度、批注、偏好
+
+| key | 写入 | 说明 |
+|-----|------|------|
+| `__reader_progress_<contentId>` | `PageReader.tsx:55` | `ReaderProgress`：`page/total/chapter/chapters/ratio/perChapter` |
+| `__nativethink_reader_notes_<contentId>` | `reader-shared.ts:145` | 段落批注 |
+| `__nativethink_reader_prefs` | `PageReader.tsx:263` | 字号 / 主题 / 视图模式 |
+| `__reader_trans_<contentId>` | `PageReader.tsx:274` | 段级译文缓存 |
+| `__reader_lookup_recent` | `PageReader.tsx:840` | 最近查词 |
+
+`ReaderProgress` 里 `total` 和 `chapters` **两个字段是必须存的**（`reader-shared.ts:22-35` 注释）：外部列表若拿「当前节选页数」当分母去除「全文空间的页码」，会显示 516%；`/books/index.json` 的 `chapters` 是 `dump-book-texts.cjs` 另算的，和阅读器切章结果不一致（弗兰肯斯坦 index 写 29、阅读器切出 32；爱丽丝 index 13、出现第 55 章），所以分母只能用保存时自己存下的那个。
+
+复习词高亮：`setHighlightWords()`（`src/lib/reader-highlight.ts`）模块级状态，`PageReader.tsx:205` 推入，颜色可选（柔和色系，6 种）。
+
+## 3. 注意事项
+
+1. **`public/books/` 是 23MB，且已进 git**（`.git` 因此 48MB）。它同时被 Cloudflare Pages 托管和 `capacitor copy` 打进 APK。这是有意的取舍：随包全文消除了「联网失败 → 静默退回压缩节选 → 章节缺失 / 译文错章」。要动这个目录，先想清楚退回节选的后果，别只按「public 不放大数据」的直觉删。
+2. **两套切章逻辑改一处必须改另一处**。判定口径还有一处残余差异：`buildNovelChapters` 会跳过 `en` 为空的段落，`splitChapters` 刻意保留空段以维持下标对齐 —— 因此「一章里只有空段」时两边章数仍会差 1。改切分逻辑后跑 `node scripts/verify-tts-progress.mjs`（它按真实书目逐页断言段落词数之和）。
+3. **`index.json` 的 `chapters` 不可作分母**（见 2.5）。任何「读到第几章/共几章」的展示都要用 `ReaderProgress.chapters`。
+4. **升级失败不再 toast 是刻意的**：`fetchFullBook` 返回 `null` 时页面只把 `fullTextLoading` 关掉（`PageReader.tsx:326`）。用户看到的仍是节选版。排查时看 `(window as any).__ft`（`start`/`cache-hit`/`cache-miss`/`idb-err`/`fetching`/`bundled`/`proxy`）和 `__ftThen` —— 这两个调试全局量**目前还留在生产代码里**（`book-fulltext.ts:68-82`、`PageReader.tsx:325`），删之前确认没人在用它复现问题。
+5. **`fetchFullBook` 的 effect 不能用 ref 做一次性守卫**：`PageReader.tsx:318-319` 注释写明 StrictMode 双执行会取消第一次、又把第二次拦死，靠的是函数内的 `inFlight` Map 去重 + IDB 缓存。
+6. **以 `<html` 开头的 200 响应是假的正文**（SPA 兜底）。任何新增的「随包静态文件」读取都要带同样的 doctype 检查。
+7. **`__reader_*` 三个键不参与云同步**：`use-cloud-sync.ts:8,55` 只收 `__nativethink_` 前缀。所以阅读进度、段级译文缓存、最近查词换设备不会带过去，而批注和偏好会。这是现状而非 bug，但用户会当成 bug 报。
+8. **AI 生成与复习词汇文章无法从历史恢复**：`ArticlePage.tsx:745` 明确提示「AI 生成内容无法恢复」，历史条目只对静态来源可点。别给它们加"重新打开"。
+9. **`scp.ts` 是抓取产物，勿手改**（`node scripts/fetch-scp.cjs`，约 1 req/s）；它带 `SCP_LICENSE`，条目必须保留 `sourceUrl`（CC BY-SA 要求署名到具体来源）。
+10. **模块 `src/data/` 下有 .bak 与进度文件**：`chunks.ts.bak`、`shadowing.ts.bak`、`shadowing.ts.expand-progress.json`（483KB）。它们不进包，但会迷惑人和增大仓库；确认生成器不再依赖后可清理。
+11. **无守卫覆盖**：阅读器只有 `verify-tts-progress`（朗读反查表）和 `verify-books-meta` ⑤⑥（书目拆分/元数据）护住数据层，**切章对齐、翻译回填、进度百分比三件事没有脚本兜**。改这些要手动开真书验证：翻到中段 → 刷新看百分比 ≤100%，「翻译本章」后中文没有落到别章。
