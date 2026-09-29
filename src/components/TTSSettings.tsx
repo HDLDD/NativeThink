@@ -35,6 +35,7 @@ import {
   type INativeVoice,
 } from '@/lib/native-tts';
 import { cleanText, cn } from '@/lib/utils';
+import { platformTag } from '@/lib/app-env';
 
 /** Unified voice option: browser SpeechSynthesis voice OR local-server voice */
 interface VoiceOption {
@@ -139,13 +140,21 @@ export default function TTSSettings() {
       const en = getEnglishVoices();
       if (en.length > 0) setVoices((prev) => mergeVoices(prev, fromSystemVoices(en)));
     };
-    // Desktop build only: enumerate the local server's voices (Edge neural + SAPI)
-    fetch('/api/tts-voices').then((r) => r.ok ? r.json() : null).then((data) => {
-      const serverVoices: VoiceOption[] = (data?.voices || []).map((v: { id: string; name: string; lang: string }) => ({
-        uri: v.id, name: v.name, lang: v.lang, source: 'server' as const,
-      }));
-      if (serverVoices.length > 0) setVoices((prev) => mergeVoices(prev, serverVoices));
-    }).catch(() => { /* web version — no local server */ });
+    /**
+     * 桌面版专属：`electron/main.mjs` 会起 `server/local-server.mjs`，只有它实现了
+     * `/api/tts-voices`（枚举本机 Windows SAPI / OneCore 音色）。
+     * 以前这段无条件执行：网页版每条路由吃一次 404，APK 更糟 —— `index.html` 把 `/api/*`
+     * 重写到线上站点，等于手机端每个页面白白多一次真实网络往返。
+     * 现在按平台圈起来：桌面意图保留，web / APK 一个请求都不发。
+     */
+    if (platformTag() === 'desktop') {
+      fetch('/api/tts-voices').then((r) => r.ok ? r.json() : null).then((data) => {
+        const serverVoices: VoiceOption[] = (data?.voices || []).map((v: { id: string; name: string; lang: string }) => ({
+          uri: v.id, name: v.name, lang: v.lang, source: 'server' as const,
+        }));
+        if (serverVoices.length > 0) setVoices((prev) => mergeVoices(prev, serverVoices));
+      }).catch(() => { /* 桌面本地服务没起来：静默，系统音色仍可用 */ });
+    }
     load();
     const p1 = setTimeout(load, 400);
     const p2 = setTimeout(load, 1200);

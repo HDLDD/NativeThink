@@ -129,6 +129,21 @@ ok(globalThis.__ttsTestSpeakCalls === 3, '不同文本各自提交（去重不�
 ok(mod.sherpaInFlightCount() === 0, '空闲时在途计数为 0（预合成守卫依赖它）',
   String(mod.sherpaInFlightCount()));
 
+/* ───────────────────────── C. 朗读设置面板的网络卫生 ───────────────────────── */
+const ttsUi = fs.readFileSync(path.join(ROOT, 'src/components/TTSSettings.tsx'), 'utf8');
+const voicesFetch = ttsUi.match(/.{0,260}fetch\('\/api\/tts-voices'\)/s)?.[0] ?? '';
+ok(voicesFetch.length > 0, '脚手架自检：抓到 /api/tts-voices 调用点附近的上下文');
+ok(/platformTag\(\) === 'desktop'/.test(voicesFetch),
+  'C1 /api/tts-voices 只在桌面版调用（web 每路由一次 404、APK 还多一次真实往返）');
+ok(/import \{[^}]*platformTag[^}]*\} from '@\/lib\/app-env'/.test(ttsUi),
+  'C2 平台判定复用 app-env 的 platformTag（不在组件里另写 UA 嗅探）');
+// 正对照：桌面本地服务确实实现了这个路由，不是"为了过断言而留着死代码"
+const localServer = fs.readFileSync(path.join(ROOT, 'server/local-server.mjs'), 'utf8');
+ok(/pathname === '\/api\/tts-voices'/.test(localServer),
+  'C3 正对照：server/local-server.mjs 确实实现了该路由（桌面这条路径是活的）');
+ok(/startServer/.test(fs.readFileSync(path.join(ROOT, 'electron/main.mjs'), 'utf8')),
+  'C4 正对照：Electron 主进程会起这个本地服务（所以只有桌面版值得请求）');
+
 /* ───────────────────────── 汇总 ───────────────────────── */
 let failed = 0;
 for (const r of results) {
