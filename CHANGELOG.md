@@ -7,6 +7,7 @@
 
 
 ## 2026-09-29
+- fix(onboarding): 使用指南不再盖住词汇首启向导 —— 自动弹出只在首页触发 (`cfc61f0`)
 - perf(bundle): 动画库同样去掉强制 manualChunks —— 首屏必需 JS 237.7 → 198.1KB gzip (`0799beb`)
 - perf(bundle): 首屏必需 JS 539.7KB → 237.7KB gzip —— 三处"运行时不执行却压进入口"的重依赖 (`7ed480c`)
 - perf(vocab): 首启向导阶段一本都不预载 —— 进 /vocabulary 从 3.16MB/1.6s 长任务降到 0.10MB/228ms (`c4e7c57`)
