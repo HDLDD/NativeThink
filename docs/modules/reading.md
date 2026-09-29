@@ -96,7 +96,7 @@ src/data/books-meta.ts   # 只含元数据，由 scripts/gen-books-meta.cjs 生�
 4. **升级失败不再 toast 是刻意的**：`fetchFullBook` 返回 `null` 时页面只把 `fullTextLoading` 关掉（`PageReader.tsx:326`）。用户看到的仍是节选版。排查时看 `(window as any).__ft`（`start`/`cache-hit`/`cache-miss`/`idb-err`/`fetching`/`bundled`/`proxy`）和 `__ftThen` —— 这两个调试全局量**目前还留在生产代码里**（`book-fulltext.ts:68-82`、`PageReader.tsx:325`），删之前确认没人在用它复现问题。
 5. **`fetchFullBook` 的 effect 不能用 ref 做一次性守卫**：`PageReader.tsx:318-319` 注释写明 StrictMode 双执行会取消第一次、又把第二次拦死，靠的是函数内的 `inFlight` Map 去重 + IDB 缓存。
 6. **以 `<html` 开头的 200 响应是假的正文**（SPA 兜底）。任何新增的「随包静态文件」读取都要带同样的 doctype 检查。
-7. **`__reader_*` 三个键不参与云同步**：`use-cloud-sync.ts:8,55` 只收 `__nativethink_` 前缀。所以阅读进度、段级译文缓存、最近查词换设备不会带过去，而批注和偏好会。这是现状而非 bug，但用户会当成 bug 报。
+7. **`__reader_*` 与 `__nativethink_*` 在同步上其实没有区别**。`use-cloud-sync.ts:8,55` 的 `DATA_PREFIX` 过滤**只作用于 `syncUp` 的全量扫描**；登录后 `registerCloudWrite()` 注册的双写处理器（`:91-105` ← `safe-storage.ts:170-177`）**不挑前缀**，任何 `safeStorage.setItem` 都会被推上云。所以阅读进度、段级译文缓存、最近查词都会同步，只是不参与登录时的全量补推。真正不上云的只有裸 `localStorage` 与 IndexedDB。详见 `docs/modules/storage-and-stats.md` §3.4。
 8. **AI 生成与复习词汇文章无法从历史恢复**：`ArticlePage.tsx:745` 明确提示「AI 生成内容无法恢复」，历史条目只对静态来源可点。别给它们加"重新打开"。
 9. **`scp.ts` 是抓取产物，勿手改**（`node scripts/fetch-scp.cjs`，约 1 req/s）；它带 `SCP_LICENSE`，条目必须保留 `sourceUrl`（CC BY-SA 要求署名到具体来源）。
 10. **模块 `src/data/` 下有 .bak 与进度文件**：`chunks.ts.bak`、`shadowing.ts.bak`、`shadowing.ts.expand-progress.json`（483KB）。它们不进包，但会迷惑人和增大仓库；确认生成器不再依赖后可清理。
