@@ -355,6 +355,38 @@ check(
     'ProgressPage 清翻译缓存用元数据，不下载书库');
 }
 
+// ── ⑥ 应用内帮助中心（HelpGuide）与实况对齐 ──
+// 这份文案比代码旧过很多次（曾写"必须自备 API Key""五个等级""数据不会上传任何服务器"），
+// 而它是用户在 App 里唯一能看到的说明 —— 说错了就是误导，所以钉成断言。
+{
+  const help = readFileSync(join(ROOT, 'src/components/HelpGuide.tsx'), 'utf8');
+  const meta = readFileSync(join(ROOT, 'src/data/wordbank/meta.ts'), 'utf8');
+  const aiCfg = readFileSync(join(ROOT, 'src/services/ai-config.ts'), 'utf8');
+
+  const unique = Number((meta.match(/TOTAL_UNIQUE_WORDS\s*=\s*([\d_]+)/) || [])[1]?.replace(/_/g, ''));
+  const entries = Number((meta.match(/TOTAL_ENTRIES\s*=\s*([\d_]+)/) || [])[1]?.replace(/_/g, ''));
+  check(unique === 21736, '脚手架自检：从 meta.ts 读到去重词数', String(unique));
+  // 光断言"文里出现了 21,736"是假的（同一段里出现两次，改错一处仍绿）——
+  // 真正的口径是：**不许出现词条总数**（这仓库踩过"把 75,113 当可学词数"的坑）
+  check((help.match(/21,736/g) || []).length >= 1 && !new RegExp(String(entries) + '|' + entries.toLocaleString('en-US')).test(help),
+    `帮助里的"全部"词数只用去重词数 ${unique.toLocaleString('en-US')}，不出现词条总数 ${entries.toLocaleString('en-US')}`);
+  check(/九档词库|聚合九档/.test(help) && !/五个等级/.test(help),
+    '词库档数写的是九档（"五个等级"这条过期文案不许回来）');
+  check(/中考[\s\S]{0,40}高考[\s\S]{0,40}四级[\s\S]{0,40}六级[\s\S]{0,40}雅思[\s\S]{0,40}托福[\s\S]{0,40}考研[\s\S]{0,40}专业[\s\S]{0,40}高阶/.test(help),
+    '九档名字逐个列全（用户能对着找）');
+
+  const provBlock = aiCfg.slice(aiCfg.indexOf('export const ALL_PROVIDERS'), aiCfg.indexOf('];', aiCfg.indexOf('export const ALL_PROVIDERS')));
+  const providers = (provBlock.match(/'[a-z]+'/g) || []).map((s) => s.replace(/'/g, ''));
+  check(providers.length === 8 && providers.includes('factory'), '脚手架自检：服务商清单 8 家且含出厂档', providers.join(','));
+  check(/8 家|八家/.test(help) || providers.every((p) => p !== 'factory' || /出厂/.test(help)),
+    '帮助里的服务商数量/口径与 ai-config 对齐');
+  check(!/需要你提供 API Key|必须自备 API Key|输入 API Key 保存/.test(help),
+    '不再写"必须自备 Key"（出厂即带免费额度）');
+  check(!/不会上传到任何服务器|不上传任何服务器/.test(help),
+    '不再写"不会上传到任何服务器"（有云同步与反馈上报，这句是错的）');
+  check(/IndexedDB|本机存储/.test(help) && /导出|备份/.test(help), '说清数据默认在本机、且给了备份入口');
+}
+
 // ── 输出 ──
 console.log('');
 console.log(`生成器条目=${genBooks.length}  数据条目=${dataBooks.size}`);
