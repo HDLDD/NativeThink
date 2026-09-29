@@ -61,20 +61,28 @@ async function loadFromCache(level: string): Promise<IWordEntry[] | null> {
 }
 
 /**
- * Save wordbank to IndexedDB (primary) and localStorage (fallback).
+ * 词库缓存：IndexedDB 是主存储，localStorage 只是**IDB 用不了时**的兜底。
+ *
+ * 以前是无条件双写：`JSON.stringify(整个等级)` 再 setItem —— 单本级 JSON 普遍 3~12MB，
+ * 而 localStorage 配额只有 5MB，于是每次加载词书都要先付一次几 MB 的**同步字符串化**，
+ * 再吃一发注定失败的 QuotaExceeded（被 catch 吞掉，看不见）。实测选「高阶词汇」到数据可用
+ * 要 1.8s（4× CPU 节流），这一下是其中的固定开销。
+ * 现在只在 IDB 真的写失败时才镜像（隐私模式 / 无 IDB 的老 WebView 仍然有兜底）。
  */
 async function saveToCache(level: string, words: IWordEntry[]): Promise<void> {
   const data = { v: CACHE_VERSION, d: words };
 
-  // Save to IndexedDB (async, higher capacity)
+  let idbOk = false;
   try {
     await idbSet(`${IDB_PREFIX}${level}`, data);
-  } catch { /* IndexedDB not available */ }
+    idbOk = true;
+  } catch { /* IndexedDB 不可用（隐私模式 / 老 WebView） */ }
 
-  // Also save to localStorage as fallback (fire-and-forget)
-  try {
-    localStorage.setItem(`${LS_PREFIX}${level}`, JSON.stringify(data));
-  } catch { /* quota exceeded — silently skip */ }
+  if (!idbOk) {
+    try {
+      localStorage.setItem(`${LS_PREFIX}${level}`, JSON.stringify(data));
+    } catch { /* 配额不够：只能这次不缓存 */ }
+  }
 }
 
 // ── Derived indexes (lazy-built, invalidated on each level load) ──
@@ -237,10 +245,14 @@ async function loadDetail(level: string): Promise<void> {
     applyDetail(level, map);
     _detailLoaded.add(level);
 
-    // 缓存给下次访问（fire-and-forget）
+    // 缓存给下次访问：与 saveToCache 同理 —— IDB 写成功就不再镜像 localStorage，
+    // 免得每次加载 detail 都白付一次几 MB 的同步 JSON.stringify + 一发必然失败的 setItem
     const data = { v: CACHE_VERSION, d: map };
-    idbSet(`${DETAIL_IDB_PREFIX}${level}`, data).catch(() => {});
-    try { localStorage.setItem(`${DETAIL_LS_PREFIX}${level}`, JSON.stringify(data)); } catch { /* quota */ }
+    try {
+      await idbSet(`${DETAIL_IDB_PREFIX}${level}`, data);
+    } catch {
+      try { localStorage.setItem(`${DETAIL_LS_PREFIX}${level}`, JSON.stringify(data)); } catch { /* 配额不够 */ }
+    }
   })();
 
   _detailLoading.set(level, p);

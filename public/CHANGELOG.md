@@ -7,6 +7,7 @@
 
 
 ## 2026-09-29
+- perf(books): 书库拆三层 —— /articles 冷加载 642KB → 376KB（书单不再下载整座书库） (`4f6d0ed`)
 - docs: 使用指南抢位那条已从 ROADMAP 下一步移除（已修），列表重编号 (`f2e5035`)
 - fix(onboarding): 使用指南不再盖住词汇首启向导 —— 自动弹出只在首页触发 (`cfc61f0`)
 - perf(bundle): 动画库同样去掉强制 manualChunks —— 首屏必需 JS 237.7 → 198.1KB gzip (`0799beb`)

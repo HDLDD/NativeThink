@@ -192,6 +192,34 @@ ok(retriedOk === false,
     `旧 考研=${legacy.postgraduate} 六级=${legacy.cet6}`);
 }
 
+// ── ⑦ 缓存写入：IDB 成功就不再镜像 localStorage；IDB 挂了才兜底 ──
+{
+  // 上面已经把 9 个等级都加载过一遍（idb 桩是"写成功"），此刻 localStorage 里不该有任何词库键。
+  // 旧实现是无条件双写：单本级 JSON 3~12MB，而 localStorage 配额只有 5MB ——
+  // 每次加载词书都要先付一次几 MB 的**同步 stringify**，再吃一发注定失败的 QuotaExceeded。
+  const mirrored = [...store.keys()].filter((k) => /__nativethink_wb/.test(k));
+  ok(mirrored.length === 0, 'IDB 写成功时不往 localStorage 镜像词库（省掉每次几 MB 的同步 stringify）',
+    mirrored.join(','));
+
+  // 反面对照：IDB 用不了（隐私模式 / 老 WebView）时，兜底必须还在
+  const noIdbDir = path.join(OUT, 'noidb');
+  fs.mkdirSync(noIdbDir, { recursive: true });
+  fs.copyFileSync(path.join(OUT, 'meta.mjs'), path.join(noIdbDir, 'meta.mjs'));
+  fs.cpSync(path.join(OUT, 'data'), path.join(noIdbDir, 'data'), { recursive: true });
+  const srcNoIdb = fs.readFileSync(path.join(OUT, 'wordbank.mjs'), 'utf8')
+    .replace(/const idbGet = async \(\) =>[^;]*;\s*const idbSet = async \(\) =>[^;]*;/,
+      'const idbGet = async () => { throw new Error("no idb"); }; const idbSet = async () => { throw new Error("no idb"); };');
+  ok(/throw new Error\("no idb"\)/.test(srcNoIdb),
+    '脚手架自检：IDB 桩确实换成了"抛错"版（没换就等于没测兜底）');
+  fs.writeFileSync(path.join(noIdbDir, 'wordbank-noidb.mjs'), srcNoIdb);
+  const before = store.size;
+  const m2 = await import(pathToFileURL(path.join(noIdbDir, 'wordbank-noidb.mjs')).href);
+  await m2.preloadCoreOnly(['ielts']);
+  const fallbackKeys = [...store.keys()].filter((k) => /__nativethink_wb_/.test(k));
+  ok(fallbackKeys.length > 0 && store.size > before,
+    '正对照：IDB 不可用时仍回写 localStorage（兜底没被顺手删掉）', fallbackKeys.join(','));
+}
+
 let failed = 0;
 for (const r of results) {
   if (!r.pass) failed++;
