@@ -61,27 +61,79 @@ function firstWins(core) {
   return out;
 }
 
+/** detail 里该词是否真有搭配 */
+function detailHasCollocations(detail, word) {
+  const d = detail?.[String(word).toLowerCase()];
+  return Array.isArray(d?.collocations) && d.collocations.length > 0;
+}
+
+/**
+ * 一条词条"本来有没有搭配"，数据里同时存在三个来源：
+ *  ① 核心文件里的 `collocations` 数组 —— 只有**拆分前**有值
+ *  ② 核心文件里的 `hasCollocations` 标记 —— split 脚本按 ① 逐条写入，**拆分后**是主文件里唯一的说法
+ *  ③ `<level>.detail.ts` 里该词的 `collocations` 数组 —— 拆分后仍带真值
+ *
+ * 基线取"当前这份数据里最权威的那个来源"（有标记用 ②，没标记用 ①），所以**任何时刻都能重建**。
+ * 旧实现只取 ①：词库一旦处于拆分后状态（数组已清空），事后重采必然得到"全 false"的期望，
+ * `--check` 大面积报红 —— 等于这脚本只在拆分前有用过一次。
+ *
+ * ②/③ 之间允许存在**有限且被钉住**的分歧：同一等级里重复出现的词条（如 postgraduate 的
+ * "transistor"）在按词键控的 detail 映射里只能留一份，标记却是逐条写的，两者必然对不上。
+ * 这是数据结构的性质，不是拆分把数据弄坏了 —— 所以分歧清单进基线，
+ * **多一条就报红**，而不是含糊地"允许不一致"。
+ */
+function entrySignals(entry, detail) {
+  const fromCore = Array.isArray(entry.collocations) && entry.collocations.length > 0;
+  const fromDetail = detailHasCollocations(detail, entry.word);
+  const marker = typeof entry.hasCollocations === 'boolean' ? entry.hasCollocations : null;
+  return { fromCore, fromDetail, marker, has: marker ?? fromCore, truth: fromCore || fromDetail };
+}
+
+/** 标记与 detail 真值对不上的条目（下标 + 词），排序后作为清单钉进基线 */
+function divergenceList(core, detail) {
+  return core
+    .map((e, i) => ({ e, i }))
+    .filter(({ e, i }) => {
+      const s = entrySignals(e, detail);
+      return s.has !== s.truth;
+    })
+    .map(({ e, i }) => `${i}:${e.word}`)
+    .sort();
+}
+
 async function baseline(outFile) {
   const data = await collect();
   const snap = { levels: {} };
   for (const lv of LEVELS) {
-    const { core } = data[lv];
+    const { core, detail } = data[lv];
     // 按位置记录：同等级内存在重复词条（如 professional 的 "facet"），
     // 用 word→bool 的映射会互相覆盖，无法表达"第一条"与"第二条"的差异。
     const words = core.map((e) => e.word);
-    const hasCollocationsByIndex = core.map((e) => Array.isArray(e.collocations) && e.collocations.length > 0);
+    const marks = core.map((e) => entrySignals(e, detail));
+    const hasCollocationsByIndex = marks.map((m) => m.has);
     // collocOnly 的真实作用对象是去重后的条目（queryWords 返回 _levelIndex）
-    const collocOnlyIds = firstWins(core)
-      .filter((e) => e.collocations.length > 0)
-      .map((e) => e.word.toLowerCase())
-      .sort();
-    snap.levels[lv] = { count: core.length, words, hasCollocationsByIndex, collocOnlyIds };
+    const deduped = firstWins(core);
+    const markOf = new Map(core.map((e, i) => [e, marks[i]]));
+    const collocOnlyIds = deduped.filter((e) => markOf.get(e).has).map((e) => e.word.toLowerCase()).sort();
+    snap.levels[lv] = {
+      count: core.length, words, hasCollocationsByIndex, collocOnlyIds,
+      divergences: divergenceList(core, detail),
+      // 证据来源写进基线，避免"拆分后重采的基线"冒充"拆分前的基线"（两者强度不同）
+      evidence: {
+        fromCore: marks.filter((m) => m.fromCore).length,
+        withMarker: marks.filter((m) => m.marker !== null).length,
+        fromDetail: marks.filter((m) => m.fromDetail).length,
+        detailPresent: !!detail,
+      },
+    };
   }
   fs.writeFileSync(outFile, JSON.stringify(snap));
   console.log(`基线已写入 ${outFile}`);
   for (const lv of LEVELS) {
     const s = snap.levels[lv];
-    console.log(`  ${lv.padEnd(13)} ${String(s.count).padStart(6)} 条  去重后 ${String(firstWins(data[lv].core).length).padStart(6)}  collocOnly=${s.collocOnlyIds.length}`);
+    const src = s.evidence.withMarker > 0 ? '主文件标记（拆分后）'
+      : (s.evidence.fromCore > 0 ? '核心数组（拆分前）' : '无来源');
+    console.log(`  ${lv.padEnd(13)} ${String(s.count).padStart(6)} 条  去重后 ${String(firstWins(data[lv].core).length).padStart(6)}  collocOnly=${String(s.collocOnlyIds.length).padStart(5)}  标记↔detail 分歧=${String(s.divergences.length).padStart(2)}  来源=${src}`);
   }
 }
 
@@ -104,6 +156,18 @@ async function check(baselineFile) {
       if (core[i].hasCollocations !== expect) {
         fail.push(`${lv}[${i}] ${core[i].word}: hasCollocations=${core[i].hasCollocations} ≠ 基线 ${expect}`);
       }
+    }
+
+    // ①b 标记与 detail 真值的分歧清单必须与基线**逐条相同**：
+    //     重复词条带来的分歧是钉住的历史事实，多一条就是新坏数据（少一条也算数据变了要重采）。
+    //     老基线没有这个字段时先提示重采，不拿"没有清单"当成"清单为空"。
+    if (Array.isArray(base.divergences)) {
+      const now = divergenceList(core, detail);
+      ok(JSON.stringify(now) === JSON.stringify(base.divergences),
+        `${lv}: 标记↔detail 分歧清单与基线不同（基线 ${base.divergences.length} 条 / 现在 ${now.length} 条）`,
+        `基线独有 ${base.divergences.filter((x) => !now.includes(x)).join(',')}；现在多出 ${now.filter((x) => !base.divergences.includes(x)).join(',')}`);
+    } else {
+      fail.push(`${lv}: 基线里没有 divergences 字段 —— 用新版脚本重采基线（--baseline）再 --check`);
     }
 
     // ② detail 源文件存在，且核心占位必须为空（证明拆分干净）
@@ -158,8 +222,13 @@ async function checkApplyDetail(data) {
   src += '\nexport { applyDetail, _levelCache };\n';
   const js = ts.transpileModule(src, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 },
-  }).outputText;
+  }).outputText.replace(/from '\.\/meta'/g, "from './meta.mjs'");
   const tmp = path.join(TMP, 'wordbank-under-test.mjs');
+  // wordbank.ts 从 ./meta 取 WORD_COUNTS 等常量（2026-09-29 词数同源），桩目录里得一起带上
+  fs.writeFileSync(path.join(TMP, 'meta.mjs'), ts.transpileModule(
+    fs.readFileSync(path.resolve(__dirname, '../src/data/wordbank/meta.ts'), 'utf8'),
+    { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } },
+  ).outputText);
   fs.writeFileSync(tmp, js);
   const wb = await import(pathToFileURL(tmp).href);
 
