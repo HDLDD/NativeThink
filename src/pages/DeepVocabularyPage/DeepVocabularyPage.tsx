@@ -49,6 +49,11 @@ interface SetupStepProps {
   counts: Record<string, number>;
   onComplete: (level: string, tab: string, dailyCount: number, reviewMode?: string) => void;
   onContinue: () => void;
+  /**
+   * 只在"已经选过词书"时传入：换书走这条**一步生效**的路径（保持当前学习方式）。
+   * 不给这个 prop 才是首启的三步向导（词书 → 方式 → 开始）。
+   */
+  onSwitchBook?: (level: string) => void;
 }
 
 /**
@@ -86,7 +91,7 @@ const REVIEW_MODES: { key: string; label: string; icon: LucideIcon; color: strin
 
 const DAILY_COUNTS = [5, 10, 20, 30, 50, 100];
 
-function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
+function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook }: SetupStepProps) {
   const [step, setStep] = useState(0);
   const [chosenLevel, setChosenLevel] = useState('');
   const [chosenMode, setChosenMode] = useState('daily');
@@ -97,6 +102,12 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
   // (75K words, ~48MB) at wizard mount causes browser OOM crashes on mobile.
 
   const handleBookSelect = (level: string) => {
+    /**
+     * 换书路径（已选过词书的人）：**点一下就切过去**，保持当前学习方式。
+     * 以前这里也只 setChosenLevel + 跳下一步，而真正写回页面 selectedLevel 的只有
+     * 走完"选方式"之后的 onComplete —— 于是"换本书"被迫多点一步，中途关向导等于没换。
+     */
+    if (onSwitchBook) { onSwitchBook(level); return; }
     setChosenLevel(level);
     setStep(1);
   };
@@ -116,8 +127,8 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
 
   return (
     <div className="min-h-[60vh] flex flex-col justify-center py-6 px-2">
-      {/* Step indicators */}
-      <div className="flex items-center justify-center gap-2 mb-8">
+      {/* Step indicators（换书是一步生效，不需要三步进度条） */}
+      <div className={cn('flex items-center justify-center gap-2 mb-8', onSwitchBook && 'hidden')}>
         {['词书', '方式', '开始'].map((label, i) => (
           <div key={i} className="flex items-center gap-2">
             <div className={cn(
@@ -136,8 +147,10 @@ function VocabSetupWizard({ counts, onComplete, onContinue }: SetupStepProps) {
       {step === 0 && (
         <div className="space-y-4">
           <div className="text-center mb-6 space-y-1">
-            <h2 className="text-xl font-black italic text-foreground">选择你的词书</h2>
-            <p className="text-xs text-muted-foreground">选择一本词书开始学习</p>
+            <h2 className="text-xl font-black italic text-foreground">{onSwitchBook ? '切换词书' : '选择你的词书'}</h2>
+            <p className="text-xs text-muted-foreground">
+              {onSwitchBook ? '点一本直接切过去，学习方式保持不变' : '选择一本词书开始学习'}
+            </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
             {BOOKS.map(({ key, label, icon: BookIcon, color, desc, gradient }) => (
@@ -399,7 +412,14 @@ export default function DeepVocabularyPage() {
 
   const handleWizardComplete = (level: string, mode: string, dailyCount: number, revMode?: string) => {
     setSelectedLevel(level);
-    setTab(mode);
+    /**
+     * 向导选完方式后要**直接落进那个模式**：以前这里只 setTab(mode)，而模式内容
+     * 由 `{!showWizard && immersed && <Tabs/>}` 把关 —— 于是用户选完"词书 + 方式"（甚至点了
+     * "开始学习"）仍回到模式列表，必须再点一次卡片才真正开始。这是"多点一步"的另一半。
+     * 走 handleTabChange 而不是裸 setTab：browse 的滚动恢复等副作用与首页点卡片保持一致。
+     */
+    handleTabChange(mode);
+    setImmersed(true);
     setMemory((p) => ({ ...p, level, tab: mode }));
     try { safeStorage.setItem('__nativethink_daily_vocab_count', String(dailyCount)); } catch { /* ignore */ }
     // Clear per-level quotas so the wizard value takes effect in useWordLearning
@@ -411,11 +431,27 @@ export default function DeepVocabularyPage() {
     preloadLevels(levels).then(() => setDataReady(true));
   };
 
+  /**
+   * 换书（一步生效）：只改 level，学习方式 / 每日量 / 复习模式全部保持不动。
+   * 预取与 dataReady、dataVersion 都交给上面那个 `[selectedLevel]` 的 effect 统一做，
+   * 这里只负责"改掉 selectedLevel + 关掉向导"。
+   * 刻意不清 `__nativethink_daily_quota_<level>` —— 那是"今天在这本书学了多少"，
+   * 切回来时应当还在；只有向导里显式改每日量才需要重置。
+   */
+  const handleSwitchBook = (level: string) => {
+    if (level !== selectedLevel && !levelReady(level)) setDataReady(false);
+    setSelectedLevel(level);
+    setMemory((p) => ({ ...p, level }));
+    setShowWizard(false);
+  };
+
   const handleWizardContinue = () => {
     const lastLevel = memory.level || 'cet4';
     const lastTab = memory.tab || 'daily';
     setSelectedLevel(lastLevel);
-    setTab(lastTab);
+    // 同 handleWizardComplete：继续上次的选择就直接进那个模式，别再让用户回列表点一次
+    handleTabChange(lastTab);
+    setImmersed(true);
     markSetupDone();
     setShowWizard(false);
     const levels = lastLevel === 'all' ? ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] : [lastLevel];
@@ -859,8 +895,9 @@ export default function DeepVocabularyPage() {
             className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 border-2 border-[#00B894]/30 hover:border-[#00B894] transition-all duration-200 active:scale-[0.98]"
           >
             {(() => {
-              const b = BOOKS.find((x) => x.key === (selectedLevel === 'all' ? 'cet4' : selectedLevel));
-              const BIcon = b?.icon ?? BookOpen;
+              // 选「全部」时用中性的书库图标 —— 别拿四级的图标冒充，会让人以为当前词书是四级
+              const b = selectedLevel === 'all' ? undefined : BOOKS.find((x) => x.key === selectedLevel);
+              const BIcon = b?.icon ?? Library;
               return <BIcon className="size-4" style={{ color: b?.color ?? '#00B894' }} />;
             })()}
             <span className="text-[10px] font-black text-ink-teal">{LEVELS.find((l) => l.key === selectedLevel)?.label || '全部'}</span>
@@ -877,8 +914,9 @@ export default function DeepVocabularyPage() {
           className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 border-2 border-[#00B894]/30 hover:border-[#00B894] hover:shadow-lg hover:shadow-emerald-200/30 dark:hover:shadow-emerald-900/20 transition-all duration-200 active:scale-[0.98] group"
         >
           {(() => {
-            const b = BOOKS.find((x) => x.key === (selectedLevel === 'all' ? 'cet4' : selectedLevel));
-            const BIcon = b?.icon ?? BookOpen;
+            // 同上：「全部」显示书库图标
+            const b = selectedLevel === 'all' ? undefined : BOOKS.find((x) => x.key === selectedLevel);
+            const BIcon = b?.icon ?? Library;
             return <BIcon className="size-4.5" style={{ color: b?.color ?? '#00B894' }} />;
           })()}
           <div className="text-left">
@@ -955,6 +993,7 @@ export default function DeepVocabularyPage() {
           counts={counts}
           onComplete={handleWizardComplete}
           onContinue={handleWizardContinue}
+          onSwitchBook={setupDone ? handleSwitchBook : undefined}
         />
       )}
 

@@ -305,6 +305,46 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '复习检测概览卡用一句说明代替重复标题');
 
   /**
+   * 切换词书必须一步生效（2026-09-29 用户报）：以前点书只 setChosenLevel，
+   * 真正写回 selectedLevel 的是走完"选方式"之后的 onComplete —— 换本书被迫多点一步，
+   * 中途关向导等于没换。从此换书与首启三步向导是两条路。
+   */
+  check(/onSwitchBook\?: \(level: string\) => void;/.test(page), '向导有可选的"换书"回调 prop（换书/首启两条路）');
+  check(/if \(onSwitchBook\) \{ onSwitchBook\(level\); return; \}/.test(page),
+    '已设过词书时点书直接切，不再跳去"选方式"那一步');
+  const switchBody = (page.match(/const handleSwitchBook = \(level: string\) => \{[\s\S]{0,400}?\};/) || [])[0] || '';
+  check(switchBody.length > 0, '脚手架自检：抓到 handleSwitchBook 函数体（抓不到就没法判）');
+  check(/setSelectedLevel\(level\);/.test(switchBody) && /setMemory\(\(p\) => \(\{ \.\.\.p, level \}\)\);/.test(switchBody),
+    '换书真的写回 selectedLevel + 记忆（不是只关掉向导）');
+  check(!/removeItem\(`__nativethink_daily_quota_/.test(switchBody),
+    '换书不清该书的每日配额（正对照：只有向导显式改每日量才重置）');
+  check(/onSwitchBook=\{setupDone \? handleSwitchBook : undefined\}/.test(page),
+    '只有完成过首启的用户才走一步换书，新人仍是三步向导');
+  check(/onSwitchBook && 'hidden'/.test(page), '换书模式不显示三步进度条（否则看着像还要走三步）');
+  check(/if \(mode === 'daily'\) setStep\(2\);/.test(page) && /else onComplete\(chosenLevel, mode, 10\);/.test(page),
+    '正对照：首启三步向导的分支仍在（加换书路径没把首启流程改坏）');
+  check(!/selectedLevel === 'all' \? 'cet4' : selectedLevel/.test(page),
+    '选「全部」时不再拿四级的图标冒充当前词书');
+
+  /**
+   * 走完向导必须**直接落进所选模式**（2026-09-29 真机化验收时发现的另一半"多点一步"）：
+   * 模式整块内容写在 `{!showWizard && immersed && ...}` 里，而 onComplete 过去只 setTab(mode)，
+   * 于是用户选完词书+方式（甚至点了"开始学习"）仍回到模式列表，得再点一次卡片才开始。
+   */
+  const completeBody = (page.match(/const handleWizardComplete = \(level: string[\s\S]{0,2000}?\n {2}\};/) || [])[0] || '';
+  check(completeBody.length > 0, '脚手架自检：抓到 handleWizardComplete 函数体');
+  check(/handleTabChange\(mode\);/.test(completeBody),
+    '向导完成走和首页点卡片同一条进模式路径（含 browse 滚动恢复等副作用）');
+  check(/setImmersed\(true\);/.test(completeBody), '向导完成即进入沉浸态，不再停在模式列表');
+  check(!/^\s*setTab\(mode\);/m.test(completeBody), '正对照：没有残留裸 setTab(mode)（那正是"回到列表要点第二下"的根因）');
+  check(/\{!showWizard && immersed && \(/.test(page), '模式内容仍由 immersed 把关（上面那句 setImmersed 才有意义）');
+  const continueBody = (page.match(/const handleWizardContinue = \(\) => \{[\s\S]{0,600}?\n  \};/) || [])[0] || '';
+  check(/handleTabChange\(lastTab\);/.test(continueBody) && /setImmersed\(true\);/.test(continueBody),
+    '「继续上次的选择」同样直接进上次的模式');
+  check(!/setImmersed/.test(switchBody),
+    '一步换书不动沉浸态：在模式里换书留在该模式，在首页换书仍留在首页');
+
+  /**
    * 两张柱状图（未来 7 天复习量 / 本周学习量）的容器必须容得下「数值+柱+星期」三层。
    * 原来写死 h-12，8px 文字行盒 ~13px，13+34+8+13=68 > 48 → 数值从顶部溢出压住标题。
    */
