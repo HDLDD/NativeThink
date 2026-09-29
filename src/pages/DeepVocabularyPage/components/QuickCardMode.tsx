@@ -139,14 +139,19 @@ export default function QuickCardMode({ level }: { level: string }) {
   const { runs, pending, remove: removeRun } = useQuickCardRuns(level);
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
 
-  /** 收藏（type='word'，与收藏页同源，在「收藏」页也能看到） */
+  /** 收藏的词（与收藏页同源，用于「只练收藏的词」与卡片上的 ★ 态） */
   const favWords = useMemo(() => favorites.filter((f) => f.type === 'word'), [favorites]);
   const isFav = useCallback((word: string) => isFavorited(word, 'word'), [isFavorited]);
+
+  /**
+   * 收藏（type='word'，与收藏页同源，在「收藏」页也能看到）。
+   * 刻意**不弹 toast**（2026-09-29 用户要求）：★ 图标本身会立刻变成实心金色，
+   * 连点几十个词时每条提示只会挡视线 —— 反馈交给控件本身，交给位置固定的收藏计数。
+   */
   const toggleFav = useCallback((w: IWordEntry) => {
     const existing = favorites.find((f) => f.type === 'word' && f.content === w.word);
     if (existing) {
       removeFavorite(existing.id);
-      toast.info(`已取消收藏「${w.word}」`, { duration: 1500 });
     } else {
       addFavorite({
         type: 'word',
@@ -155,7 +160,6 @@ export default function QuickCardMode({ level }: { level: string }) {
         example: w.examples[0]?.en,
         category: `快速闪卡 · ${level === 'all' ? '全部词库' : level}`,
       });
-      toast.success(`已收藏「${w.word}」`, { duration: 1500 });
     }
   }, [favorites, addFavorite, removeFavorite, level]);
 
@@ -396,8 +400,9 @@ export default function QuickCardMode({ level }: { level: string }) {
       addStudyMinutes(0.15, 'vocabulary');
       const key = cw.word.toLowerCase();
       if ((relearnCounts[key] ?? 0) < MAX_RELEARN) {
+        // 只重排，不弹提示（2026-09-29 用户要求）：卡片紧接着翻面显示释义，
+        // 且它在同一轮里真的会再出现 —— 再叠一条 toast 只是刷屏。
         scheduleRelearn(cw);
-        toast.info('这个词稍后会再出现一次', { duration: 1500 });
       }
     }
     setResultAt(idx, false);

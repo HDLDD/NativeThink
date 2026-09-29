@@ -412,6 +412,18 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   const favPage = readFileSync(join(ROOT, 'src/pages/FavoritesPage/FavoritesPage.tsx'), 'utf8');
   check(/'all', 'vocabulary', 'word'/.test(favPage), '收藏页有「单词」过滤项（否则收藏的词只能在全部里翻）');
 
+  // ⑧b 静默契约（2026-09-29 用户要求：快速闪卡里"不认识"和"收藏"都不要弹提示）
+  //     锁住"不许再加回来"，同时用锚点断言证明不是把整块功能删掉换来的绿。
+  const toggleFavBody = (qc.match(/const toggleFav = useCallback\([\s\S]{0,700}?\}, \[favorites, addFavorite, removeFavorite, level\]\);/) || [])[0] || '';
+  check(toggleFavBody.length > 0, '脚手架自检：抓到 toggleFav 函数体（抓不到就没法判静默）');
+  check(!/toast\./.test(toggleFavBody), '收藏 / 取消收藏不弹 toast');
+  check(/addFavorite\(\{/.test(toggleFavBody) && /removeFavorite\(existing\.id\)/.test(toggleFavBody),
+    '正对照：收藏开关仍然真的在写数据（不是靠删功能变静默）');
+  //（"不认识不弹提示"的反向断言在 ⑪ 重排那一节，与旧文案一同维护，避免两处重复）
+  check(/if \(\(relearnCounts\[key\] \?\? 0\) < MAX_RELEARN\) \{[\s\S]{0,200}scheduleRelearn\(cw\);/.test(qc),
+    '正对照：重排机制本身仍在（只是不再播报）');
+  check(!/已收藏「|已取消收藏「/.test(qc), '文件里不再出现收藏类 toast 文案');
+
   // ⑨ 释义必须带词性
   check(/cw\.partOfSpeech\}/.test(qc) && /tracking-wider text-ink-violet/.test(qc), '卡片释义行内显示词性');
   check(/entry\.partOfSpeech\}/.test(qc), '详情弹窗释义行内显示词性');
@@ -455,7 +467,9 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/idx \+ 1 >= queueRef\.current\.length/.test(qc), '完成判定用 queueRef 最新长度（最后一张卡答错仍会重排）');
   check(!/setRelearnCounts\(\(c\) => \{[\s\S]{0,120}setQueue\(/.test(qc), '重排计数 updater 内无嵌套 setState（StrictMode 约定）');
   check(/if \(\(relearnCounts\[key\] \?\? 0\) < MAX_RELEARN\)/.test(qc), '同一个词一轮最多重排 MAX_RELEARN 次');
-  check(/这个词稍后会再出现一次/.test(qc), '重排有提示文案');
+  // 2026-09-29 用户要求：重排本身保留，但不再弹提示（卡片紧接着翻面就是反馈）。
+  // 断言随之**反向**——不是删掉这条，而是改锁新契约；同节 ⑧b 还有"重排仍在"的正对照。
+  check(!/这个词稍后会再出现一次/.test(qc), '重排不再弹提示（旧文案不许回来）');
 
   // ⑫ 同一个词不重复计入/列出（重刷后统计与词表都要按词去重）
   check(/const uniqueResults = useMemo/.test(qc), '结果按词去重（取最后一次作答）');
