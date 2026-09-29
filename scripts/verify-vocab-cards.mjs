@@ -345,6 +345,18 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '一步换书不动沉浸态：在模式里换书留在该模式，在首页换书仍留在首页');
 
   /**
+   * 使用指南不许抢词汇首启向导的位（2026-09-29 无头 Chrome 复现）。
+   * HelpGuide 挂载 800ms 后无条件自动弹**模态** Dialog，新用户一进 /vocabulary
+   * 就被它盖住，必须先关掉才能选词书（自动化验收也被它挡掉过两次真实点击）。
+   */
+  const help = readFileSync(join(ROOT, 'src/components/HelpGuide.tsx'), 'utf8');
+  const autoOpen = (help.match(/useEffect\(\(\) => \{[\s\S]{0,600}?setOpen\(true\)[\s\S]{0,120}?\}, \[defaultOpen, pathname\]\);/) || [])[0] || '';
+  check(autoOpen.length > 0, '脚手架自检：抓到 HelpGuide 的自动弹出 effect（含 pathname 依赖）');
+  check(/pathname !== '\/' && pathname !== ''/.test(autoOpen),
+    '使用指南只在首页自动弹（各功能页的首启流程归该页自己管）');
+  check(/useLocation\(\)/.test(help), '路由判定用 useLocation（带 basename 部署时 window.location.pathname 会多前缀）');
+
+  /**
    * 首启向导阶段一本都不许预载（2026-09-29 性能体检）。
    * selectedLevel 默认 'all'，挂载 effect 以前会把 9 本书连 detail 全拉进来 ——
    * 实测全新 profile 进 /vocabulary：18 个词库 chunk / 3.16MB（压缩后 ≈40MB 源码）、

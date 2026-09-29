@@ -4,6 +4,7 @@ import {
   CheckCircle2, RotateCw, Link2, Shuffle, Edit3, Headphones, Coffee,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { safeStorage } from '@/lib/safe-storage';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -227,6 +228,7 @@ const HELP_TAB_KEY = '__nativethink_help_tab';
 
 export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
+  const { pathname } = useLocation();
   const [activeTab, setActiveTab] = useState(() => {
     try {
       const saved = safeStorage.getItem(HELP_TAB_KEY);
@@ -234,13 +236,21 @@ export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
     } catch { return 'modules'; }
   });
 
-  // Auto-show for new users
+  /*
+   * 自动弹出**只在首页**触发（2026-09-29 实测缺陷）：它是模态 Radix Dialog，
+   * 挂载 800ms 后无条件 setOpen(true) —— 新用户直接进 /vocabulary 时，
+   * 首启三步向导还铺在下面，"使用指南"先盖上来抢位，必须先关掉它才能选词书
+   * （本轮自动化验收就被它挡掉过两次点击）。全局指南该由首页这个"总入口"来发，
+   * 各功能页自己的首启流程（词汇向导等）归它们管。工具栏图标始终可手动打开。
+   */
   useEffect(() => {
-    if (defaultOpen === undefined && !hasSeenHelpGuide()) {
-      const timer = setTimeout(() => setOpen(true), 800);
-      return () => clearTimeout(timer);
-    }
-  }, [defaultOpen]);
+    if (defaultOpen !== undefined) return;
+    // 用 useLocation 而不是 window.location.pathname：带 basename 部署时后者会多出前缀
+    if (pathname !== '/' && pathname !== '') return;
+    if (hasSeenHelpGuide()) return;
+    const timer = setTimeout(() => setOpen(true), 800);
+    return () => clearTimeout(timer);
+  }, [defaultOpen, pathname]);
 
   const handleOpenChange = (o: boolean) => {
     setOpen(o);
