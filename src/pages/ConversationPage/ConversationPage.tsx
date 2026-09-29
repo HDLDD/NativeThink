@@ -32,7 +32,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { capabilityClient } from '@lark-apaas/client-toolkit-lite';
+import { getCapabilityClient } from '@/lib/capability-client';
 import { toast } from 'sonner';
 import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { useLearningStats } from '@/lib/use-learning-stats';
@@ -286,7 +286,7 @@ export default function ConversationPage() {
         }
       } else {
         // Fallback to Lark plugin
-        const plugin = capabilityClient?.load?.(PLUGIN_IDS.AI_CONVERSATION);
+        const plugin = (await getCapabilityClient())?.load?.(PLUGIN_IDS.AI_CONVERSATION);
         if (!plugin) { toast.error('AI 插件未加载'); setIsLoading(false); return; }
         const stream = plugin.callStream('textGenerate', {
           scenario: selectedScenario?.name,
@@ -397,7 +397,7 @@ export default function ConversationPage() {
           }
         }
       } else {
-        const plugin2 = capabilityClient?.load?.(PLUGIN_IDS.NATURALNESS_ANALYSIS);
+        const plugin2 = (await getCapabilityClient())?.load?.(PLUGIN_IDS.NATURALNESS_ANALYSIS);
         if (!plugin2) { toast.error('AI 插件未加载'); setAnalyzing(false); return; }
         const stream = plugin2.callStream('textGenerate', {
           conversation_history: history,

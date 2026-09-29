@@ -57,7 +57,7 @@ import { cn, cleanText, extractJson } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
 import { toast } from 'sonner';
 import { useTTS } from '@/lib/use-tts';
-import { capabilityClient } from '@lark-apaas/client-toolkit-lite';
+import { getCapabilityClient } from '@/lib/capability-client';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
 
@@ -712,7 +712,7 @@ Keep it brief — 2-3 bullet points max.`,
           }
         }
       } else {
-        const result = await capabilityClient
+        const result = await (await getCapabilityClient())
           .load(PLUGIN_IDS.CHINGLISH_DETECTION)
           .call('textGenerate', { english_sentence: input });
 

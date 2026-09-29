@@ -22,7 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { capabilityClient } from '@lark-apaas/client-toolkit-lite';
+import { getCapabilityClient } from '@/lib/capability-client';
 import { toast } from 'sonner';
 import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { MOCK_THINK_EXERCISES, type IThinkExercise } from '@/data/thinkexercises';
@@ -195,7 +195,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
           }
         }
       } else {
-        const stream = capabilityClient
+        const stream = (await getCapabilityClient())
           .load(PLUGIN_IDS.CHINGLISH_DETECTION)
           .callStream('textGenerate', { english_sentence: input });
 
@@ -273,7 +273,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
           }
         }
       } else {
-        const stream = capabilityClient
+        const stream = (await getCapabilityClient())
           .load(PLUGIN_IDS.THOUGHT_TRANSLATION)
           .callStream('textGenerate', {
             user_english_expression: input,
@@ -351,7 +351,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
           }
         }
       } else {
-        const stream = capabilityClient.load(PLUGIN_IDS.BACK_TRANSLATION).callStream('textGenerate', {
+        const stream = (await getCapabilityClient()).load(PLUGIN_IDS.BACK_TRANSLATION).callStream('textGenerate', {
           original_sentence: input,
           target_meaning: exercise.scenarioHint,
         });
@@ -480,7 +480,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
           }
         }
       } else {
-        const stream = capabilityClient
+        const stream = (await getCapabilityClient())
           .load(PLUGIN_IDS.CHINGLISH_DETECTION)
           .callStream('textGenerate', {
             english_sentence: input,

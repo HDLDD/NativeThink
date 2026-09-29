@@ -33,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { capabilityClient } from '@lark-apaas/client-toolkit-lite';
+import { getCapabilityClient } from '@/lib/capability-client';
 import { toast } from 'sonner';
 import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { useLearningStats } from '@/lib/use-learning-stats';
@@ -553,7 +553,7 @@ Suggest 2-3 more advanced or natural alternatives to words used in the essay.`,
           }
         }
       } else {
-        const stream = capabilityClient
+        const stream = (await getCapabilityClient())
           .load(PLUGIN_IDS.CHINGLISH_DETECTION)
           .callStream('textGenerate', {
             english_sentence: `Writing task: "${selectedPrompt.title}". The user wrote the following essay. Please analyze it for grammar errors, naturalness, and provide improvement suggestions:\n\n${text}\n\nPlease provide feedback in this format:\n1. Overall Score (1-10)\n2. Grammar Corrections\n3. Naturalness Feedback\n4. Specific Improvement Suggestions`,

@@ -15,7 +15,7 @@
 | 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
 | 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-09 两轮全站质量优化已把拼写/跟读/写作/对话/语块也扫过一遍 |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 9 个 `scripts/verify-*.mjs` 断言脚本（2026-09-29 全绿：loading 45 · books-meta 213 · vocab-cards 254 · vocab-caches 21 · tts-progress 6175 · tts-hardening 15 · feedback-loop 56 · overlay-fit 16 · bundle-budget 8） |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 9 个 `scripts/verify-*.mjs` 断言脚本（2026-09-29 全绿：loading 45 · books-meta 213 · vocab-cards 254 · vocab-caches 21 · tts-progress 6175 · tts-hardening 15 · feedback-loop 56 · overlay-fit 16 · bundle-budget 10） |
 | 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
 | 最容易踩的坑 | ①改动 TTS 切片上限会让云端链路静默失败 ②ref 不随组件重挂载归零 ③`public/` 不能放大文件 ④推送用 SSH over 443 ⑤洗牌列表 + 下标定位当前题必须用 `use-stable-shuffle`（否则当前题悄悄漂移） |
@@ -82,6 +82,7 @@
 - `release/CetThink-mobile.apk`（227.8MB）是**正式发布产物**（另仓 CetThink 的安装包，含离线朗读模型），合法，别删；但它**绝不能进 `public/`**。
 - **禁止往 `public/` 放 APK 或大二进制**：Vite 会把 `public/` 原样拷进 `dist/client`，导致 web / 主 APK / 桌面三份产物各白背体积（历史事故：227.5MB 的 CetThink apk 回流进 public，主 APK 里又套一个 APK）。
 - **当前 APK 体积构成**（2.0.25 实测，`node scripts/report-apk-size.cjs`，包内占用 = 压缩后）：离线小模型 541.3MB（未压 877.9MB）+ Kokoro 113.0MB + Piper 音色 65.1MB + web 产物 40.3MB + 原生库 29.3MB + dex/res 14.7MB = **803.7MB**。要减体积先动 `models-bundled`（离线 LLM/翻译模型），别去动 TTS 栈。
+  ⑤ 四个功能页（思维/语块/对话/写作）静态 import 平台 AI 插件客户端（`@lark-apaas/client-toolkit-lite`，507KB raw / 160KB gzip）—— 而它只在"用户没配 AI Key"那条平台兜底分支才被碰到。改走 `src/lib/capability-client.ts` 的动态加载后，这四条路由各少下载整个 chunk。
 - **首屏下载口径**（2026-09-29 起）：`npm run verify:bundle-budget` 守的是"入口 chunk 沿**静态** import 递归出来的集合"，实测 11 个 chunk / **198.1KB gzip**（预算线 600KB）。APK 里 WebView 不压缩本地资源，所以这个数直接就是手机首次进 App 的下载 + 解析量。
 
 ---
@@ -183,7 +184,7 @@ npm run verify:vocab-cards       # 背单词卡片交互契约（254 断言）
 npm run verify:vocab-caches      # 词汇缓存基建契约（capped-cache / colloc-ai-cache 接线，21 断言）
 npm run verify:feedback-loop     # 反馈链路契约（挂载点 + 三档状态 + 后端 KV/飞书替身真实执行，56 断言）
 npm run verify:overlay-fit       # 窄视口浮层契约（Dialog 基座夹高度 + 朗读/AI 设置内部滚动，16 断言）
-npm run verify:bundle-budget     # 首屏下载预算（从产物反查入口静态依赖图，8 断言；跑前必须先 build:web）
+npm run verify:bundle-budget     # 首屏下载预算 + 平台 SDK 禁止静态 import（从产物反查入口静态依赖图，10 断言；跑前必须先 build:web）
 npm run verify:tts-progress      # 朗读切片/进度（6175 断言）
 node scripts/verify-tts-hardening.mjs        # TTS 降级/预合成守卫 + 设置面板网络卫生（15 项）
 npm run check:tts-voices         # 音色与模型资产一致性（package:apk 前置）

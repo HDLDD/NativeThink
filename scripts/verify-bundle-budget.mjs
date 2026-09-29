@@ -86,6 +86,26 @@ const hasMarkdown = files.some((f) => /react-markdown|remark|markdown/i.test(f))
 check(hasCharts, '正对照：图表库仍在产物里（是按需，不是被删了）');
 check(hasMarkdown, '正对照：Markdown 渲染器仍在产物里（是按需，不是被删了）');
 
+/*
+ * 源码级卫生检查：平台 SDK 只准动态加载。
+ * `@lark-apaas/client-toolkit-lite` 那个 chunk 实测 507KB raw / 160KB gzip，
+ * 静态 import 它的四个功能页（思维/语块/对话/写作）每次进入都要下载解析一遍，
+ * 而它只在"用户没配 AI Key"那条平台兜底分支里才被碰到。
+ * 入口那处同步 require 同理（会连 zone.js / axios / lodash 全量一起拖进来）。
+ */
+{
+  const { execSync } = await import('node:child_process');
+  let grepOut = '';
+  try { grepOut = execSync('git grep -n "lark-apaas/client-toolkit-lite" -- src', { cwd: ROOT, encoding: 'utf8' }); } catch { grepOut = ''; }
+  const hits = grepOut.split('\n').filter((l) => /:\d+:/.test(l));
+  const statics = hits.filter((l) => {
+    const code = l.replace(/^[^:]+:\d+:/, '').trim();
+    return /^import\s/.test(code) || /^export\s+\{[^}]*\}\s+from\s+['"]@lark-apaas/.test(code);
+  });
+  check(hits.length > 0, '脚手架自检：抓到平台 SDK 的引用点（抓不到说明 grep 失效）', `${hits.length} 处`);
+  check(statics.length === 0, '没有文件静态 import 平台 SDK（只准 import()）', statics.join(' | ').slice(0, 220));
+}
+
 console.log('');
 console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
 if (fail) { failures.slice(0, 20).forEach((f) => console.log('  ✗ ' + f)); process.exit(1); }

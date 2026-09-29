@@ -7,6 +7,7 @@
 
 
 ## 2026-09-29
+- build(apk): versionCode 75 / 2.0.30 —— 含本轮全部性能与交互改动，已打包待装机 (`809b1ae`)
 - docs(help): 应用内帮助中心按实况重写 —— 九档词库 / 出厂免费额度 / 数据去向都说清了 (`f3f2e4b`)
 - perf(wordbank): IDB 写成功就不再镜像 localStorage —— 省掉每次加载词书的几 MB 同步 stringify (`dbe729d`)
 - perf(books): 书库拆三层 —— /articles 冷加载 642KB → 376KB（书单不再下载整座书库） (`4f6d0ed`)
