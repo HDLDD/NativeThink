@@ -15,7 +15,7 @@
 | 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
 | 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-09 两轮全站质量优化已把拼写/跟读/写作/对话/语块也扫过一遍 |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 8 个 `scripts/verify-*.mjs` 断言脚本（42 / 202 / 246 / 21 / 6175 / 15 / 56 / 16，2026-09-29 全绿） |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 9 个 `scripts/verify-*.mjs` 断言脚本（2026-09-29 全绿：loading 42 · books-meta 202 · vocab-cards 251 · vocab-caches 21 · tts-progress 6175 · tts-hardening 15 · feedback-loop 56 · overlay-fit 16 · bundle-budget 8） |
 | 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
 | 最容易踩的坑 | ①改动 TTS 切片上限会让云端链路静默失败 ②ref 不随组件重挂载归零 ③`public/` 不能放大文件 ④推送用 SSH over 443 ⑤洗牌列表 + 下标定位当前题必须用 `use-stable-shuffle`（否则当前题悄悄漂移） |
@@ -82,6 +82,7 @@
 - `release/CetThink-mobile.apk`（227.8MB）是**正式发布产物**（另仓 CetThink 的安装包，含离线朗读模型），合法，别删；但它**绝不能进 `public/`**。
 - **禁止往 `public/` 放 APK 或大二进制**：Vite 会把 `public/` 原样拷进 `dist/client`，导致 web / 主 APK / 桌面三份产物各白背体积（历史事故：227.5MB 的 CetThink apk 回流进 public，主 APK 里又套一个 APK）。
 - **当前 APK 体积构成**（2.0.25 实测，`node scripts/report-apk-size.cjs`，包内占用 = 压缩后）：离线小模型 541.3MB（未压 877.9MB）+ Kokoro 113.0MB + Piper 音色 65.1MB + web 产物 40.3MB + 原生库 29.3MB + dex/res 14.7MB = **803.7MB**。要减体积先动 `models-bundled`（离线 LLM/翻译模型），别去动 TTS 栈。
+- **首屏下载口径**（2026-09-29 起）：`npm run verify:bundle-budget` 守的是"入口 chunk 沿**静态** import 递归出来的集合"，实测 12 个 chunk / **237.7KB gzip**。APK 里 WebView 不压缩本地资源，所以这个数直接就是手机首次进 App 的下载 + 解析量。
 
 ---
 
@@ -178,10 +179,11 @@ node scripts/verify-wordbank-loading.mjs     # 词库加载层集成验证（42 
 node scripts/verify-wordbank-split.mjs --baseline <out.json>   # 数据层拆分校验：采基线（拆分前后都能采）
 node scripts/verify-wordbank-split.mjs --check <in.json>
 npm run verify:books-meta        # 书目/SCP 元数据 + 复习词高亮 + 乱码（202 断言）
-npm run verify:vocab-cards       # 背单词卡片交互契约（246 断言）
+npm run verify:vocab-cards       # 背单词卡片交互契约（251 断言）
 npm run verify:vocab-caches      # 词汇缓存基建契约（capped-cache / colloc-ai-cache 接线，21 断言）
 npm run verify:feedback-loop     # 反馈链路契约（挂载点 + 三档状态 + 后端 KV/飞书替身真实执行，56 断言）
 npm run verify:overlay-fit       # 窄视口浮层契约（Dialog 基座夹高度 + 朗读/AI 设置内部滚动，16 断言）
+npm run verify:bundle-budget     # 首屏下载预算（从产物反查入口静态依赖图，8 断言；跑前必须先 build:web）
 npm run verify:tts-progress      # 朗读切片/进度（6175 断言）
 node scripts/verify-tts-hardening.mjs        # TTS 降级/预合成守卫 + 设置面板网络卫生（15 项）
 npm run check:tts-voices         # 音色与模型资产一致性（package:apk 前置）
@@ -351,6 +353,18 @@ node scripts/device-eval.mjs back
 - **全站两轮质量优化**（`4f45167` / `e33a780`）：`useStableShuffle` 统一洗牌、快速闪卡状态机三连修、断点按词书分键、屏蔽词全路径过滤、写作 reset/换题打断在途批改流、拼写错词重练入口 + 听写语速滑杆、跟读 100% 完成成就横幅、复习检测键盘弹窗守卫、危险操作两段确认、四个只增不减的缓存 FIFO 封顶 + 键迁移（`capped-cache` / `colloc-ai-cache`）、模式首页角标订阅刷新、贪婪正则换 `extractJson`、emoji 图标换 lucide。
 - **系统层**：Android 15+ edge-to-edge 适配（`viewport-fit=cover` + safe-area 工具类）、词库 5,909 处 U+FFFD 乱码清理、品牌视觉资产重建（`gen-app-brand.ps1`）、真机 CDP 通道 `device-eval.mjs`。
 - **反馈链路对接补全（2026-09-28）**：入口挂上 `Header`，后端改为「先 KV 留档、再可选推飞书」，返回三档真实状态（`delivered`/`stored`/`failed`），失败可在历史里重试；新增 `src/lib/app-env.ts` 统一版本与平台上报，新增守卫 `npm run verify:feedback-loop`（53 断言，含正对照）。详见 §3.4。
+- **首屏下载体检与瘦身（2026-09-29）**：从**产物**反查入口静态依赖图，抓到三处"运行时明明不执行、却压进入口"的重依赖 ——
+  ① `vite.config` 给 recharts/d3 与 react-markdown 写了强制 `manualChunks`，效果**正好相反**：被强制归组的 chunk 变成入口静态依赖，
+  全站只有 `/progress` 用得着的图表库（111KB gzip）与只有几页用得着的 Markdown 渲染器（45KB）每条路由都得下载；
+  ② `src/index.tsx` 同步 `require("@lark-apaas/client-toolkit-lite")` —— 只在 miaoda 平台内才用，
+  但把 zone.js（两个版本）、axios、crypto-js、@opentelemetry、lodash 全量一起拖进入口（入口 chunk 301KB gzip）。
+  三处改完：**首屏必需 JS 539.7KB → 237.7KB gzip（-56%）**，冷加载 `/` 750KB → 336KB、`/vocabulary` 800KB → 392KB、
+  `/articles` 1055KB → 642KB；图表与渲染器改为**用到时才拉**（已实测切到「学习统计」tab 才请求 ProgressCharts 110KB、
+  点「更新日志」才请求渲染器 45KB）。新增守卫 `npm run verify:bundle-budget`（8 断言 + 两条"确实还在产物里"的正对照，
+  把旧 manualChunks 规则加回去立刻报红）。
+- **词汇深度首启不再预载九本（2026-09-29）**：`selectedLevel` 默认 'all' 时挂载即预载 9 本书连 detail ——
+  全新 profile 进 `/vocabulary` 就是 18 个词库 chunk / 3.16MB / 15 个长任务合计 1.6s，而用户连一本都还没选。
+  现在没 `setupDone` 一律不预载，模式子树也等 `dataReady` 才挂载（顺带修掉"数据晚到但 memo 不重算 → 本书进度整块消失"）。
 - **词汇向导「少点一步」两修（2026-09-29）**：① 换书与首启拆成两条路 —— 已选过词书的人点任意一本书**一步生效**（保持当前学习方式、不清该书今日配额），三步进度条只在首启出现，「全部」不再拿四级图标冒充；② 走完向导（含点「开始学习」与「继续上次的选择」）**直接落进所选模式**，不再退回模式列表逼用户点第二下。`verify-vocab-cards.mjs` 补 21 条断言（含三条变异正对照），并用本机无头 Chrome + CDP 把 A/B/C/D 四段路径真实点了一遍（23 项行为断言全绿，截图见下条）。
 
 ### 未完成 / 已知短板

@@ -30,7 +30,8 @@
     "package:all": "npm run package:web && concurrently -n apk,desktop -c cyan,magenta \"npm run package:apk\" \"npm run package:desktop\"",
     "verify:vocab-caches": "node scripts/verify-vocab-caches.mjs",
     "verify:feedback-loop": "node scripts/verify-feedback-loop.mjs",
-    "verify:overlay-fit": "node scripts/verify-overlay-fit.mjs"
+    "verify:overlay-fit": "node scripts/verify-overlay-fit.mjs",
+    "verify:bundle-budget": "node scripts/verify-bundle-budget.mjs"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "^8.0.2",

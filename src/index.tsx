@@ -1,4 +1,4 @@
-import { StrictMode, useState } from "react";
+import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
@@ -43,22 +43,41 @@ function isMiaodaPlatform(): boolean {
 
 function SafeShell({ children }: { children: React.ReactNode }) {
   const [appContainerFailed, setAppContainerFailed] = useState(false);
+  const [Container, setContainer] = useState<React.ComponentType<{ children: React.ReactNode }> | null>(null);
+  const onPlatform = isMiaodaPlatform();
 
-  // Skip AppContainer on non-miaoda platforms
-  if (!isMiaodaPlatform() || appContainerFailed) {
+  /*
+   * 这里原来是同步 `require("@lark-apaas/client-toolkit-lite")` —— 虽然只有平台内才会用到，
+   * 但同步 require 让打包器必须把它**连它的一整串传递依赖**（zone.js 两个版本、axios、
+   * crypto-js、@opentelemetry/semantic-conventions、lodash 全量…）压进入口 chunk。
+   * 我们的两条产品线（Cloudflare Pages / Capacitor APK）都不跑在 miaoda 上，
+   * 等于每条路由首屏白背一坨永远不执行的代码。改成动态 import：非平台环境根本不请求，
+   * 平台环境多等一次网络往返再套壳（渲染结果不变，只是晚一帧）。
+   * ⚠️ effect 必须在任何提前 return 之前（Rules of Hooks —— pre-commit 的
+   *    react-hooks/rules-of-hooks 就是为这种写法准备的，别绕过它）。
+   */
+  useEffect(() => {
+    if (!onPlatform || appContainerFailed || Container) return;
+    let cancelled = false;
+    import("@lark-apaas/client-toolkit-lite")
+      .then((m) => { if (!cancelled && m?.AppContainer) setContainer(() => m.AppContainer); })
+      .catch(() => { if (!cancelled) setAppContainerFailed(true); });
+    return () => { cancelled = true; };
+  }, [onPlatform, appContainerFailed, Container]);
+
+  // 非平台 / 套壳失败 / 壳还没到 —— 三种情况都直接渲染 children
+  if (!onPlatform || appContainerFailed || !Container) {
     return <>{children}</>;
   }
 
-  // Lazy-import AppContainer only on miaoda platform
-  const { AppContainer } = require("@lark-apaas/client-toolkit-lite");
   return (
     <ErrorBoundary
-      fallbackRender={({ resetErrorBoundary }) => {
+      fallbackRender={() => {
         setAppContainerFailed(true);
         return <>{children}</>;
       }}
     >
-      <AppContainer>{children}</AppContainer>
+      <Container>{children}</Container>
     </ErrorBoundary>
   );
 }

@@ -193,7 +193,7 @@ export default defineConfig({
     rolldownOptions: {
       output: {
         manualChunks(id) {
-          // ── Vendor chunks (third-party libraries) ──
+                    // ── Vendor chunks (third-party libraries) ──
 
           // React core (~130KB) — loaded on every page
           if (id.includes('node_modules/react-dom/') || id.includes('node_modules/react/')) {
@@ -215,16 +215,15 @@ export default defineConfig({
           if (id.includes('node_modules/framer-motion') || id.includes('node_modules/motion')) {
             return 'vendor-motion';
           }
-          // Recharts (~200KB) — charts (only ProgressPage)
-          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) {
-            return 'vendor-charts';
-          }
-          // React Markdown (~100KB) — markdown rendering
-          if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark-') ||
-              id.includes('node_modules/unified') || id.includes('node_modules/mdast-') ||
-              id.includes('node_modules/micromark') || id.includes('node_modules/unist-')) {
-            return 'vendor-markdown';
-          }
+          // Recharts / d3 —— **故意不给它单独 manualChunks**。
+          // 加了这条规则反而害事：被强制归进 'vendor-charts' 的模块会让**入口**静态依赖这个 chunk，
+          // 于是每条路由首屏都要多拉 111KB（压缩后）的图表库，而全站只有 /progress 用得到它。
+          // 实测对比（本机无头 Chrome 冷缓存）：/ 750KB → 643KB，/vocabulary 800KB → 693KB；
+          // 关掉规则后 recharts 只出现在 ProgressCharts-*.js 这一个懒加载 chunk 里（无重复打包）。
+          // React Markdown —— 同 recharts：**不给它单独 manualChunks**。
+          // 这条规则会让入口静态依赖 vendor-markdown chunk，于是每条路由首屏多拉 45KB（压缩后），
+          // 而只有 5 个页面真正用到渲染器。实测：关掉规则后渲染器仍只落在**一个** chunk 里
+          // （150KB raw，改名 lib-*.js），总量不变、无重复打包，入口不再引用它。
           // Date utilities (~20KB)
           if (id.includes('node_modules/date-fns/')) {
             return 'vendor-date';

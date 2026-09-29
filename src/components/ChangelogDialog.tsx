@@ -1,7 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { ScrollText, Loader2 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+/**
+ * react-markdown + remark-gfm + unified/mdast/micromark 压缩后 ≈45KB。
+ * 本组件挂在顶栏（每条路由都在），以前是静态 import —— 于是这 45KB 进了**入口**的依赖图，
+ * 每个页面首屏都得拉。改懒加载后：只有真打开「更新日志」并拿到正文时才加载。
+ * ⚠️ remark-gfm 必须和渲染器一起走懒加载（它同属 vendor-markdown chunk）——
+ *    所以两者都收进 MarkdownBody，这里只 lazy 那一个模块。
+ * 兜底用 <pre> 原文显示：正文已经到手、渲染器还没到 —— 宁可丑一点，不要空一块。
+ */
+const MarkdownBody = lazy(() => import('@/components/MarkdownBody'));
 import {
   Dialog,
   DialogContent,
@@ -66,7 +73,9 @@ export default function ChangelogDialog() {
               prose-li:text-sm prose-li:my-0.5
               prose-code:text-[10px] prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded
             ">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+              <Suspense fallback={<pre className="text-xs whitespace-pre-wrap">{content}</pre>}>
+                <MarkdownBody>{content}</MarkdownBody>
+              </Suspense>
             </div>
           )}
         </div>

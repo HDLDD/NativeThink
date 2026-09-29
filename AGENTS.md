@@ -86,6 +86,9 @@ node scripts/verify-vocab-caches.mjs
 # 窄视口浮层契约（改 ui/dialog 基座、朗读设置/AI 设置面板结构后必跑）
 node scripts/verify-overlay-fit.mjs
 
+# 首屏下载预算（改 vite.config 的 manualChunks、壳里新增静态 import/require 后必跑；先 build:web）
+node scripts/verify-bundle-budget.mjs
+
 # 反馈链路契约（FeedbackDialog / use-feedback / functions/api/feedback/submit.js 改动后必跑；
 # 后端 handler 用忠实 KV + webhook 替身真实执行，含正对照）
 npm run verify:feedback-loop
@@ -239,6 +242,7 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 | 东八区凌晨日期错一天 | `toISOString().slice(0,10)` | 用 `formatDate()` |
 | 父子双 `onClick` 触发两次 | 事件冒泡重复绑定 | 只保留外层 handler |
 | button 嵌套 DOM 警告 | `<button>` 内再嵌 button | 内层改 `span role="button"` |
+| 首屏白背一坨永不执行的代码 | `vite.config` 里给某个只有懒加载页面用的库写强制 `manualChunks`，或壳里同步 `require` 一个平台 SDK —— 两者都会让它变成**入口 chunk 的静态依赖**（源码里看着是 lazy，产物里不是） | 强制分块规则删掉让打包器自己分；SDK 改 `import()`；用 `npm run verify:bundle-budget` 从**产物**反查入口静态依赖图 |
 | 顶部内容被一条空条遮住 | 无内容但带 `bg-*` 的 sticky 元素仍占位遮挡 | 只在有内容时渲染（`{tab === 'browse' && (...)}`） |
 | 向导/设置"选完了却没开始" | 状态确实写回了（tab/level），但视图另由 `immersed` 一类开关把关，用户被留在原列表上 | 完成路径与"点卡片进入"走同一个函数（`handleTabChange` + `setImmersed(true)`）；换书这类保持上下文的操作则**不要**动那个开关 |
 | 图表数值压住标题 | 容器高度装不下「值+柱+轴」三层 | 容器高度 ≥ 三层实测高度 |
