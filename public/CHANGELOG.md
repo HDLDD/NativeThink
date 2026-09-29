@@ -7,6 +7,7 @@
 
 
 ## 2026-09-29
+- docs(help): 应用内帮助中心按实况重写 —— 九档词库 / 出厂免费额度 / 数据去向都说清了 (`f3f2e4b`)
 - perf(wordbank): IDB 写成功就不再镜像 localStorage —— 省掉每次加载词书的几 MB 同步 stringify (`dbe729d`)
 - perf(books): 书库拆三层 —— /articles 冷加载 642KB → 376KB（书单不再下载整座书库） (`4f6d0ed`)
 - docs: 使用指南抢位那条已从 ROADMAP 下一步移除（已修），列表重编号 (`f2e5035`)
