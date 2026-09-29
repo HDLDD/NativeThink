@@ -82,7 +82,7 @@
 - `release/CetThink-mobile.apk`（227.8MB）是**正式发布产物**（另仓 CetThink 的安装包，含离线朗读模型），合法，别删；但它**绝不能进 `public/`**。
 - **禁止往 `public/` 放 APK 或大二进制**：Vite 会把 `public/` 原样拷进 `dist/client`，导致 web / 主 APK / 桌面三份产物各白背体积（历史事故：227.5MB 的 CetThink apk 回流进 public，主 APK 里又套一个 APK）。
 - **当前 APK 体积构成**（2.0.25 实测，`node scripts/report-apk-size.cjs`，包内占用 = 压缩后）：离线小模型 541.3MB（未压 877.9MB）+ Kokoro 113.0MB + Piper 音色 65.1MB + web 产物 40.3MB + 原生库 29.3MB + dex/res 14.7MB = **803.7MB**。要减体积先动 `models-bundled`（离线 LLM/翻译模型），别去动 TTS 栈。
-- **首屏下载口径**（2026-09-29 起）：`npm run verify:bundle-budget` 守的是"入口 chunk 沿**静态** import 递归出来的集合"，实测 12 个 chunk / **237.7KB gzip**。APK 里 WebView 不压缩本地资源，所以这个数直接就是手机首次进 App 的下载 + 解析量。
+- **首屏下载口径**（2026-09-29 起）：`npm run verify:bundle-budget` 守的是"入口 chunk 沿**静态** import 递归出来的集合"，实测 11 个 chunk / **198.1KB gzip**（预算线 600KB）。APK 里 WebView 不压缩本地资源，所以这个数直接就是手机首次进 App 的下载 + 解析量。
 
 ---
 
@@ -353,12 +353,14 @@ node scripts/device-eval.mjs back
 - **全站两轮质量优化**（`4f45167` / `e33a780`）：`useStableShuffle` 统一洗牌、快速闪卡状态机三连修、断点按词书分键、屏蔽词全路径过滤、写作 reset/换题打断在途批改流、拼写错词重练入口 + 听写语速滑杆、跟读 100% 完成成就横幅、复习检测键盘弹窗守卫、危险操作两段确认、四个只增不减的缓存 FIFO 封顶 + 键迁移（`capped-cache` / `colloc-ai-cache`）、模式首页角标订阅刷新、贪婪正则换 `extractJson`、emoji 图标换 lucide。
 - **系统层**：Android 15+ edge-to-edge 适配（`viewport-fit=cover` + safe-area 工具类）、词库 5,909 处 U+FFFD 乱码清理、品牌视觉资产重建（`gen-app-brand.ps1`）、真机 CDP 通道 `device-eval.mjs`。
 - **反馈链路对接补全（2026-09-28）**：入口挂上 `Header`，后端改为「先 KV 留档、再可选推飞书」，返回三档真实状态（`delivered`/`stored`/`failed`），失败可在历史里重试；新增 `src/lib/app-env.ts` 统一版本与平台上报，新增守卫 `npm run verify:feedback-loop`（53 断言，含正对照）。详见 §3.4。
-- **首屏下载体检与瘦身（2026-09-29）**：从**产物**反查入口静态依赖图，抓到三处"运行时明明不执行、却压进入口"的重依赖 ——
+- **首屏下载体检与瘦身（2026-09-29）**：从**产物**反查入口静态依赖图，抓到四处"运行时明明不执行、却压进入口"的重依赖 ——
   ① `vite.config` 给 recharts/d3 与 react-markdown 写了强制 `manualChunks`，效果**正好相反**：被强制归组的 chunk 变成入口静态依赖，
   全站只有 `/progress` 用得着的图表库（111KB gzip）与只有几页用得着的 Markdown 渲染器（45KB）每条路由都得下载；
   ② `src/index.tsx` 同步 `require("@lark-apaas/client-toolkit-lite")` —— 只在 miaoda 平台内才用，
   但把 zone.js（两个版本）、axios、crypto-js、@opentelemetry、lodash 全量一起拖进入口（入口 chunk 301KB gzip）。
-  三处改完：**首屏必需 JS 539.7KB → 237.7KB gzip（-56%）**，冷加载 `/` 750KB → 336KB、`/vocabulary` 800KB → 392KB、
+  ③ 同一条规则家族里的 `vendor-motion`（framer-motion）：全站只有词汇页与学习记录页用它，而且都走
+  `src/lib/lazy-framer-motion.tsx` 的动态 import —— 删掉规则后动画库真的只在进这两页时才拉。
+  四处改完：**首屏必需 JS 539.7KB → 198.1KB gzip（-63%）**，冷加载 `/` 750KB → 336KB、`/vocabulary` 800KB → 392KB、
   `/articles` 1055KB → 642KB；图表与渲染器改为**用到时才拉**（已实测切到「学习统计」tab 才请求 ProgressCharts 110KB、
   点「更新日志」才请求渲染器 45KB）。新增守卫 `npm run verify:bundle-budget`（8 断言 + 两条"确实还在产物里"的正对照，
   把旧 manualChunks 规则加回去立刻报红）。

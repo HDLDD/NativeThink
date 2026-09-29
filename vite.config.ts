@@ -211,10 +211,11 @@ export default defineConfig({
           if (id.includes('node_modules/lucide-react/')) {
             return 'vendor-icons';
           }
-          // Framer Motion (~130KB) — animations
-          if (id.includes('node_modules/framer-motion') || id.includes('node_modules/motion')) {
-            return 'vendor-motion';
-          }
+          // Framer Motion —— 同 recharts / react-markdown：**不写强制 manualChunks**。
+          // 这条规则会让 'vendor-motion' 变成入口的静态依赖，而全站只有词汇页与学习记录页
+          // 的两个组件用它（且都走 src/lib/lazy-framer-motion.tsx 的动态 import）。
+          // 实测：删掉规则后首屏必需 JS 从 237.7KB 降到 198.1KB gzip（-39.6KB），
+          // 动画库改为真正按需加载；守卫见 npm run verify:bundle-budget。
           // Recharts / d3 —— **故意不给它单独 manualChunks**。
           // 加了这条规则反而害事：被强制归进 'vendor-charts' 的模块会让**入口**静态依赖这个 chunk，
           // 于是每条路由首屏都要多拉 111KB（压缩后）的图表库，而全站只有 /progress 用得到它。
