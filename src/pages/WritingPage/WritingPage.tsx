@@ -827,11 +827,7 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
           </TabsList>
 
           <TabsContent value="all" className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {allPrompts.map((prompt) => (
-                <PromptCard key={prompt.id} prompt={prompt} onSelect={startWriting} isAi={prompt.id.startsWith('ai_')} onDelete={handleDeletePrompt} />
-              ))}
-            </div>
+            <PromptGrid list={allPrompts} onSelect={startWriting} onDelete={handleDeletePrompt} />
           </TabsContent>
           {['narrative', 'opinion', 'workplace', 'essay'].map((cat) => {
             const catMap: Record<string, string> = {
@@ -842,11 +838,7 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
             };
             return (
               <TabsContent key={cat} value={cat} className="mt-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {allPrompts.filter((p) => p.category === catMap[cat]).map((prompt) => (
-                    <PromptCard key={prompt.id} prompt={prompt} onSelect={startWriting} isAi={prompt.id.startsWith('ai_')} onDelete={handleDeletePrompt} />
-                  ))}
-                </div>
+                <PromptGrid list={allPrompts.filter((p) => p.category === catMap[cat])} onSelect={startWriting} onDelete={handleDeletePrompt} />
               </TabsContent>
             );
           })}
@@ -1094,6 +1086,43 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * 题目网格 —— 默认只渲染前 12 张卡。
+ *
+ * 为什么：题库有 100 道（不是"少量题目"），以前"全部题目"面板一次性把 100 张卡全渲染出来，
+ * 手机上页面高达 17,604px（约 21 屏），挂载期主线程长任务合计 1055ms（4× CPU 节流实测）。
+ * 折叠不删内容：点"展开其余 N 题"仍然一次看到全部，收起也还在。
+ */
+function PromptGrid({
+  list,
+  onSelect,
+  onDelete,
+}: {
+  list: IWritingPrompt[];
+  onSelect: (p: IWritingPrompt) => void;
+  onDelete?: (e: React.MouseEvent, id: string) => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? list : list.slice(0, 12);
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {visible.map((prompt) => (
+          <PromptCard key={prompt.id} prompt={prompt} onSelect={onSelect} isAi={prompt.id.startsWith('ai_')} onDelete={onDelete} />
+        ))}
+      </div>
+      {list.length > 12 && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          className="mt-4 w-full py-3 rounded-2xl border-2 border-dashed border-border text-xs font-black text-muted-foreground hover:border-[#00B894]/50 hover:text-ink-teal transition-colors"
+        >
+          {showAll ? '收起，只看前 12 题' : `展开其余 ${list.length - 12} 题（共 ${list.length} 题）`}
+        </button>
+      )}
+    </>
   );
 }
 

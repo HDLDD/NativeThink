@@ -1,0 +1,60 @@
+/**
+ * verify-list-scaling.mjs — 「一屏渲染不完的列表必须折叠/分页」的回归守卫。
+ *
+ * 起因（2026-09-29 性能体检）：写作页题库有 **100 道**，"全部题目"面板一次性全渲染 ——
+ * 实测手机视口下页面高 17,604px（约 21 屏），挂载期主线程长任务 4 个合计 1055ms（4× CPU 节流）。
+ * 改成默认 12 张 + "展开其余 N 题"后：页高 2,634px（-85%），长任务 2 个合计 118ms（-89%），
+ * 且 100 题仍然一次点击全部可达（折叠不是删内容 —— 用户入口不许被削弱）。
+ *
+ * 本脚本守的是源码级契约（渲染路径 + 上限常量），真实数字由无头 Chrome 量（见交接手册）。
+ *
+ * 用法：node scripts/verify-list-scaling.mjs
+ */
+import { readFileSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const read = (p) => readFileSync(join(ROOT, p), 'utf8');
+
+let pass = 0, fail = 0;
+const failures = [];
+const check = (cond, label, detail) => {
+  if (cond) pass++; else { fail++; failures.push(label + (detail ? ` — ${detail}` : '')); }
+};
+
+/* ── 写作页题库 ── */
+{
+  const src = read('src/pages/WritingPage/WritingPage.tsx');
+  const prompts = (src.match(/\bid:\s*['"]/g) || []).length;
+  check(prompts >= 100, `脚手架自检：题库确实有 ${prompts} 道（少于 100 说明解析失效或题库缩了）`);
+
+  // 抓组件体：从 PromptGrid 到下一个顶层 function（非贪婪的 \n} 会被内部提前截断）
+  const gStart = src.indexOf('function PromptGrid(');
+  const gEnd = src.indexOf('\nfunction ', gStart + 10);
+  const grid = gStart >= 0 && gEnd > gStart ? src.slice(gStart, gEnd) : '';
+  check(grid.length > 200, `脚手架自检：抓到 PromptGrid 组件体（${grid.length} 字符）`);
+  check(/list\.slice\(0, 12\)/.test(grid), '题卡默认只渲染前 12 张');
+  check(/showAll \? list : list\.slice/.test(grid), '展开后渲染完整列表（折叠不是丢内容）');
+  check(/展开其余 \$\{list\.length - 12\} 题/.test(grid) && /收起/.test(grid), '有"展开其余 N 题"与"收起"两个入口');
+
+  // 源码里只有两个字面 TabsContent 块（四个分类由 .map 生成），两处都必须走 PromptGrid
+  const panels = (src.match(/<TabsContent[\s\S]{0,400}?<\/TabsContent>/g) || []).filter((b) => /PromptCard|PromptGrid/.test(b));
+  check(panels.length === 2, `脚手架自检：抓到 ${panels.length} 个字面题目面板（全部 + 分类模板）`);
+  check(panels.every((b) => /<PromptGrid/.test(b)), '全部题目与分类模板面板都走 PromptGrid（没有漏网的全量 map）');
+  check(!/allPrompts\.map\(/.test(src) && !/catMap\[cat\)\]\.map\(/.test(src),
+    '正对照：不再存在对整份题库的直接 .map 渲染');
+}
+
+/* ── 词库浏览分页（同一个不变量的另一处，防止被改回全量渲染） ── */
+{
+  const src = read('src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx');
+  check(/pagedWords = useMemo\(\s*\(\) => filteredWords\.slice\(wordPage \* browsePageSize/.test(src),
+    '词库浏览仍按页取词（不是把整本书一次性渲染）');
+  check(/setWordPage\(0\); \}, \[filteredWords\.length\]\)/.test(src),
+    '筛选条件变化时回到第一页（否则会停在空白页）');
+}
+
+console.log('');
+console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
+if (fail) { failures.slice(0, 20).forEach((f) => console.log('  ✗ ' + f)); process.exit(1); }

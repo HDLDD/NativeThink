@@ -86,6 +86,9 @@ node scripts/verify-vocab-caches.mjs
 # 窄视口浮层契约（改 ui/dialog 基座、朗读设置/AI 设置面板结构后必跑）
 node scripts/verify-overlay-fit.mjs
 
+# 长列表折叠/分页契约（改写作题库面板、词库浏览分页后必跑）
+node scripts/verify-list-scaling.mjs
+
 # 首屏下载预算（改 vite.config 的 manualChunks、壳里新增静态 import/require 后必跑；先 build:web）
 node scripts/verify-bundle-budget.mjs
 
@@ -246,6 +249,7 @@ docs/                       # 设计文档 / PRODUCT-SPEC
 | 为一个纯函数下载整座书库 | 数据模块（`books.ts` 604KB）里混着工具函数，别的模块 `import { fn } from './books'` 就把整包拖进依赖图 | 纯函数拆到独立模块（`book-clean.ts`）；列表只要元数据（`books-meta.ts`，由 `scripts/gen-books-meta.cjs` 生成）；`verify:books-meta` 第 ⑤ 节钉住 |
 | 顶部内容被一条空条遮住 | 无内容但带 `bg-*` 的 sticky 元素仍占位遮挡 | 只在有内容时渲染（`{tab === 'browse' && (...)}`） |
 | 向导/设置"选完了却没开始" | 状态确实写回了（tab/level），但视图另由 `immersed` 一类开关把关，用户被留在原列表上 | 完成路径与"点卡片进入"走同一个函数（`handleTabChange` + `setImmersed(true)`）；换书这类保持上下文的操作则**不要**动那个开关 |
+| 一屏渲染不完的列表 | 题库/词表这类上百条的列表一次性全渲染（写作页 100 题 → 手机页高 18,058px、挂载长任务 1055ms） | 默认只渲染前 N 条 +「展开其余」（折叠不许等于丢内容）；`npm run verify:list-scaling` 守 |
 | 图表数值压住标题 | 容器高度装不下「值+柱+轴」三层 | 容器高度 ≥ 三层实测高度 |
 | 弹窗打开时按 Esc 连带退出当前流程 | Radix 在 document 冒泡阶段**同步 flush** 关弹窗，window 冒泡监听已看不到 dialog | 键盘监听用**捕获阶段** `addEventListener('keydown', fn, true)` |
 | 维基百科加载失败 | 网络限制 | `origin=*` + `AbortSignal.timeout(10000)` |

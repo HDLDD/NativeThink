@@ -15,7 +15,7 @@
 | 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
 | 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-09 两轮全站质量优化已把拼写/跟读/写作/对话/语块也扫过一遍 |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 9 个 `scripts/verify-*.mjs` 断言脚本（2026-09-29 全绿：loading 45 · books-meta 213 · vocab-cards 254 · vocab-caches 21 · tts-progress 6175 · tts-hardening 15 · feedback-loop 56 · overlay-fit 16 · bundle-budget 10） |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 10 个 `scripts/verify-*.mjs` 断言脚本（2026-09-29 全绿：loading 45 · books-meta 213 · vocab-cards 254 · vocab-caches 21 · tts-progress 6175 · tts-hardening 15 · feedback-loop 56 · overlay-fit 16 · bundle-budget 10 · list-scaling 10） |
 | 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
 | 最容易踩的坑 | ①改动 TTS 切片上限会让云端链路静默失败 ②ref 不随组件重挂载归零 ③`public/` 不能放大文件 ④推送用 SSH over 443 ⑤洗牌列表 + 下标定位当前题必须用 `use-stable-shuffle`（否则当前题悄悄漂移） |
@@ -185,6 +185,7 @@ npm run verify:vocab-caches      # 词汇缓存基建契约（capped-cache / col
 npm run verify:feedback-loop     # 反馈链路契约（挂载点 + 三档状态 + 后端 KV/飞书替身真实执行，56 断言）
 npm run verify:overlay-fit       # 窄视口浮层契约（Dialog 基座夹高度 + 朗读/AI 设置内部滚动，16 断言）
 npm run verify:bundle-budget     # 首屏下载预算 + 平台 SDK 禁止静态 import（从产物反查入口静态依赖图，10 断言；跑前必须先 build:web）
+npm run verify:list-scaling      # 长列表必须折叠/分页（写作题库 100 题默认 12 张 + 词库浏览分页，10 断言）
 npm run verify:tts-progress      # 朗读切片/进度（6175 断言）
 node scripts/verify-tts-hardening.mjs        # TTS 降级/预合成守卫 + 设置面板网络卫生（15 项）
 npm run check:tts-voices         # 音色与模型资产一致性（package:apk 前置）
@@ -357,17 +358,21 @@ node scripts/device-eval.mjs back
 - **全站两轮质量优化**（`4f45167` / `e33a780`）：`useStableShuffle` 统一洗牌、快速闪卡状态机三连修、断点按词书分键、屏蔽词全路径过滤、写作 reset/换题打断在途批改流、拼写错词重练入口 + 听写语速滑杆、跟读 100% 完成成就横幅、复习检测键盘弹窗守卫、危险操作两段确认、四个只增不减的缓存 FIFO 封顶 + 键迁移（`capped-cache` / `colloc-ai-cache`）、模式首页角标订阅刷新、贪婪正则换 `extractJson`、emoji 图标换 lucide。
 - **系统层**：Android 15+ edge-to-edge 适配（`viewport-fit=cover` + safe-area 工具类）、词库 5,909 处 U+FFFD 乱码清理、品牌视觉资产重建（`gen-app-brand.ps1`）、真机 CDP 通道 `device-eval.mjs`。
 - **反馈链路对接补全（2026-09-28）**：入口挂上 `Header`，后端改为「先 KV 留档、再可选推飞书」，返回三档真实状态（`delivered`/`stored`/`failed`），失败可在历史里重试；新增 `src/lib/app-env.ts` 统一版本与平台上报，新增守卫 `npm run verify:feedback-loop`（53 断言，含正对照）。详见 §3.4。
-- **首屏下载体检与瘦身（2026-09-29）**：从**产物**反查入口静态依赖图，抓到四处"运行时明明不执行、却压进入口"的重依赖 ——
+- **首屏下载体检与瘦身（2026-09-29）**：从**产物**反查入口静态依赖图，抓到五处"运行时明明不执行、却压进入口"的重依赖 ——
   ① `vite.config` 给 recharts/d3 与 react-markdown 写了强制 `manualChunks`，效果**正好相反**：被强制归组的 chunk 变成入口静态依赖，
   全站只有 `/progress` 用得着的图表库（111KB gzip）与只有几页用得着的 Markdown 渲染器（45KB）每条路由都得下载；
   ② `src/index.tsx` 同步 `require("@lark-apaas/client-toolkit-lite")` —— 只在 miaoda 平台内才用，
   但把 zone.js（两个版本）、axios、crypto-js、@opentelemetry、lodash 全量一起拖进入口（入口 chunk 301KB gzip）。
   ③ 同一条规则家族里的 `vendor-motion`（framer-motion）：全站只有词汇页与学习记录页用它，而且都走
   `src/lib/lazy-framer-motion.tsx` 的动态 import —— 删掉规则后动画库真的只在进这两页时才拉。
-  四处改完：**首屏必需 JS 539.7KB → 198.1KB gzip（-63%）**，冷加载 `/` 750KB → 336KB、`/vocabulary` 800KB → 392KB、
+  五处改完：**首屏必需 JS 539.7KB → 198.1KB gzip（-63%）**，冷加载 `/` 750KB → 336KB、`/vocabulary` 800KB → 392KB、
   `/articles` 1055KB → 642KB；图表与渲染器改为**用到时才拉**（已实测切到「学习统计」tab 才请求 ProgressCharts 110KB、
   点「更新日志」才请求渲染器 45KB）。新增守卫 `npm run verify:bundle-budget`（8 断言 + 两条"确实还在产物里"的正对照，
   把旧 manualChunks 规则加回去立刻报红）。
+- **长列表折叠（2026-09-29）**：写作页题库其实有 **100 道**（不是"少量题目"），"全部题目"面板一次性全渲染 ——
+  手机视口下页面高 18,058px（约 21 屏），挂载期长任务 4 个合计 1055ms（4× CPU 节流）。
+  现在默认渲染前 12 张 +「展开其余 88 题」（收起也在）：页高 **2,634px（-85%）**、长任务 **2 个合计 118ms（-89%）**，
+  点一下仍能看到全部 100 题（折叠不是删内容）。守卫 `npm run verify:list-scaling`（10 断言，两处变异验红）。
 - **词汇深度首启不再预载九本（2026-09-29）**：`selectedLevel` 默认 'all' 时挂载即预载 9 本书连 detail ——
   全新 profile 进 `/vocabulary` 就是 18 个词库 chunk / 3.16MB / 15 个长任务合计 1.6s，而用户连一本都还没选。
   现在没 `setupDone` 一律不预载，模式子树也等 `dataReady` 才挂载（顺带修掉"数据晚到但 memo 不重算 → 本书进度整块消失"）。

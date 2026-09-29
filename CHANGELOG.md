@@ -7,6 +7,7 @@
 
 
 ## 2026-09-29
+- perf(ai-pages): 平台 AI 插件客户端改按需 —— 思维/语块/对话/写作各少下载 160KB (`da4b272`)
 - build(apk): versionCode 75 / 2.0.30 —— 含本轮全部性能与交互改动，已打包待装机 (`809b1ae`)
 - docs(help): 应用内帮助中心按实况重写 —— 九档词库 / 出厂免费额度 / 数据去向都说清了 (`f3f2e4b`)
 - perf(wordbank): IDB 写成功就不再镜像 localStorage —— 省掉每次加载词书的几 MB 同步 stringify (`dbe729d`)
