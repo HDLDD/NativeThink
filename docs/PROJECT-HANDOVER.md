@@ -1,8 +1,8 @@
 # NativeThink 项目交接手册（Agent Handover）
 
 > 面向**接手的 AI agent / 新同事**：只读这一份就能开工。
-> 最后校准：2026-09-29（已装机 APK 2.0.28 / versionCode 73；本轮词汇向导改动**尚未打包**，下一版 74 / 2.0.29）。
-> 相关文档：`AGENTS.md`（日常约定速查）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
+> 最后校准：2026-09-29（线上 APK 已装机 2.0.28 / versionCode 73；**已打包 2.0.31 / versionCode 76 但因设备断线尚未装机验证**，真机那段走查仍欠）。
+> 相关文档：`AGENTS.md`（**索引**：跨模块约定 + 模块文档导航）、[`docs/modules/`](./modules/)（**每模块一篇：功能 / 实现方法 / 注意事项，带 `文件:行号`**）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
 
 ---
 
@@ -15,7 +15,8 @@
 | 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
 | 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-09 两轮全站质量优化已把拼写/跟读/写作/对话/语块也扫过一遍 |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 10 个 `scripts/verify-*.mjs` 断言脚本（2026-09-29 全绿：loading 45 · books-meta 213 · vocab-cards 254 · vocab-caches 21 · tts-progress 6175 · tts-hardening 15 · feedback-loop 56 · overlay-fit 16 · bundle-budget 10 · list-scaling 10） |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 11 个 `scripts/verify-*.mjs` 断言脚本（2026-09-29 全绿：loading 45 · books-meta 222 · vocab-cards 254 · vocab-caches 21 · tts-progress 6175 · tts-hardening 15 · feedback-loop 56 · overlay-fit 16 · bundle-budget 10 · list-scaling 10）。**typecheck 是弱守卫**（继承 `strict:false`）；守卫覆盖不到的页面清单见 [modules/verification.md](./modules/verification.md) |
+| 改某个模块前 | 读 [`docs/modules/`](./modules/) 里对应那一篇 —— 功能、实现方法、以及**逐条读代码核实过**的注意事项（本手册与 AGENTS.md 的若干旧说法在那里被推翻并已修正） |
 | 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
 | 最容易踩的坑 | ①改动 TTS 切片上限会让云端链路静默失败 ②ref 不随组件重挂载归零 ③`public/` 不能放大文件 ④推送用 SSH over 443 ⑤洗牌列表 + 下标定位当前题必须用 `use-stable-shuffle`（否则当前题悄悄漂移） |

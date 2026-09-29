@@ -68,8 +68,8 @@
 | `__nativethink_quickcard_session_<level>` | 快速闪卡断点（含作答/翻面/暂停） | `quickcard-history.ts:233-237` |
 | `__nativethink_quickcard_runs` / `_pending` | 留档（≤20 轮、单轮 ≤300 词）与余数桶 | `quickcard-history.ts:18-25,129,164-206` |
 | `__nativethink_daily_quota_<level>` / `__nativethink_daily_vocab_count` | 每本今日量 / 全局默认量 | `use-word-learning.ts:23-25,166-181` |
-| `__nativethink_vocab_autospeak` | 四模式共用的自动发音开关 | `DailyLearningMode.tsx:34`、`FlashcardMode.tsx:33` |
-| `__nativethink_level_memory` | 浏览位置记忆 —— **故意用裸 `localStorage`**（不随登录前缀变，见 AGENTS.md「刷新后记忆丢失」那条） | `DeepVocabularyPage.tsx:322-328` |
+| `__nativethink_vocab_autospeak` | 自动发音开关，**默认开**（只有显式存 `'0'` 才算关）。⚠️ 实际生效的是**复习检测 / 每日学习 / 语块复习**三处 —— **快速闪卡不读它**（`QuickCardMode.tsx:300-306` 在 `inSession` 时无条件 `tts.speak`） | `FlashcardMode.tsx:33,64-67`、`DailyLearningMode.tsx:34,219-221`、`ChunkTrainingPage.tsx:100,373-379` |
+| `__nativethink_level_memory` | 浏览位置记忆 —— **故意用裸 `localStorage`**（不经 safeStorage 就不会因登录前缀变化而"隐身"，也因此不参与云同步，见 [storage-and-stats.md](./storage-and-stats.md) §3.2/§3.4） | `DeepVocabularyPage.tsx:322-328`、`wordbank.ts:477` |
 
 ## 收藏 / 生词本 / 助记
 

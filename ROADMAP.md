@@ -1,7 +1,7 @@
 # NativeThink 开发路线
 
-> 校准：2026-09-29（已装 APK **2.0.28 / versionCode 73**；本轮词汇向导改动待打包成 74 / 2.0.29）。
-> 现状细节与坑表见 [`docs/PROJECT-HANDOVER.md`](./docs/PROJECT-HANDOVER.md)，日常约定见 [`AGENTS.md`](./AGENTS.md)，产品/UI 规范见 [`docs/PRODUCT-SPEC.md`](./docs/PRODUCT-SPEC.md)。
+> 校准：2026-09-29（已装机 APK **2.0.28 / versionCode 73**；**2.0.31 / versionCode 76 已打包、因设备断线尚未装机**）。
+> 现状细节与坑表见 [`docs/PROJECT-HANDOVER.md`](./docs/PROJECT-HANDOVER.md)，跨模块约定与文档导航见 [`AGENTS.md`](./AGENTS.md)，**每模块的功能/实现/注意事项见 [`docs/modules/`](./docs/modules/)**，产品与 UI 规范见 [`docs/PRODUCT-SPEC.md`](./docs/PRODUCT-SPEC.md)。
 > **重点研发的两条线是 APK 与网站**（Electron 桌面只是顺带产物）；站点 `functions/api/*` 同时是 APK 的线上后端 —— APK 内 `/api/*` 被重写到 `https://nativethink.pages.dev`。
 
 ---
@@ -26,8 +26,19 @@
 5. **开通反馈通道**：链路已接好（入口在顶栏，后端先写 KV 留档、再推飞书），但线上 Pages 项目目前只有 `JWT_SECRET` 一个 secret，实测 POST 仍回 503 `Webhook not configured`。加 `FEISHU_WEBHOOK_URL`（飞书群机器人）和/或确认 KV 绑定生效，用户看到的才从「暂未送出」变成「已送达」。
 6. **文档债（帮助中心）**：`HelpGuide.tsx` 的过期口径已于 2026-09-29 修正并钉进 `verify:books-meta` 第 ⑥ 节；仍待做的是把里面偏长的"各模块介绍"逐条对着现在的功能面再过一遍。
 7. **品牌字体要不要自托管**：`fonts.googleapis.com` 对大陆用户不可达 —— 线上每条路由一次资源错误、Plus Jakarta Sans / Noto Sans SC 从未生效（非阻塞 + 系统字兜底，所以只是不好看）。选项见交接手册 §9 第 16 条。
-7. 顺手项：`.githooks/post-commit` 插入日期标题时带固定空行（`CHANGELOG.md` 头部已堆 4 行，无害）。
-8. **真机补验 2.0.28**：词书词数（六级 7,404 / 考研能开卡）与朗读设置手指滑到底，目前只有本机证据。
+8. 顺手项：`.githooks/post-commit` 插入日期标题时带固定空行（`CHANGELOG.md` 头部已堆 4 行，无害）。
+9. **真机补验 2.0.28**：词书词数（六级 7,404 / 考研能开卡）与朗读设置手指滑到底，目前只有本机证据。**另：2.0.31 / versionCode 76 已打包但设备断线未装机**（`force-stop` 归位也没做成）。
+10. **文档写作期间新核实、尚未修的缺陷**（按"用户能感觉到"排序，每条都在 `docs/modules/` 里有 `文件:行号` 与复现路径）：
+    - **跟读删 AI 追加句会弄乱完成标记**，100% 横幅与重置按钮随之消失 —— 同一个"句子序号"在三处含义不同（[shadowing.md §3.1](./docs/modules/shadowing.md)）。
+    - **备份从来不含整书译文缓存**：`backup.ts` 的 IDB 分支从 localStorage 里找 `booktrans-*`，而那些键只在 IndexedDB —— `idbCount` 恒为 0。正解可照抄 `ProgressPage.tsx:136-140`（用 `BOOK_META` 拿 id）。
+    - **云同步下行会把刚下载的数据再推回去**（回声），且 5 分钟轮询重复一次；只有 3 个 hook 订阅下行事件，其余拿陈旧内存态，一写就把新值覆盖回去（[cloud-sync.md](./docs/modules/cloud-sync.md)）。
+    - **同步失败完全静默**：三个空 `catch`、`syncing`/`lastSync` 无人消费 —— 全站 `<Toaster />` 已就位，补提示的成本是一行。
+    - **四处把「AI 服务不可用」报成「格式异常」**（首页每日一句最靠近用户眼睛），另有一处走禁用的贪婪正则；**跟读的两处分析不判空 → 面板一片空白且无提示**（`use-ai` 已吞错，本页 catch 永不触发）。
+    - **语块替换训练在 `useMemo` 里洗牌**（违反 `use-stable-shuffle` 规定）→ AI 生成/删除语块即整套题漂移；**phrases tab 一次铺全部 748 条**、**跟读两栏全量渲染**是仅剩的两个长列表。
+    - **对话页 `mountedRef` 在 StrictMode 双挂载后恒 false** → dev 下对话永远空白（生产不受影响，但会把人带偏去查 AI 层）。
+    - **快速闪卡不读 `__nativethink_vocab_autospeak`**：词汇里关了自动朗读，进快速闪卡照样出声（要么补读取，要么统一文案说"三处"）。
+    - 反馈历史把 `stored` 显示成「已送达」，与提交时的诚实 toast 自相矛盾；**拼写批量加句缺 `!result.trim()` 前置**。
+    - 文案口径：设置页「Qwen2.5-0.5B（约 400MB）」磁盘实为 750MiB；`使用攻略.md:60` 把拼写写成四种练法（实为 2 mode × 2 音频）。
 
 
 ## 打包
