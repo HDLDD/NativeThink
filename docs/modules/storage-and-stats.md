@@ -64,7 +64,7 @@
 
 ### 3.2 学习数据实际都走 `safeStorage`
 
-AGENTS.md 坑表里那句「用户学习数据用原生 `localStorage` 或带事件同步的 hook」是**旧建议，与现状不符**。实测：`use-learning-stats` `use-word-learning` `use-spelling-learning` `use-favorites` `quickcard-history` `custom-words` `word-notes` `use-sentence-review` `tts-settings` `reader-highlight` **全部走 `safeStorage`**（各自 `grep -c 'safeStorage\.'` ≥ 2，裸 `localStorage` 为 0）。"带事件同步"那半句仍然成立，而且正是进度不丢的机制（§2.2）。
+AGENTS.md **旧版**坑表里那句「用户学习数据用原生 `localStorage` 或带事件同步的 hook」是与现状不符的旧建议（2026-09-29 改造索引时已把这条改成"新键先决定走哪一侧"）。实测：`use-learning-stats` `use-word-learning` `use-spelling-learning` `use-favorites` `quickcard-history` `custom-words` `word-notes` `use-sentence-review` `tts-settings` `reader-highlight` **全部走 `safeStorage`**（各自 `grep -c 'safeStorage\.'` ≥ 2，裸 `localStorage` 为 0）。"带事件同步"那半句仍然成立，而且正是进度不丢的机制（§2.2）。
 
 真正要防的是**前缀变化**：`getUserId()` 在平台 user 出现后会变（`:66-82`），而 `_prefix` 一算出就缓存整会话（`:94-100`）→ 会话中途登录，前缀仍是旧的，看起来"记忆丢失"。已有的两道缓解都有限：`tryMigrate` 只搬旧格式 `__miaoda_<appId>__:`（`:123-140`），`recoverAnonIdFromStorage` 只匹配 `__global__` 标记（`:31-44`），**平台登录态（带真实 appId/userId）的前缀不在恢复范围内**。新增用户数据键时优先想清楚它挂在哪一侧，不要指望迁移。
 

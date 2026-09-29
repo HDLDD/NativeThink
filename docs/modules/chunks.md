@@ -20,13 +20,14 @@
 
 合并池 `allChunks`（`:257`）= 内置 + `__nativethink_custom_chunks`。SRS 走 `src/lib/use-phrase-learning.ts`（键 `__nativethink_phrase_learning`、`__nativethink_phrase_daily_quota`，`:6-7`）。
 
-## 3. AI 调用点：8 处，只有 3 处守住了空串前置
+## 3. AI 调用点：9 处（8 `aiChat` + 1 `aiStream`），只有 4 处守住了空串前置
 
 | 位置 | 用途 | 返回 | 判空 |
 |------|------|------|------|
 | `:680` | 接龙判定 | 纯文本，**要求首行 PASS/FAIL**（`:725-726` 取首行，非 FAIL 即通过） | — |
 | `:229` | 例句翻译 | 纯文本 | ✅ `:236-238` |
 | `:298` | 短语例句 | JSON | ✅ `:305` 判空 → `:306` `extractJson` |
+| `:793` | **批量生成语块** | JSON 数组 | ✅ `:822` 判空 → `:823` `extractJson` |
 | `:855` | 选项讲解 | 纯文本 | ✅ `:874` |
 | `:887` | 生成例句 | JSON | ❌ `:900` 直接 `extractJson('')` → 抛「无法从 AI 返回中提取有效 JSON」→ `:912` 误报「AI 生成失败」 |
 | `:320` | 生成语块 | JSON | ❌ `:327` 直接 `extractJson`，且 `:328/:329` 重复守卫 |
@@ -58,7 +59,7 @@
 ## 6. 注意事项
 
 1. **两处违反「洗牌必须用 `use-stable-shuffle`」的硬规矩**：
-   - `:524` `const staticExercises = useMemo(() => generateReplacementExercises(allChunks), [allChunks])`，而 `generateReplacementExercises`（`:116-126`）内部有**三处** `Math.random()`（`:118` 选题、`:123` 选干扰项、`:124` 排选项）。`allChunks` 身份一变（新增自定义语块、AI 生成语块）就整套题重排 → **当前题漂移**，正是 AGENTS.md 坑表那条。对照：`:619` 的 chain tab 已经正确用了 `useStableShuffle` ✅。
+   - `:522` `const staticExercises = useMemo(() => generateReplacementExercises(allChunks), [allChunks])`，而 `generateReplacementExercises`（`:116-126`）内部有**三处** `Math.random()`（`:118` 选题、`:123` 选干扰项、`:124` 排选项）。`allChunks` 身份一变（新增自定义语块、AI 生成语块）就整套题重排 → **当前题漂移**，正是 AGENTS.md 坑表那条。对照：`:619` 的 chain tab 已经正确用了 `useStableShuffle` ✅。
    - `:512-520` `suggestPhrases` 在 `useMemo` 里手写 Fisher-Yates，且 deps 含 `phraseState.progress` → **学一个词，「随便看看」那 5 条就跳序**。
 2. **`toggleMemorized` 在 updater 内写 safeStorage**（`:558-562`）→ StrictMode 双调用写两遍。规则见 `capped-cache.ts:32-35`。
 3. **phrases tab 一次性铺全部 748+**（`:2221-2224` 按 A-Z 直接 map，无分页无虚拟列表）。library 有分页（`:580-586`），写作页也已折叠 —— **这是目前最大的未收敛长列表**，改它参照 `verify-list-scaling.mjs` 的断言形态补一条守卫。

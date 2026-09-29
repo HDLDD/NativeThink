@@ -243,7 +243,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 | 白屏 `Cannot access X before initialization` | TDZ：hook/const 声明顺序 | `useState`/`useRef`/`useMemo` 放到使用之前 |
 | 页面永远 loading | `setLoaded(true)` 在 try 内，出错不执行 | `finally { setLoaded(true) }` |
 | ref 记录"第一次对、之后静默失效" | **ref 不随组件重挂载归零** | 每轮开始显式清空。真实案例：`ConversationPage.tsx:151-152` 的 `mountedRef` 在 StrictMode 双挂载后恒 false → dev 下对话永远空白 |
-| 切 tab/退出/杀 App 后状态丢 | 切 Tab 卸载组件，state 随之消失 | 显式持久化 + 挂载后恢复（`Layout.tsx:123` 的 `key={pathname}` 会让每次导航都重挂载） |
+| 切 tab/退出/杀 App 后状态丢 | 切 Tab 卸载组件，state 随之消失 | 显式持久化 + 挂载后恢复（`Layout.tsx:122` 的 `key={location.pathname}` 会让每次导航都重挂载） |
 | 洗牌列表 + 下标定位当前题悄悄漂移 | `useMemo(() => shuffle(items), [items])` 依赖数组身份 | 用 `use-stable-shuffle.ts`；接入点索引加守卫 |
 | StrictMode 双调用使副作用翻倍 | setState updater 里再调 setState / 写 storage | 副作用提到事件层，updater 保持纯（`capped-cache.ts:32-35`） |
 | 首屏白背一坨永不执行的代码 | 给只用懒加载页面的库写强制 `manualChunks`，或壳里同步 `require` SDK —— 都会变成**入口 chunk 的静态依赖** | 删掉强制分块规则 / 改 `import()`；用 `npm run verify:bundle-budget` 从**产物**反查 |

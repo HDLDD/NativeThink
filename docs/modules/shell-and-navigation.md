@@ -74,7 +74,7 @@ AGENTS.md 说的"四件套"确实都还在，但**还有两处隐性要求**，�
 3. **预取发生在 hover/touch，不是 mount**，也不是 `<link rel=prefetch>`。所以"进页面慢"的第一嫌疑是被 `index.html` 的 modulepreload 与入口静态依赖图决定的，而不是这张表 —— 查首屏必须用 `npm run verify:bundle-budget`（从产物 BFS）。
 4. **别在壳里同步 `require` 任何平台 SDK**。`SafeShell` 以前就是同步 `require("@lark-apaas/client-toolkit-lite")`，让它成为入口 chunk 的静态依赖；改成动态 import 后四个 AI 路由各少下载 160KB。同一条规律也适用于 `manualChunks`（见 `docs/modules/build-release.md`）。
 5. **改 `SafeShell` 时把 hooks 全放在任何 early return 之前** —— 上次这被 pre-commit 的 `react-hooks/rules-of-hooks` 拦下（`useState`/`useEffect` 在 `if (!isMiaodaPlatform()) return` 之后就是违规）。不要用 `--no-verify` 绕过。
-6. **`<div key={location.pathname}>` 会让页面在导航时重挂载**（`Layout.tsx:123`）：组件内 state 全丢。任何"切 tab 回来还在"的需求都必须显式持久化（`usePageMemory` 或模块级状态），别指望组件内存 —— 这也是 AGENTS.md 坑表里「退出/切 tab/杀 App 后状态丢」的机制。
+6. **`<div key={location.pathname}>` 会让页面在导航时重挂载**（`Layout.tsx:122`）：组件内 state 全丢。任何"切 tab 回来还在"的需求都必须显式持久化（`usePageMemory` 或模块级状态），别指望组件内存 —— 这也是 AGENTS.md 坑表里「退出/切 tab/杀 App 后状态丢」的机制。
 7. **APK 的 `/api/*` 重写只在 `index.html:25-35`**：存在 `window.Capacitor` 时设 `window.__API_BASE__ = 'https://nativethink.pages.dev'` 并包裹 `window.fetch`。**只覆盖 `fetch`** —— 音频/图片类 URL 要自己读 `__API_BASE__` 拼接（`use-tts.ts:232-238`）。
 8. **`public/_redirects` 的顺序与语义不能想当然**：`/api/* /api/* 200` 必须先于 `/* /index.html 200`，否则函数请求会被 SPA 兜底吃掉（返回 HTML 200 而不是 JSON）。`/models/* /models/* 404` 也是刻意的：web 版没内置模型，404 让 transformers 回落远程源。`public/_headers` 的 COOP/COEP（`credentialless`）是多线程 WASM（离线模型）必需，去掉会让 wasm 线程失效。
 9. **`wrangler.toml` 里有真实 KV namespace id**（`id = "68391cb5…"`）。它是 binding 标识、不是密钥，但要清楚：**这个文件改错会让线上函数读不到 KV**，而本项目没有部署 workflow（`.github` 目录不存在），push 到 `main` 就由 Pages Git 集成构建上线。
