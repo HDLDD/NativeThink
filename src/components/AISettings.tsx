@@ -203,9 +203,15 @@ export default function AISettings() {
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl rounded-[32px] p-0 overflow-hidden">
+      {/*
+        窄视口守卫（2026-09-29 实测 393×600 上下各被裁 43px）：整块面板比视口高时，
+        Radix 用 translate-y-[-50%] 居中 → 标题和底部的「选用/测试」一起跑到视口外，
+        而模态框锁住了页面滚动，用户救不回来。做法与朗读设置一致：
+        外层夹住可用高度并竖排，标题固定，正文自己滚。
+      */}
+      <DialogContent className="max-w-3xl rounded-[32px] p-0 overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)]">
         {/* Header */}
-        <div className="p-6 border-b border-border bg-gradient-to-r from-emerald-50 to-indigo-50 dark:from-emerald-500/10 dark:to-indigo-500/10">
+        <div className="p-6 border-b border-border shrink-0 bg-gradient-to-r from-emerald-50 to-indigo-50 dark:from-emerald-500/10 dark:to-indigo-500/10">
           <DialogHeader>
             <DialogTitle className="text-xl font-black italic text-foreground flex items-center gap-2">
               <Sparkles className="size-5 text-ink-teal" />
@@ -220,9 +226,9 @@ export default function AISettings() {
           </DialogHeader>
         </div>
 
-        {/* 2xn Grid of provider cards */}
-        <div className="p-6 max-h-[60vh] overflow-y-auto">
-          <div className="grid grid-cols-2 gap-4">
+        {/* 2xn Grid of provider cards（手机上单列：393px 塞两列会把「智谱免费·出厂」压成竖排一字一行） */}
+        <div className="p-6 flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {ALL_PROVIDERS.map((provider) => {
               const cfg = PROVIDER_CONFIGS[provider];
               const st = states[provider];
