@@ -31,7 +31,7 @@
 10. **文档写作期间新核实、尚未修的缺陷**（按"用户能感觉到"排序，每条都在 `docs/modules/` 里有 `文件:行号` 与复现路径）：
     - ~~**跟读删 AI 追加句会弄乱完成标记**，100% 横幅与重置按钮随之消失~~（**已修**：索引换算收进 `src/lib/shadowing-progress.ts` 纯函数，删除路径只收合并索引；新增 `npm run verify:shadowing-completion` 23 断言，含"退回旧调用方式"的正对照 + 变异实测会红）。
     - ~~**跟读的两处分析不判空 → 面板一片空白且无提示**~~（**已修**，同一轮：`!result.trim()` 前置 + 诚实 toast，`verify:shadowing-completion` 静态守住两处都在）。
-    - **备份从来不含整书译文缓存**：`backup.ts` 的 IDB 分支从 localStorage 里找 `booktrans-*`，而那些键只在 IndexedDB —— `idbCount` 恒为 0。正解可照抄 `ProgressPage.tsx:136-140`（用 `BOOK_META` 拿 id）。
+    - ~~**备份从来不含整书译文缓存**~~（**已修**：`book-translation.ts` 新增 `dumpBookTranslationCache(id, maxBytes)`，键格式知识留在拥有它的模块里；`backup.ts` 按 `BOOK_META` + 导入书目逐本导出，封顶后如实标 `idbSkipped`。新增 `npm run verify:backup-idb` 16 断言，含"旧枚举方式拿到 0 个键"的正对照与变异实测红 5 条）。
     - **云同步下行会把刚下载的数据再推回去**（回声），且 5 分钟轮询重复一次；只有 3 个 hook 订阅下行事件，其余拿陈旧内存态，一写就把新值覆盖回去（[cloud-sync.md](./docs/modules/cloud-sync.md)）。
     - **同步失败完全静默**：三个空 `catch`、`syncing`/`lastSync` 无人消费 —— 全站 `<Toaster />` 已就位，补提示的成本是一行。
     - **四处把「AI 服务不可用」报成「格式异常」**（首页每日一句最靠近用户眼睛），另有一处走禁用的贪婪正则。（跟读那两处已随本轮修好）

@@ -41,13 +41,13 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 写作 `/writing` | [modules/writing.md](./docs/modules/writing.md) | 100 题 + AI 批改（Markdown 不是 JSON）；默认折叠 12 张 |
 | 句子学习 `/sentences` | [modules/sentence-lab.md](./docs/modules/sentence-lab.md) | 158 句语料、意群运行时定位；**主干判定三处索引不同源** |
 | 句子拼写 `/spelling` | [modules/spelling.md](./docs/modules/spelling.md) | 2×2 玩法、四条题目来源、断点键没按 level 分 |
-| 首页 / 记录 / 收藏 / 备份 | [modules/dashboard-progress-favorites.md](./docs/modules/dashboard-progress-favorites.md) | 每日一句、分项重置、收藏判重口径；**备份其实不含整书译文** |
+| 首页 / 记录 / 收藏 / 备份 | [modules/dashboard-progress-favorites.md](./docs/modules/dashboard-progress-favorites.md) | 每日一句、分项重置、收藏判重口径；整书译文随备份导出由 `verify:backup-idb` 守 |
 | 外壳与导航 | [modules/shell-and-navigation.md](./docs/modules/shell-and-navigation.md) | 启动顺序、双层 ErrorBoundary、预取时机、**新增页面实际是六处** |
 | 存储与学习统计 | [modules/storage-and-stats.md](./docs/modules/storage-and-stats.md) | 四套存储、safeStorage 前缀自愈、`addStudyMinutes` 真实语义、同步边界 |
 | 云同步与账号 | [modules/cloud-sync.md](./docs/modules/cloud-sync.md) | 两条上行口径不同、**下行回声再推回云端**、只有 3 个 hook 订阅下行、失败全静默 |
 | 反馈链路 | [modules/feedback.md](./docs/modules/feedback.md) | 本机优先 + 三档诚实结果 + KV/飞书双出路；限流记账时机 |
 | 构建与发布 | [modules/build-release.md](./docs/modules/build-release.md) | 脚本地图与重复 bump、**缺资产静默出残包**、APK 版本线与产物命名 |
-| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 12 个契约守卫 + 无头 Chrome/CDP + 真机通道 + 写守卫四条硬规矩 |
+| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 13 个契约守卫 + 无头 Chrome/CDP + 真机通道 + 写守卫四条硬规矩 |
 
 ---
 
@@ -109,6 +109,7 @@ node scripts/verify-overlay-fit.mjs               # 16   窄视口浮层契约
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
 node scripts/verify-list-scaling.mjs              # 10   长列表必须折叠/分页
 node scripts/verify-shadowing-completion.mjs      # 23   跟读完成标记的索引契约（纯函数真跑 + 接线）
+node scripts/verify-backup-idb.mjs                # 16   导出学习数据真的含整书译文
 npm run verify:feedback-loop                      # 56   反馈链路（后端 handler 用忠实替身真实执行）
 ```
 
@@ -281,7 +282,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 254 / 21 / 6175 / 15 / 56 / 16 / 10 / 10 / 23 + feedback-loop 56）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 254 / 21 / 6175 / 15 / 56 / 16 / 10 / 10 / 23 / 16 + feedback-loop 56）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`

@@ -807,6 +807,57 @@ export async function clearBookTranslation(bookId: string): Promise<void> {
   await idbDelete(manifestKeyOf(bookId));
 }
 
+/**
+ * 把某本书的整书翻译缓存导出成「IDB 键 → 值」的扁平映射，供备份使用。
+ *
+ * 为什么放在本模块而不是 backup.ts：**键格式是本模块的私有知识**。
+ * backup.ts 此前试图从 localStorage 里扫 `booktrans-*` 来枚举这本书译过哪些章 ——
+ * 而那些键只存在于 IndexedDB，一个都不在 localStorage 里，于是 `idbCount` 恒为 0，
+ * 「备份含整书译文」这句承诺从来没兑现过（详见 docs/modules/dashboard-progress-favorites.md §5.4）。
+ *
+ * 只按 manifest 里登记的章节走，不需要下载书正文；`maxBytes` 用于体积封顶，
+ * 超了就停并在 `skipped` 里如实说明（宁可少备份，也不要导出失败）。
+ */
+export interface ITranslationCacheDump {
+  /** IDB 键（`booktrans-<id>-ch<n>` / `booktrans-<id>-index`）→ 值 */
+  entries: Record<string, unknown>;
+  bytes: number;
+  /** 因超过 maxBytes 而没全部导出 */
+  skipped: boolean;
+}
+
+export async function dumpBookTranslationCache(
+  bookId: string,
+  maxBytes: number,
+): Promise<ITranslationCacheDump> {
+  const out: ITranslationCacheDump = { entries: {}, bytes: 0, skipped: false };
+  let manifest: ITranslationManifest | null = null;
+  try {
+    manifest = await idbGet<ITranslationManifest>(manifestKeyOf(bookId));
+  } catch { return out; }
+  if (!manifest || !Array.isArray(manifest.chapters) || manifest.chapters.length === 0) return out;
+
+  const put = (key: string, value: unknown): boolean => {
+    let size = 0;
+    try { size = JSON.stringify(value).length; } catch { return false; }
+    if (out.bytes + size > maxBytes) { out.skipped = true; return false; }
+    out.entries[key] = value;
+    out.bytes += size;
+    return true;
+  };
+
+  // 先放清单：恢复时靠它枚举章节，缺了就只能靠章节键名反解
+  put(manifestKeyOf(bookId), manifest);
+  for (const idx of manifest.chapters) {
+    if (!Number.isInteger(idx) || idx < 0) continue;
+    let arr: string[] | null = null;
+    try { arr = await idbGet<string[]>(chapterKeyOf(bookId, idx)); } catch { continue; }
+    if (!Array.isArray(arr) || arr.length === 0) continue;
+    if (!put(chapterKeyOf(bookId, idx), arr)) break;
+  }
+  return out;
+}
+
 /** 翻译统计：已译章节数 / 总章数（传入 book 时按实时切分精确统计整章完成度） */
 export async function getBookTranslationStats(
   bookId: string,

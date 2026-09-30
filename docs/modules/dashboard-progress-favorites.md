@@ -54,7 +54,7 @@ LEGACY_KEY      = __nativethink_favorites_v2     （裸 localStorage，读一次
 1. **首页的 AI 生成把「服务不可用」报成「格式异常」**，而且走的是禁用的贪婪正则：`DashboardPage.tsx:161` `result.match(/\{[\s\S]*\}/)`，`:162` 无匹配就 `toast.error('AI 返回格式异常')`。`use-ai.ts:82-85` 失败返回 `''`，`''.match(...)` 必然为 null → 用户看到"格式异常"但其实 Key 没配/服务挂了。同类站点见 `ai-services.md` §3.1。**这里同时违反两条规矩（不判空 + 不用 `extractJson`），是四处遗留里最靠近用户眼睛的一处。**
 2. **`MODULES` / `MODULE_COLORS` / `MODULE_NAMES` / `MODULE_PROGRESS_KEYS` 四份清单要靠人对齐**，其中 `MODULE_PROGRESS_KEYS`（`use-learning-stats.ts:70-80`）是白名单投影，漏了它新模块的进度会被 `mergeStats` **静默丢弃**。详见 `shell-and-navigation.md` §4。
 3. **重置类操作分模块、且大多要刷新才生效**。加新重置项时照 `handleResetReading` 的做法：先按 `localStorage` 键名扫一遍（`:128-133`，注意它匹配的是**含前缀的完整键名**，用 `k.includes(...)` / `k.endsWith(...)`），再单独处理 IndexedDB。
-4. **【已确认缺陷】备份实际上从来没包含整书翻译缓存。** `backup.ts` 文件头承诺「覆盖范围 2) IndexedDB 里的整书对照翻译缓存（最贵的可再生产物，重翻耗时数小时）」，但 `exportBackup()` 的 IDB 分支是这样找键的（`:43-49`）：
+4. ~~**【已确认缺陷】备份从来不含整书翻译缓存**~~ → **【已修，2026-09-30】** 留档备查：`exportBackup()` 原先这样找章节：
 
    ```
    for (const k of Object.keys(data)) {            // data = localStorage 里带前缀的应用键
@@ -62,9 +62,10 @@ LEGACY_KEY      = __nativethink_favorites_v2     （裸 localStorage，读一次
    }
    ```
 
-   `booktrans-*` **只存在于 IndexedDB**（`book-translation.ts` 只用 `idbSet`；全仓 grep 没有任何地方把它们镜像进 localStorage），所以 `manifestKeys` 恒为空 → `candidateKeys` 恒为空 → `idb` 恒为 `undefined`、`idbCount` 恒为 0。`:47` 那句注释「也从 IndexedDB 侧补齐」下面的代码并没有做这件事，而且 `idb.ts` 压根没有枚举键的 API（只有 `idbGet/idbSet/idbDelete/idbHas/idbClear`，`:41-126`）。
-   **后果**：重装 APK / 清数据后，几小时的整书对照翻译并不会随备份回来 —— 而 UI 的措辞（`:297`）只是"省略"了这个事实。
-   **可照抄的正解就在同仓库**：`ProgressPage.tsx:136-140` 的清理逻辑用 `BOOK_META` 拿到 22 本书的 id，再 `clearBookTranslation(b.id)` —— 备份侧完全可以按同一套 id 清单去 `idbGet('booktrans-<id>-index')` 再展开章节，而且用元数据模块不会为了拿 id 去下载 22 本书正文。
+   `booktrans-*` **只存在于 IndexedDB**，所以 `manifestKeys` 恒空 → `idb` 恒 `undefined`、`idbCount` 恒 0，`idb.ts` 也没有枚举键的 API（只有 `idbGet/idbSet/idbDelete/idbHas/idbClear`）。
+
+   现在的形态：`book-translation.ts` 新增 `dumpBookTranslationCache(bookId, maxBytes)`（**键格式知识留在拥有它的模块里**，按 manifest 登记的章节导出，含清单键本身）；`backup.ts` 用 `BOOK_META` + `loadImportedBooks()` 拿到随包 22 本与用户导入书的 id，逐本导出，累计到 `IDB_LIMIT_BYTES` 就停并如实标 `idbSkipped`。
+   **守卫：`npm run verify:backup-idb`（16 断言）** —— A 段用忠实 IDB 替身真跑导出函数（有缓存/无缓存/超上限/跨书隔离），并带"旧枚举方式在同一数据下拿到 0 个键"的正对照；B 段静态守接线，变异实测：把 IDB 分支改回旧的 `Object.keys(data)` 枚举会红 5 条。
 5. **`importBackup` 会覆盖同键**且不校验 `version`，也没有"合并"语义：拿旧备份恢复会把新进度回退。恢复前 UI 应该提示这一点。
 6. **收藏的判重是 `content + type`**，所以想给同一句英文做"跨模块统一收藏"需要显式设计，不是把 `type` 改一改就能合并 —— 历史数据已经按 type 分开了。
 7. **`use-achievements` 只在自身文件里读写**（`:5,121,135`），不订阅 `nativethink-sync-down`（订阅者只有 3 个，见 `cloud-sync.md`）→ 云同步下来的新成就要点开首页才重算。

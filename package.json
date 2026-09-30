@@ -34,7 +34,8 @@
     "verify:overlay-fit": "node scripts/verify-overlay-fit.mjs",
     "verify:bundle-budget": "node scripts/verify-bundle-budget.mjs",
     "verify:list-scaling": "node scripts/verify-list-scaling.mjs",
-    "verify:shadowing-completion": "node scripts/verify-shadowing-completion.mjs"
+    "verify:shadowing-completion": "node scripts/verify-shadowing-completion.mjs",
+    "verify:backup-idb": "node scripts/verify-backup-idb.mjs"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "^8.0.2",

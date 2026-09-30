@@ -11,7 +11,7 @@
  */
 
 import { safeStorage } from './safe-storage';
-import { idbGet, idbSet } from './idb';
+import { idbSet } from './idb';
 
 export interface IBackupFile {
   app: 'NativeThink';
@@ -38,27 +38,36 @@ export async function exportBackup(): Promise<{ file: IBackupFile; localStorageC
   }
 
   // IndexedDB：整书翻译缓存（按需、限量）
+  //
+  // 注意：章节清单**不能**从 localStorage 里找 —— `booktrans-*` 只存在于 IndexedDB。
+  // 此前这里写的是 `for (const k of Object.keys(data)) if (k.startsWith('booktrans-'))`，
+  // 而 data 全部来自 localStorage，所以永远扫不到 → 备份实际上从来没含整书译文
+  // （文件头的承诺落空，用户重装后几小时的对照翻译要重翻）。
+  // 现在按书目元数据拿到随包 22 本的 id（外加用户导入的书），逐本向 book-translation 要它自己登记的缓存。
   let idb: Record<string, unknown> | undefined;
   let idbSkipped = false;
   try {
-    const manifestKeys: string[] = [];
-    for (const k of Object.keys(data)) {
-      if (k.startsWith(IDB_BACKUP_PREFIX) && k.endsWith('-index')) manifestKeys.push(k);
-    }
-    // 也从 IndexedDB 侧补齐（localStorage 未镜像这些键时）
-    const candidateKeys = new Set<string>(manifestKeys);
+    const [{ BOOK_META }, { loadImportedBooks }, { dumpBookTranslationCache }] = await Promise.all([
+      import('@/data/books-meta'),
+      import('@/data/imported-books'),
+      import('@/data/book-translation'),
+    ]);
+    const bookIds = [...BOOK_META.map((b) => b.id), ...(await loadImportedBooks()).map((b) => b.id)];
     const idbData: Record<string, unknown> = {};
     let bytes = 0;
-    for (const key of candidateKeys) {
-      const val = await idbGet<unknown>(key);
-      if (val == null) continue;
-      const size = JSON.stringify(val).length;
-      if (bytes + size > IDB_LIMIT_BYTES) { idbSkipped = true; break; }
-      bytes += size;
-      idbData[key] = val;
+    let stopped = false;
+    for (const bookId of bookIds) {
+      if (stopped) break;
+      const dump = await dumpBookTranslationCache(bookId, IDB_LIMIT_BYTES - bytes);
+      if (dump.skipped) idbSkipped = true;
+      for (const [key, value] of Object.entries(dump.entries)) {
+        idbData[key] = value;
+        bytes += JSON.stringify(value).length;
+      }
+      if (bytes >= IDB_LIMIT_BYTES) { idbSkipped = true; stopped = true; }
     }
     if (Object.keys(idbData).length > 0) idb = idbData;
-  } catch { /* IDB 不可用则跳过 */ }
+  } catch { /* IDB 或书目模块不可用则跳过 */ }
 
   const file: IBackupFile = {
     app: 'NativeThink',
