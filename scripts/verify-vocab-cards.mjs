@@ -606,8 +606,10 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
 
   // ⑧b 静默契约（2026-09-29 用户要求：快速闪卡里"不认识"和"收藏"都不要弹提示）
   //     锁住"不许再加回来"，同时用锚点断言证明不是把整块功能删掉换来的绿。
-  const toggleFavBody = (qc.match(/const toggleFav = useCallback\([\s\S]{0,700}?\}, \[favorites, addFavorite, removeFavorite, level\]\);/) || [])[0] || '';
-  check(toggleFavBody.length > 0, '脚手架自检：抓到 toggleFav 函数体（抓不到就没法判静默）');
+  const tfStart = qc.indexOf('const toggleFav = useCallback(');
+  const tfEnd = qc.indexOf('}, [favorites, addFavorite, removeFavorite, level]);', tfStart + 1);
+  const toggleFavBody = tfStart >= 0 && tfEnd > tfStart ? qc.slice(tfStart, tfEnd) : '';
+  check(toggleFavBody.length > 200, `脚手架自检：抓到 toggleFav 函数体（实际 ${toggleFavBody.length} 字符，抓不到就没法判静默）`);
   check(!/toast\./.test(toggleFavBody), '收藏 / 取消收藏不弹 toast');
   check(/addFavorite\(\{/.test(toggleFavBody) && /removeFavorite\(existing\.id\)/.test(toggleFavBody),
     '正对照：收藏开关仍然真的在写数据（不是靠删功能变静默）');
@@ -615,6 +617,59 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/if \(\(relearnCounts\[key\] \?\? 0\) < MAX_RELEARN\) \{[\s\S]{0,200}scheduleRelearn\(cw\);/.test(qc),
     '正对照：重排机制本身仍在（只是不再播报）');
   check(!/已收藏「|已取消收藏「/.test(qc), '文件里不再出现收藏类 toast 文案');
+
+  /**
+   * ⑧c 复习检测的评分静默（2026-09-30 用户要求：「每点击一个单词的熟练度就会提示一次」）
+   *
+   * 以前 `markWithQuality` 每次评分都 `toast(labels[quality])` 播报档位名，答错还额外弹一条
+   * 「答错的词稍后会再出现一次」—— 一轮 30 张就是 30~60 条提示。反馈应该由界面自己给：
+   * 卡片自己翻到下一张、音效已经响过；**只有里程碑才说话**（连对 5 个、整轮完成）。
+   * 三条正向断言是必需的：否则"把评分函数整个删掉"也能让前两条变绿。
+   */
+  const mkStart = fc.indexOf('const markWithQuality = useCallback(');
+  const mkEnd = fc.indexOf('}, [cw, rated, recordReview, session.relearnCounts]);', mkStart + 1);
+  /** 用"声明 → deps 锚点"切片，不用定长正则：函数体以后只会变长，定长窗口会静默抓空 → 反向断言变真空通过 */
+  const markBody = mkStart >= 0 && mkEnd > mkStart ? fc.slice(mkStart, mkEnd) : '';
+  check(markBody.length > 200, `脚手架自检：抓到 markWithQuality 函数体（实际 ${markBody.length} 字符，抓不到就没法判静默）`);
+  check(!/toast\(/.test(markBody), '复习检测：点熟练度不再逐次弹提示');
+  check(!/答错的词稍后会再出现/.test(fc), '复习检测：答错那条播报也一起撤掉（与快速闪卡同口径）');
+  check(!/答错的词稍后会再出现/.test(dl), '每日学习：同一条答错播报也撤掉（三个模式口径一致）');
+  check(/const scheduleRelearnWord = \(word: IWordEntry\)[\s\S]{0,420}next\.splice\(at, 0, word\);/.test(dl),
+    '正对照：每日学习的答错重排仍在（只是不出声）');
+  check(/recordReview\(cw, quality\)/.test(markBody) && /setRatedKeys\(\(prev\) => new Set\(prev\)\.add/.test(markBody),
+    '正对照：评分仍然真的在写 SM-2 与"已评"状态（不是靠删功能换静默）');
+  check(/pendingRelearnRef\.current = key;/.test(markBody), '正对照：答错重排的排期仍在（只是不出声）');
+
+  /**
+   * ⑧d 练习界面零提示（2026-09-30 用户要求：「不要在练习界面有任何提示」）
+   *
+   * 三个练习模式文件里**剩下每一个 toast 调用点都必须逐字命中白名单**，白名单只有两类：
+   *   ① 失败 / 空队列 —— 不解释就变成"点了没反应"（AGENTS.md 坑表里那条）；
+   *   ② 「不再出现」的撤销 —— 撤销按钮只挂在这条提示上，撤了就是丢功能。
+   * 其余（档位名播报、连对里程碑、整轮完成、进场续学、自动发音开关、收藏、到期堆积、每日目标、
+   * 从生词本移除、切换练法）全部撤掉，反馈改由界面承担：卡面序号、顶部「已评 / 连对 / 今天新学」、
+   * ★ 实心、按钮选中态、进度条走满。音效刻意保留（那是声音，不是弹窗）。
+   */
+  const ALLOW_TOAST = [
+    /上次的进度已失效/,
+    /已把「\$\{word\.word\}」移出学习队列/,
+    /搭配翻译失败/,
+    /暂时没有可学的单词/,
+    /收藏的词在词库里找不到了/,
+  ];
+  for (const [name, src] of [['FlashcardMode', fc], ['DailyLearningMode', dl], ['QuickCardMode', qc]]) {
+    const lines = src.split('\n').map((l) => l.trim())
+      .filter((l) => /(^|[^.\w])toast(\.\w+)?\(/.test(l) && !l.startsWith('//') && !l.startsWith('*') && !/from 'sonner'/.test(l));
+    const bad = lines.filter((l) => !ALLOW_TOAST.some((re) => re.test(l)));
+    check(lines.length > 0 && bad.length === 0,
+      `⑧d ${name}：练习界面只剩白名单提示（失败/撤销），实测 ${lines.length} 处`, bad.join(' ⧸ ').slice(0, 160));
+  }
+  check(!/连对 \$\{next\} 个|连对 \$\{n\} 个|完成一整轮|接着上次继续|已开启自动发音|已收藏「|已取消收藏「|到期复习 \$\{|每日目标已设为|已从生词本移除|切换至 \$\{|重练 \$\{|开始练收藏的|今日目标已完成|已恢复 \$\{/.test(fc + '\n' + dl + '\n' + qc),
+    '⑧d 播报类文案在三个练习模式里全部消失（新增提示必须先改这条白名单）');
+  check(/action: \{ label: '撤销'/.test(fc) && /action: \{ label: '撤销'/.test(dl),
+    '⑧d 正对照：「不再出现」的撤销入口仍挂在提示上（不许靠删功能变静默）');
+  check(/连对 \{combo\}/.test(fc) && /今天新学 \{state\.todayLearned\.length\}\/\{dailyQuota\}/.test(fc) && /已评/.test(fc),
+    '⑧d 正对照：反馈改由界面承担（连对 Flame 数字 / 今天新学 x/y / 已评计数在位）');
 
   // ⑨ 释义必须带词性
   check(/cw\.partOfSpeech\}/.test(qc) && /tracking-wider text-ink-violet/.test(qc), '卡片释义行内显示词性');

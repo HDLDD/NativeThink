@@ -8,6 +8,7 @@
 
 
 ## 2026-09-30
+- docs(verification): 补两条复习检测实测事实（背面才有评分 / 回看卡只有「按 →」） (`3a893c9`)
 - docs(verification): 真机通道三条坑（Browser.close 会杀 WebView / 导航销毁上下文 / 走查按「接着上次」） (`8aa8ba0`)
 - docs(verification): 真机补验 84/2.0.39 的结果，并把高亮结论改挂到可复现的 A/B (`d11117a`)
 - docs(reading): 说清高亮与重生成的两套词表优先方向为何相反 (`696f9bd`)

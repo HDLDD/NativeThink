@@ -90,7 +90,6 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     const next = !autoSpeak;
     setAutoSpeak(next);
     try { safeStorage.setItem(AUTO_SPEAK_KEY, next ? '1' : '0'); } catch { /* ignore */ }
-    toast(next ? '已开启自动发音' : '已关闭自动发音', { duration: 1200 });
   }, [autoSpeak]);
 
   const allCounts = useMemo(() => getWordCounts(), []);
@@ -153,12 +152,6 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     const newWords = fillCount > 0 ? getNewWords(fillCount).filter((w) => !seen.has(w.word.toLowerCase())) : [];
     return [...customEntries, ...cappedDue, ...otherWords, ...newWords];
   }, [wrongDrill, wrongEntries, dueForReview, state.progress, getNewWords, customList]);
-
-  // 到期堆积提示（只在本轮挂载时提示一次）
-  const dueOverCap = dueForReview.length > 30;
-  useEffect(() => {
-    if (dueOverCap) toast.info(`到期复习 ${dueForReview.length} 个 — 本轮先复习 30 个，别有压力`, { duration: 4000 });
-  }, []);
 
   const ttsRef = useRef(tts);
   ttsRef.current = tts;
@@ -312,14 +305,12 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const weekAccuracy = weekTotal > 0 ? Math.round((weekGood / weekTotal) * 100) : 0;
   const noteCount = countWordNotes();
 
-  /** 恢复所有被「不再出现」屏蔽的词 */
-  const restoreSuspended = useCallback(() => {    const keys = Object.values(state.progress).filter((p) => p.suspended).map((p) => p.wordKey);
-    let n = 0;
-    for (const k of keys) {
+  /** 恢复所有被「不再出现」屏蔽的词（不弹提示：按钮旁边「已屏蔽 N 个」的计数会当场归零） */
+  const restoreSuspended = useCallback(() => {
+    for (const k of Object.values(state.progress).filter((p) => p.suspended).map((p) => p.wordKey)) {
       const w = findWord(k);
-      if (w) { setSuspended(w, false); n++; }
+      if (w) setSuspended(w, false);
     }
-    if (n > 0) toast.success(`已恢复 ${n} 个词`, { duration: 2000 });
   }, [state.progress, setSuspended]);
 
   const stats = useMemo(() => {
@@ -350,7 +341,6 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       setBestCombo((b) => Math.max(b, next));
       if (next > 0 && next % 5 === 0) {
         sfxComplete();
-        toast.success(`连对 ${next} 个！继续保持`, { duration: 1500 });
       }
     } else {
       setCombo(0);
@@ -362,14 +352,16 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     // pendingRelearnRef 的注释（同步重排会让"刚评分"状态立刻失效，卡死在本张）。
     if (quality <= 2) {
       const key = cw.word.toLowerCase();
-      // 先判断是否还会重排再提示 —— 不要把 toast 放进 setState 更新函数里（StrictMode 下会弹两次）
+      // 先判断是否还会重排再记 pending —— 不要把 toast/sfx 放进 setState 更新函数里（StrictMode 下会弹两次）
       if ((session.relearnCounts[key] ?? 0) < MAX_RELEARN) {
         pendingRelearnRef.current = key;
-        toast.info('答错的词稍后会再出现一次', { duration: 1200 });
       }
     }
-    const labels = ['完全忘了', '有点印象', '基本记得', '比较熟悉', '完全掌握'];
-    toast(labels[quality] || '已记录', { duration: 800 });
+    /**
+     * 评分**不弹任何提示**（2026-09-30 用户要求：每点一次熟练度就被播报一次）。
+     * 反馈交给界面本身：卡片自己翻到下一张、音效已经响过、连对里程碑与整轮完成才说话。
+     * 与快速闪卡「不认识 / 收藏不弹提示」同一条口径（见 ⑧b 静默契约）。
+     */
   }, [cw, rated, recordReview, session.relearnCounts]);
 
   /**
@@ -407,9 +399,10 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     }
     const next = nextIndex(session, currentIdx);
     if (next === null) {
-      // 走到队尾：本轮结束，回开头再来一轮（重排插入的词也已经消费完）
+      // 走到队尾：本轮结束，回开头再来一轮（重排插入的词也已经消费完）。
+      // 不弹 toast（2026-09-30 用户要求练习界面零提示）——"练完一轮"由界面自己说：
+      // 卡面序号回到 1/N、顶部「已评」继续累加、进度条走满；音效保留（那是声音，不是弹窗）。
       sfxComplete();
-      toast.success(`🎉 完成一整轮 ${session.order.length} 张卡片 · 累计评分 ${sessionReviewCount + 1} 次，巩固完成`, { duration: 4000 });
       setIdx(0);
       return;
     }
@@ -471,7 +464,6 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     lastSpokenKey.current = '';  // 同上：恢复的那一轮也要从第一张卡正常出声
     pendingRelearnRef.current = null;  // 同上：断点里不保存"待重排"，续学从干净状态开始
     setStarted(true);
-    toast.success(`接着上次继续 — 还剩 ${order.length - idx} 张`, { duration: 2000 });
   }, [currentLevel, customList]);
 
   /** 本轮断点（顺序 + 当前位置）—— 中途退出后仍可续学 */
@@ -708,7 +700,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
           </div>
           <div className="flex items-center gap-1.5">
             {[10, 20, 30, 50, 100].map((n) => (
-              <button key={n} onClick={() => { setDailyQuota(n); toast.success(`每日目标已设为 ${n} 个`, { duration: 1500 }); }}
+              <button key={n} onClick={() => setDailyQuota(n)}
                 className={cn('flex-1 py-1.5 rounded-xl text-[10px] font-black transition-all border',
                   dailyQuota === n ? 'border-[#6C5CE7] text-ink-violet bg-[#6C5CE7]/10' : 'border-border text-muted-foreground hover:border-[#6C5CE7]/40')}>
                 {n}
@@ -791,7 +783,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                     <p className="text-[10px] text-muted-foreground truncate">{w.meaning || '（无释义）'}</p>
                     {w.source && <p className="text-[9px] text-muted-foreground/70 truncate">{w.source}</p>}
                   </div>
-                  <button onClick={() => { removeCustom(w.word); toast.success(`已从生词本移除「${w.word}」`, { duration: 1500 }); }}
+                  <button onClick={() => removeCustom(w.word)}
                     className="shrink-0 p-1 text-muted-foreground hover:text-rose-500" title="从生词本移除">
                     <XCircle className="size-4" />
                   </button>

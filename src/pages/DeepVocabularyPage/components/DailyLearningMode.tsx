@@ -98,13 +98,10 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     setTimeout(() => setLevelToast(null), 1200);
   };
 
-  const MODE_LABEL_MAP: Record<ReviewMode, string> = { flashcard: '闪卡', choice: '选择题', spelling: '拼写', listening: '听写', matching: '配对', fillblank: '填空' };
-
   const handleModeChange = (mode: ReviewMode) => {
     if (mode !== reviewMode) {
       setReviewMode(mode);
       setSessionWords([]);
-      toast.success(`切换至 ${MODE_LABEL_MAP[mode]}`, { duration: 1000 });
     }
   };
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -229,7 +226,6 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     const next = !autoSpeak;
     setAutoSpeak(next);
     try { safeStorage.setItem(AUTO_SPEAK_KEY, next ? '1' : '0'); } catch { /* ignore */ }
-    toast(next ? '已开启自动发音' : '已关闭自动发音', { duration: 1200 });
   };
   /** 连击：连续答对（quality>=3）计数，答错清零 —— 与复习检测同款即时正反馈 */
   const [combo, setCombo] = useState(0);
@@ -368,7 +364,6 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       // 不许静默空转：明确告诉用户为什么没开始、出口在哪
       if (dueForReview.length === 0 && todayRemaining <= 0) {
         setSetupOpen(true);
-        toast.info('今日目标已完成 — 想继续学可在学习设置里调大每日学习量', { duration: 3500 });
       } else {
         toast.info('暂时没有可学的单词，请稍后再试', { duration: 2500 });
       }
@@ -428,7 +423,6 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     const existing = favorites.find((f) => f.type === 'word' && f.content === w.word);
     if (existing) {
       removeFavorite(existing.id);
-      toast.info(`已取消收藏「${w.word}」`, { duration: 1500 });
     } else {
       addFavorite({
         type: 'word',
@@ -437,7 +431,6 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
         example: w.examples[0]?.en,
         category: `每日学习 · ${level === 'all' ? '全部词库' : level}`,
       });
-      toast.success(`已收藏「${w.word}」`, { duration: 1500 });
     }
   };
 
@@ -542,7 +535,10 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     return { sentence: `______ (${word.meaning})`, zh: '' };
   };
 
-  /** 答错的词隔 RELEARN_GAP 张重新插回本轮队列（与复习检测/快速闪卡的即时巩固同参） */
+  /**
+   * 重排**不弹提示**（2026-09-30 用户要求，与复习检测/快速闪卡同一条口径）：
+   * 每答错一次就被播报一次很吵，而它真的会再出现 —— 反馈交给卡片本身。
+   */
   const scheduleRelearnWord = (word: IWordEntry) => {
     const key = word.word.toLowerCase();
     if ((relearnCounts[key] ?? 0) >= MAX_RELEARN) return;
@@ -553,7 +549,6 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       next.splice(at, 0, word);
       return next;
     });
-    toast.info('答错的词稍后会再出现一次', { duration: 1200 });
   };
 
   /** 连击：连续答对累加，答错清零。每 10 连给一次反馈（toast 不能放进 setState 更新函数 —— StrictMode 会双弹） */
@@ -561,7 +556,6 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
     if (quality >= 3) {
       const n = combo + 1;
       setCombo(n);
-      if (n % 10 === 0) toast.success(`连对 ${n} 个！状态很好`, { duration: 1500 });
     } else {
       setCombo(0);
     }
@@ -834,7 +828,6 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       setRated(false);
       lastSpokenKey.current = '';
       setDailyResumed(true);
-      toast.success(`接着上次继续 — ${MODE_LABEL_MAP[saved.mode || 'flashcard']}还剩 ${entries.length - idx} 张`, { duration: 2500 });
     } catch { setDailyResumed(true); }
   }, [dailyResumed, inSession, dailyBreakpointKey]);
   useEffect(() => {

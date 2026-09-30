@@ -98,7 +98,6 @@ export default function QuickCardMode({ level }: { level: string }) {
     const next = !autoSpeak;
     setAutoSpeak(next);
     try { safeStorage.setItem(AUTO_SPEAK_KEY, next ? '1' : '0'); } catch { /* ignore */ }
-    toast(next ? '已开启自动发音' : '已关闭自动发音', { duration: 1200 });
   }, [autoSpeak]);
 
   const [roundSize, setRoundSize] = useState<number>(() => {
@@ -551,7 +550,6 @@ export default function QuickCardMode({ level }: { level: string }) {
     setPaused(false);
     setShowHistory(false);
     setOpenRunId(null);
-    toast.info(`重练 ${entries.length} 个词`, { duration: 1500 });
   }, [startRun]);
 
   /**
@@ -578,7 +576,6 @@ export default function QuickCardMode({ level }: { level: string }) {
     setPaused(false);
     setShowFavs(false);
     setShowHistory(false);
-    toast.info(`开始练收藏的 ${entries.length} 个词`, { duration: 1500 });
   }, [startRun]);
 
   /**
