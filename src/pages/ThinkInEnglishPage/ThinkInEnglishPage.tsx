@@ -34,6 +34,7 @@ import { useAI } from '@/hooks/use-ai';
 import { useTTS } from '@/lib/use-tts';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { safeStorage } from '@/lib/safe-storage';
+import { persistJson, warnStorageFull } from '@/lib/capped-cache';
 import { cn, extractJson } from '@/lib/utils';
 import { useStableShuffle } from '@/lib/use-stable-shuffle';
 
@@ -112,9 +113,10 @@ export default function ThinkInEnglishPage() {
   });
 
   // Persist custom exercises to localStorage
-  useEffect(() => { safeStorage.setItem('__nativethink_custom_translations', JSON.stringify(customTranslations)); }, [customTranslations]);
-  useEffect(() => { safeStorage.setItem('__nativethink_custom_backs', JSON.stringify(customBacks)); }, [customBacks]);
-  useEffect(() => { safeStorage.setItem('__nativethink_custom_natives', JSON.stringify(customNatives)); }, [customNatives]);
+  // 三份自建题库不可重算：写失败必须说出来（以前 catch{} 吞掉，症状是"刷新后自建题没了"）
+  useEffect(() => { if (!persistJson('__nativethink_custom_translations', customTranslations)) warnStorageFull(); }, [customTranslations]);
+  useEffect(() => { if (!persistJson('__nativethink_custom_backs', customBacks)) warnStorageFull(); }, [customBacks]);
+  useEffect(() => { if (!persistJson('__nativethink_custom_natives', customNatives)) warnStorageFull(); }, [customNatives]);
 
   // AI generation state
   const [genLoading, setGenLoading] = useState<'translation' | 'back' | 'native' | null>(null);

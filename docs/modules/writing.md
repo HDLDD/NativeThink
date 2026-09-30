@@ -47,7 +47,7 @@
 
 1. **流式批改必须在新开一条流之前 abort 旧流**。两处 abort 点（`startWriting` `:478-481`、`reset` `:598-601`）都是为修「旧流完成回调误清新题草稿」补的，注释在 `:476-479`。**新增任何"离开当前题"的路径而不调 `abortRef.current?.abort()`，同一个 bug 就会复现。**
 2. **流跑完但内容为空 ≠ 解析失败**。`useAI.streamChat` 异常时 `yield {content:'',done:true}` 并 toast（`use-ai.ts:67-72`），所以「不完整」与「正常空」对调用方不可区分；写作页用 `!full.trim()` 兜（`:570-576`），**不写历史、不删草稿**，注释里就是历史 bug 说明。
-3. **`__nativethink_custom_prompts` 没有条数上限**：既没用 `capped-cache.ts`，也没有 `slice`。生成几十道 AI 题会一直涨，且整份 JSON 每次状态变化都重写一遍。按仓库约定「按词/按条累积的缓存一律走 `capped-cache.ts`」，这里是个未收敛的点。
+3. ~~**`__nativethink_custom_prompts` 没有条数上限**~~（2026-09-30 处置，口径要说清）：**没有给它加裁剪** —— 自建题是用户/AI 创作、不可重算的东西，静默裁掉等于替用户删数据。改成"写失败必须可见"：`:438` 走 `persistJson('__nativethink_custom_prompts', …)`，返回 false 时 `warnStorageFull()` 给一条 60 秒去抖的提示并指路「学习记录 → 清理学习数据」。真正无界的累积点还剩 `__nativethink_writing_history`（只有 `slice(-50)`）。
 4. **AI 生成面板给了 10 个分类，其中 6 类没有对应 tab**（创意写作/科技前沿/社会热点/个人成长/文化对比/环保绿色，`:722` vs `:832-844`）—— 生成的题只在「全部题目」里出现。用户报「生成的题找不到」多半是这个。
 5. **去重只喂了内置 100 题的标题**（`:616` 用 `WRITING_PROMPTS` 而不是 `allPrompts`）：**已生成的自定义题不参与去重**，所以会重复出题。
 6. **每块 `setFeedback(full)` → 整篇 `ReactMarkdown` 重渲染**（`:552,565,1067`，容器固定 `h-[400px]` ScrollArea）。长反馈在低端机上是持续重排源；改成节流要保住"实时看到字在出"的体验。

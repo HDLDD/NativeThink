@@ -44,6 +44,7 @@ import { useAI } from '@/hooks/use-ai';
 import { useTTS } from '@/lib/use-tts';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { safeStorage } from '@/lib/safe-storage';
+import { persistJson, warnStorageFull } from '@/lib/capped-cache';
 import { cn, extractJson } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -433,7 +434,8 @@ export default function WritingPage() {
 
   // Persist custom prompts to localStorage
   useEffect(() => {
-    safeStorage.setItem('__nativethink_custom_prompts', JSON.stringify(customPrompts));
+    // 自定义题目不可重算 —— 写失败必须说出来（以前 catch{} 吞掉，症状是"刷新后题目没了"）
+    if (!persistJson('__nativethink_custom_prompts', customPrompts)) warnStorageFull();
   }, [customPrompts]);
   const [showGenDialog, setShowGenDialog] = useState(false);
   const [genCategory, setGenCategory] = useState('日常叙事');

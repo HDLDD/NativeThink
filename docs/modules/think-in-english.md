@@ -29,7 +29,7 @@
 | key | 说明 |
 |-----|------|
 | `__nativethink_practice_history` | `:62/:71/:74`，**FIFO 50**，内存去重后取 8 条展示 |
-| `__nativethink_custom_translations` / `_backs` / `_natives` | `:106/:109/:112` 读，`:116-118` 写，**无上限** |
+| `__nativethink_custom_translations` / `_backs` / `_natives` | `:106/:109/:112` 读，`:116-118` 写 —— 自建题库**不可重算**，所以不裁剪；写失败经 `persistJson` 返回 false 并 `warnStorageFull()` 提示 |
 | `think-tab` | `usePageMemory` |
 
 - **朗读**：只有手动喇叭（`:779/:980/:1093/:1156/:1321`），默认语速，**不接** `__nativethink_vocab_autospeak`。

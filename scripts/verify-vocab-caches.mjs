@@ -1,17 +1,21 @@
 /**
- * verify-vocab-caches.mjs — 词汇模块缓存基建的回归防线。
+ * verify-vocab-caches.mjs — 缓存与存储写入基建的回归防线。
  *
- * 覆盖 2026-09 技术债清理引入的两块：
+ * 覆盖：
  *  ① capped-cache / colloc-ai-cache 的纯函数（封顶淘汰、合并、键序语义）；
  *  ② 各调用方的接线断言：键名拼写修正后不许再出现散落的旧键引用、
  *     三个无上限缓存（搭配释义/AI 例句/深度解析）必须有 cappedPut 封顶、
- *     持久化必须走 effect（setState 更新函数保持纯 —— StrictMode 双调用规则）。
+ *     持久化必须走 effect（setState 更新函数保持纯 —— StrictMode 双调用规则）；
+ *  ④（2026-09-30 加）**存储写入的结果必须可见**：用注入的 localStorage 替身真跑
+ *     safe-storage / capped-cache —— 配额满时 `setItem`/`persistJson` 返回 false、
+ *     `warnStorageFull` 全站 60s 只提示一次；`appendCapped` 对**不可重算**的清单
+ *     只拒绝新增、绝不裁剪已有条目。再断言七个用户清单的接线。
  *
  * 用法：node scripts/verify-vocab-caches.mjs
  */
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve, dirname, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 
@@ -102,6 +106,142 @@ function transpile(relPath, extraExports) {
   // ProgressPage 清理清单：新键必清，旧键保留只为兜底
   const progress = readFileSync(join(ROOT, 'src/pages/ProgressPage/ProgressPage.tsx'), 'utf8');
   check(progress.includes("'__nativethink_colloc_ai_translations'"), 'ProgressPage 清理清单包含正确键名');
+}
+
+// ── ④ 存储写入结果可见：注入 localStorage 替身，真跑 safe-storage + capped-cache ──
+{
+  const dir = mkdtempSync(join(tmpdir(), 'nt-storage-'));
+  // sonner 替身：只记调用（warnStorageFull 的去抖要能被真跑观察到）
+  writeFileSync(join(dir, 'sonner.mjs'),
+    'export const toast = { error: (...a) => { (globalThis.__toasts ||= []).push(a); }, success: () => {}, info: () => {} };\n', 'utf8');
+
+  const emit = (rel, exports, renames = []) => {
+    let src = readFileSync(join(ROOT, rel), 'utf8');
+    renames.forEach(([from, to]) => { src = src.split(from).join(to); });
+    src = src.replace(/^export (?=(const|function|let|class))/gm, '');
+    const out = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const name = basename(rel).replace(/\.ts$/, '.mjs');
+    writeFileSync(join(dir, name), out + `\nexport { ${exports} };\n`, 'utf8');
+    return name;
+  };
+  emit('src/lib/safe-storage.ts', 'safeStorage');
+  emit('src/lib/capped-cache.ts', 'persistJson, appendCapped, warnStorageFull, readJson',
+    [['from \'./safe-storage\'', 'from \'./safe-storage.mjs\''], ['from \'sonner\'', "from './sonner.mjs'"]]);
+
+  /** 可切换"配额满"的 localStorage 替身 */
+  const mkStub = () => {
+    const store = new Map();
+    const api = {
+      full: false,
+      get length() { return store.size; },
+      key: (i) => [...store.keys()][i] ?? null,
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => {
+        if (api.full) { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }
+        store.set(k, String(v));
+      },
+      removeItem: (k) => store.delete(k),
+      store,
+    };
+    return api;
+  };
+  const stub = mkStub();
+  globalThis.localStorage = stub;
+  globalThis.window = globalThis;
+
+  const ss = await import(pathToFileURL(join(dir, 'safe-storage.mjs')).href);
+  const cc = await import(pathToFileURL(join(dir, 'capped-cache.mjs')).href);
+  const { safeStorage } = ss;
+  const { persistJson, appendCapped, warnStorageFull } = cc;
+
+  check(safeStorage.setItem('nt_probe', 'v1') === true, '④ setItem 写成功返回 true');
+  check(safeStorage.getItem('nt_probe') !== null, '④ 写进去的东西能读回来（替身确实被驱动）');
+  stub.full = true;
+  check(safeStorage.setItem('nt_probe2', 'v2') === false,
+    '④ 配额满时 setItem 返回 false（过去这里 catch{} 吞掉，唯一症状是"刷新后数据没了"）');
+  check(persistJson('nt_probe3', { a: 1 }) === false, '④ persistJson 把失败如实传给调用方');
+  stub.full = false;
+  check(persistJson('nt_probe4', { a: 1 }) === true, '④ 空间恢复后 persistJson 返回 true');
+
+  globalThis.__toasts = [];
+  warnStorageFull();
+  warnStorageFull();
+  warnStorageFull();
+  check(globalThis.__toasts.length === 1,
+    '④ warnStorageFull 60 秒去抖：连撞三次只提示一次', `实际 ${globalThis.__toasts.length} 条`);
+  check(/空间不足/.test(String(globalThis.__toasts[0]?.[0])), '④ 提示说的是"存储空间不足"，不是笼统的失败');
+  check(/清理/.test(String(globalThis.__toasts[0]?.[1]?.description || '')), '④ 提示给了出路（去哪清理）');
+
+  // appendCapped：不可重算的清单只拒绝新增，绝不裁剪已有
+  const base = ['a', 'b', 'c'];
+  const ok = appendCapped(base, ['d'], 5);
+  check(ok.next.join('') === 'abcd' && ok.added === 1, '④ appendCapped：有余量时正常追加');
+  const part = appendCapped(base, ['d', 'e', 'f', 'g'], 5);
+  check(part.added === 2 && part.next.length === 5 && part.next.slice(0, 3).join('') === 'abc',
+    '④ appendCapped：只加得进剩下的 2 条，已有三条一条没动（拒绝 ≠ 裁剪）', JSON.stringify(part));
+  const none = appendCapped(base, ['x', 'y'], 3);
+  check(none.added === 0 && none.next.length === 3, '④ appendCapped：满了就整批拒绝并如实报 added=0');
+  check(appendCapped(base, ['d'], 0).added === 0, '④ appendCapped：上限 0 不越界');
+}
+
+// ── ⑤ 接线：七个"用户创作、不可重算"的清单写失败都要可见 ──
+{
+  const KEY_SITES = [
+    ['src/pages/WritingPage/WritingPage.tsx', '__nativethink_custom_prompts'],
+    ['src/pages/ShadowingPage/ShadowingPage.tsx', '__nativethink_custom_shadowing'],
+    ['src/pages/ShadowingPage/ShadowingPage.tsx', '__nativethink_shadowing_extra'],
+    ['src/pages/ChunkTrainingPage/ChunkTrainingPage.tsx', '__nativethink_custom_chunks'],
+    ['src/pages/ThinkInEnglishPage/ThinkInEnglishPage.tsx', '__nativethink_custom_translations'],
+    ['src/pages/ThinkInEnglishPage/ThinkInEnglishPage.tsx', '__nativethink_custom_backs'],
+    ['src/pages/ThinkInEnglishPage/ThinkInEnglishPage.tsx', '__nativethink_custom_natives'],
+    ['src/lib/use-spelling-sentences.ts', '__nativethink_spelling_sentences'],
+    ['src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx', '__nativethink_browse_memorized'],
+  ];
+  const cache = {};
+  for (const [file, key] of KEY_SITES) {
+    cache[file] = cache[file] ?? readFileSync(join(ROOT, file), 'utf8');
+    const src = cache[file];
+    // 有的地方直接写字面量，有的先定义 *_KEY 常量 —— 两种都算，但常量必须确实等于这个键
+    const viaConst = new RegExp(`(?:const|let)\\s+(\\w+)\\s*=(?:\\s*'${key}')`).exec(src);
+    const pattern = viaConst
+      ? new RegExp(`if \\(!persistJson\\(${viaConst[1]}[,)]`)
+      : new RegExp(`if \\(!persistJson\\('${key}'[,)]`);
+    check(pattern.test(src), `${key}：写入失败走 warnStorageFull 分支`);
+    check(!new RegExp(`safeStorage\\.setItem\\('${key}'`).test(src),
+      `${key}：不再用吞异常的裸 setItem 落盘`);
+  }
+
+  // 句子库到上限要**说出来**，而且区分"到上限"与"都导入过"
+  const spelling = readFileSync(join(ROOT, 'src/pages/SpellingPage/SpellingPage.tsx'), 'utf8');
+  // 钉"插值里真的把 skipped 说出来"，只查 `result.skipped` 这个 token 不够 ——
+  // 三元判断的条件也在用它，把数字偷偷换成 0 仍然会有 token 残留（N8 变异就是这么溜掉的）。
+  check(/\$\{result\.skipped\} 条未加入/.test(spelling),
+    '拼写：AI 批量生成的 skipped 数字会展示给用户');
+  check(/result\.count === 0[\s\S]{0,120}一条也没加进去/.test(spelling),
+    '拼写：满库时"0 条"有独立说法，不写成"成功添加 0 条"');
+  check((spelling.match(/句子库已到/g) ?? []).length >= 3,
+    '拼写：三处都区分"已到上限"与"都导入过"', `实际 ${(spelling.match(/句子库已到/g) ?? []).length}`);
+  const hook = cache['src/lib/use-spelling-sentences.ts'];
+  check(/appendCapped\(sentences, newItems, SPELLING_SENTENCE_LIMIT\)/.test(hook),
+    '拼写：批量添加用 appendCapped（拒绝新增而非裁剪已有）');
+  check(/export const SPELLING_SENTENCE_LIMIT = 1200;/.test(hook), '拼写：句子库上限钉死 1200 条');
+  check(/if \(sentences\.length >= SPELLING_SENTENCE_LIMIT\) return false;/.test(hook),
+    '拼写：单条添加在满库时如实返回 false');
+  check(!/\.slice\(-?SPELLING_SENTENCE_LIMIT\)/.test(hook) && !/splice\(/.test(hook),
+    '正对照：拼写句子库里不许出现"按上限裁剪已有句子"的写法');
+
+  // AI 派生缓存（可重算）才允许 FIFO
+  const chunks = cache['src/pages/ChunkTrainingPage/ChunkTrainingPage.tsx'];
+  check(/cappedPut\(p, chunk\.id, zh, CHUNK_EXAMPLE_TRANS_KEYS\)/.test(chunks), '语块：例句翻译按 400 键封顶');
+  check(/cappedPut\(\s*prev,\s*chunk\.id,[\s\S]{0,160}CHUNK_AI_SENTENCE_KEYS/.test(chunks), '语块：AI 例句按 200 键封顶');
+  check(/\.slice\(-CHUNK_AI_SENTENCES_PER_KEY\)/.test(chunks), '语块：单个语块的例句数也封顶（保留最近的）');
+  check(/cappedPut\(\s*prev,\s*key,[\s\S]{0,200}CHUNK_PHRASE_EXAMPLE_KEYS/.test(chunks), '短语：AI 例句按 300 键封顶');
+  check(/from '@\/lib\/capped-cache'/.test(chunks), '语块页引入 capped-cache');
+  // 上限值本身也要钉住 —— 只断言"用了常量名"的话，把 200 改成 2_000_000 照样绿
+  check(/const CHUNK_AI_SENTENCE_KEYS = 200;/.test(chunks), '语块：例句键上限钉死 200');
+  check(/const CHUNK_AI_SENTENCES_PER_KEY = 30;/.test(chunks), '语块：单语块例句上限钉死 30');
+  check(/const CHUNK_EXAMPLE_TRANS_KEYS = 400;/.test(chunks), '语块：例句翻译上限钉死 400');
+  check(/const CHUNK_PHRASE_EXAMPLE_KEYS = 300;/.test(chunks), '短语：例句上限钉死 300');
 }
 
 console.log('');

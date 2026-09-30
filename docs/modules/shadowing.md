@@ -51,8 +51,8 @@
 | key | 位置 | 上限 |
 |-----|------|------|
 | `__nativethink_shadowing_completed` | `:78` 读 / `:81` / `:86` 每次变更整体 JSON 写 | **无上限、无 FIFO** |
-| `__nativethink_custom_shadowing` | `:92/:99` | — |
-| `__nativethink_shadowing_extra` | `:125/:132`，按语料 id 分桶 | — |
+| `__nativethink_custom_shadowing` | `:92/:108`，写失败经 `persistJson`→`warnStorageFull()` | AI 生成材料不可重算 → **不裁剪** |
+| `__nativethink_shadowing_extra` | `:125/:141`，按语料 id 分桶，写失败同上 | 追加式，无键数上限（已知遗留，见 §3.6） |
 | `shadowing-rate` / `shadowing-filter` / `shadowing-autoplay` | `:76` / `:115` / `:331`（`usePageMemory`） | — |
 
 时长：`:316` 点播放即 +1（**纯听也算**）、`:372` 完成一句 +0.5。

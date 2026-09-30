@@ -19,7 +19,7 @@
 | `verify-wordbank-split.mjs` | 数据全量比对 | 拆分校验：`--baseline` 采基线（**拆分前后都能采**）、`--check` 逐项断言 | 改词库拆分 |
 | `verify-books-meta.mjs` | 222 | ①–④ 生成器与数据不漂移；⑤ books/book-clean/books-meta 拆分（**实际加载两个模块交叉核对**）；⑥ HelpGuide 文案 vs `meta.ts`/`ai-config.ts` | 改书单、scp、reader-highlight |
 | `verify-vocab-cards.mjs` | 284 | 背单词卡片交互契约 + 手势决策表 + 换卡节奏（数值锁）+ 答错重排延后 + 静默契约 + 换书路径 + 预载门 + HelpGuide 内容 | 改 FlashcardMode/QuickCardMode/vocab-* |
-| `verify-vocab-caches.mjs` | 21 | `cappedPut`/`colloc-ai-cache` 纯函数 + 各调用方接线（键名、封顶、落盘走 effect） | 改缓存基建接线 |
+| `verify-vocab-caches.mjs` | 67 | 缓存与存储写入基建：`cappedPut`/`mergeCollocAiCache`/`appendCapped` 纯函数**真跑** + **注入 localStorage 替身真跑 safe-storage/capped-cache**（配额满时 `setItem`/`persistJson` 返回 false、`warnStorageFull` 60s 只提示一次）+ 九个不可重算清单的接线与派生缓存的上限数值 | 改缓存基建接线 / 改任何 `persistJson`·`cappedPut` 调用点 |
 | `verify-tts-progress.mjs` | 6175 | 「读到哪」反查表恒等式：各段词数之和 === 各切片词数之和（书目 22 / 页 419 / 切片 3785 + 5 项脚手架自检） | 改 TTS 切片上限或阅读器朗读逻辑 |
 | `verify-tts-hardening.mjs` | 15 | A 原生静态（无 `new Thread().start()`、有界线程池 + 队列上限）4 项；B 真实模块在途去重 6 项；C 桌面限定 5 项 | 改降级链路或预合成 |
 | `verify-feedback-loop.mjs` | 58 | 反馈前后端对接：**用忠实 KV + webhook 替身真实执行后端 handler**，含正对照；并断言 Header 挂载 `<FeedbackDialog />`、全站 `<Toaster />` 挂载、以及历史标签按 `pushed` 区分「已送达 / 已留档」 | 改 FeedbackDialog / use-feedback / `functions/api/feedback/submit.js` |

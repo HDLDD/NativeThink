@@ -61,6 +61,7 @@ import { useTTS } from '@/lib/use-tts';
 import { getCapabilityClient } from '@/lib/capability-client';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
+import { cappedPut, persistJson, warnStorageFull } from '@/lib/capped-cache';
 
 const CATEGORIES = [
   { value: 'all', label: '全部' },
@@ -112,6 +113,15 @@ const REVIEW_AUTO_SPEAK_KEY = '__nativethink_vocab_autospeak';
 const REVIEW_RELEARN_GAP = 4;
 /** 同一语块一轮最多重排几次 */
 const REVIEW_MAX_RELEARN = 2;
+/**
+ * AI 派生缓存的封顶（FIFO，`cappedPut`）—— 这三个键此前只增不减：
+ * 一个语块 30 条例句 ≈ 3KB，反复点「生成例句」能一路涨到把 localStorage 撑爆，
+ * 而写入失败原先的表现是"整份静默丢失"。派生数据可重算，所以淘汰是安全的。
+ */
+const CHUNK_AI_SENTENCE_KEYS = 200;
+const CHUNK_AI_SENTENCES_PER_KEY = 30;
+const CHUNK_EXAMPLE_TRANS_KEYS = 400;
+const CHUNK_PHRASE_EXAMPLE_KEYS = 300;
 
 // 生成替换练习题目：基于语块例句，把正确语块替换成生硬表达作为题目
 const AWKWARD_MAP: Record<string, string> = {
@@ -239,7 +249,8 @@ export default function ChunkTrainingPage() {
 
   // Persist custom chunks to localStorage
   useEffect(() => {
-    safeStorage.setItem('__nativethink_custom_chunks', JSON.stringify(customChunks));
+    // 自建语块不可重算：写失败要说出来，不能只表现为"刷新后自建语块没了"
+    if (!persistJson('__nativethink_custom_chunks', customChunks)) warnStorageFull();
   }, [customChunks]);
 
   // AI sentence generation state (keyed by chunk ID)
@@ -253,7 +264,7 @@ export default function ChunkTrainingPage() {
 
   // Persist AI sentences to localStorage
   useEffect(() => {
-    safeStorage.setItem('__nativethink_chunk_ai_sentences', JSON.stringify(aiSentences));
+    if (!persistJson('__nativethink_chunk_ai_sentences', aiSentences)) warnStorageFull();
   }, [aiSentences]);
 
   // Example sentence translations cache — keyed by chunk ID
@@ -261,7 +272,7 @@ export default function ChunkTrainingPage() {
     try { const s = safeStorage.getItem('__nativethink_example_trans'); return s ? JSON.parse(s) : {}; } catch { return {}; }
   });
   const [exampleTransLoading, setExampleTransLoading] = useState<string | null>(null);
-  useEffect(() => { safeStorage.setItem('__nativethink_example_trans', JSON.stringify(exampleTranslations)); }, [exampleTranslations]);
+  useEffect(() => { if (!persistJson('__nativethink_example_trans', exampleTranslations)) warnStorageFull(); }, [exampleTranslations]);
 
   const handleTranslateExample = async (chunk: IChunk) => {
     if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
@@ -276,7 +287,7 @@ export default function ChunkTrainingPage() {
         { temperature: 0.3, maxTokens: 128 },
       );
       const zh = result.trim().replace(/^["']|["']$/g, '').slice(0, 80);
-      if (zh) setExampleTranslations((p) => ({ ...p, [chunk.id]: zh }));
+      if (zh) setExampleTranslations((p) => cappedPut(p, chunk.id, zh, CHUNK_EXAMPLE_TRANS_KEYS));
       else toast.error('AI 服务暂不可用，请稍后重试');
     } catch {
       // 不许静默失败 —— 按钮恢复原状但毫无反馈会让用户以为点击无效
@@ -294,7 +305,7 @@ export default function ChunkTrainingPage() {
     try { const s = safeStorage.getItem('__nativethink_ai_replacements'); return s ? JSON.parse(s) : []; } catch { return []; }
   });
   const [replaceGenLoading, setReplaceGenLoading] = useState(false);
-  useEffect(() => { safeStorage.setItem('__nativethink_ai_replacements', JSON.stringify(aiReplacements)); }, [aiReplacements]);
+  useEffect(() => { if (!persistJson('__nativethink_ai_replacements', aiReplacements)) warnStorageFull(); }, [aiReplacements]);
 
   const allChunks = useMemo(() => {
     try { return [...customChunks, ...MOCK_CHUNKS]; } catch { return [...MOCK_CHUNKS]; }
@@ -319,7 +330,7 @@ export default function ChunkTrainingPage() {
   const [phraseExamples, setPhraseExamples] = useState<Record<string, { en: string; zh: string }[]>>(() => {
     try { const s = safeStorage.getItem('__nativethink_phrase_examples'); return s ? JSON.parse(s) : {}; } catch { return {}; }
   });
-  useEffect(() => { safeStorage.setItem('__nativethink_phrase_examples', JSON.stringify(phraseExamples)); }, [phraseExamples]);
+  useEffect(() => { if (!persistJson('__nativethink_phrase_examples', phraseExamples)) warnStorageFull(); }, [phraseExamples]);
 
   // ===== 语块库点击朗读 =====
   const libraryTtsRef = useRef(tts);
@@ -355,10 +366,12 @@ export default function ChunkTrainingPage() {
       if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
       const parsed = extractJson<any[]>(result);
       if (!Array.isArray(parsed) || parsed.length === 0) { toast.error('AI 返回格式异常'); return; }
-      setPhraseExamples((prev) => ({
-        ...prev,
-        [key]: [...(prev[key] || []), ...parsed.map((e: any) => ({ en: e.en || '', zh: e.zh || '' }))].filter((e) => e.en && e.zh).slice(0, 10),
-      }));
+      setPhraseExamples((prev) => cappedPut(
+        prev,
+        key,
+        [...(prev[key] || []), ...parsed.map((e: any) => ({ en: e.en || '', zh: e.zh || '' }))].filter((e) => e.en && e.zh).slice(0, 10),
+        CHUNK_PHRASE_EXAMPLE_KEYS,
+      ));
       toast.success(`已生成 ${parsed.length} 条例句`);
     } catch (e) { console.error('AI phrase examples generation failed:', e); toast.error('AI 生成例句失败'); }
   };
@@ -964,10 +977,12 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
         zh: item.zh || '',
       })).filter((item: { en: string; zh: string }) => item.en && item.zh);
       if (items.length === 0) { toast.error('AI 未生成有效例句，请重试'); return; }
-      setAiSentences((prev) => ({
-        ...prev,
-        [chunk.id]: [...(prev[chunk.id] || []), ...items],
-      }));
+      setAiSentences((prev) => cappedPut(
+        prev,
+        chunk.id,
+        [...(prev[chunk.id] || []), ...items].slice(-CHUNK_AI_SENTENCES_PER_KEY),
+        CHUNK_AI_SENTENCE_KEYS,
+      ));
       toast.success(`AI 已生成 ${items.length} 条例句！`);
     } catch (e) {
       console.error('AI sentence generation failed:', e);

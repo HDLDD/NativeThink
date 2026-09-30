@@ -66,7 +66,7 @@ import { useTTS } from '@/lib/use-tts';
 import { sfxCorrect, sfxWrong, sfxComplete } from '@/lib/sfx';
 import { useFavorites } from '@/lib/use-favorites';
 import { useAI } from '@/hooks/use-ai';
-import { useSpellingSentences } from '@/lib/use-spelling-sentences';
+import { useSpellingSentences, SPELLING_SENTENCE_LIMIT } from '@/lib/use-spelling-sentences';
 import { useSpellingLearning } from '@/lib/use-spelling-learning';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { toast } from 'sonner';
@@ -472,7 +472,7 @@ export default function SpellingPage() {
   const [aiDifficulty, setAiDifficulty] = useState<SpellingDifficulty>('intermediate');
   const [aiCount, setAiCount] = useState(10);
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiResult, setAiResult] = useState<{ success: boolean; count: number; error?: string } | null>(null);
+  const [aiResult, setAiResult] = useState<{ success: boolean; count: number; skipped?: number; error?: string } | null>(null);
 
   // Import dialog state
 /** Build/rebuild session — accepts optional override params to avoid stale-closure issues */
@@ -935,8 +935,9 @@ export default function SpellingPage() {
       difficulty: 'intermediate' as const,
     }));
     const added = addSentences(items);
+    const skipped = items.length - added;
     if (added > 0) {
-      toast.success(`已导入 ${added} 个收藏单词（建议配合"单词拼写"模式）`);
+      toast.success(`已导入 ${added} 个收藏单词${skipped > 0 ? `（句子库已到 ${SPELLING_SENTENCE_LIMIT} 条上限，${skipped} 个未导入）` : ''}（建议配合"单词拼写"模式）`);
       if (activeLevel !== 'all') {
         setActiveLevel('all');
         rebuildSession({ level: 'all' });
@@ -944,9 +945,14 @@ export default function SpellingPage() {
         rebuildSession();
       }
     } else {
-      toast.info('收藏单词都已导入过');
+      // 到上限和"都导入过"是两件事，说错了用户会以为重点一次就行
+      toast.info(
+        sentences.length >= SPELLING_SENTENCE_LIMIT
+          ? `句子库已到 ${SPELLING_SENTENCE_LIMIT} 条上限，先删掉一些再导入`
+          : '收藏单词都已导入过',
+      );
     }
-  }, [favorites, addSentences, activeLevel, rebuildSession]);
+  }, [favorites, addSentences, activeLevel, rebuildSession, sentences.length]);
 
   const handleBuildDatabase = useCallback(async () => {
     setBuilding(true);
@@ -1872,7 +1878,7 @@ function AIBatchAddDialog({
   count: number;
   onCountChange: (c: number) => void;
   loading: boolean;
-  result: { success: boolean; count: number; error?: string } | null;
+  result: { success: boolean; count: number; skipped?: number; error?: string } | null;
   onGenerate: () => Promise<void>;
   isConfigured: boolean;
 }) {
@@ -1951,7 +1957,9 @@ function AIBatchAddDialog({
                   : 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300',
               )}>
                 {result.success
-                  ? `✅ 成功添加 ${result.count} 条句子`
+                  ? result.count === 0
+                    ? `⚠️ 句子库已到 ${SPELLING_SENTENCE_LIMIT} 条上限，这次一条也没加进去 —— 先删掉一些再试`
+                    : `✅ 成功添加 ${result.count} 条句子${result.skipped ? `（已到 ${SPELLING_SENTENCE_LIMIT} 条上限，${result.skipped} 条未加入）` : ''}`
                   : `❌ ${result.error || '生成失败'}`}
               </div>
             )}

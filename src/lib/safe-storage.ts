@@ -167,7 +167,12 @@ export const safeStorage = {
     }
   },
 
-  setItem(key: string, value: string): void {
+  /**
+   * @returns 是否真的写进去了。配额满 / 隐私模式时抛错仍被吞掉（不让 UI 崩），
+   * 但**结果如实回报**，调用方才能区分"存下了"和"静默丢了"。
+   * 历史上这里返回 void 且 `catch {}`，写失败的唯一表现是"刷新后数据没了"。
+   */
+  setItem(key: string, value: string): boolean {
     try {
       _migratedKeys.add(key); // No need to check old on write
       localStorage.setItem(prefixKey(key), value);
@@ -175,8 +180,10 @@ export const safeStorage = {
       if (_cloudSyncHandler) {
         try { _cloudSyncHandler(key, value); } catch { /* ignore */ }
       }
+      return true;
     } catch {
-      // Storage full or unavailable — silently ignore
+      // Storage full or unavailable — 不抛，但让调用方知道
+      return false;
     }
   },
 

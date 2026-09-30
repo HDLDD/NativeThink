@@ -42,11 +42,13 @@
 | key | API | 上限 |
 |-----|-----|------|
 | `__nativethink_chunk_position` | **裸 `localStorage`**（`:139/:149`，滚动 250ms 防抖） | — |
-| `__nativethink_custom_chunks` | safeStorage（`:180/:200`） | **无上限** |
-| `__nativethink_chunk_ai_sentences` | safeStorage（`:206/:214`） | — |
-| `__nativethink_example_trans` | safeStorage（`:219/:222`） | — |
-| `__nativethink_ai_replacements` | safeStorage（`:252/:255`） | — |
-| `__nativethink_phrase_examples` | safeStorage（`:270/:272`） | 每词 10（`:310`） |
+| `__nativethink_custom_chunks` | `:253` 写，走 `persistJson` | 自建语块**不可重算 → 不裁剪**；写失败 `warnStorageFull()` |
+| `__nativethink_chunk_ai_sentences` | `:267` 写；`cappedPut` 于 `:976` | **200 键 / 每键留最近 30 条**（`CHUNK_AI_SENTENCE_KEYS`/`_PER_KEY`，`:120-121`） |
+| `__nativethink_example_trans` | `:275` 写；`cappedPut` 于 `:288` | **400 键**（`CHUNK_EXAMPLE_TRANS_KEYS`） |
+| `__nativethink_ai_replacements` | `:308` 写 | 每次生成整体替换（`:1046`），天然有界；写失败仍提示 |
+| `__nativethink_phrase_examples` | `:333` 写；`cappedPut` 于 `:371` | 每词 10 条 + **300 键**（`CHUNK_PHRASE_EXAMPLE_KEYS`） |
+
+派生缓存用 FIFO 封顶（可重算，淘汰安全）；自建语块相反 —— **只拒绝、不裁剪**，落盘失败一律 `warnStorageFull()`。守卫 `verify-vocab-caches` ④/⑤ 钉住上限数值与接线。
 | `__nativethink_chunk_review_session` | 断点（`:475/:479/:486/:495`） | — |
 | `__nativethink_chunk_memorized` | `:549/:561` | — |
 | `__nativethink_vocab_autospeak` | **与词汇模块共用**（`:100`，读写 `:374/:379`，`safeStorage`） | — |

@@ -13,6 +13,7 @@
  */
 
 import { safeStorage } from './safe-storage';
+import { toast } from 'sonner';
 
 export function readJson<T>(storageKey: string, fallback: T): T {
   try {
@@ -23,10 +24,47 @@ export function readJson<T>(storageKey: string, fallback: T): T {
   }
 }
 
-export function persistJson(storageKey: string, value: unknown): void {
+/**
+ * 落盘一份 JSON。
+ * @returns 是否真的写进去了（配额满 / 隐私模式下是 false）。
+ *          过去这里 `catch {}` 吞掉一切，"整份缓存静默丢失"只会在刷新后被发现。
+ */
+export function persistJson(storageKey: string, value: unknown): boolean {
   try {
-    safeStorage.setItem(storageKey, JSON.stringify(value));
-  } catch { /* quota — 下次写入会先淘汰再试 */ }
+    return safeStorage.setItem(storageKey, JSON.stringify(value));
+  } catch {
+    return false;
+  }
+}
+
+/** 上一次"空间不足"提示的时间戳（全站一条，别刷屏） */
+let lastStorageWarnAt = 0;
+
+/**
+ * 用户创作、**不可重算**的清单写失败时的诚实提示。
+ * 60 秒去抖：持久化是 effect，空间一直满的话每个 state 变化都会失败，
+ * 不去抖就是把 toast 堆满屏（与 `use-cloud-sync.ts:41` 的失败提示同策略）。
+ */
+export function warnStorageFull(): void {
+  const now = Date.now();
+  if (now - lastStorageWarnAt < 60_000) return;
+  lastStorageWarnAt = now;
+  toast.error('本机存储空间不足，刚才的改动没能保存', {
+    description: '请到「学习记录 → 清理学习数据」删掉不用的自定义条目后重试',
+    duration: 6000,
+  });
+}
+
+/**
+ * 纯函数：给"用户/AI 创作、不可重算"的清单设**加入上限**。
+ * 与 `cappedPut` 的关键区别 —— 这里**不淘汰已有条目**：
+ * 那是用户的作品（自定义题目、AI 生成的句子），悄悄裁掉等于替用户删数据。
+ * 超出的部分由调用方如实告诉用户"本次只加进了 N 条"。
+ */
+export function appendCapped<T>(items: T[], additions: T[], max: number): { next: T[]; added: number } {
+  const room = Math.max(0, Math.floor(max) - items.length);
+  const taken = additions.slice(0, room);
+  return { next: [...items, ...taken], added: taken.length };
 }
 
 /**

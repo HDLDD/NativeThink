@@ -14,7 +14,7 @@ import { useWordLearning } from '@/lib/use-word-learning';
 import { WordImage } from '@/components/WordImage';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
-import { cappedPut, persistJson, readJson } from '@/lib/capped-cache';
+import { cappedPut, persistJson, readJson, warnStorageFull } from '@/lib/capped-cache';
 import { cn, cleanText, extractJson } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
 import { toast } from 'sonner';
@@ -388,7 +388,9 @@ export default function DeepVocabularyPage() {
       const next = new Set(prev);
       const key = word.toLowerCase();
       if (next.has(key)) next.delete(key); else next.add(key);
-      safeStorage.setItem('__nativethink_browse_memorized', JSON.stringify([...next]));
+      // 「已记住」是用户状态、不可重算 —— 写失败要说出来（warnStorageFull 全站 60s 去抖，
+      // 即便 StrictMode 把这里的更新函数跑两遍也不会叠成两条 toast）
+      if (!persistJson('__nativethink_browse_memorized', [...next])) warnStorageFull();
       return next;
     });
   };

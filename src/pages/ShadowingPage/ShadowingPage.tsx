@@ -41,6 +41,7 @@ import { useLearningStats } from '@/lib/use-learning-stats';
 import { useFavorites } from '@/lib/use-favorites';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
+import { persistJson, warnStorageFull } from '@/lib/capped-cache';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { cn, extractJson } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
@@ -103,7 +104,8 @@ export default function ShadowingPage() {
 
   // Persist custom materials to localStorage
   useEffect(() => {
-    safeStorage.setItem('__nativethink_custom_shadowing', JSON.stringify(customMaterials));
+    // AI 生成的跟读材料不可重算：写失败要说出来，不能只表现为"刷新后材料没了"
+    if (!persistJson('__nativethink_custom_shadowing', customMaterials)) warnStorageFull();
   }, [customMaterials]);
 
   // Navigate to a specific material via ?material=<title> query param
@@ -136,7 +138,7 @@ export default function ShadowingPage() {
   const [addingSentences, setAddingSentences] = useState<string | null>(null);
 
   useEffect(() => {
-    safeStorage.setItem('__nativethink_shadowing_extra', JSON.stringify(extraSentences));
+    if (!persistJson('__nativethink_shadowing_extra', extraSentences)) warnStorageFull();
   }, [extraSentences]);
 
   /**

@@ -5,11 +5,20 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { safeStorage } from './safe-storage';
+import { persistJson, warnStorageFull, appendCapped } from './capped-cache';
 import { extractJson } from './utils';
 import type { ISpellingSentence, SpellingDifficulty, SpellingSentenceSource } from '@/types/spelling';
 
 const SENTENCES_KEY = '__nativethink_spelling_sentences';
 const BATCH_COUNTER_KEY = '__nativethink_spelling_batch_counter';
+
+/**
+ * 句子库上限。拼写句子每条 ≈ 100–200 字节（中英各一句 + 元数据），
+ * 1,200 条约 150–250KB —— 再往上就是"整份句子库写不进 localStorage"的量级，
+ * 而这里的条目**不可重算**（AI 生成的、收藏导入的），所以到上限时**只拒绝新增、绝不裁剪已有**，
+ * 并把"本次只加进 N 条"如实告诉调用方。
+ */
+export const SPELLING_SENTENCE_LIMIT = 1200;
 
 function generateId(): string {
   return `spell_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -24,7 +33,9 @@ function loadSentences(): ISpellingSentence[] {
 }
 
 function saveSentences(sentences: ISpellingSentence[]) {
-  safeStorage.setItem(SENTENCES_KEY, JSON.stringify(sentences));
+  // 句子库是用户/AI 创作、不可重算的：写失败必须说出来（原先整份静默丢失，
+  // 症状是"导入的句子刷新后没了"）
+  if (!persistJson(SENTENCES_KEY, sentences)) warnStorageFull();
 }
 
 export function useSpellingSentences() {
@@ -47,13 +58,14 @@ export function useSpellingSentences() {
     saveSentences(items);
   }, []);
 
-  /** Add a single sentence (dedup by English text) */
+  /** Add a single sentence (dedup by English text). false = 已存在 或 句子库已到上限 */
   const addSentence = useCallback(
     (sentence: Omit<ISpellingSentence, 'id' | 'createdAt'>): boolean => {
       // Dedup: skip if same English text already exists
       if (sentences.some((s) => s.en.trim().toLowerCase() === sentence.en.trim().toLowerCase())) {
         return false;
       }
+      if (sentences.length >= SPELLING_SENTENCE_LIMIT) return false;
       const newItem: ISpellingSentence = {
         ...sentence,
         id: generateId(),
@@ -65,7 +77,7 @@ export function useSpellingSentences() {
     [sentences, persist],
   );
 
-  /** Add multiple sentences at once (batch add, dedup by English text) */
+  /** Add multiple sentences at once (batch add, dedup by English text). 到上限只加得进剩下的部分 */
   const addSentences = useCallback(
     (items: Omit<ISpellingSentence, 'id' | 'createdAt'>[]): number => {
       const existingTexts = new Set(sentences.map((s) => s.en.trim().toLowerCase()));
@@ -81,10 +93,10 @@ export function useSpellingSentences() {
           });
         }
       }
-      if (newItems.length > 0) {
-        persist([...sentences, ...newItems]);
-      }
-      return newItems.length; // number actually added
+      // 封顶在这里：不裁剪已有句子，多余的拒绝写入并由调用方报出 skipped
+      const { next, added } = appendCapped(sentences, newItems, SPELLING_SENTENCE_LIMIT);
+      if (added > 0) persist(next);
+      return added; // number actually added
     },
     [sentences, persist],
   );
@@ -104,6 +116,7 @@ export function useSpellingSentences() {
             changed++;
           }
         } else {
+          if (updated.length >= SPELLING_SENTENCE_LIMIT) continue; // 到上限只更新，不再新增
           updated.push({
             ...item,
             id: generateId(),
@@ -175,7 +188,7 @@ export function useSpellingSentences() {
       topic: string,
       difficulty: SpellingDifficulty,
       count: number,
-    ): Promise<{ success: boolean; count: number; error?: string }> => {
+    ): Promise<{ success: boolean; count: number; skipped?: number; error?: string }> => {
       const systemPrompt = `你是一位英语教师，正在创建句子拼写练习。
 
 请生成 ${count} 条英文句子，每条句子需满足：
@@ -220,7 +233,8 @@ export function useSpellingSentences() {
           }));
 
         const added = addSentences(items);
-        return { success: true, count: added };
+        // skipped 必须报出来：不报的话，"生成 20 条只进了 3 条"看起来像 AI 偷懒
+        return { success: true, count: added, skipped: items.length - added };
       } catch (e) {
         return { success: false, count: 0, error: 'AI 返回数据解析失败，请重试' };
       }

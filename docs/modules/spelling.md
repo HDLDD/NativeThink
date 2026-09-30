@@ -53,7 +53,7 @@
 | `__nativethink_spelling_progress` | SM-2 主体 | `use-spelling-learning.ts:11` |
 | `__nativethink_spelling_completed` | 本轮完成 | `:12` |
 | `__nativethink_spelling_served` | 最近出题记录，**超 4000 条剪最旧** | `:13,26-45` |
-| `__nativethink_spelling_sentences` | AI 生成的句子 | `use-spelling-sentences.ts:11` |
+| `__nativethink_spelling_sentences` | AI 生成的句子 + 收藏导入 + 例句导入，**上限 1200 条**（`use-spelling-sentences.ts:21` 的 `SPELLING_SENTENCE_LIMIT`） | 到上限**只拒绝新增、不裁剪已有**（`appendCapped`，`:97`）；`aiBatchAdd` 回报 `skipped`（`:233`），页面把它显示成"另有 N 条未导入"，满库时点导入也不会误报"都已导入过"。落盘走 `persistJson`，失败 `warnStorageFull()`（`:38`） |
 | `__nativethink_spelling_round_size` | 本轮句数 | `SpellingPage.tsx:451,502,1342` |
 | `__nativethink_spelling_resume` | 断点 `{activeLevel, currentIndex}` | `:967,975` |
 

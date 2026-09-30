@@ -104,7 +104,7 @@ node scripts/verify-tts-progress.mjs              # 6175 朗读切片与进度�
 node scripts/verify-tts-hardening.mjs             # 15   TTS 降级/在途去重/桌面限定（注意：没有 npm script）
 node scripts/verify-books-meta.mjs                # 222  书目元数据 + 复习词高亮
 node scripts/verify-vocab-cards.mjs               # 284  背单词卡片契约 + 手势决策表 + 换卡节奏 + 答错重排延后
-node scripts/verify-vocab-caches.mjs              # 21   缓存基建契约
+node scripts/verify-vocab-caches.mjs              # 67   缓存封顶 + 存储写失败可见（替身真跑）
 node scripts/verify-overlay-fit.mjs               # 16   窄视口浮层契约
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
 node scripts/verify-list-scaling.mjs              # 18   长列表必须折叠/分页（写作题库 + 词库浏览 + 短语库字母段）
@@ -258,7 +258,8 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 | 窄视口浮层点不到底部控件 | Popover 是 portal，页面滚动救不了；Dialog 基座 `translate-y-[-50%]` 超高时**上下两头一起溢出** | 外层 `max-h-[calc(var(--radix-popover-content-available-height)-1.5rem)] flex flex-col`，标题 `shrink-0`，正文 `flex-1 min-h-0 overflow-y-auto overscroll-contain`；正文里的嵌套小滚动在移动端去掉 `max-h + overflow-y-auto` |
 | 一屏渲染不完的列表拖垮首屏 | 一次性铺全部条目 | 默认折叠/分页 + 展开入口（**不许削弱用户入口**）；补 `verify-list-scaling` 式断言 |
 | 弹窗打开时按 Esc 连带退出当前流程 | Radix 在 document 冒泡阶段**同步 flush** 关弹窗 | 键盘监听用捕获阶段 `addEventListener('keydown', fn, true)` |
-| 按词累积的缓存撑爆 localStorage | 只增不减，写失败后整份静默丢失 | 新缓存一律走 `capped-cache.ts`；落盘走 persist effect |
+| 按词累积的缓存撑爆 localStorage | 只增不减，写失败后整份静默丢失（症状是"刷新后数据没了"） | **分两类**：AI 派生可重算 → `cappedPut` FIFO 封顶；用户创作不可重算 → `appendCapped` **只拒绝新增、绝不裁剪** |
+| 落盘失败完全无声 | `safeStorage.setItem` 过去 `catch {}` 吞掉配额错误 | 现在返回布尔（`safe-storage.ts:175`）；写用户清单的 effect 一律 `if (!persistJson(k, x)) warnStorageFull()`（全站 60s 去抖一条 toast，`capped-cache.ts:48`） |
 | AI 生成内容"格式异常"误报 | `use-ai` 失败返回 `''`，页面把空串当解析失败 | **先判 `result.trim()` 为空 → 服务不可用**；解析一律 `extractJson`，勿用贪婪正则。全仓 24 个解析点由 `npm run verify:ai-parse` 扫 |
 | 功能"两端都写了却点不到" | 组件与云函数都存在，但没有页面挂载；静态检查看不出断线 | 挂载点写进回归断言（`verify:feedback-loop` 检查 Header 是否渲染 `<FeedbackDialog />`）；新功能入口必须真机/真页面验证可达 |
 | 提交类操作谎报成功 | 后端只有一个 boolean，503（通道未配）与网络失败都归成"没成功"，UI 一律 toast 成功 | 结果分档返回（`delivered`/`stored`/`failed`），UI 按档给不同提示；失败保留条目并提供重试入口 |
@@ -288,7 +289,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 284 / 21 / 6175 / 15 / 16 / 10 / 18 / 23 / 16 / 18 / 10 / 16 / 24 / 55 / 74 + feedback-loop 58）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 284 / 67 / 6175 / 15 / 16 / 10 / 18 / 23 / 16 / 18 / 10 / 16 / 24 / 55 / 74 + feedback-loop 58）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`

@@ -78,7 +78,7 @@ AGENTS.md **旧版**坑表里那句「用户学习数据用原生 `localStorage`
 `use-cloud-sync.ts` 里 `DATA_PREFIX = '__nativethink_'`（`:8`）**只在 `syncUp` 的全量扫描里生效**（`:55`）。而登录后的 `registerCloudWrite()`（`:91-105`）注册的是 `safeStorage` 的双写处理器：
 
 ```
-safeStorage.setItem(key, value)            // safe-storage.ts:168-178
+safeStorage.setItem(key, value): boolean   // safe-storage.ts:175-190（2026-09-30 起返回是否写成功）
   └─ if (_cloudSyncHandler) _cloudSyncHandler(key, value)   ← 没有任何前缀过滤
        └─ pendingRef[key] = value → 3s 防抖 flushPending → POST /api/data/sync
 ```
@@ -110,11 +110,20 @@ safeStorage.setItem(key, value)            // safe-storage.ts:168-178
 
 **已知不符合约定的两处**：句子拼写用单个全局键 `__nativethink_spelling_resume` 存 `{activeLevel, currentIndex}`（`SpellingPage.tsx:967-987`），只能记住一本的位置；详见 `docs/modules/spelling.md`。
 
-### 3.6 按词累积的缓存一律走 `capped-cache`
+### 3.6 累积缓存一律封顶；不可重算的用户清单只拒绝、不裁剪
 
-以前 AI 例句/搭配翻译/深度解析只增不减，重度使用把 localStorage 撑爆，**写入失败后整份缓存静默丢失**。新缓存必须封顶；落盘放 persist effect，updater 保持纯。
+以前 AI 例句/搭配翻译/深度解析只增不减，重度使用把 localStorage 撑爆，**写入失败后整份缓存静默丢失**（症状是"刷新后东西没了"）。2026-09-30 把这条拆成两个方向，**两类数据的处置方式必须不同**：
 
-**仍在封顶之外的累积点**（本次文档盘点发现，供后续收敛）：`__nativethink_custom_prompts`（写作 AI 题，整份 JSON 每次变化重写）、`__nativethink_writing_history`（只有 `slice(-50)`，无键级上限）、`__nativethink_spelling_sentences`（AI 批量句子无上限）。
+| 类别 | 处置 | API |
+|---|---|---|
+| **AI 派生、可重算**（例句、释义翻译、替换题） | FIFO 封顶淘汰，按键数与每键条数双向限 | `cappedPut(obj, key, value, max)`（`capped-cache.ts:36`，纯函数，落盘交 effect） |
+| **用户/AI 创作、不可重算**（自建题目、自建语块、跟读材料、拼写句子库、「已记住」清单） | **绝不裁剪已有条目**；到上限只拒绝新增并如实报 `added/skipped` | `appendCapped(items, additions, max)`（`capped-cache.ts:64`）；拼写句子库上限 `SPELLING_SENTENCE_LIMIT = 1200`（`use-spelling-sentences.ts:21`） |
+
+**写失败必须可见**：`safeStorage.setItem` 现在返回布尔（`safe-storage.ts:175`，配额满时 `false` 而不是吞掉），`persistJson` 透传该结果（`capped-cache.ts:32`）。用户清单的 effect 统一写成 `if (!persistJson(key, x)) warnStorageFull();` —— `warnStorageFull`（`capped-cache.ts:48`）全站 60 秒去抖一条 toast，指路「学习记录 → 清理学习数据」。
+
+接线点（守卫 `verify-vocab-caches` ⑤ 逐个钉，M/N 变异各验红）：`custom_prompts`（WritingPage）、`custom_shadowing` + `shadowing_extra`（ShadowingPage）、`custom_chunks` + `chunk_ai_sentences` + `example_trans` + `ai_replacements` + `phrase_examples`（ChunkTrainingPage）、`custom_translations`/`_backs`/`_natives`（ThinkInEnglishPage）、`spelling_sentences`（use-spelling-sentences）、`browse_memorized`（DeepVocabularyPage）。语块侧上限钉死：AI 例句 200 键 / 每键 30 条、例句翻译 400 键、短语例句 300 键。
+
+**仍在封顶之外的累积点**（后续可收敛）：`__nativethink_writing_history`（只有 `slice(-50)`，无键级上限）、`__nativethink_shadowing_completed`（整份 JSON 每次变更重写，无限增长）。
 
 ### 3.7 组件卸载会带走 state
 
