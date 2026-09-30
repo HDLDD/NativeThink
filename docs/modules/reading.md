@@ -86,7 +86,7 @@ src/data/books-meta.ts   # 只含元数据，由 scripts/gen-books-meta.cjs 生�
 
 `ReaderProgress` 里 `total` 和 `chapters` **两个字段是必须存的**（`reader-shared.ts:22-35` 注释）：外部列表若拿「当前节选页数」当分母去除「全文空间的页码」，会显示 516%；`/books/index.json` 的 `chapters` 是 `dump-book-texts.cjs` 另算的，和阅读器切章结果不一致（弗兰肯斯坦 index 写 29、阅读器切出 32；爱丽丝 index 13、出现第 55 章），所以分母只能用保存时自己存下的那个。
 
-复习词高亮：`setHighlightWords()`（`src/lib/reader-highlight.ts`）模块级状态，`PageReader.tsx:205` 推入，颜色可选（柔和色系，6 种）。
+复习词高亮：`setHighlightWords()`（`src/lib/reader-highlight.ts`）模块级状态，`PageReader.tsx:213-220` 推入，颜色可选（柔和色系，6 种）。**词表两套字段互为兜底**：`reviewWords = highlightWords?.length ? highlightWords : rvWords ?? []` —— 新文章两个都有（点名的整批 vs 真出现在正文里的），**改造之前存下的老复习词文章只有 `rvWords`**；只认 `highlightWords` 的话，这类文章点进去零高亮、设置里也没有「待复习词的颜色」那一行 —— 本机 A/B 实测钉住（一次性 profile 里塞一篇只有 `rvWords` 的文章：有回退时颜色行写「（3 个）」并真框出 3 处，把源码改回旧写法同一份数据变成颜色行消失、0 处框词，12/12 全绿）。⚠️ 一度把"真机 83 上看不到颜色行"当成这条的证据，后来在本机复跑发现那次读数不可复现（那篇文章其实带 `highlightWords=50`），已按 A/B 结论改写措辞 —— 见 verification.md §4。注意 `rv-articles.ts:134` `rvRegenKeys` 的优先方向**相反**（重生成要用真出现过的词），这不是笔误。退出阅读器必须 `setHighlightWords(null)`，否则下一篇无辜文章被上一篇的词表染色。
 
 ### 2.6 复习词汇文章：选词 / 分篇 / 用词出队
 
@@ -113,5 +113,5 @@ src/data/books-meta.ts   # 只含元数据，由 scripts/gen-books-meta.cjs 生�
 8. **AI 文章的历史可点性 = `meta.aiId` 对应的文章还在**：`ArticlePage.tsx:824` 的 `clickable` 现在还会查 `aiArticles`（新条目都带 `aiId`，含复习词汇文章与自由生成文章）；文章删掉后提示「文章已被删除」，**老条目**（2026-09-30 之前写入、没有 `meta.aiId` 的）仍显示「此条记录生成于旧版本，无法恢复」。改历史面板时别把这条分支删回去。
 9. **`scp.ts` 是抓取产物，勿手改**（`node scripts/fetch-scp.cjs`，约 1 req/s）；它带 `SCP_LICENSE`，条目必须保留 `sourceUrl`（CC BY-SA 要求署名到具体来源）。
 10. **模块 `src/data/` 下有 .bak 与进度文件**：`chunks.ts.bak`、`shadowing.ts.bak`、`shadowing.ts.expand-progress.json`（483KB）。它们不进包，但会迷惑人和增大仓库；确认生成器不再依赖后可清理。
-11. **阅读器是 `fixed inset-0` 全屏层，必须自带 safe-area**：外壳那层内缩救不到它。2026-09-30 真机反馈「AI 生成文章顶部被手机顶部栏遮住」—— 实测小米 onyx 上 `env(safe-area-inset-top)=47px`，而阅读器顶栏 `top:0`，整条（含「退出阅读」）藏进状态栏。修法：根节点补 `safe-area-top safe-area-bottom`（`PageReader.tsx:1197`），底部翻页条同时躲开手势条。新增任何贴顶的全屏层同理，`verify-overlay-fit` ④ 会扫本文件里所有 `fixed inset-0`（单/双引号都吃、先剥注释）并要求非居中的那些带内缩；本机验收用 CDP `Emulation.setSafeAreaInsetsOverride`（参数是 `insets: {top,bottom,left,right}` 对象）强制 47/24，量顶栏 `top` 从 0 变 47。
+11. **阅读器是 `fixed inset-0` 全屏层，必须自带 safe-area**：外壳那层内缩救不到它。2026-09-30 真机反馈「AI 生成文章顶部被手机顶部栏遮住」—— 实测小米 onyx 上 `env(safe-area-inset-top)=47px`，而阅读器顶栏 `top:0`，整条（含「退出阅读」）藏进状态栏。修法：根节点补 `safe-area-top safe-area-bottom`（`PageReader.tsx:1210`），底部翻页条同时躲开手势条。新增任何贴顶的全屏层同理，`verify-overlay-fit` ④ 会扫本文件里所有 `fixed inset-0`（单/双引号都吃、先剥注释）并要求非居中的那些带内缩；本机验收用 CDP `Emulation.setSafeAreaInsetsOverride`（参数是 `insets: {top,bottom,left,right}` 对象）强制 47/24，量顶栏 `top` 从 0 变 47。
 12. **守卫覆盖**：数据层有 `verify-tts-progress`（朗读反查表）与 `verify-books-meta` ⑤⑥（书目拆分/元数据）；复习词汇文章的**选词/分篇/用词出队/体裁主题进提示词/覆盖判定/原位重写**由 `verify-rv-articles`（104 断言，含 27 条变异测试：13 条针对首版、14 条针对本次扩展）钉住。**切章对齐、翻译回填、进度百分比三件事仍没有脚本兜**，改这些要手动开真书验证：翻到中段 → 刷新看百分比 ≤100%，「翻译本章」后中文没有落到别章。

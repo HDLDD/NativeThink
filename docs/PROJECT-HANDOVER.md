@@ -1,7 +1,7 @@
 # NativeThink 项目交接手册（Agent Handover）
 
 > 面向**接手的 AI agent / 新同事**：只读这一份就能开工。
-> 最后校准：2026-09-30（**已打 `versionCode=82 / 2.0.37`**，含当天**前 9 项**改动 —— **第 10 项「快速闪卡训练页去掉每轮词数档位」是打包之后做的，不在 82 里**。`adb install -r` 回过 Success 后设备掉线，**真机复测未完成**：已验的是切换词书向导在真机上从视口顶部展开、带「当前」标记与「关闭」出口；**待真机再看的是两条** —— 阅读器顶栏被状态栏压住（81/2.0.36 上实测 inset=47px 时顶栏 `top:0`，已在本机用 CDP 强制 `safe-area-inset` 47/24 验过修复：顶栏 `top` 0 → 47）、快速闪卡训练页只剩只读卡数（本机 CDP 18 项真点全绿，含 393px 顶栏不换行不溢出）。其余见 §8 末尾两张坑表与 §9）。
+> 最后校准：2026-09-30（**真机已更到 `versionCode=84 / 2.0.39`**（`adb install -r`，数据没清），当天 11 项改动全部在包里；两条待真机复看的都已实测：**阅读器顶栏**在真实 inset 下 `paddingTop=47`、顶栏按钮 `top=58`（不再被状态栏压住），**快速闪卡训练页**只剩只读卡数、12 项真点全绿。⚠️ 收尾时设备又掉线（`adb devices` 空），**最后一条 `force-stop` 没打成** —— 设备重连后补 `adb shell am force-stop com.nativethink.app` 归位。其余见 §8 末尾两张坑表与 §9）。
 > 相关文档：`AGENTS.md`（**索引**：跨模块约定 + 模块文档导航）、[`docs/modules/`](./modules/)（**每模块一篇：功能 / 实现方法 / 注意事项，带 `文件:行号`**）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
 
 ---
@@ -180,7 +180,7 @@ npm run preview             # 本地预览构建产物（:4173）
 node scripts/verify-wordbank-loading.mjs     # 词库加载层集成验证（45 项：显示数=出卡池子、九本全载不互抢、缓存双写只在 IDB 失败时兜底）
 node scripts/verify-wordbank-split.mjs --baseline <out.json>   # 数据层拆分校验：采基线（拆分前后都能采）
 node scripts/verify-wordbank-split.mjs --check <in.json>
-npm run verify:books-meta        # 书目/SCP 元数据 + 书库拆分 + 复习词高亮 + 乱码（222 断言）
+npm run verify:books-meta        # 书目/SCP 元数据 + 书库拆分 + 复习词高亮 + 乱码（227 断言）
 npm run verify:vocab-cards       # 背单词卡片交互契约（290 断言；含换卡节奏数值锁 + 答错重排延后 + 换书路径）
 npm run verify:vocab-caches      # 词汇缓存基建契约（capped-cache / colloc-ai-cache 接线，21 断言）
 npm run verify:feedback-loop     # 反馈链路契约（挂载点 + 三档状态 + 后端 KV/飞书替身真实执行，58 断言）
@@ -405,8 +405,14 @@ node scripts/device-eval.mjs back
   ③ **复习词汇文章扩展**（`9b1e263`，用户选定方向）：每篇词数放开到 50、一次最多 6 篇；体裁（说明/记叙/议论/对话/书信）+ 主题（复用 `TOPICS`，含"不限"）经 `buildRvPrompt` 唯一构造点进提示词并随文章存下；`rvWords` 只记**真的出现在正文里**的词（`coveredReviewWords` 复用阅读器 `matchesHighlight` 的形态归并，不过度归并），漏用的自动退回词表并如实提示；已保存文章可「重写这篇」—— `replaceAiArticle` 原位替换保持 id（收藏 `content` 与历史 `meta.aiId` 不断链）、沿用文章自己的体裁主题、失败保留原文。`verify-rv-articles` 55 → 104 断言（累计 27 条变异全红）+ CDP 42 项。
   ④ **云同步下行后 7 个 hook 都重读**（`cb6c180`）：订阅收成单一出口 `src/lib/sync-down.ts`（事件名只定义一次、`onSyncDown` 可用假 target 真跑），新增 SM-2 词学习 / 语块学习 / 生词本 / 我的助记；顺带掐掉回声写（下行重读后原样回写 = 登录后一次 POST）—— 引用一致跳过为主、序列化同值不写为辅。`verify-cloud-sync` 18 → 43 断言 + 10 条变异 + CDP 12 项。
 - **新增 `npm run verify:all`**（同日）：自动发现全部 `scripts/verify-*.mjs` + typecheck，一条红就非零退出。理由是一条真实翻车：改复习词汇文章当天 `verify-rv-articles` 全绿，而 `verify-books-meta` 里盯同一处源码的断言**早已失效** —— 只有全量跑法能发现这种跨守卫漂移（已写进 `AGENTS.md` 提交前清单与 `docs/modules/verification.md` §5）。当时基线：**18 条契约守卫 / 断言合计 7,220 条**（**2026-09-30 收盘复跑：19 条 / 7,269 条全绿**，`npm run build:web` 通过、首屏必需 JS 199.5KB gzip）。
-- **阅读器全屏层自带 safe-area**（`be64f2f`，真机反馈"AI 生成文章顶部被手机顶部栏遮住"）：`PageReader` 是 `fixed inset-0` 的全屏层，**跳出了外壳 `SidebarProvider` 那层 safe-area 内缩**，Android 15+ edge-to-edge 下顶栏整条被状态栏压住。修法：根节点补 `safe-area-top safe-area-bottom`（`PageReader.tsx:1197`），并在 `verify-overlay-fit` ④ 加"阅读器全屏层都带 top/bottom + 扫不到第二处贴顶内容层"；本机验收用 CDP `Emulation.setSafeAreaInsetsOverride`（**insets 传对象**）强制 47/24 量顶栏 `top`（0 → 47）。
+- **阅读器全屏层自带 safe-area**（`be64f2f`，真机反馈"AI 生成文章顶部被手机顶部栏遮住"）：`PageReader` 是 `fixed inset-0` 的全屏层，**跳出了外壳 `SidebarProvider` 那层 safe-area 内缩**，Android 15+ edge-to-edge 下顶栏整条被状态栏压住。修法：根节点补 `safe-area-top safe-area-bottom`（`PageReader.tsx:1210`），并在 `verify-overlay-fit` ④ 加"阅读器全屏层都带 top/bottom + 扫不到第二处贴顶内容层"；本机验收用 CDP `Emulation.setSafeAreaInsetsOverride`（**insets 传对象**）强制 47/24 量顶栏 `top`（0 → 47）。
 - **快速闪卡训练页不再提供每轮词数**（2026-09-30 用户点名）：`10/20/50/100/全部` 从训练页顶栏撤掉，只留起跑页那份（改档位 = 重建随机队列 = 本轮已作答全部清空）。训练页顶栏改只读 `SPAN` 报 `本轮 {uniqueTotal} 词 · 换数量请返回`。`verify-vocab-cards` ⑤b 7 条断言（284 → 290，含"起跑页档位仍可点"正对照）+ 5 条变异全红 + CDP 真点 18 项（向导进训练页 / 答 3 张 / 刷新续学 / 返回改 50 / 重开一轮 / 393px 顶栏不换行不溢出）。见 `docs/modules/vocabulary.md` 注意事项第 12 条。
+- **2026-09-30 晚：真机补验两条 + 顺手修掉复习词高亮的字段断层**（`50ea54e`，APK 83/2.0.38 → 84/2.0.39）：
+  ① **阅读器顶栏**在真机（小米 onyx，实测 inset 顶 47 / 底 16）：`PageReader` 根节点 `paddingTop=47`，「退出阅读 / 阅读设置」两键 `top=58` —— 不再整条藏进状态栏；横向 `scrollWidth 393 = innerWidth 393`。
+  ② **快速闪卡**训练页 12 项真点全绿：顶栏只有只读卡数（`本轮 50 词 · 换数量请返回`，是 SPAN 不是 BUTTON）、三处状态（初次开轮 / 断点续学 / 换 50 后的新轮）都扫不到可点档位，返回后起跑页 `10,20,50,100,全部` 齐在、改 50 下一轮真按 `0/50` 起，杀掉页面重进进度仍是 `1/50`。
+  ③ 走查复习词文章时发现**只有 `rvWords` 的老文章点进阅读器不高亮**（两套字段各写各的）→ `PageReader` 加 `highlightWords → rvWords` 回退；`verify-books-meta` 那条旧断言重新推导成 6 条（222 → 227，含"旧写法必须消失"反向正对照）+ 3 条变异全红 + **本机 A/B 真跑 12 项**（塞一篇只有 rvWords 的文章：有回退 → 颜色行「（3 个）」+ 3 处框词；把源码改回旧写法 → 颜色行消失 + 0 处，按 sha256 还原）。
+  ⚠️ 三条记录纪律：② 里那条"真机 83 看不到颜色行"最初被我当成 ③ 的证据，回头在 84 上复现不了（那篇文章其实带 `highlightWords=50`）→ 已把结论改挂到能复现的 A/B 上，教训写进 `docs/modules/verification.md` §4 第 6 条。
+  ④ **收尾未完成**：设备在最后一条 `force-stop` 之前又掉线（`adb devices` 空，`kill-server/start-server` 没救回来）→ 重连后补 `adb shell am force-stop com.nativethink.app`。走查过程中答掉的十来张闪卡是真学习数据（SM-2 + 时长照计），选词面板的临时选择已复原成 0 词。
 
 ### 未完成 / 已知短板
 1. ~~**切换词书必须多走一步「学习方式」**~~（2026-09-29 用户报，**已修**）。

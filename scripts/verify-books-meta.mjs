@@ -283,10 +283,11 @@ check(
     '「用复习词汇生成文章」把点名词交给阅读器高亮，只把真用上的记为 rvWords');
   check(/highlightWords\?: string\[\];/.test(readFileSync(join(ROOT, 'src/data/reading.ts'), 'utf8')), 'IReadingContent 有 highlightWords 字段');
   /**
-   * 2026-09-30 真机（83/2.0.38）实测到的断层：改造前存下的复习词文章只带 `rvWords`，
-   * 阅读器只认 `highlightWords` —— 列表行写着「复习词 42」，点进去一个词都不高亮，
-   * 阅读设置里连「待复习词的颜色」那一行都不出现。两套字段改成互为兜底：
-   * 高亮优先"点名的一整批"（highlightWords），老数据回落 rvWords；`rvRegenKeys` 反向优先 rvWords（重生成要用真出现过的词）。
+   * 老复习词文章只带 `rvWords`（改造之前存下来的那种），只认 `highlightWords` 时点进去一个词都不框、
+   * 设置里连「待复习词的颜色」那一行都没有。两套字段互为兜底：高亮优先"点名的一整批"（highlightWords），
+   * 老数据回落 rvWords；`rvRegenKeys` 反向优先 rvWords（重生成要用真出现过的词）。
+   * 这 6 条的行为依据是本机 A/B（塞一篇只有 rvWords 的文章：有回退 → 颜色行「（3 个）」+ 3 处框词；
+   * 把源码改回旧写法 → 颜色行消失 + 0 处框词），不是靠"看着像"。
    */
   check(/const reviewWords = useMemo\(\s*\(\) => \(content\.highlightWords\?\.length \? content\.highlightWords : content\.rvWords \?\? \[\]\)/.test(pageReaderSrc),
     '阅读器复习词表按 highlightWords → rvWords 回退（老复习词文章不再有高亮断层）');

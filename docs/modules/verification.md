@@ -17,7 +17,7 @@
 | `verify-cloud-sync-hygiene.mjs` | 43 | 云同步四条不变量：转译**真实** `use-cloud-sync` + `safe-storage` 在 Node 里驱动 —— 下行后 0 次 POST（回声）、同键本地再写必须 1 次 POST（正对照）、空 catch 数为 0、周期补推按需且 `needsResync` 引用稳定；④ 新增**用假 target 真跑 `sync-down`**（通知/退订/异常隔离/事件名一致）+ 7 个订阅者逐个点名 + "没有任何 hook 再自己拼事件名" + SM-2/语块两道回声判据都在 | 改 `use-cloud-sync.ts` / `sync-down.ts` / `CloudSyncProvider.tsx` / `safe-storage.ts` 双写钩子 / 任何 `useSyncDown` 调用点 |
 | `verify-wordbank-loading.mjs` | 45 | 加载层集成：显示数 = 出卡池子、九本不互抢、IDB 失败才兜底 localStorage | 改词库或加载层 |
 | `verify-wordbank-split.mjs` | 数据全量比对 | 拆分校验：`--baseline` 采基线（**拆分前后都能采**）、`--check` 逐项断言 | 改词库拆分 |
-| `verify-books-meta.mjs` | 222 | ①–④ 生成器与数据不漂移；⑤ books/book-clean/books-meta 拆分（**实际加载两个模块交叉核对**）；⑥ HelpGuide 文案 vs `meta.ts`/`ai-config.ts` | 改书单、scp、reader-highlight |
+| `verify-books-meta.mjs` | 227 | ①–④ 生成器与数据不漂移；⑤ books/book-clean/books-meta 拆分（**实际加载两个模块交叉核对**）；⑥ HelpGuide 文案 vs `meta.ts`/`ai-config.ts` | 改书单、scp、reader-highlight |
 | `verify-vocab-cards.mjs` | 290 | 背单词卡片交互契约 + 手势决策表 + 换卡节奏（数值锁）+ 答错重排延后 + 静默契约 + 换书路径 + 预载门 + HelpGuide 内容 | 改 FlashcardMode/QuickCardMode/vocab-* |
 | `verify-vocab-caches.mjs` | 67 | 缓存与存储写入基建：`cappedPut`/`mergeCollocAiCache`/`appendCapped` 纯函数**真跑** + **注入 localStorage 替身真跑 safe-storage/capped-cache**（配额满时 `setItem`/`persistJson` 返回 false、`warnStorageFull` 60s 只提示一次）+ 九个不可重算清单的接线与派生缓存的上限数值 | 改缓存基建接线 / 改任何 `persistJson`·`cappedPut` 调用点 |
 | `verify-tts-progress.mjs` | 6175 | 「读到哪」反查表恒等式：各段词数之和 === 各切片词数之和（书目 22 / 页 419 / 切片 3785 + 5 项脚手架自检） | 改 TTS 切片上限或阅读器朗读逻辑 |
@@ -76,6 +76,7 @@ node scripts/device-eval.mjs shot .screen.png
 3. **文案变了要重新推导对齐断言，而不是放宽它**。断言数**只增不减**，除非删功能。
 4. **没定性就停住，别改绿**。自己抓到的反例：HelpGuide 的词数断言在变异掉两处出现之一后仍然通过 → 重写成「计数 + 禁止出现词条数那个数字」，再跑变异才变红。
 5. **改完一个模块要跑"引用了同一处源码"的所有守卫，不是只跑自己那条**。2026-09-30 真实翻车：复习词汇文章改造把 `highlightWords: words.map(...)` 换成了统一构造的 `highlightWords: args.keys`，`verify-rv-articles` 当天全绿，而 `verify-books-meta` 里那条同样盯这个写法的断言**已经悄悄失效**（它读的还是同一个 `ArticlePage.tsx`）—— 直到后来跑全量才发现。教训落成了习惯：见 §5 的全量跑法，收尾必跑。
+6. **一次性的"看到了"不算证据，能复现的 A/B 才算**。同日真实教训：真机 83 上查「待复习词的颜色」那一行没出现，我就把它写成"实测到的断层"并照着去修。回头在 84 上同一步骤重量，那一行又出现了 —— 把那篇文章的存储读出来才对上：它其实带 `highlightWords=50`，旧写法照样会出那一行，所以 83 那次读数根本不支持我的结论（阅读器在章节未点进时的渲染时序 / 我量的是刚打开的那一瞬，都可能是原因）。修法是把判据换成**可复现的 A/B**：本机一次性 profile 里塞一篇只有 `rvWords` 的老形状文章 → 有回退时颜色行「（3 个）」+ 真框出 3 处；把源码临时改回旧写法（按 sha256 还原）→ 颜色行消失 + 0 处。**结论：修是修对了（第二类文章确实没高亮），但记录里的证据必须换成这次 A/B，不能留着那条我复现不了的"真机实测"。**
 
 ## 5. 全量跑法（收尾必跑）
 
@@ -85,7 +86,7 @@ npm run verify:all        # scripts/verify-all.mjs：typecheck + 全部 verify-*
 
 它自动发现 `scripts/verify-*.mjs`，所以新增守卫不用登记。两处刻意跳过：`verify-wordbank-split`（要 `--baseline/--check` 的基线文件）、`verify-bundle-budget`（没有 `dist/client` 产物时跳过 —— **先 `npm run build:web` 再跑才算真验过体积**）。
 
-2026-09-30 实测：typecheck + 19 条守卫全绿，**断言合计 7,269 条**（tts-progress 一条就占 6,175；其余 18 条相加：45+222+290+67+15+16+10+18+23+23+16+43+16+24+10+104+74+36+58 = 1,094。旧版这条漏算了 shadowing-completion 的 23，且 vocab-cards 还是 284，两个口径都在这轮对齐）。
+2026-09-30 实测：typecheck + 19 条守卫全绿，**断言合计 7,274 条**（tts-progress 一条就占 6,175；其余 18 条相加：45+227+290+67+15+16+10+18+23+23+16+43+16+24+10+104+74+36+58 = 1,099。旧版这条漏算了 shadowing-completion 的 23，两个口径已对齐；books-meta 227 = 原 222 + 复习词高亮回退那 6 条（其中一条是"旧写法必须消失"的反向正对照））。
 
 ## 6. 静态检查的已知弱度
 

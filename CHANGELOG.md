@@ -8,6 +8,7 @@
 
 
 ## 2026-09-30
+- docs(reading): 说清高亮与重生成的两套词表优先方向为何相反 (`696f9bd`)
 - fix(reading): 阅读器复习词高亮按 highlightWords → rvWords 回退 (`50ea54e`)
 - docs(vocabulary): 快速闪卡去档位的 CDP 记录补全（18 项，含 393px 顶栏不换行不溢出） (`75a562e`)
 - fix(vocabulary): 快速闪卡训练页不再提供每轮词数，避免中途切换清空本轮进度 (`090ed6f`)

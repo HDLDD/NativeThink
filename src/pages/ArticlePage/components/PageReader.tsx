@@ -207,8 +207,8 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   /**
    * 两套字段互为兜底（`rv-articles.ts:rvRegenKeys` 同样两套，只是优先方向相反 —— 那边要"真用上的词"重生成，
    * 这边要"点名的一整批"高亮）：**新文章两个都有，改造之前存下的老复习词文章只有 `rvWords`**。
-   * 真机（2026-09-30，83/2.0.38）实测到断层 —— 列表行明明写着「复习词 42」，
-   * 点进阅读器却一个词都不高亮、设置里也没有「待复习词的颜色」那一行。
+   * 只认 `highlightWords` 时那种老文章点进去一个词都不框（本机 A/B 实测：颜色行「（3 个）」+ 3 处框词，
+   * 改回旧写法同一份数据变成颜色行消失 + 0 处）。
    */
   const reviewWords = useMemo(
     () => (content.highlightWords?.length ? content.highlightWords : content.rvWords ?? []),
