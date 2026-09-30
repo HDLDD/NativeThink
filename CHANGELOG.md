@@ -8,6 +8,7 @@
 
 
 ## 2026-09-30
+- docs(verification): 真机补验 84/2.0.39 的结果，并把高亮结论改挂到可复现的 A/B (`d11117a`)
 - docs(reading): 说清高亮与重生成的两套词表优先方向为何相反 (`696f9bd`)
 - fix(reading): 阅读器复习词高亮按 highlightWords → rvWords 回退 (`50ea54e`)
 - docs(vocabulary): 快速闪卡去档位的 CDP 记录补全（18 项，含 393px 顶栏不换行不溢出） (`75a562e`)
