@@ -540,7 +540,35 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   // ⑤ 「单词上限解开」= 增加不限量档位
   check(/const ROUND_ALL = 0;/.test(qc), '定义「全部」档位（0 = 不限量）');
   check(/v === ROUND_ALL \|\| \(ROUND_SIZES as readonly number\[\]\)\.includes\(v\)/.test(qc), '「全部」档位能持久化（0 不被回退成 20）');
-  check(/全部/.test(qc), '「全部」有可见入口');
+
+  /**
+   * ⑤b 每轮数量**只能在起跑页改**（2026-09-30 用户要求）。
+   *
+   * 训练页顶栏原先有一排 10/20/50/100/全部：`changeRoundSize` → `roundSize` 变 →
+   * 重建队列的 effect ② 重新随机抽一轮，**本轮已作答的认识/不认识全部清空**。
+   * 所以断言分两侧，缺一不可：
+   *   - 起跑页（`if (paused)` → `if (!cw)`）仍然给得出档位 —— 不许把功能整个删掉；
+   *   - 训练页（`if (!cw)` 之后到组件 return 结束）没有任何 `changeRoundSize` 调用点。
+   * 区域用两个分支标记切，不按行号。**两侧都是必需的**：只留"训练页没有"这一侧，
+   * 实现把起跑页的档位一起删掉也算过 —— 那正是本项目明令禁止的"削弱用户入口"。
+   * 变异实测（把档位塞回训练页 / 把起跑页档位点掉，共 5 条）见临时脚本 nt-mutate-roundsize.mjs，全红。
+   */
+  const pausedAt = qc.indexOf('if (paused) {');
+  const loadingAt = qc.indexOf('if (!cw) {');
+  check(pausedAt > 0 && loadingAt > pausedAt, '⑤b 起跑页 / 加载中 / 训练页三个分支能按标记切开');
+  const setupPage = qc.slice(pausedAt, loadingAt);
+  /** 训练页主体（顶栏 + 卡片 + 进度条）；后面的 WordChip / 面板 / 详情弹窗是子组件，另算 */
+  const practicePage = qc.slice(loadingAt, qc.indexOf('\nfunction WordChip'));
+  const sizeCalls = [...qc.matchAll(/changeRoundSize\(/g)];
+  check(sizeCalls.length === 2 && sizeCalls.every((m) => m.index > pausedAt && m.index < loadingAt),
+    `⑤b 全文件的档位调用点只有起跑页那两处（实际 ${sizeCalls.length} 处）—— 训练页与子组件一个都没有`);
+  check(!/ROUND_SIZES\.map/.test(practicePage), '⑤b 训练页顶栏不再铺 10/20/50/100 按钮组');
+  check(setupPage.includes('onClick={() => changeRoundSize(n)}') && setupPage.includes('onClick={() => changeRoundSize(ROUND_ALL)}'),
+    '⑤b 起跑页仍可挑档位（10/20/50/100 + 全部）—— 只挪走入口，不削功能');
+  check(/本轮可出 \{roundSize === ROUND_ALL/.test(setupPage), '⑤b 起跑页把本轮出词数写在标题里');
+  check(/本轮 \{uniqueTotal\} 词/.test(practicePage),
+    '⑤b 训练页保留**只读**的本轮词数提示（分母与进度条同源，断点续学后也不会说错数）');
+  check(/换数量请返回/.test(practicePage), '⑤b 只读提示说清去哪改数量');
 
   // ⑥ 返回必须真的返回：原先 setQueue([]) 会被重建队列的 effect 立刻填回去
   check(/if \(paused\) return;/.test(qc), '暂停态不自动重建队列');

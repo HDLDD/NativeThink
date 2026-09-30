@@ -103,7 +103,7 @@ node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆�
 node scripts/verify-tts-progress.mjs              # 6175 朗读切片与进度反查表
 node scripts/verify-tts-hardening.mjs             # 15   TTS 降级/在途去重/桌面限定（注意：没有 npm script）
 node scripts/verify-books-meta.mjs                # 222  书目元数据 + 复习词高亮
-node scripts/verify-vocab-cards.mjs               # 284  背单词卡片契约 + 手势决策表 + 换卡节奏 + 答错重排延后
+node scripts/verify-vocab-cards.mjs               # 290  背单词卡片契约 + 手势决策表 + 换卡节奏 + 答错重排延后
 node scripts/verify-vocab-caches.mjs              # 67   缓存封顶 + 存储写失败可见（替身真跑）
 node scripts/verify-overlay-fit.mjs               # 23   窄视口浮层契约 + 全屏层自带 safe-area
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
@@ -293,7 +293,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 222 · vocab-cards 284 · vocab-caches 67 · tts-progress 6175 · tts-hardening 15 · overlay-fit 23 · bundle-budget 10 · list-scaling 18 · shadowing 23 · backup-idb 16 · cloud-sync 43 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · rv-articles 104 · study-credit 74 · chain-verdict 36 · feedback-loop 58；合计 7,263）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 222 · vocab-cards 290 · vocab-caches 67 · tts-progress 6175 · tts-hardening 15 · overlay-fit 23 · bundle-budget 10 · list-scaling 18 · shadowing 23 · backup-idb 16 · cloud-sync 43 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · rv-articles 104 · study-credit 74 · chain-verdict 36 · feedback-loop 58；合计 7,269）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`

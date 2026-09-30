@@ -1,7 +1,7 @@
 # NativeThink 项目交接手册（Agent Handover）
 
 > 面向**接手的 AI agent / 新同事**：只读这一份就能开工。
-> 最后校准：2026-09-30（**已打 `versionCode=82 / 2.0.37`**，含当天全部 9 项改动。`adb install -r` 回过 Success 后设备掉线，**真机复测未完成**：已验的是切换词书向导在真机上从视口顶部展开、带「当前」标记与「关闭」出口；**待真机再看的一条**是阅读器顶栏被状态栏压住（81/2.0.36 上实测 inset=47px 时顶栏 `top:0`）—— 已在本机用 CDP 强制 `safe-area-inset` 47/24 验过修复（顶栏 `top` 0 → 47）。其余见 §8 末尾两张坑表与 §9）。
+> 最后校准：2026-09-30（**已打 `versionCode=82 / 2.0.37`**，含当天**前 9 项**改动 —— **第 10 项「快速闪卡训练页去掉每轮词数档位」是打包之后做的，不在 82 里**。`adb install -r` 回过 Success 后设备掉线，**真机复测未完成**：已验的是切换词书向导在真机上从视口顶部展开、带「当前」标记与「关闭」出口；**待真机再看的是两条** —— 阅读器顶栏被状态栏压住（81/2.0.36 上实测 inset=47px 时顶栏 `top:0`，已在本机用 CDP 强制 `safe-area-inset` 47/24 验过修复：顶栏 `top` 0 → 47）、快速闪卡训练页只剩只读卡数（本机 CDP 16 项真点全绿）。其余见 §8 末尾两张坑表与 §9）。
 > 相关文档：`AGENTS.md`（**索引**：跨模块约定 + 模块文档导航）、[`docs/modules/`](./modules/)（**每模块一篇：功能 / 实现方法 / 注意事项，带 `文件:行号`**）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
 
 ---
@@ -15,7 +15,7 @@
 | 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
 | 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-09 两轮全站质量优化已把拼写/跟读/写作/对话/语块也扫过一遍 |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 18 条可跑的 `scripts/verify-*.mjs` 断言脚本（另有 verify-wordbank-split 需基线参数、verify-all 是全量跑法）（2026-09-30 实测 vocab-cards 284；其余最近一次全绿记录与完整断言数见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 18 条可跑的 `scripts/verify-*.mjs` 断言脚本（另有 verify-wordbank-split 需基线参数、verify-all 是全量跑法）（2026-09-30 实测 vocab-cards 290；其余最近一次全绿记录与完整断言数见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
 | 改某个模块前 | 读 [`docs/modules/`](./modules/) 里对应那一篇 —— 功能、实现方法、以及**逐条读代码核实过**的注意事项（本手册与 AGENTS.md 的若干旧说法在那里被推翻并已修正） |
 | 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
@@ -181,7 +181,7 @@ node scripts/verify-wordbank-loading.mjs     # 词库加载层集成验证（45 
 node scripts/verify-wordbank-split.mjs --baseline <out.json>   # 数据层拆分校验：采基线（拆分前后都能采）
 node scripts/verify-wordbank-split.mjs --check <in.json>
 npm run verify:books-meta        # 书目/SCP 元数据 + 书库拆分 + 复习词高亮 + 乱码（222 断言）
-npm run verify:vocab-cards       # 背单词卡片交互契约（284 断言；含换卡节奏数值锁 + 答错重排延后 + 换书路径）
+npm run verify:vocab-cards       # 背单词卡片交互契约（290 断言；含换卡节奏数值锁 + 答错重排延后 + 换书路径）
 npm run verify:vocab-caches      # 词汇缓存基建契约（capped-cache / colloc-ai-cache 接线，21 断言）
 npm run verify:feedback-loop     # 反馈链路契约（挂载点 + 三档状态 + 后端 KV/飞书替身真实执行，58 断言）
 npm run verify:overlay-fit       # 窄视口浮层契约（Dialog 基座夹高度 + 朗读/AI 设置内部滚动，16 断言）
@@ -225,7 +225,7 @@ adb install -r release/NativeThink-mobile-debug.apk
 1. **断言要重新推导，不能照抄**。改语义时必须连断言一起改 —— 历史上 `viewingPast = rated && isFlipped` 这个**错误定义被断言一起锁死**，导致"评分后自动跳转"永远不触发却一直是绿的。
 2. 断言里加**脚手架自检**（例如"解析到的条目数必须等于源文件条目数"），否则正则会静默漏项（曾漏掉含撇号的书名）。
 3. 数据文件混用单/双引号，正则要写 `(?:[^"\\]|\\.)*`；解析 TS 数据优先用 `ts.transpileModule` 而不是正则。
-4. 断言数会随功能增长（`verify-vocab-cards` 135 → 225 → 246 → 284），**只增不减**，除非删功能。
+4. 断言数会随功能增长（`verify-vocab-cards` 135 → 225 → 246 → 284 → 290），**只增不减**，除非删功能。
 
 ---
 
@@ -404,7 +404,9 @@ node scripts/device-eval.mjs back
   ② **落盘失败不再静默**（`d242cf4`）：`safeStorage.setItem` 返回布尔（过去 `catch {}` 吞配额错误），9 个不可重算清单的 effect 一律 `if (!persistJson(…)) warnStorageFull()`（全站 60s 去抖，指路清理入口）；AI 派生可重算的三份语块缓存 FIFO 封顶（200 键·每键 30 条 / 400 / 300），拼写句子库用 `appendCapped`（1200 条上限，**只拒绝新增、绝不裁剪已有**，`skipped` 如实报出）。`verify-vocab-caches` 21 → 67 断言（注入 localStorage 替身真跑）+ 10 条变异 + CDP 20 项。
   ③ **复习词汇文章扩展**（`9b1e263`，用户选定方向）：每篇词数放开到 50、一次最多 6 篇；体裁（说明/记叙/议论/对话/书信）+ 主题（复用 `TOPICS`，含"不限"）经 `buildRvPrompt` 唯一构造点进提示词并随文章存下；`rvWords` 只记**真的出现在正文里**的词（`coveredReviewWords` 复用阅读器 `matchesHighlight` 的形态归并，不过度归并），漏用的自动退回词表并如实提示；已保存文章可「重写这篇」—— `replaceAiArticle` 原位替换保持 id（收藏 `content` 与历史 `meta.aiId` 不断链）、沿用文章自己的体裁主题、失败保留原文。`verify-rv-articles` 55 → 104 断言（累计 27 条变异全红）+ CDP 42 项。
   ④ **云同步下行后 7 个 hook 都重读**（`cb6c180`）：订阅收成单一出口 `src/lib/sync-down.ts`（事件名只定义一次、`onSyncDown` 可用假 target 真跑），新增 SM-2 词学习 / 语块学习 / 生词本 / 我的助记；顺带掐掉回声写（下行重读后原样回写 = 登录后一次 POST）—— 引用一致跳过为主、序列化同值不写为辅。`verify-cloud-sync` 18 → 43 断言 + 10 条变异 + CDP 12 项。
-- **新增 `npm run verify:all`**（同日）：自动发现全部 `scripts/verify-*.mjs` + typecheck，一条红就非零退出。理由是一条真实翻车：改复习词汇文章当天 `verify-rv-articles` 全绿，而 `verify-books-meta` 里盯同一处源码的断言**早已失效** —— 只有全量跑法能发现这种跨守卫漂移（已写进 `AGENTS.md` 提交前清单与 `docs/modules/verification.md` §5）。当前基线：**18 条契约守卫 / 断言合计 7,220 条**、`npm run build:web` 通过、首屏必需 JS 199.5KB gzip。
+- **新增 `npm run verify:all`**（同日）：自动发现全部 `scripts/verify-*.mjs` + typecheck，一条红就非零退出。理由是一条真实翻车：改复习词汇文章当天 `verify-rv-articles` 全绿，而 `verify-books-meta` 里盯同一处源码的断言**早已失效** —— 只有全量跑法能发现这种跨守卫漂移（已写进 `AGENTS.md` 提交前清单与 `docs/modules/verification.md` §5）。当时基线：**18 条契约守卫 / 断言合计 7,220 条**（**2026-09-30 收盘复跑：19 条 / 7,269 条全绿**，`npm run build:web` 通过、首屏必需 JS 199.5KB gzip）。
+- **阅读器全屏层自带 safe-area**（`be64f2f`，真机反馈"AI 生成文章顶部被手机顶部栏遮住"）：`PageReader` 是 `fixed inset-0` 的全屏层，**跳出了外壳 `SidebarProvider` 那层 safe-area 内缩**，Android 15+ edge-to-edge 下顶栏整条被状态栏压住。修法：根节点补 `safe-area-top safe-area-bottom`（`PageReader.tsx:1197`），并在 `verify-overlay-fit` ④ 加"阅读器全屏层都带 top/bottom + 扫不到第二处贴顶内容层"；本机验收用 CDP `Emulation.setSafeAreaInsetsOverride`（**insets 传对象**）强制 47/24 量顶栏 `top`（0 → 47）。
+- **快速闪卡训练页不再提供每轮词数**（2026-09-30 用户点名）：`10/20/50/100/全部` 从训练页顶栏撤掉，只留起跑页那份（改档位 = 重建随机队列 = 本轮已作答全部清空）。训练页顶栏改只读 `SPAN` 报 `本轮 {uniqueTotal} 词 · 换数量请返回`。`verify-vocab-cards` ⑤b 7 条断言（284 → 290，含"起跑页档位仍可点"正对照）+ 5 条变异全红 + CDP 真点 16 项（向导进训练页 / 答 3 张 / 刷新续学 / 返回改 50 / 重开一轮）。见 `docs/modules/vocabulary.md` 注意事项第 12 条。
 
 ### 未完成 / 已知短板
 1. ~~**切换词书必须多走一步「学习方式」**~~（2026-09-29 用户报，**已修**）。
@@ -494,7 +496,7 @@ node scripts/device-eval.mjs back
 
 **改完代码**
 - [ ] `npm run typecheck`、`npm run lint:eslint`、`npm run build:web`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言（断言数以 [modules/verification.md](./modules/verification.md) 表格为准；2026-09-30 实测 vocab-cards 284 全绿）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言（断言数以 [modules/verification.md](./modules/verification.md) 表格为准；2026-09-30 实测 vocab-cards 290 全绿）
 - [ ] 改过词库文件 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 真机装机验证（涉及 safe-area / 原生 TTS / 手势 / 持久化的改动**必须**真机验；动手前先报备，收尾 `force-stop`）
 

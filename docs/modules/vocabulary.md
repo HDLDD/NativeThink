@@ -1,7 +1,7 @@
 # 词汇深度（`/vocabulary`）
 
 > 代码：`src/pages/DeepVocabularyPage/`（页面 1 个 + `components/` 5 个，约 7,700 行）+ `src/lib/` 里 6 个支撑模块
-> 数据来自：[词库数据层](./wordbank-data.md) · 朗读见 [朗读引擎](./tts.md) · 守卫：`npm run verify:vocab-cards`（284 断言）
+> 数据来自：[词库数据层](./wordbank-data.md) · 朗读见 [朗读引擎](./tts.md) · 守卫：`npm run verify:vocab-cards`（290 断言）
 > 最后校准：2026-09-30
 
 ## 这个模块是什么
@@ -55,7 +55,7 @@
 
 答错重排：`RELEARN_GAP = 4`、`MAX_RELEARN = 2`（`src/lib/vocab-session.ts:14-16`），插入前先移除旧位置、超出队尾不回绕（`:37-53`）。
 
-> ⚠️ **重排有三份平行实现**：`vocab-session.ts`（复习检测用）、`DailyLearningMode.tsx:546-557`（自写 splice，**不去旧位置**）、`QuickCardMode.tsx:386-401`（queue 与 results 同步 splice）。改一处参数**不会**同步另两处。
+> ⚠️ **重排有三份平行实现**：`vocab-session.ts`（复习检测用）、`DailyLearningMode.tsx:546-557`（自写 splice，**不去旧位置**）、`QuickCardMode.tsx:388-404`（queue 与 results 同步 splice）。改一处参数**不会**同步另两处。
 
 ### 复习检测的换卡节奏（2026-09-30 提速，别把值调回去）
 
@@ -91,7 +91,7 @@
 
 ## 收藏 / 生词本 / 助记
 
-- 收藏与 `FavoritesPage` 同源（`use-favorites.ts`，键 `__nativethink_favorites`）。⚠️ **同一个"收藏单词"存两种 type**：词库浏览用 `'vocabulary'`（`DeepVocabularyPage.tsx:901-908`），每日学习与快速闪卡用 `'word'`（`DailyLearningMode.tsx:424-442`、`QuickCardMode.tsx:161-180`）。判重/统计必须同时看两个 type。
+- 收藏与 `FavoritesPage` 同源（`use-favorites.ts`，键 `__nativethink_favorites`）。⚠️ **同一个"收藏单词"存两种 type**：词库浏览用 `'vocabulary'`（`DeepVocabularyPage.tsx:901-908`），每日学习与快速闪卡用 `'word'`（`DailyLearningMode.tsx:424-442`、`QuickCardMode.tsx:163-182`）。判重/统计必须同时看两个 type。
 - 生词本 `custom-words.ts`（键 `__nativethink_custom_words`）：阅读器收集词库未收录的词，词条 `level:'custom'`（`:106`），进度经 `SUB_LEVELS` 走独立一路；复习队列优先纳入已学过的 custom 词（`FlashcardMode.tsx:151-154`）。
 - 助记 `word-notes.ts`（键 `__nativethink_word_notes`）：**目前只有复习检测卡背接了线**（`FlashcardMode.tsx:1066-1089`），其它模式不显示。
 
@@ -99,20 +99,21 @@
 
 1. **`memo` 依赖里必须有"数据到位"信号**：`filteredWords` 的 deps 带 `dataReady, dataVersion`（`:564`）；`DailyLearningMode` 的「本书进度」memo 只依赖 `progressKeyCount`（`:73-84`）—— 所以模式子树必须等 `dataReady` 才挂载，否则数据晚到不会重算，表现为"选了书、进度条整块消失"。
 2. **本轮顺序必须冻结**：队列若直接依赖 `state.progress`，每评一次分就重算、当前题会漂（`FlashcardMode.tsx:56-60,119-155`）。`use-stable-shuffle` 只被思维页与语块页使用，**本模块没有用它**。
-3. **ref 不随组件重挂载归零**：`lastSpokenKey` 一类要在每轮开始显式清空（`FlashcardMode.tsx:165-172,446,471`、`QuickCardMode.tsx:145,196,240`），否则"第二轮起第一张卡不出声"。
-4. **`setState` updater 里不许有副作用**（toast / 落盘 / 改 ref）—— StrictMode 双调用会翻倍（`DailyLearningMode.tsx:227-233`、`QuickCardMode.tsx:382-385`）。
-5. **完成判定不能读闭包里的 `queue.length`**：重排插入后那是旧值，最后一卡答错会被直接判完成（`QuickCardMode.tsx:363` 用 `queueRef.current.length`）。
-6. **Esc 监听阶段不一致**：`QuickCardMode.tsx:487` 与 `DailyLearningMode.tsx:899` 用**捕获阶段**（AGENTS.md 规定），而 `FlashcardMode.tsx:272-282` 用冒泡阶段 + `!document.querySelector('[role="dialog"]')` 守卫 —— 按同一条坑，Radix 在 document 冒泡阶段已同步 flush 掉 dialog，这个守卫可能失效。改这块请照捕获阶段那两处写。
+3. **ref 不随组件重挂载归零**：`lastSpokenKey` 一类要在每轮开始显式清空（`FlashcardMode.tsx:165-172,446,471`、`QuickCardMode.tsx:147,198,242`），否则"第二轮起第一张卡不出声"。
+4. **`setState` updater 里不许有副作用**（toast / 落盘 / 改 ref）—— StrictMode 双调用会翻倍（`DailyLearningMode.tsx:227-233`、`QuickCardMode.tsx:384-387`）。
+5. **完成判定不能读闭包里的 `queue.length`**：重排插入后那是旧值，最后一卡答错会被直接判完成（`QuickCardMode.tsx:365` 用 `queueRef.current.length`）。
+6. **Esc 监听阶段不一致**：`QuickCardMode.tsx:489` 与 `DailyLearningMode.tsx:899` 用**捕获阶段**（AGENTS.md 规定），而 `FlashcardMode.tsx:272-282` 用冒泡阶段 + `!document.querySelector('[role="dialog"]')` 守卫 —— 按同一条坑，Radix 在 document 冒泡阶段已同步 flush 掉 dialog，这个守卫可能失效。改这块请照捕获阶段那两处写。
 7. **嵌套按钮一律 `span` + `stopPropagation`**（`DeepVocabularyPage.tsx:1317,1330`），否则触发 React 的 button 嵌套告警且父级 `onClick` 会重复执行。
 8. **已知未接线**：向导里的「已学单词 (SM-2) / 整本随机」选择会写 `__nativethink_review_mode`（`:479`）并被页面读进 state（`:408`），**但没有任何消费方** —— `FlashcardMode` 只收 `level` 与 `counts`（`:1161`）。目前这个选择无实际效果。
 9. **`AnimatePresence mode="wait"` 里别用慢弹簧**：退场动画必须**衰减到亚像素**才算完成，`spring` 的参数调得再"脆"也有几百毫秒尾巴，`mode="wait"` 会把这段尾巴整段加到换卡延迟上。换卡类动画用定长 `tween`（本模块都是 `duration: 0.18, ease: 'easeOut'`）。
 10. **评分回调里不要动 `session.order[currentIdx]`**：当前卡的 key 就是靠这个下标取的，一动当前卡就"变脸"（评分按钮消失/串到下个词）。任何"重排当前卡"的动作都要延后到 `advance`（`pendingRelearnRef` 的模式）；同理，改动评分流程后要真机/按帧确认"它自己会翻到下一张"。
 11. **向导必须能一步打开、一眼看见、一键退出**（2026-09-30 真机反馈"点了切换词书没反应"）：三件事缺一不可 —— 首页模式卡与向导**互斥渲染**（`DeepVocabularyPage.tsx`，向导曾在 y≈809 之下，视口内只有 42px）、打开时 `window.scrollTo` + `main.scrollTo` 归零、向导带「当前」标记与「关闭」出口。切换逻辑本身没错，坏在"看不见有东西弹出来"。
+12. **快速闪卡的每轮数量只能在起跑页改**（2026-09-30 用户要求）：`ROUND_SIZES` 档位按钮组**只出现在** `if (paused)` 那块（`QuickCardMode.tsx:712-747`，`changeRoundSize` 全文件仅这两个调用点）。原因：`changeRoundSize` → `roundSize` 变 → 重建队列的 effect（`:257-267`）会**重新随机抽一轮**，本轮已作答的认识/不认识整轮清空 —— 以前训练页顶栏也铺着同一排按钮，练到第 15 张改主意点一下，进度就没了。训练页现在只留一块只读 `SPAN` 报 `本轮 {uniqueTotal} 词 · 换数量请返回`（`:819-825`，分母与进度条同源，断点续学回来不会报成档位数字）。守卫：`verify-vocab-cards` ⑤b（含"起跑页档位仍可点"的正对照，防止把它当成"删功能"）。
 
 ## 怎么验证
 
 ```bash
 npm run typecheck
-node scripts/verify-vocab-cards.mjs      # 284 断言：手势决策表、排卡、换卡节奏（数值锁）、答错重排延后、回看出口、断点、静默契约、换书一步生效、预载门
+node scripts/verify-vocab-cards.mjs      # 290 断言：手势决策表、排卡、换卡节奏（数值锁）、答错重排延后、回看出口、断点、静默契约、换书一步生效、预载门
 ```
 交互类改动（"点了没反应"、状态不写回）静态检查看不出来 —— 用本机无头 Chrome + CDP 真点一遍（见 [验证体系](./verification.md)）。换卡耗时这类体感问题同样要按帧量：`TEMP/nt-flip-timing.mjs` 会点真实评分按钮、按帧采样卡片 DOM，直接报"进 DOM 毫秒数"。

@@ -13,6 +13,8 @@
  *   - 一轮结束展示**本轮词表**（认识/不认识分色，点词可朗读）；
  *   - 每轮的词表**落盘留档**（quickcard-history），可回看、可整组重练、可只重练不认识的；
  *   - 「全部」档位解除每轮数量上限（一次过整本词书）。
+ *   - 每轮数量（10/20/50/100/全部）**只出现在起跑页**：训练中途改档位 = 重建随机队列，
+ *     本轮已作答的结果会整轮清空，所以训练页顶栏只显示只读卡数（要换数量先「返回」）。
  *
  * 认识/不认识 依然写入 SM-2 进度（5 / 1），与复习系统联动。
  */
@@ -794,7 +796,7 @@ export default function QuickCardMode({ level }: { level: string }) {
 
   return (
     <div className="space-y-4">
-      {/* 顶栏：返回 + 本轮设置 + 进度 */}
+      {/* 顶栏：返回 + 本轮词数（只读）+ 收藏/记录 + 进度 */}
       <div className="flex items-center gap-3 flex-wrap">
         <Button
           variant="ghost" size="icon"
@@ -808,30 +810,19 @@ export default function QuickCardMode({ level }: { level: string }) {
           <Zap className="size-4 text-ink-teal" />
           <span className="text-xs font-black italic text-foreground">快速闪卡</span>
         </div>
+        {/*
+          每轮数量**只给在起跑页**（下面的 `if (paused)` 分支）。
+          训练页这里原本有一排 10/20/50/100/全部：点一下 → roundSize 变 → 重建队列的 effect ②
+          直接把这一轮**重新随机抽**，已作答的认识/不认识整轮清空（用户反馈：练到一半换数量，进度没了）。
+          所以这里换成只读标签，要改数量先「返回」到起跑页 —— 中途不存在可点的档位。
+        */}
         <div className="flex items-center gap-1 ml-auto flex-wrap justify-end">
-          <Shuffle className="size-3 text-muted-foreground shrink-0" />
-          {ROUND_SIZES.map((n) => (
-            <button
-              key={n}
-              onClick={() => changeRoundSize(n)}
-              className={cn(
-                'px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all',
-                roundSize === n ? 'bg-[#00B894] text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80',
-              )}
-            >
-              {n}
-            </button>
-          ))}
-          <button
-            onClick={() => changeRoundSize(ROUND_ALL)}
-            className={cn(
-              'px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all',
-              roundSize === ROUND_ALL ? 'bg-[#00B894] text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80',
-            )}
-            title="不限量：一次过完整本词书"
+          <span
+            className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-muted text-muted-foreground"
+            title={`本轮 ${uniqueTotal} 词 —— 每轮数量在「返回」后的起跑页调整；训练中改档位会重开一轮，本轮进度会没`}
           >
-            全部
-          </button>
+            本轮 {uniqueTotal} 词 · 换数量请返回
+          </span>
           <button
             onClick={() => { setShowFavs((v) => !v); setShowHistory(false); }}
             className={cn(
