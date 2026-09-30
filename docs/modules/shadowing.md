@@ -43,8 +43,8 @@
 |------|------|------|------|
 | `:166` | 追加句子 | JSON 数组 | ✅ `:183` 判空 → `:184` `extractJson` |
 | `:437` | 生成整篇语料 | JSON 对象 + `validateMaterial`（`:392` 校验 `<u>` 配对 / 乱码 / AI 元文本） | ✅ `:464` |
-| `:523` | 发音难点分析 | 中英双语 Markdown 表格 | ❌ |
-| `:615` | 录音后分析 | 同上 | ❌ |
+| `:523` | 发音难点分析 | 中英双语 Markdown 表格 | ✅（本轮补，见 §3.2 第 1 条） |
+| `:615` | 录音后分析 | 同上 | ✅（本轮补） |
 
 ### 2.5 存储
 
@@ -59,20 +59,27 @@
 
 ## 3. 注意事项
 
-### 3.1 【已确认缺陷】删除 AI 追加句会把完成标记弄乱，100% 横幅从此不再出现
+### 3.1 【已修，2026-09-29】删除 AI 追加句曾把完成标记弄乱，100% 横幅永久消失
 
-三段索引语义不一致：
+原缺陷的三段索引语义不一致（留着备查，改动时别退回这个形态）：
 
-- **写**：`markCompleted`（`:366`）`key = ${selectedCorpus.id}-${currentSentenceIdx}`，而 `currentSentenceIdx` 是**合并数组索引**（`:229-231`、`:241`）。
-- **读**：`totalCompleted`（`:235-238`）按 `${id}-` 前缀数 key；进度条 `:955/:1169-1175`、「已完成」徽章 `:943`、按钮禁用态 `:1075/:1079`、句行绿勾 `:1209-1210`、**100% 横幅判定 `:1181`**、重置 `:1192-1197` —— 全部读合并索引键。
-- **删**：删除按钮（`:1250`）传的是 `idx - selectedCorpus.sentences.length`，即 **extras 的本地索引**，进入 `handleDeleteSentence(corpusId, sentenceIdx)`（`:135`）后，`:138-149` 却把它当**合并索引**做位移：`i < sentenceIdx` 保留、`i === sentenceIdx` 丢弃、`i > sentenceIdx` 改写成 `i-1`。
+- **写**：`markCompleted` 的键 `${selectedCorpus.id}-${currentSentenceIdx}`，`currentSentenceIdx` 是**合并数组索引**（`:229-231`、`:241`）。
+- **读**：`totalCompleted`、进度条 `:955/:1169-1175`、「已完成」徽章 `:943`、按钮禁用态 `:1075/:1079`、句行绿勾 `:1209-1210`、**100% 横幅判定 `:1181`**、重置 `:1192-1197` —— 全部读合并索引键。
+- **删（错）**：删除按钮传 `idx - selectedCorpus.sentences.length`（**extras 本地索引**）进 `handleDeleteSentence`，而它把这个数字当合并索引位移。
 
-复现：原 8 句 + AI 追加 3 句，删掉**第一条追加句**（`sentenceIdx = 0`）→ 合并键 `id-0`（第 1 句的完成标记）被 `:146` **删掉**，`id-1…id-10` 整体下移一位 → `totalCompleted` 少 1、绿勾与进度错位到别的句子、`totalCompleted >= totalSentences` 不再成立 → **100% 横幅与重置按钮消失**。
-`setExtraSentences` 用本地索引过滤（`:153`）本身是对的 —— **根因是同一个"句子序号"在三个地方含义不同**。修法是让删除路径也传合并索引（或把完成标记改用句子自身的稳定 id，而不是位置索引）。
+后果：原 8 句 + 追加 3 句、做完了除第一条追加句以外的 10 句，此时删掉第一条追加句 → 被删的其实是 `id-0`（第 1 句的标记），标记整体错位一格 → 完成数掉到 9 而新句数是 10 → **100% 横幅与「再来一遍」按钮永久消失**。
+`setExtraSentences` 用本地索引过滤本身是对的 —— 根因是**同一个"句子序号"在三个地方含义不同**。
+
+现在的形态：
+
+- 索引换算单点归属在 **`src/lib/shadowing-progress.ts`**（纯函数、零依赖）：`shadowingCompletionKey` / `parseCompletionIndex` / `countCompletedForCorpus` / `isSentenceCompleted` / `shiftCompletionAfterDelete` / `clearCompletionForCorpus` / `extrasLocalIndex`。
+- `handleDeleteSentence(corpusId, mergedIdx)` **只收合并索引**，内部用 `extrasLocalIndex` 换算本地索引；`localIdx < 0` 直接 return（内置原句不可删）；当前指针跟着左移/夹紧。
+- 键构造、计数、清空、位移在页面里都不再手写 —— `currentDoneKey`（`:256` 附近）与 `markCompleted` / 句行绿勾同源。
+- **守卫：`node scripts/verify-shadowing-completion.mjs`（23 断言）** —— A 段真转译真跑纯函数，含"退回旧调用方式"的正对照（同一场景下完成数掉 1 且横幅不成立、`id-7` 丢失），变异实测：把调用点改回 `idx - sentences.length` 会红两条。
 
 ### 3.2 其它
 
-1. **两处分析调用不判空**（`:523`、`:615`）：`setAiAnalysis(result)` 在 `:552/:652`，失败时空串 → 面板空白；而 `use-ai.ts:82-86` 已经把异常吞成返回 `''`（AbortError 也一样），本页的 `catch` **永不触发** → 用户看到「分析中 → 一片空白」且没有任何提示。修法：先判 `!result.trim()` 再 set，并保留重试入口。
+1. **【已修，2026-09-29】两处分析调用现在都先判空串**：`setAiAnalysis(result)` 前有 `if (!result.trim())` + `toast.error('AI 服务暂不可用…')`。修的原因：`use-ai.ts:82-86` 已经把异常吞成返回 `''`（AbortError 也一样），本页的 `catch` **永不触发** —— 原先用户会看到「分析中 → 一片空白且无任何提示」。守卫：`verify:shadowing-completion` 静态断言两处 `!result.trim()` 都在（断言数 = `setAiAnalysis` 出现数）。
 2. **autoplay effect 的依赖数组只写 `[currentSentenceIdx]`**（`:339`）：`autoPlay`、`playbackRate`、`selectedCorpus?.accent`、`tts.speak` 都不在里面。后果 —— 开着自动播放时改语速/换口音**不会对当前句生效**；反过来 `currentSentenceIdx` 不变但句子内容变了（例如追加/删除句子后索引复用）也不会重读。对照 `playCurrentSentence` 的 deps（`:328`）就齐全。
 3. **渲染期间直接写 ref**：`:245/:247/:285/:288` 在 render 体内赋 `allSentencesRef/rateRef/isSpeakingRef/loopSpeakRef`。并发渲染下（Suspense / transition）可能与实际提交的值不一致；本页目前没用到这些边界，但把它当地基就是隐患。
 4. **两栏都是全量渲染**：左栏 117 篇无分页直接 map（`:847-849`），右栏句列表同样全量（`:1208`，只有 `max-h-[400px]` 滚动，**没有虚拟列表**）。这是继语块 phrases tab 之后第二个待折叠的长列表（参照 `verify-list-scaling.mjs`）。

@@ -44,6 +44,13 @@ import { safeStorage } from '@/lib/safe-storage';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { cn, extractJson } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
+import {
+  shadowingCompletionKey,
+  countCompletedForCorpus,
+  clearCompletionForCorpus,
+  shiftCompletionAfterDelete,
+  extrasLocalIndex,
+} from '@/lib/shadowing-progress';
 import { toast } from 'sonner';
 
 const SHADOWING_CATEGORIES = [
@@ -132,28 +139,36 @@ export default function ShadowingPage() {
     safeStorage.setItem('__nativethink_shadowing_extra', JSON.stringify(extraSentences));
   }, [extraSentences]);
 
-  const handleDeleteSentence = (corpusId: string, sentenceIdx: number) => {
-    // 完成键 = `${corpusId}-${句序}`：删除中间句后，其后句子的完成标记要**整体前移一位**，
-    // 否则进度虚高/虚低且绿勾指到错误的句子
-    setCompletedSentences((prev) => {
-      const next = new Set<string>();
-      const prefix = `${corpusId}-`;
-      for (const key of prev) {
-        if (!key.startsWith(prefix)) { next.add(key); continue; }
-        const i = Number(key.slice(prefix.length));
-        if (i < sentenceIdx) next.add(key);
-        else if (i > sentenceIdx) next.add(`${corpusId}-${i - 1}`);
-        // i === sentenceIdx 的完成标记随句子一起删除
-      }
-      return next;
-    });
+  /**
+   * 删除一句 AI 追加的话。
+   * `mergedIdx` **必须是合并数组索引**（`allSentences` 里的下标 = 原句数 + 追加句序号），
+   * 因为完成键就是按合并索引存的；extras 的本地索引由 `extrasLocalIndex` 在这里换算，
+   * 两套索引不允许在调用方各算各的（历史缺陷见 `shadowing-progress.ts` 文件头）。
+   */
+  const handleDeleteSentence = (corpusId: string, mergedIdx: number) => {
+    const baseLen = selectedCorpus && selectedCorpus.id === corpusId
+      ? selectedCorpus.sentences.length
+      : undefined;
+    if (baseLen === undefined) return;
+    const localIdx = extrasLocalIndex(mergedIdx, baseLen);
+    if (localIdx < 0) return; // 内置原句不可删
+
+    // ① 完成键按合并索引整体前移一位
+    setCompletedSentences((prev) => shiftCompletionAfterDelete(prev, corpusId, mergedIdx));
+    // ② extras 按本地索引过滤
     setExtraSentences((prev) => {
+      const bucket = prev[corpusId];
+      if (!bucket) return prev;
       const updated = { ...prev };
-      if (!updated[corpusId]) return prev;
-      updated[corpusId] = updated[corpusId].filter((_, i) => i !== sentenceIdx);
+      updated[corpusId] = bucket.filter((_, i) => i !== localIdx);
       if (updated[corpusId].length === 0) delete updated[corpusId];
       return updated;
     });
+    // ③ 当前指针跟着走：被删句之后的左移一格，正好删在当前句上则夹到新的末尾
+    //    （否则"下一句"会跳过一句，或指针落到不存在的下标上）
+    setCurrentSentenceIdx((prev) => (
+      prev > mergedIdx ? prev - 1 : Math.min(prev, Math.max(0, totalSentences - 2))
+    ));
     toast.success('已删除句子');
   };
 
@@ -233,12 +248,16 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
   // 只统计**当前语料**的完成数 —— 此前用全局 Set 的 size 除以当前语料句数，
   // 在 A 语料完成几句后切到 B，进度条直接虚高甚至超过 100%
   const totalCompleted = useMemo(
-    () => (selectedCorpus ? [...completedSentences].filter((k) => k.startsWith(`${selectedCorpus.id}-`)).length : 0),
+    () => (selectedCorpus ? countCompletedForCorpus(completedSentences, selectedCorpus.id) : 0),
     [completedSentences, selectedCorpus],
   );
   const progressPercent = totalSentences > 0 ? Math.min(100, (totalCompleted / totalSentences) * 100) : 0;
 
   const currentSentence = allSentences[currentSentenceIdx];
+  /** 当前句的完成标记键 —— 按**合并索引**构造，与 markCompleted / 句行绿勾同源 */
+  const currentDoneKey = selectedCorpus
+    ? shadowingCompletionKey(selectedCorpus.id, currentSentenceIdx)
+    : '';
 
   const skipAdvanceRef = useRef(false);
   const allSentencesRef = useRef(allSentences);
@@ -363,7 +382,7 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
 
   const markCompleted = useCallback(() => {
     if (!selectedCorpus) return;
-    const key = `${selectedCorpus.id}-${currentSentenceIdx}`;
+    const key = shadowingCompletionKey(selectedCorpus.id, currentSentenceIdx);
     setCompletedSentences((prev) => {
       const next = new Set(prev);
       next.add(key);
@@ -549,6 +568,13 @@ Keep it concise and practical.`,
         ],
         { temperature: 0.3, maxTokens: 1024 },
       );
+      // useAI 在失败/中止时返回空串并自己 toast（`use-ai.ts:82-86`），本页的 catch 永远不会触发。
+      // 不判空就会把"分析中"直接切成**一片空白且没有任何提示** —— 空串必须先当作"服务不可用"。
+      if (!result.trim()) {
+        toast.error('AI 服务暂不可用，请稍后重试');
+        setShowAnalysis(false);
+        return;
+      }
       setAiAnalysis(result);
     } catch {
       toast.error('AI 分析失败，请稍后重试');
@@ -649,6 +675,11 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
           ],
           { temperature: 0.3, maxTokens: 1536 },
         );
+        // 同上：空串 = 服务不可用，不是"分析结果为空"（见 :571 那条注释）
+        if (!result.trim()) {
+          toast.error('AI 服务暂不可用，录音已保留，可重新分析');
+          return;
+        }
         setAiAnalysis(result);
       } catch {
         toast.error('AI 分析失败，请稍后重试');
@@ -1072,11 +1103,11 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                       </Button>
                       <Button
                         onClick={markCompleted}
-                        disabled={completedSentences.has(`${selectedCorpus.id}-${currentSentenceIdx}`)}
+                        disabled={completedSentences.has(currentDoneKey)}
                         className="bg-gradient-to-r from-emerald-500 to-[#00B894] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30 hover:scale-105 transition-all gap-2 disabled:opacity-50 disabled:hover:scale-100"
                       >
                         <CheckCircle2 className="size-4" />
-                        {completedSentences.has(`${selectedCorpus.id}-${currentSentenceIdx}`) ? '已完成' : '我读完了'}
+                        {completedSentences.has(currentDoneKey) ? '已完成' : '我读完了'}
                       </Button>
                     </div>
 
@@ -1190,11 +1221,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                         variant="outline"
                         onClick={() => {
                           if (!selectedCorpus) return;
-                          setCompletedSentences((prev) => {
-                            const next = new Set(prev);
-                            [...next].filter((k) => k.startsWith(`${selectedCorpus.id}-`)).forEach((k) => next.delete(k));
-                            return next;
-                          });
+                          setCompletedSentences((prev) => clearCompletionForCorpus(prev, selectedCorpus.id));
                           setCurrentSentenceIdx(0);
                           toast.info('本语料完成标记已重置，开始新的一遍吧', { duration: 2000 });
                         }}
@@ -1206,7 +1233,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                   )}
                   <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
                     {allSentences.map((s, idx) => {
-                      const key = `${selectedCorpus.id}-${idx}`;
+                      const key = shadowingCompletionKey(selectedCorpus.id, idx);
                       const done = completedSentences.has(key);
                       const isCurrent = idx === currentSentenceIdx;
                       const isExtra = idx >= selectedCorpus.sentences.length;
@@ -1247,7 +1274,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleDeleteSentence(selectedCorpus.id, idx - selectedCorpus.sentences.length);
+                                    handleDeleteSentence(selectedCorpus.id, idx);
                                   }}
                                   className="shrink-0 size-5 rounded-full flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors opacity-0 group-hover/row:opacity-100"
                                 >

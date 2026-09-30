@@ -33,7 +33,8 @@
     "verify:feedback-loop": "node scripts/verify-feedback-loop.mjs",
     "verify:overlay-fit": "node scripts/verify-overlay-fit.mjs",
     "verify:bundle-budget": "node scripts/verify-bundle-budget.mjs",
-    "verify:list-scaling": "node scripts/verify-list-scaling.mjs"
+    "verify:list-scaling": "node scripts/verify-list-scaling.mjs",
+    "verify:shadowing-completion": "node scripts/verify-shadowing-completion.mjs"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "^8.0.2",
