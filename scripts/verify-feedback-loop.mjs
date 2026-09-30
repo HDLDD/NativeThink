@@ -52,8 +52,17 @@ const check = (cond, label, detail) => {
     'FeedbackDialog 分别处理 delivered / stored / failed');
   check(/toast\.error\('反馈暂未送出'/.test(dialog), '未送达时给出 error 级提示（不再谎报成功）');
   check(!/sentToFeishu/.test(dialog), '清掉 boolean 时代的 sentToFeishu 判定');
-  check(/markSynced\(item\.id, res\.status !== 'failed'\)/.test(dialog),
-    '提交结果回写 synced（失败保持 false 才能重试）');
+  check(/markSynced\(item\.id, res\.status !== 'failed', res\.status === 'delivered'\)/.test(dialog),
+    '提交结果回写 synced（失败保持 false 才能重试）+ pushed（有没有真的推进飞书）');
+  /**
+   * 历史列表的文案必须把 delivered 与 stored 分开。
+   * 原先 `synced = res.status !== 'failed'` 把两档都写成 true，标签只有 `fb.synced === true → 已送达`，
+   * 于是提交时 toast 老实说「即时通知通道暂未开通」，回头翻历史却显示「已送达」—— 自相矛盾。
+   */
+  check(/fb\.pushed === true \? '已送达'/.test(dialog) && /已留档/.test(dialog),
+    '历史标签区分「已送达」与「已留档（未即时推送）」');
+  check(!/fb\.synced === true[\s\S]{0,140}>已送达[\s\S]{0,40}<\/span>/.test(dialog),
+    '正对照：不再是"synced 一律显示已送达"那种一刀切标签');
   check(/handleRetry/.test(dialog) && /submitFeedbackToServer\(fb\)/.test(dialog),
     '历史条目可重试（未送达不只能看不能救）');
   check(/fb\.synced === false/.test(dialog) && /fb\.synced === true/.test(dialog),

@@ -93,6 +93,15 @@ const DIFFICULTY_LABELS: Record<string, string> = {
   beginner: '初级', intermediate: '中级', advanced: '高级',
 };
 const LIBRARY_PAGE_SIZE = 20;
+/**
+ * 短语库每个字母段默认只铺前 6 条。
+ * 实测（本机 headless Chrome，393×851 / DPR 3 / 4× CPU 节流，直接进短语库 tab）：
+ * 全量铺开 748 条时 DOM 达 **4,805 个元素 / 797 个按钮**，而默认「语块库」tab 只有 788 个元素 ——
+ * 手机上一个滚动区里放 6 倍于整页的节点，首帧和滚动都要付钱。
+ * A-Z 跳转仍指向全部 26 个字母段（段一直在那里，只是条目先收起），
+ * 折叠不是删内容：点「显示其余 N 条」即全展开，任何一条都还是一次点击可达。
+ */
+const PHRASE_LETTER_PREVIEW = 6;
 function getDifficultyLabel(d: string) { return DIFFICULTY_LABELS[d] || d; }
 function getDifficultyAbbr(d: string) { return d === 'beginner' ? '初' : d === 'intermediate' ? '中' : '高'; }
 
@@ -297,6 +306,14 @@ export default function ChunkTrainingPage() {
   }, [allChunks]);
   const [phraseGenLoading, setPhraseGenLoading] = useState(false);
   const [selectedPhrase, setSelectedPhrase] = useState<IChunk | null>(null);
+  /** 短语库里被展开的字母段（默认折叠到 PHRASE_LETTER_PREVIEW 条，A-Z 跳转仍可达每一段） */
+  const [expandedLetters, setExpandedLetters] = useState<Set<string>>(new Set());
+  const toggleLetterExpanded = (letter: string) => {
+    // 更新函数保持纯，Set 的复制在外部做 —— StrictMode 下 updater 会被调用两次
+    const next = new Set(expandedLetters);
+    if (next.has(letter)) next.delete(letter); else next.add(letter);
+    setExpandedLetters(next);
+  };
   const [phraseExamples, setPhraseExamples] = useState<Record<string, { en: string; zh: string }[]>>(() => {
     try { const s = safeStorage.getItem('__nativethink_phrase_examples'); return s ? JSON.parse(s) : {}; } catch { return {}; }
   });
@@ -2262,10 +2279,12 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                     {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => {
                       const chunks = sortedChunks.filter((c) => c.content[0]?.toUpperCase() === letter);
                       if (chunks.length === 0) return null;
+                      const expanded = expandedLetters.has(letter);
+                      const visible = expanded ? chunks : chunks.slice(0, PHRASE_LETTER_PREVIEW);
                       return (
                         <div key={letter} id={`phrase-l-${letter}`}>
                           <div className="text-[10px] font-black text-ink-teal mb-1 sticky top-0 bg-background/90 py-0.5">{letter} · {chunks.length}</div>
-                          {chunks.map((chunk) => {
+                          {visible.map((chunk) => {
                             const exCount = (phraseExamples[chunk.id]?.length || 0) + 1;
                             return (
                               <button
@@ -2287,6 +2306,16 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                               </button>
                             );
                           })}
+                          {/* 折叠不删内容：其余条目仍在同一个字母段里，一次点击即全展开 */}
+                          {chunks.length > PHRASE_LETTER_PREVIEW && (
+                            <button
+                              type="button"
+                              onClick={() => toggleLetterExpanded(letter)}
+                              className="w-full text-left px-3 py-1.5 mt-1 rounded-xl text-[10px] font-black text-ink-teal hover:bg-[#00B894]/10 transition-colors"
+                            >
+                              {expanded ? '收起，只看前 6 条' : `显示其余 ${chunks.length - PHRASE_LETTER_PREVIEW} 条（${letter} 共 ${chunks.length} 条）`}
+                            </button>
+                          )}
                         </div>
                       );
                     })}

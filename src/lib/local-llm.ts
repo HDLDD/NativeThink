@@ -2,7 +2,7 @@
  * local-llm — 离线备用小模型（transformers.js + Qwen2.5-0.5B-Instruct ONNX）。
  *
  * 用途：出厂 API 限流（1305/429）或断网时的手机端兜底。
- * - 模型约 400MB（q4 量化），首次下载后由浏览器 Cache API 持久化，之后完全离线
+ * - 模型约 780MB（q4 量化，磁盘实测 model_q4.onnx = 786,156,820 B ≈ 750 MiB），首次下载后由浏览器 Cache API 持久化，之后完全离线
  * - 加载是惰性的：只有用户在 AI 设置里点下载、或自动回落首次触发时才 import
  * - 中英双语；质量当然不如云端大模型 — 定位是"可用"而非"好用"
  */
@@ -133,7 +133,7 @@ export async function downloadLocalLlm(): Promise<void> {
   }
 }
 
-/** 就绪时取 pipeline；未下载返回 null（不会意外触发 400MB 下载） */
+/** 就绪时取 pipeline；未下载返回 null（不会意外触发这数百 MB 的下载） */
 async function getPipe(): Promise<any | null> {
   if (pipePromise) return pipePromise;
   try {

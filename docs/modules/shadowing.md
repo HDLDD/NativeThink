@@ -82,7 +82,7 @@
 1. **【已修，2026-09-29】两处分析调用现在都先判空串**：`setAiAnalysis(result)` 前有 `if (!result.trim())` + `toast.error('AI 服务暂不可用…')`。修的原因：`use-ai.ts:82-86` 已经把异常吞成返回 `''`（AbortError 也一样），本页的 `catch` **永不触发** —— 原先用户会看到「分析中 → 一片空白且无任何提示」。守卫：`verify:shadowing-completion` 静态断言两处 `!result.trim()` 都在（断言数 = `setAiAnalysis` 出现数）。
 2. **autoplay effect 的依赖数组只写 `[currentSentenceIdx]`**（`:339`）：`autoPlay`、`playbackRate`、`selectedCorpus?.accent`、`tts.speak` 都不在里面。后果 —— 开着自动播放时改语速/换口音**不会对当前句生效**；反过来 `currentSentenceIdx` 不变但句子内容变了（例如追加/删除句子后索引复用）也不会重读。对照 `playCurrentSentence` 的 deps（`:328`）就齐全。
 3. **渲染期间直接写 ref**：`:245/:247/:285/:288` 在 render 体内赋 `allSentencesRef/rateRef/isSpeakingRef/loopSpeakRef`。并发渲染下（Suspense / transition）可能与实际提交的值不一致；本页目前没用到这些边界，但把它当地基就是隐患。
-4. **两栏都是全量渲染**：左栏 117 篇无分页直接 map（`:847-849`），右栏句列表同样全量（`:1208`，只有 `max-h-[400px]` 滚动，**没有虚拟列表**）。这是继语块 phrases tab 之后第二个待折叠的长列表（参照 `verify-list-scaling.mjs`）。
+4. **两栏都是全量渲染 —— 但量过之后判定不动**：左栏 117 篇直接 map（`:847-849`），右栏句列表同样全量（`:1208`，只有 `max-h-[400px]` 滚动，无虚拟列表）。headless Chrome 393×851 / DPR 3 实测 `/shadowing` 挂载后 **2,219 个 DOM 元素、页高 2,256px**，与写作页折叠后的 2,634px 同量级，不是短语库（4,805）那种规模 —— 所以这轮**没有为它改代码**：没有测量证据就加折叠，等于白白削弱「一眼看完全部语料」的入口。真要动之前先重跑测量，并参照 `verify-list-scaling.mjs` 补断言。（同一份 harness 里 longtask 观察器装在 navigate 之前会因文档切换而丢失，所以这里的结论只建立在 DOM 节点数与页高上。）
 5. **`cancelPendingAdvance` 的覆盖点齐全**：`:343/:352/:386/:264`（prev / next / selectCorpus / 卸载）都取消了 400ms 自动前进 ✅ —— 新增"离开当前句"的路径时请继续保持。
 6. **`__nativethink_shadowing_completed` 无上限**：每篇 579 句全记下来还行，但它是整份 JSON 每次变更重写（`:86`），语料越多写越贵。
 7. **无守卫**：本页没有任何 `verify-*.mjs` 覆盖，§3.1 那个缺陷正是**静态检查完全看不出来**的那类（三处都用了一个叫 `idx`/`sentenceIdx` 的名字，含义却不同）。

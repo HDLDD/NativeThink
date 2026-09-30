@@ -36,12 +36,12 @@
     - ~~**同步失败完全静默**~~（**已修**：上行/下行/单项配额失败各给诚实提示，60 秒去抖；守卫断言 `use-cloud-sync.ts` 空 catch 数为 0）。
     - **下行后多数 hook 仍持陈旧内存态**（**未修**，只有 3 个订阅者）：A 设备改了，B 设备要重开页面才看到；陈旧实例一有写入还会把刚拉下来的新值覆盖回去。
     - ~~**四处把「AI 服务不可用」报成「格式异常」**，另有一处走禁用的贪婪正则~~（**已修**：实际清点是 **7 处缺判空**而不是 4 处 —— 阅读页 3、背单词页 3、拼写批量加句 1，加上原记的 4 处贪婪正则/缺判空站点，24 个解析点全部补齐判空并统一 `extractJson`。新增 `npm run verify:ai-parse` 10 断言：全仓扫、注释行不参与判定、三段固件自证检查器本身有效；顺带把首页每日一句的 `category`/`difficulty` 夹进 `IChunk` 取值域）。
-    - ~~**语块替换训练在 `useMemo` 里洗牌**~~（**已修**：`exercisePool = useStableShuffle(allChunks)` + `generateReplacementExercises` 改成给定同一入参输出逐字相同的纯函数；「随便看看」也改用稳定池，学一个词不再跳序）。**phrases tab 一次铺全部 748 条**、**跟读两栏全量渲染**是仅剩的两个长列表。
+    - ~~**语块替换训练在 `useMemo` 里洗牌**~~（**已修**：`exercisePool = useStableShuffle(allChunks)` + `generateReplacementExercises` 改成给定同一入参输出逐字相同的纯函数；「随便看看」也改用稳定池，学一个词不再跳序）。**phrases tab 一次铺全部 748 条**。跟读两栏量过之后**判定不动**（2,219 元素 / 页高 2,256px，与写作页折叠后同量级），理由与数字见 shadowing.md §3.2 第 4 条。
     - ~~**对话页 `mountedRef` 在 StrictMode 双挂载后恒 false**~~（**已修**：effect 体内复位为 true。原先 dev 下 `:214/:281/:393` 的 `if (!mountedRef.current) break` 会静默丢弃全部流式内容 → 对话永远空白；生产不受影响，但极易把人带偏去查 AI 层）。
     - ~~**快速闪卡不读 `__nativethink_vocab_autospeak`**~~（**已修**：读键门控朗读 effect + 进度行加开关，默认开与其余三处同口径 —— 真机上别处的提示语本来就写着「与快速闪卡共用此设置」。`verify:vocab-cards` 补 10 条断言，含「门控必须位于 `tts.speak` 之前」的正对照）。
-    - 反馈历史把 `stored` 显示成「已送达」，与提交时的诚实 toast 自相矛盾（**未修**）。
-    - 句子学习**主干判定的三处索引不同源**（`stdParts` / `item.segments` / `resolved`）与**拼写断点键不按 level 分**（**未修**）。
-    - 文案口径：设置页「Qwen2.5-0.5B（约 400MB）」磁盘实为 750MiB；`使用攻略.md:60` 把拼写写成四种练法（实为 2 mode × 2 音频）。
+    - ~~反馈历史把 `stored` 显示成「已送达」~~（**已修**：新增 `pushed` 字段，历史标签分「已送达 / 已留档（未即时推送）/ 服务端已收到」三档；`verify:feedback-loop` 那条 `markSynced` 断言按新语义**重新推导**而不是放宽，另加一刀切标签的正对照）。
+    - ~~文案口径~~（**已修**：设置页改成「约 780MB；另需 22.5MB 运行时」并带上实测字节数；`使用攻略.md` 拼写一段改成真实的 2 种练法 × 2 种播放）。
+    - **仍未修**：句子学习主干判定三处索引不同源（`stdParts` / `item.segments` / `resolved`）；拼写断点键不按 level 分；多处 `addStudyMinutes` 写在 await 之前（失败也记时长）；云同步下行只有 3 个 hook 订阅（其余持陈旧内存态）；写作/拼写/语块的自定义条目缓存无 `capped-cache` 上限；`ShadowingPage` autoplay effect 依赖数组不全。
 
 
 ## 打包

@@ -55,6 +55,29 @@ const check = (cond, label, detail) => {
     '筛选条件变化时回到第一页（否则会停在空白页）');
 }
 
+/* ── 短语库（748 条按字母分组）：每段默认折叠，A-Z 跳转仍指向全部字母段 ── */
+{
+  const src = read('src/pages/ChunkTrainingPage/ChunkTrainingPage.tsx');
+  const chunkCount = (read('src/data/chunks.ts').match(/^  \{ id:/gm) || []).length;
+  check(chunkCount >= 700, `脚手架自检：MOCK_CHUNKS 确实有 ${chunkCount} 条（少于 700 说明计数失效）`);
+
+  // 实测（本机 headless Chrome，393×851 / DPR 3 / 4× CPU 节流，直接落在短语库 tab）：
+  //   全量铺开 4,805 DOM 元素 / 797 按钮；折叠后 1,148 元素 / 205 按钮（-76%），展开一段回到 1,244
+  // —— 说明折叠真的减了节点，而不是只是加了个按钮
+  check(/chunks\.slice\(0, PHRASE_LETTER_PREVIEW\)/.test(src), '每个字母段默认只铺前 6 条');
+  check(/const PHRASE_LETTER_PREVIEW = 6;/.test(src), '折叠上限写成命名常量（改数字要显式改这里）');
+  check(/显示其余 \$\{chunks\.length - PHRASE_LETTER_PREVIEW\} 条/.test(src) && /收起，只看前 6 条/.test(src),
+    '有"显示其余 N 条"与"收起"两个入口（折叠不是删内容，一次点击全可达）');
+  check(/expandedLetters\.has\(letter\)/.test(src) && /toggleLetterExpanded\(letter\)/.test(src),
+    '展开状态按字母维护（不是全局一刀切）');
+  check(/const next = new Set\(expandedLetters\);[\s\S]{0,200}setExpandedLetters\(next\)/.test(src),
+    '更新函数保持纯：Set 复制在 updater 外做（StrictMode 会双调用 updater）');
+  check(/id=\{`phrase-l-\$\{letter\}`\}/.test(src) && /scrollIntoView/.test(src),
+    'A-Z 跳转目标仍逐段存在（折叠不能把跳转入口弄失效）');
+  check(!/\{chunks\.map\(\(chunk\) =>/.test(src),
+    '正对照：字母段内不再有对整段 chunks 的直接 .map 全量渲染');
+}
+
 console.log('');
 console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
 if (fail) { failures.slice(0, 20).forEach((f) => console.log('  ✗ ' + f)); process.exit(1); }

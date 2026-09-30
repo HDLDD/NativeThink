@@ -8,6 +8,7 @@
 
 
 ## 2026-09-30
+- fix(ai-parse,chunks,conversation,quickcard): 补齐清单里剩下四项，并把 AI 解析约定做成全仓守卫 (`8e9cf74`)
 - fix(cloud-sync): 抑制下行回声、失败不再全静默、周期任务不再无条件全量重推 (`519defd`)
 - fix(backup): 导出学习数据真的带上整书对照翻译缓存 (`c5e60a7`)
 - fix(shadowing): 删除 AI 追加句不再弄乱完成标记 —— 索引换算收进单点纯函数 (`933cadc`)

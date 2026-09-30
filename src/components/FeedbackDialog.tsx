@@ -117,7 +117,7 @@ export default function FeedbackDialog() {
 
     // 服务端代理（飞书 webhook 不进前端包），返回三档真实状态
     const res = await submitFeedbackToServer(item);
-    markSynced(item.id, res.status !== 'failed');
+    markSynced(item.id, res.status !== 'failed', res.status === 'delivered');
 
     if (res.status === 'delivered') {
       toast.success('反馈已提交', { description: '已送达开发者，我们会尽快查看。' });
@@ -141,7 +141,7 @@ export default function FeedbackDialog() {
     if (retryingId) return;
     setRetryingId(fb.id);
     const res = await submitFeedbackToServer(fb);
-    markSynced(fb.id, res.status !== 'failed');
+    markSynced(fb.id, res.status !== 'failed', res.status === 'delivered');
     setRetryingId(null);
     if (res.status === 'failed') {
       toast.error('还是没送出去', { description: `原因：${res.reason}；稍后再试或换网络。` });
@@ -344,7 +344,7 @@ export default function FeedbackDialog() {
                           {fb.synced === true && (
                             <span className="flex items-center gap-0.5 text-[10px] opacity-60 shrink-0">
                               <Check className="size-3" />
-                              已送达
+                              {fb.pushed === true ? '已送达' : fb.pushed === false ? '已留档（未即时推送）' : '服务端已收到'}
                             </span>
                           )}
                           <span className="ml-auto flex items-center gap-1 text-[10px] opacity-60 shrink-0">

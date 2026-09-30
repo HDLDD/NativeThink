@@ -50,7 +50,7 @@
 
 ## 3. 注意事项
 
-1. **历史列表把 `stored` 也显示成「已送达」** —— 与提交那一刻的 toast 自相矛盾。`FeedbackDialog.tsx:120` 是 `markSynced(item.id, res.status !== 'failed')`，把 delivered 与 stored 都写成 `synced = true`，而 `:343-347` 的标签只认 `fb.synced === true` → 文案「已送达」。在飞书通道未开通时（当前就是未开通），用户提交后先看到诚实的「即时通知通道暂未开通」，回头翻历史却变成「已送达」。**要么把 `synced` 扩成三态，要么把标签文案改成「服务端已收到」**，别两边各说一套。
+1. ~~历史列表把 `stored` 也显示成「已送达」~~（**已修 2026-09-30**）：`IFeedbackItem` 新增 `pushed?: boolean`（有没有真的推进飞书），`markSynced(id, synced, pushed)` 三参数回写；历史标签按 `pushed` 分「已送达 / 已留档（未即时推送）/ 服务端已收到」三档，`undefined` 留给改造前的老数据、不硬猜。守卫 `verify:feedback-loop` 把原先那条 `markSynced(item.id, res.status !== 'failed')` 断言**重新推导**成三参数版本（不是放宽它），并新增「不再一刀切显示已送达」的正对照；变异实测：把标签改回 `synced → 已送达` 会红。
 2. **限流在提交前就记账**：`recordSubmission()` 在 `addFeedback` 里同步调用（`use-feedback.ts:151`），**不管后面服务端成功还是失败**。离线时连点三次就把这一小时的额度用光了，而三条其实都没出去。
 3. **`_lib/kv.js` 的 binding 没配时 `archived` 为 false**，此时只剩飞书一条路；两条都没配 → 503 → 前端 `failed`。这是"通道未配"这一档的来源，以前被误报成成功。
 4. **入口可达性必须断言**：`scripts/verify-feedback-loop.mjs:41-44` 检查 `Header.tsx` 里既有 `import FeedbackDialog` 又有 `<FeedbackDialog />`。静态检查看不出"组件写了但没人挂载"，这条断言是唯一防线 —— 别把它删了或者改成宽松版。

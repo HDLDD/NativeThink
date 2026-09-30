@@ -90,6 +90,13 @@ export interface IFeedbackItem {
    * false = 已存本地但服务端没收到（可在历史列表重试）；true = 服务端已接住。
    */
   synced?: boolean;
+  /**
+   * 有没有真的推进即时通道（飞书）。`synced` 只说明"服务端收下了"，
+   * 而 `stored` 档 = 落了 KV 但即时通道未开通 —— 此前历史列表把两档都显示成「已送达」，
+   * 与提交那一刻诚实的 toast（"即时通知通道暂未开通"）自相矛盾。
+   * undefined = 旧数据，无法判断，退回中性文案。
+   */
+  pushed?: boolean;
 }
 
 // --- Hook ---
@@ -152,9 +159,12 @@ export function useFeedback() {
     [],
   );
 
-  /** 服务端接收结果回写 —— 只有真的被接住才标 synced=true，失败时保持 false 好让用户重试 */
-  const markSynced = useCallback((id: string, synced = true) => {
-    setFeedbacks((prev) => prev.map((f) => (f.id === id ? { ...f, synced } : f)));
+  /**
+   * 服务端接收结果回写 —— 只有真的被接住才标 synced=true，失败时保持 false 好让用户重试。
+   * `pushed` 单独记"有没有真的推进飞书"，历史列表据此区分「已送达」与「已留档」。
+   */
+  const markSynced = useCallback((id: string, synced = true, pushed?: boolean) => {
+    setFeedbacks((prev) => prev.map((f) => (f.id === id ? { ...f, synced, pushed } : f)));
   }, []);
 
   const deleteFeedback = useCallback((id: string) => {

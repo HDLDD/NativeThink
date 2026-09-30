@@ -65,7 +65,7 @@
    - ~~`useMemo(() => generateReplacementExercises(allChunks), [allChunks])` + 内部三处 `Math.random()`~~ → **已修 2026-09-30**：新增 `exercisePool = useStableShuffle(allChunks)`，`generateReplacementExercises(shuffledChunks)` 改成**给定同一入参输出逐字相同**的纯函数（选题与顺序取自稳定序列，干扰项按固定步长取，选项位置用内容哈希旋转）。集合变化只做增量同步，正在作答的题不再被悄悄换掉。
    - ~~`suggestPhrases` 在 `useMemo` 里手写 Fisher-Yates，deps 含 `phraseState.progress` → 学一个词推荐区就跳序~~ → **已修**：改为从 `exercisePool` 过滤未学过的取前 5 条（稳定顺序，只增删不重排）。
 2. **`toggleMemorized` 在 updater 内写 safeStorage**（`:558-562`）→ StrictMode 双调用写两遍。规则见 `capped-cache.ts:32-35`。
-3. **phrases tab 一次性铺全部 748+**（`:2221-2224` 按 A-Z 直接 map，无分页无虚拟列表）。library 有分页（`:580-586`），写作页也已折叠 —— **这是目前最大的未收敛长列表**，改它参照 `verify-list-scaling.mjs` 的断言形态补一条守卫。
+3. ~~phrases tab 一次性铺全部 748+~~（**已修 2026-09-30，量过再改**）：headless Chrome 393×851 / DPR 3 直接落在短语库 tab 实测 **4,805 个 DOM 元素 / 797 个按钮**（默认「语块库」tab 只有 788 个元素）。现在每个字母段默认铺 6 条（`PHRASE_LETTER_PREVIEW`），重测 **1,148 元素 / 205 按钮（-76%）**，展开一段回到 1,244 —— A-Z 跳转的 25 个字母段一个不少，折叠不是删内容。守卫：`npm run verify:list-scaling` 补 8 条断言（10→18），含「字母段内不再有直接 `.map` 全量渲染」的正对照；变异实测：退回全量渲染会红 2 条。library 的分页（`:580-586`）保持不变。
 4. ~~**4 处 AI 调用把「服务不可用」误报成「格式异常」**~~（**已修 2026-09-30**，见第 3 节）。守卫：`npm run verify:ai-parse` 全仓扫解析点。
 5. `:947` 的 AI 出题**没走 `extractJson`**，是仓库明令禁止的贪婪正则路线（`utils.ts:34` 注释解释为什么）。
 6. **接龙判定的容错方向**：`:725-726` 取首行，**只有明确 FAIL 才算不过** —— AI 返回别的首行（说明文字、markdown 符号）都算通过。改成"必须 PASS 才过"会让大量正确造句被判错，改之前先想清楚。

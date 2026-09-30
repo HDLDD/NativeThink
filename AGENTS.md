@@ -103,16 +103,16 @@ node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆�
 node scripts/verify-tts-progress.mjs              # 6175 朗读切片与进度反查表
 node scripts/verify-tts-hardening.mjs             # 15   TTS 降级/在途去重/桌面限定（注意：没有 npm script）
 node scripts/verify-books-meta.mjs                # 222  书目元数据 + 复习词高亮
-node scripts/verify-vocab-cards.mjs               # 254  背单词卡片契约 + 手势决策表
+node scripts/verify-vocab-cards.mjs               # 264  背单词卡片契约 + 手势决策表 + 自动发音四处共用
 node scripts/verify-vocab-caches.mjs              # 21   缓存基建契约
 node scripts/verify-overlay-fit.mjs               # 16   窄视口浮层契约
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
-node scripts/verify-list-scaling.mjs              # 10   长列表必须折叠/分页
+node scripts/verify-list-scaling.mjs              # 18   长列表必须折叠/分页（写作题库 + 词库浏览 + 短语库字母段）
 node scripts/verify-shadowing-completion.mjs      # 23   跟读完成标记的索引契约（纯函数真跑 + 接线）
 node scripts/verify-backup-idb.mjs                # 16   导出学习数据真的含整书译文
 node scripts/verify-cloud-sync-hygiene.mjs        # 18   云同步：下行回声/失败可见/按需补推（真跑真实模块）
 node scripts/verify-ai-parse.mjs                  # 10   AI 解析约定：24 个解析点判空 + 无贪婪正则（元判据固件自证）
-npm run verify:feedback-loop                      # 56   反馈链路（后端 handler 用忠实替身真实执行）
+npm run verify:feedback-loop                      # 58   反馈链路（后端 handler 用忠实替身真实执行）
 ```
 
 **数据生成 / 资产**：
@@ -284,7 +284,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 264 / 21 / 6175 / 15 / 56 / 16 / 10 / 10 / 23 / 16 / 18 / 10 + feedback-loop 56）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 264 / 21 / 6175 / 15 / 16 / 10 / 18 / 23 / 16 / 18 / 10 + feedback-loop 58）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`

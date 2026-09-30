@@ -431,7 +431,7 @@ export default function AISettings() {
                   </Badge>
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
-                  Qwen2.5-0.5B（约 400MB）· API 限流或断网时自动兜底，可完全离线
+                  Qwen2.5-0.5B（q4 量化，约 780MB；另需 22.5MB 运行时）· API 限流或断网时自动兜底，可完全离线
                 </p>
               </div>
               {llmStatus === 'ready' ? (

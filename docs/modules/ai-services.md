@@ -77,7 +77,7 @@ scripts/.apikey（gitignore，.gitignore:4）
 
 4. **`ai-service.ts:101` 注释「Always route through server proxy to protect API key」与实现不符**：`:98` 把 `apiKey` 放进请求体，Key 也存在 localStorage，服务端只是"优先用客户端 Key"（`chat.js:76`）。别把这句注释当安全边界。
 
-5. **端侧模型体积的文案口径不一致**：磁盘实测 `model_q4.onnx` = 786,156,820 B ≈ **750 MiB**，但 `local-llm.ts:5` 和 `AISettings.tsx:434` 写「约 400MB」，`local-mt.ts:4` 写 750MB。设置页那句「约 400MB」是**用户可见的误导**，要改文案。
+5. **端侧模型体积**：磁盘实测 `model_q4.onnx` = 786,156,820 B ≈ 750 MiB。设置页原先写「约 400MB」（低估近一倍），2026-09-30 已改成「约 780MB；另需 22.5MB 运行时」，`local-llm.ts:5` 同步带上实测字节数。三个数字各有含义：786,156,820 B（磁盘十进制）= 750 MiB（二进制）≈ 780MB（给用户看的十进制），别再混用。
 
 6. **`local-llm` 因为被 `ai-service.ts:16-20` 静态引用而内联在入口 chunk**（产物 `index-*.js` 里能 grep 到 `onnx-community/Qwen2.5-0.5B-Instruct`）。这本身不重（就是个包装 + 状态机），真正的 22.5MB `ort-wasm-simd-threaded.asyncify-*.wasm` 和 538KB `transformers.web-*.js` 都只在 `import()` 里。但**任何往 `local-llm.ts` 顶部加静态 import 的改动都会直接进首屏** —— 改完跑 `npm run verify:bundle-budget`，它是从产物反查入口静态依赖图的。
 
