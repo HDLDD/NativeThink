@@ -8,6 +8,7 @@
 
 
 ## 2026-09-30
+- fix(packaging): package:apk 前置 ensure-web-build，杜绝把上一次 web 产物打进新包 (`cdf2a6e`)
 - docs(chunks): 接龙三档判定的 CDP 真点补齐（39 项），删掉未覆盖的自认缺口 (`f02db88`)
 - fix(chunks): 语块接龙判定改三档，未判定不再当通过送分 (`7427dc6`)
 - docs: 2026-09-30 全天四项改动的交接记录 + 守卫计数与体积复测 (`6ca2cba`)
