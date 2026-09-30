@@ -8,6 +8,7 @@
 
 
 ## 2026-09-30
+- feat(reading): 复习词汇文章改为选词+分篇，逐篇落盘可收藏删除，用词从词表出队 (`f621aa0`)
 - docs(guide): 句子拼写的练法描述与实际两档玩法对齐 (`0deaaae`)
 - fix(vocab): 换书向导一眼可见 + 闪卡换卡提速与答错重排延后 (`0121807`)
 - fix(sentence-lab,spelling,chunks,think,shadowing): 断点分键、主干索引同源、Updater 纯化、自动朗读依赖修正 (`40b5b39`)
