@@ -35,7 +35,7 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 朗读 TTS | [modules/tts.md](./docs/modules/tts.md) | 引擎降级链、切片 180 由上游 200 硬上限钉死、闪退自愈、音色四处同步 |
 | AI 服务与端侧模型 | [modules/ai-services.md](./docs/modules/ai-services.md) | Key 优先级、服务端免费档回退、端侧回落条件、`extractJson` 规定由 `verify:ai-parse` 全仓扫 |
 | 母语思维 `/think` | [modules/think-in-english.md](./docs/modules/think-in-english.md) | 4 tab；换题不 abort 导致流式内容串题 |
-| 语块 `/chunks` | [modules/chunks.md](./docs/modules/chunks.md) | 2713 行最大单文件；练习池走 `useStableShuffle`、短语库按字母段折叠（4,805→1,148 元素） |
+| 语块 `/chunks` | [modules/chunks.md](./docs/modules/chunks.md) | 最大单文件；练习池走 `useStableShuffle`、短语库按字母段折叠（4,805→1,148 元素）、接龙判定三档（未判定不送分） |
 | 对话 `/conversation` | [modules/conversation.md](./docs/modules/conversation.md) | 场景选择↔聊天；`mountedRef` 每轮挂载需复位（dev 下曾恒 false 让对话永远空白） |
 | 影子跟读 `/shadowing` | [modules/shadowing.md](./docs/modules/shadowing.md) | 连播/循环/录音评分；完成标记按**合并索引**存，索引换算单点在 `shadowing-progress.ts` |
 | 写作 `/writing` | [modules/writing.md](./docs/modules/writing.md) | 100 题 + AI 批改（Markdown 不是 JSON）；默认折叠 12 张 |
@@ -113,6 +113,7 @@ node scripts/verify-backup-idb.mjs                # 16   导出学习数据真�
 node scripts/verify-cloud-sync-hygiene.mjs        # 43   云同步：下行回声/失败可见/按需补推 + sync-down 真跑与订阅者清单
 node scripts/verify-sentence-lab.mjs              # 16   拆句训练主干判定索引同源（真转译跑出分歧）
 node scripts/verify-spelling-resume.mjs           # 24   拼写断点按词书分键 + 迁移 + 重置枚举
+node scripts/verify-chain-verdict.mjs             # 36   语块接龙判定三档（未判定不计分也不判错）
 node scripts/verify-ai-parse.mjs                  # 10   AI 解析约定：25 个解析点判空 + 无贪婪正则（元判据固件自证）
 npm run verify:feedback-loop                      # 58   反馈链路（后端 handler 用忠实替身真实执行）
 npm run verify:rv-articles                        # 104  复习词汇文章：选词/分篇/覆盖出队/体裁主题/原位重写（含旧 slice(0,10) 正对照）
@@ -290,7 +291,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 222 · vocab-cards 284 · vocab-caches 67 · tts-progress 6175 · tts-hardening 15 · overlay-fit 16 · bundle-budget 10 · list-scaling 18 · shadowing 23 · backup-idb 16 · cloud-sync 43 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · rv-articles 104 · study-credit 74 · feedback-loop 58；合计 7,220）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 222 · vocab-cards 284 · vocab-caches 67 · tts-progress 6175 · tts-hardening 15 · overlay-fit 16 · bundle-budget 10 · list-scaling 18 · shadowing 23 · backup-idb 16 · cloud-sync 43 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · rv-articles 104 · study-credit 74 · chain-verdict 36 · feedback-loop 58；合计 7,256）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`

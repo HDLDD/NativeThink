@@ -1,6 +1,6 @@
 # 验证体系
 
-> 本项目**没有测试框架**。防线是：`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 18 条可跑的 `scripts/verify-*.mjs` 契约守卫（另有需要基线参数的 verify-wordbank-split 与作为全量跑法的 verify-all，共 20 个文件） + 无头 Chrome/CDP 行为验收 + 真机 CDP 通道。
+> 本项目**没有测试框架**。防线是：`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 19 条可跑的 `scripts/verify-*.mjs` 契约守卫（另有需要基线参数的 verify-wordbank-split 与作为全量跑法的 verify-all，共 21 个文件） + 无头 Chrome/CDP 行为验收 + 真机 CDP 通道。
 > 一句话原则：**证据来自产物和真运行，不来自读代码**。
 
 ## 1. 契约守卫（`scripts/verify-*.mjs`）
@@ -40,6 +40,8 @@ node scripts/verify-bundle-budget.mjs # 必须先 npm run build:web
 ```
 
 `npm run check:tts-voices` 是资产校验（不是断言计数，输出 errors 列表），已嵌进 `package:apk` 前置，失败 `exit 1` 阻断打包。
+
+| `verify-chain-verdict.mjs` | 36 | 语块接龙判定的三档语义：真跑 `parseChainVerdict`（首行才算、整词+有限后缀、`PASTA`/`PASSAGE`/`FAILSAFE` 不算、正文里的 PASS 不算、空回复算未判定）+ `chainScoreFor` 只给 pass 分 + 页面接线（分数单点来自 `chainScoreFor`、未判定不前进不清空、catch 不送分、旧写法 `!== 'FAIL'` 不许回来 —— **剥掉注释再扫**，否则我们自己写的解释性注释会把它判红） | 改 `chain-verdict.ts` / `handleChainSubmit` |
 
 ## 2. 行为验收：本机无头 Chrome + CDP
 
@@ -83,7 +85,7 @@ npm run verify:all        # scripts/verify-all.mjs：typecheck + 全部 verify-*
 
 它自动发现 `scripts/verify-*.mjs`，所以新增守卫不用登记。两处刻意跳过：`verify-wordbank-split`（要 `--baseline/--check` 的基线文件）、`verify-bundle-budget`（没有 `dist/client` 产物时跳过 —— **先 `npm run build:web` 再跑才算真验过体积**）。
 
-2026-09-30 实测：typecheck + 18 条守卫全绿，**断言合计 7,220 条**（tts-progress 一条就占 6,175；其余 17 条相加：45+222+284+67+15+16+10+18+23+16+43+16+24+10+104+74+58 = 1,045）。
+2026-09-30 实测：typecheck + 19 条守卫全绿，**断言合计 7,256 条**（tts-progress 一条就占 6,175；其余 18 条相加：45+222+284+67+15+16+10+18+23+16+43+16+24+10+104+74+36+58 = 1,081）。
 
 ## 6. 静态检查的已知弱度
 

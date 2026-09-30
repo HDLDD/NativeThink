@@ -62,6 +62,7 @@ import { getCapabilityClient } from '@/lib/capability-client';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
 import { cappedPut, persistJson, warnStorageFull } from '@/lib/capped-cache';
+import { parseChainVerdict, chainScoreFor } from '@/lib/chain-verdict';
 
 const CATEGORIES = [
   { value: 'all', label: '全部' },
@@ -790,28 +791,18 @@ Keep it brief — 2-3 bullet points max.`,
 
         feedback = (result as { content?: string })?.content || '';
       }
-      // 判定取模型给出的**结构化结论**（首行 PASS/FAIL）——
-      // 此前用"反馈里是否出现『建议/问题/错误』等词"做启发式，而提示词模板本身就
-      // 固定含「有什么改进建议？」bullet，导致造得正确的句子也永远判不通过。
-      // 首行既非 PASS 也非 FAIL（模型没守格式）时按通过处理，与 catch 分支的宽松降级一致。
-      const verdict = feedback.trimStart().split('\n')[0]?.trim().toUpperCase();
-      const passed = verdict !== 'FAIL';
-      const detail = verdict === 'PASS' || verdict === 'FAIL'
-        ? feedback.trimStart().split('\n').slice(1).join('\n').trim()
-        : feedback;
+      // 判定走唯一解析点 `chain-verdict.ts`：PASS 计分、FAIL 不计分并给建议、
+      // **首行没给结论 = 未判定**（不计分也不判错，把模型原话摊开让用户重来一次）。
+      // 旧写法是 `verdict !== 'FAIL'` —— 非 FAIL 即通过，模型不守格式也 +10，接龙分数于是等于提交次数。
+      const parsed = parseChainVerdict(feedback);
+      const gained = chainScoreFor(parsed.verdict);
+      if (gained) setChainScore((prev) => prev + gained);
 
-      if (!passed) {
-        setChainFeedback({
-          correct: false,
-          message: '句子还有可以改进的地方～',
-          detail,
-        });
-      } else {
-        setChainScore((prev) => prev + 10);
+      if (parsed.verdict === 'pass') {
         setChainFeedback({
           correct: true,
           message: `太棒了！正确使用了 "${chunkContent}" +10分`,
-          detail,
+          detail: parsed.detail,
         });
         setTimeout(() => {
           setCurrentChainIdx((prev) => (prev + 1) % chainChunks.length);
@@ -819,21 +810,29 @@ Keep it brief — 2-3 bullet points max.`,
           setChainFeedback(null);
           setAiChainChallenge(null);
         }, 2000);
+      } else if (parsed.verdict === 'fail') {
+        setChainFeedback({
+          correct: false,
+          message: '句子还有可以改进的地方～',
+          detail: parsed.detail,
+        });
+      } else {
+        // 未判定：不前进、不清空输入 —— 同一句话可以立刻重来，也不假装用户答错了
+        setChainFeedback({
+          correct: false,
+          message: feedback.trim()
+            ? 'AI 没按格式给出判定（PASS/FAIL），这次不计分，可以再提交一次'
+            : 'AI 服务没返回内容，这次不计分，请稍后重试',
+          detail: parsed.detail,
+        });
       }
     } catch (err) {
       toast.error('AI 服务暂不可用，请稍后重试');
-      // 降级：仅做字符串包含判断
-      setChainScore((prev) => prev + 10);
+      // 降级不再白送 10 分：包含校验只说明"这句话里有用到这个语块"，判不了用得对不对。
       setChainFeedback({
-        correct: true,
-        message: `正确使用了 "${chunkContent}" +10分（AI 服务暂不可用，已通过基础校验）`,
+        correct: false,
+        message: `句子里确实有 "${chunkContent}"，但 AI 服务暂不可用，这次不计分（恢复后可重说一次）`,
       });
-      setTimeout(() => {
-        setCurrentChainIdx((prev) => (prev + 1) % chainChunks.length);
-        setChainInput('');
-        setChainFeedback(null);
-        setAiChainChallenge(null);
-      }, 2000);
     } finally {
       setChainLoading(false);
       chainAbortRef.current = null;
