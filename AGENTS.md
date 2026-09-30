@@ -103,7 +103,7 @@ node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆�
 node scripts/verify-tts-progress.mjs              # 6175 朗读切片与进度反查表
 node scripts/verify-tts-hardening.mjs             # 15   TTS 降级/在途去重/桌面限定（注意：没有 npm script）
 node scripts/verify-books-meta.mjs                # 222  书目元数据 + 复习词高亮
-node scripts/verify-vocab-cards.mjs               # 264  背单词卡片契约 + 手势决策表 + 自动发音四处共用
+node scripts/verify-vocab-cards.mjs               # 284  背单词卡片契约 + 手势决策表 + 换卡节奏 + 答错重排延后
 node scripts/verify-vocab-caches.mjs              # 21   缓存基建契约
 node scripts/verify-overlay-fit.mjs               # 16   窄视口浮层契约
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
@@ -286,7 +286,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 264 / 21 / 6175 / 15 / 16 / 10 / 18 / 23 / 16 / 18 / 10 / 16 / 24 + feedback-loop 58）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 284 / 21 / 6175 / 15 / 16 / 10 / 18 / 23 / 16 / 18 / 10 / 16 / 24 + feedback-loop 58）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`

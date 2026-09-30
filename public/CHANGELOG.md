@@ -8,6 +8,7 @@
 
 
 ## 2026-09-30
+- fix(sentence-lab,spelling,chunks,think,shadowing): 断点分键、主干索引同源、Updater 纯化、自动朗读依赖修正 (`40b5b39`)
 - fix(chunks,feedback,copy): 短语库按测量结果折叠；反馈历史区分已送达/已留档；体积与练法文案纠正 (`ca61085`)
 - fix(ai-parse,chunks,conversation,quickcard): 补齐清单里剩下四项，并把 AI 解析约定做成全仓守卫 (`8e9cf74`)
 - fix(cloud-sync): 抑制下行回声、失败不再全静默、周期任务不再无条件全量重推 (`519defd`)

@@ -769,10 +769,11 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   // 不能让它顺带清标记（否则答错的自动跳页会被取消）
   useEffect(() => { setRatedNow(null); }, [currentIdx]);
 
-  // 闪卡：评分后自动进入下一张（答对 550ms / 答错 900ms —— 与复习检测节奏一致）
+  // 闪卡：评分后自动进入下一张（答对 120ms / 答错 300ms —— 与复习检测同一节奏）。
+  // 2026-09-30 与复习检测一起缩短：旧值 550/900 让"翻下一张"有明显停顿（用户反馈）。
   useEffect(() => {
     if (reviewMode !== 'flashcard' || sessionDone || !ratedNow) return;
-    const delay = lastQualityRef.current >= 3 ? 550 : 900;
+    const delay = lastQualityRef.current >= 3 ? 120 : 300;
     const t = setTimeout(() => handleNextRef.current(), delay);
     return () => clearTimeout(t);
   }, [reviewMode, ratedNow, sessionDone]);
@@ -1195,6 +1196,9 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
           {/* ===== FLASHCARD MODE ===== */}
           {reviewMode === 'flashcard' && (
             <>
+              {/* 换卡动画用定长 tween 而不是 spring：mode="wait" 下新卡要等旧卡退场
+                  **完全结束**才挂载，而 spring 要衰减到亚像素才算结束（长尾 ~400ms）——
+                  这正是"闪卡切换下一张等待时间长"的一半来源（另一半是评分后的停留）。 */}
               <div className="flex justify-center">
                 <AnimatePresence mode="wait">
                   <MotionDiv
@@ -1202,8 +1206,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                     initial={{ opacity: 0, x: 60 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -60 }}
-                    transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-                    className="w-full max-w-md cursor-pointer"
+                    transition={{ duration: 0.18, ease: 'easeOut' }}
                     onClick={() => setFlipped(!isFlipped)}
                   >
                     <Card className={cn(

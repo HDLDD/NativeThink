@@ -116,6 +116,13 @@ check(T({ dx: -120, isFlipped: true, rated: false }) === 'rate-unknown', '手势
 check(T({ dx: 120, isFlipped: true, rated: false }) === 'rate-known', '手势：已翻面右滑 → 认识');
 check(T({ dx: -120, isFlipped: true, rated: true }) === 'prev', '手势：已评分左滑 → 上一张方向');
 check(T({ dx: 120, isFlipped: true, rated: true }) === 'next', '手势：已评分右滑 → 下一张');
+/**
+ * 2026-09-30：答错重排的词回插队列后是 front 朝上的**回看态**，旧表在这个状态返回 'flip'，
+ * 手机上表现为"滑了没反应"（与"答错卡死"叠成同一个体感）。已评分的卡滑动必须直接导航；
+ * 上面 113/114 两条（未评分只翻面）就是这次改动的正对照 —— 防盲滑的保护不许松。
+ */
+check(T({ dx: -120, isFlipped: false, rated: true }) === 'prev', '手势：已评分未翻面左滑 → 直接上一张（回看态不必先翻面）');
+check(T({ dx: 120, isFlipped: false, rated: true }) === 'next', '手势：已评分未翻面右滑 → 直接下一张');
 check(SWIPE_QUALITY_UNKNOWN === 2 && SWIPE_QUALITY_KNOWN === 4, '滑动映射到 SM-2 quality 2 / 4', `${SWIPE_QUALITY_UNKNOWN}/${SWIPE_QUALITY_KNOWN}`);
 check(/decideSwipe\(\{ dx, isFlipped, rated \}\)/.test(fc), '组件用纯函数判定手势（不在组件里重复分支）');
 check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值常量只有一处定义（lib），组件不重复声明');
@@ -168,9 +175,19 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
 
   // 组件接线
   check(/createSessionOrder\(entries\.map/.test(fc), '开始复习时冻结本轮顺序');
-  check(/scheduleRelearn\(s, currentIdx, key\)/.test(fc), '答错时调用重排');
-  check(/quality <= 2\) \{[\s\S]{0,200}scheduleRelearn/.test(fc), '只有答错（quality<=2）才重排');
-  check(/nextIndex\(session, p\)/.test(fc), '推进用会话顺序（不再用会漂的 queue 下标）');
+  /**
+   * 答错重排：评分时只记 key，**前进时才插回**（2026-09-30 按帧实测的修复）。
+   * 旧写法在评分那刻就 `setSession((s) => scheduleRelearn(s, currentIdx, key))`，
+   * 而 cw/currentKey 都取自 `session.order[currentIdx]` —— 重排当场把该位置换成下一张 →
+   * currentKey 变化 → justRated 立即为 false → 自动跳转的定时器永远排不上，
+   * 屏幕还直接换成下一个词的背面（评分按钮健在）。现象：「点完全忘了卡死在本张」。
+   */
+  check(/quality <= 2\) \{[\s\S]{0,400}?pendingRelearnRef\.current = key;/.test(fc), '答错时只把 key 记进待重排（不在评分那刻动 session）');
+  check(!/setSession\(\(s\) => scheduleRelearn/.test(fc), '评分时同步重排的旧写法已消失（正对照在下面的 advance 两条）');
+  check(/const applies = pending !== null && pending === session\.order\[currentIdx\];/.test(fc), 'advance：只有"待重排的就是当前这张"才插回（回看路径不乱插）');
+  check(/setSession\(scheduleRelearn\(session, currentIdx, pending\)\)/.test(fc), 'advance 里真正执行重排（scheduleRelearn 仍在用）');
+  check(/setIdx\(applies \? currentIdx : next\);/.test(fc), '重排把下一张顶到原位 → applies 时下标不动也等于前进');
+  check(/nextIndex\(session, currentIdx\)/.test(fc), '推进用会话顺序（下标从冻结的 session.order 来，不再用会漂的 queue）');
   check(!/if \(!cw\) \{/.test(fc), '空状态判定不再误用 cw（会话未开始时 cw 也是 undefined）');
   check(/if \(queue\.length === 0\) \{/.test(fc), '空状态只由"根本没词"触发');
 }
@@ -297,7 +314,17 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   // 用户明确要求：点了熟悉程度就应该翻到下一张，不该再点一次「下一个」
   check(/if \(!started \|\| !justRated\) return;/.test(fc), '自动跳转的前置条件（只有"本次刚评分"才跳）');
   check(/setTimeout\(\(\) => advanceRef\.current\(1\), delay\)/.test(fc), '评分后定时自动进入下一张');
-  check(/const delay = lastQualityRef\.current >= 3 \? 550 : 900;/.test(fc), '答对停留短、答错停留久（让人看清反馈）');
+  /**
+   * 停留时长**按数值锁**，不锁字面量（2026-09-30 用户报"切换下一张等待时间长"）：
+   * 无头 Chrome 按帧实测，旧值 550/900 + advance 里另走一拍的 150ms + spring 尾巴
+   * = 点完评分到下一张进 DOM 1122ms。现在 120/300 + 定长 tween ≈ 300ms。
+   * 数值断言：答对必须短于答错，且答错不超过 400ms —— 谁把值调回 550/900，这里就红。
+   */
+  const dwellM = fc.match(/const delay = lastQualityRef\.current >= 3 \? (\d+) : (\d+);/);
+  check(!!dwellM, '自动跳转的停留时长可解析（答对/答错三元式）');
+  check(!!dwellM && Number(dwellM[1]) < Number(dwellM[2]), '答对停留短于答错（让人看清反馈）', dwellM ? `${dwellM[1]}ms vs ${dwellM[2]}ms` : '未匹配');
+  check(!!dwellM && Number(dwellM[2]) <= 400, '答错停留 ≤ 400ms（实测基线：旧值合计 1122ms 才进下一张）', dwellM ? `${dwellM[2]}ms` : '未匹配');
+  check(/transition=\{\{ duration: 0\.18, ease: 'easeOut' \}\}/.test(fc), '卡片退场用定长 tween（spring 必须衰减到亚像素才算完，尾巴 ≈400ms）');
   check(/advanceRef\.current = advance;/.test(fc), 'advance 同步到 ref（避免 effect 反复重置定时器）');
   check(/评完自动跳下一个/.test(fc), '提示文案说明会自动跳转');
   // 回看时不能自动跳（否则刚点开上一个词就被抢走）
@@ -350,6 +377,32 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '正对照：首启三步向导的分支仍在（加换书路径没把首启流程改坏）');
   check(!/selectedLevel === 'all' \? 'cet4' : selectedLevel/.test(page),
     '选「全部」时不再拿四级的图标冒充当前词书');
+
+  /**
+   * 向导必须在**点开的那一刻就看得见**（2026-09-30 真机反馈"点击切换词书无法切换"）。
+   *
+   * 真机 393×851 复现：点按钮后向导渲染在六张模式卡**下面**，从 y≈809 才开始、
+   * 高度 1133px —— 视口内只有 42px，屏幕看起来毫无变化（切换逻辑本身是好的，
+   * 坏的是"用户根本看不见有东西弹出来"）。三处一起修：
+   *  ①首页模式块与向导互斥渲染（向导打开时让位），②打开即回顶，③向导带「当前」标记与关闭出口。
+   * 无头 Chrome 场景脚本（TEMP/nt-switchbook-clean.mjs，12 断言）量过 visiblePx 42 → 685。
+   */
+  check(/\{!immersed && !showWizard && \(/.test(page),
+    '首页模式卡与向导互斥渲染（向导打开时让位，不再把向导挤到 800px 之下）');
+  const openWizBody = (page.match(/const handleOpenWizard = \(\) => \{[\s\S]{0,600}?\};/) || [])[0] || '';
+  check(openWizBody.length > 0, '脚手架自检：抓到 handleOpenWizard 函数体');
+  check(/window\.scrollTo\(\{ top: 0/.test(openWizBody) && /setShowWizard\(true\)/.test(openWizBody),
+    '打开向导即回到顶部（否则用户停在滚动位置，向导仍在视口外）');
+  check(/document\.querySelector\('main'\)\?\.scrollTo\?\.\(\{ top: 0 \}\)/.test(openWizBody),
+    '同时归零 <main> 滚动容器（Layout 里内容是 overflow-y-auto，窄屏可能由它滚）');
+  check(/onClose\?: \(\) => void;/.test(page) && /aria-label="关闭向导"/.test(page),
+    '向导有可选关闭出口（误点开不用走完三步才能退出）');
+  check(/onClose=\{\(\) => setShowWizard\(false\)\}/.test(page), '页面把关闭出口接上（关掉向导、不动任何选择）');
+  check(/currentLevel\?: string;/.test(page) && /\{onSwitchBook && currentLevel === key && \(/.test(page) && /\{onSwitchBook && currentLevel === 'all' && \(/.test(page),
+    '换书向导给当前词书打「当前」标记（单个词书 + 全部词库两处都要）');
+  check(/currentLevel=\{selectedLevel\}/.test(page), '页面把当前词书传给向导（标记的数据源）');
+  check(/onSwitchBook && currentLevel === key \? 'border-\[#00B894\]/.test(page),
+    '当前词书卡片有视觉强调（正对照：只在换书模式 + 命中当前书时）');
 
   /**
    * 走完向导必须**直接落进所选模式**（2026-09-29 真机化验收时发现的另一半"多点一步"）：
@@ -417,6 +470,17 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   const resetCount = (fc.match(/lastSpokenKey\.current = '';/g) ?? []).length;
   check(resetCount >= 2, 'startSession / resumeSession 都清空朗读记录', `找到 ${resetCount} 处`);
   check(/clearSession\(currentLevel\);[\s\S]{0,120}lastSpokenKey\.current = '';/.test(fc), '新开一轮时清空（紧跟 clearSession）');
+
+  /**
+   * 「答错待重排」是同样性质的每轮 ref：startSession / resumeSession / suspendCurrent /
+   * advance 消费后都要清。漏了 startSession 就会把上一轮没消费的 key 插进新一轮队列。
+   * suspendCurrent 那条是必要条件 —— scheduleRelearn 只认 key、不看词还在不在队里，
+   * 不清就会把"不再出现"的词复活。
+   */
+  const pendClear = (fc.match(/pendingRelearnRef\.current = null;/g) ?? []).length;
+  check(pendClear >= 4, '待重排在 开始/续学/前进消费/屏蔽 四处都被清', `找到 ${pendClear} 处`);
+  check(/if \(pendingRelearnRef\.current === word\.word\.toLowerCase\(\)\) pendingRelearnRef\.current = null;/.test(fc),
+    '屏蔽当前词时撤销它的待重排（否则下次前进会把它插回队里）');
 }
 
 // ── ⑫ 复习检测：取消「下一个」按钮 + 快速闪卡交互补齐 ──
@@ -425,6 +489,9 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(!/onClick=\{\(\) => advance\(\)\}/.test(fc), '复习检测不再有「下一个」按钮');
   check(/即将进入下一张/.test(fc), '评分后改为「即将进入下一张」过渡提示');
   check(/rated && !viewingPast && \(/.test(fc), '过渡提示只在本次刚评分时显示（回看态不显示）');
+  // 回看态（含答错重排再现的卡）没有评分按钮也没有「下一个」按钮 → 必须给出可见的继续出口，
+  // 否则手机用户滑了没反应 = 卡死（2026-09-30 与"答错卡死"同一批修）。
+  check(/已评过的卡 · 滑动 \/ 按 → 继续/.test(fc), '回看态显示「滑动 / 按 → 继续」出口');
 
   /**
    * 背面自动朗读必须**先读单词再读例句**（用户反馈「只朗读句子，不朗读单词」）。

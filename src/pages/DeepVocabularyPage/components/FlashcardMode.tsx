@@ -250,6 +250,16 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const lastQualityRef = useRef(4);
   /** advance 的 ref 镜像：自动跳转的 effect 用它，避免 advance 每次重建导致定时器反复重置 */
   const advanceRef = useRef<(dir?: number) => void>(() => {});
+  /**
+   * 「答错待重排」的词 key —— 评分时只记下，**等真正前进时再插回队列**。
+   *
+   * 2026-09-30 按帧实测的坑：以前在 markWithQuality 里同步 `setSession(scheduleRelearn(...))`，
+   * 而 cw / currentKey 都取自 `session.order[currentIdx]`，重排会把该位置就地换成下一张，
+   * 于是同一次批处理里 currentKey 就变了 —— `justRated`（ratedNow === currentKey）立即变
+   * false，自动跳转的定时器永远排不上；屏幕上还直接换成下一个词的背面（评分按钮健在）。
+   * 现象：点「完全忘了」后卡死不动。重排挪到 advance 里做，评分那一刻 session 不动。
+   */
+  const pendingRelearnRef = useRef<string | null>(null);
 
   // 进入一张卡时确保该词的等级 detail 已加载 —— 否则背面只有释义，没有搭配/例句
   useEffect(() => {
@@ -347,19 +357,20 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     }
     setRatedKeys((prev) => new Set(prev).add(cw.word.toLowerCase()));
     setRatedNow(cw.word.toLowerCase());
-    // 答错立即重排：隔 RELEARN_GAP 张后再出现（最多 MAX_RELEARN 次）—— 这比只记 wrongCount
-    // 有用得多，是主流 SRS（Anki learning steps）的即时巩固环节。
+    // 答错重排：**先记下，等 advance 时再插回**（隔 RELEARN_GAP 张，最多 MAX_RELEARN 次）——
+    // 主流 SRS（Anki learning steps）的即时巩固环节。为什么不在这里 setSession 见
+    // pendingRelearnRef 的注释（同步重排会让"刚评分"状态立刻失效，卡死在本张）。
     if (quality <= 2) {
       const key = cw.word.toLowerCase();
       // 先判断是否还会重排再提示 —— 不要把 toast 放进 setState 更新函数里（StrictMode 下会弹两次）
       if ((session.relearnCounts[key] ?? 0) < MAX_RELEARN) {
-        setSession((s) => scheduleRelearn(s, currentIdx, key));
+        pendingRelearnRef.current = key;
         toast.info('答错的词稍后会再出现一次', { duration: 1200 });
       }
     }
     const labels = ['完全忘了', '有点印象', '基本记得', '比较熟悉', '完全掌握'];
     toast(labels[quality] || '已记录', { duration: 800 });
-  }, [cw, rated, recordReview, currentIdx]);
+  }, [cw, rated, recordReview, session.relearnCounts]);
 
   /**
    * 前后翻卡。
@@ -376,27 +387,50 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       return;
     }
     setDir(direction); setFlipped(false); setShowDeep(false);
-    setTimeout(() => setIdx((p) => {
-      const next = nextIndex(session, p);
-      if (next === null) {
-        // 走到队尾：本轮结束，回开头再来一轮（重排插入的词也已经消费完）
-        sfxComplete();
-        toast.success(`🎉 完成一整轮 ${session.order.length} 张卡片 · 累计评分 ${sessionReviewCount + 1} 次，巩固完成`, { duration: 4000 });
-        return 0;
-      }
-      return next;
-    }), 150);
-  }, [session, sessionReviewCount]);
+    /**
+     * 一次批量切换，**不再"先翻回正面、150ms 后再换下标"**。
+     *
+     * 2026-09-30 按帧实测：AnimatePresence mode="wait" 下这两次相邻的 key 变化会被
+     * 合并成一次「退场 + 入场」，中间那 150ms 是纯粹的干等（旧写法点完评分到下一张
+     * 进 DOM 要 1122ms）。批量切换后 key 只变一次，内容同样是下一张的正面。
+     * 副作用（sfx/toast）也顺手挪出了 setState 更新函数 —— 更新函数必须纯，
+     * 否则 StrictMode 双调用会把完成提示弹两次。
+     */
+    // 前进时才把"答错待重排"的词插回队列（为什么不能提前到评分那一刻：见 pendingRelearnRef）。
+    // 重排会把它从 currentIdx 抽走再插到 +RELEARN_GAP 处，原顺序的下一张移到 currentIdx ——
+    // 所以 applies 时 `setIdx(currentIdx)`（下标不动）本身就是"前进到下一张"。
+    const pending = pendingRelearnRef.current;
+    const applies = pending !== null && pending === session.order[currentIdx];
+    if (applies) {
+      pendingRelearnRef.current = null;
+      setSession(scheduleRelearn(session, currentIdx, pending));
+    }
+    const next = nextIndex(session, currentIdx);
+    if (next === null) {
+      // 走到队尾：本轮结束，回开头再来一轮（重排插入的词也已经消费完）
+      sfxComplete();
+      toast.success(`🎉 完成一整轮 ${session.order.length} 张卡片 · 累计评分 ${sessionReviewCount + 1} 次，巩固完成`, { duration: 4000 });
+      setIdx(0);
+      return;
+    }
+    setIdx(applies ? currentIdx : next);
+  }, [session, sessionReviewCount, currentIdx]);
   advanceRef.current = advance;
 
   /**
    * 评分后**自动**进入下一张 —— 主流背单词 App 都是这样：点完熟悉程度就翻页，
-   * 不需要再点一次「下一个」。留一小段停留时间让人看清反馈（答错留久一点）。
+   * 不需要再点一次「下一个」。这里的停留只作"这一下点到了"的即时确认（答错稍久一点）。
+   *
+   * 2026-09-30 无头 Chrome 按帧实测（用户反馈"闪卡切换下一张等待时间长"）：
+   * 旧值 550/900 停留 + advance 里另走一拍的 150ms + 串行等退场 spring(260/24)，
+   * 点完评分到**下一张词进 DOM 1122ms、眼睛能看清约 1.7s**。
+   * 现在：停留 120/300 + 定长 tween 退场（见卡片那处注释），同一路径 ≈300ms。
+   * 想更快：停留窗口内按空格 / → 或滑动一下就会立刻跳（advance 会清掉这个定时器）。
    * 回看态 / 未开始 / 未评分都不触发；卡片一换 effect 自动清理定时器。
    */
   useEffect(() => {
     if (!started || !justRated) return;
-    const delay = lastQualityRef.current >= 3 ? 550 : 900;
+    const delay = lastQualityRef.current >= 3 ? 120 : 300;
     const t = setTimeout(() => advanceRef.current(1), delay);
     return () => clearTimeout(t);
   }, [started, justRated, currentKey]);
@@ -410,6 +444,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setCombo(0); setBestCombo(0);
     clearSession(currentLevel); // 新开一轮就丢掉旧断点
     lastSpokenKey.current = '';  // 新一轮必须忘掉上一轮的朗读记录，否则第一张卡不出声
+    pendingRelearnRef.current = null;  // 上一轮没消费完的"待重排"不跨轮
     setStarted(true);
   }, [currentLevel]);
 
@@ -434,6 +469,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setRatedKeys(new Set()); setSessionRated(0); setSessionGood(0);
     setCombo(0); setBestCombo(0);
     lastSpokenKey.current = '';  // 同上：恢复的那一轮也要从第一张卡正常出声
+    pendingRelearnRef.current = null;  // 同上：断点里不保存"待重排"，续学从干净状态开始
     setStarted(true);
     toast.success(`接着上次继续 — 还剩 ${order.length - idx} 张`, { duration: 2000 });
   }, [currentLevel, customList]);
@@ -448,6 +484,9 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const suspendCurrent = useCallback(() => {
     if (!cw) return;
     const word = cw;
+    // 屏蔽的词若正处在"答错待重排"，这张待办必须一起撤销 —— 否则下次前进会把它插回队里，
+    // 「不再出现」的承诺就失效了（scheduleRelearn 只认 key，不看词是否还在队中）。
+    if (pendingRelearnRef.current === word.word.toLowerCase()) pendingRelearnRef.current = null;
     setSuspended(word, true);
     setSession((s) => {
       const key = word.word.toLowerCase();
@@ -823,10 +862,14 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
         </div>
       {/* Flashcard */}
       <div className="flex justify-center">
+        {/* 退场和入场在这里是串行的（mode="wait"：新卡要等旧卡退场**完全结束**才挂载），
+            所以别用 spring —— 它要衰减到亚像素才算结束（260/24 实测退场 ~420ms，
+            即使换成很紧的 460/34 仍有 ~400ms 的长尾）。定长 tween 0.18s 精确可控，
+            与快速闪卡的换卡动画同一条曲线，两个闪卡模式手感一致。 */}
         <AnimatePresence mode="wait">
           <MotionDiv key={shown?.word + (isFlipped ? '-back' : '-front')}
             initial={{ opacity: 0, x: dir * 100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -dir * 100 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
             className="w-full max-w-sm"
           >
             <div
@@ -1075,7 +1118,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       )}
       {/*
         评分后**不再有「下一个」按钮** —— 主流背单词 App 点完熟悉程度就自动翻页，
-        多按一次是纯负担。这里只留一条过渡提示（仍在 550/900ms 内可点空白处取消节奏）。
+        多按一次是纯负担。这里只留一条过渡提示；停留窗口已缩到 120/300ms，
+        所以它只是"点到了"的一闪。想更快：空格 / → / 滑动都能立刻跳。
         回看态不显示：那时停留多久由用户决定。
       */}
       {rated && !viewingPast && (
@@ -1083,6 +1127,18 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
           <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-muted/60 text-muted-foreground text-[10px] font-black uppercase tracking-wider">
             <RotateCw className="size-3.5 animate-spin [animation-duration:1.6s]" />
             即将进入下一张…
+          </span>
+        </div>
+      )}
+      {/*
+        回看态（含答错重排再现的那张）**必须有可见的继续出口**：
+        没有评分按钮、也没有「下一个」按钮，光靠"滑动/按 →"的隐藏手势会让手机用户
+        直接卡在这张上。滑动手势本身也改成 rated 即导航（见 vocab-swipe.ts）。
+      */}
+      {viewingPast && (
+        <div className="flex justify-center">
+          <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-muted/60 text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+            已评过的卡 · 滑动 / 按 → 继续
           </span>
         </div>
       )}

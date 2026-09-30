@@ -54,6 +54,10 @@ interface SetupStepProps {
    * 不给这个 prop 才是首启的三步向导（词书 → 方式 → 开始）。
    */
   onSwitchBook?: (level: string) => void;
+  /** 当前正在学的词书 key —— 向导里给它打「当前」标记（换书后用户能确认自己切到了哪本） */
+  currentLevel?: string;
+  /** 关闭向导（不改变任何选择）。没有出口的向导是陷阱：用户误点开只能走完全程 */
+  onClose?: () => void;
 }
 
 /**
@@ -91,7 +95,7 @@ const REVIEW_MODES: { key: string; label: string; icon: LucideIcon; color: strin
 
 const DAILY_COUNTS = [5, 10, 20, 30, 50, 100];
 
-function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook }: SetupStepProps) {
+function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook, currentLevel, onClose }: SetupStepProps) {
   const [step, setStep] = useState(0);
   const [chosenLevel, setChosenLevel] = useState('');
   const [chosenMode, setChosenMode] = useState('daily');
@@ -146,7 +150,21 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook }: Setu
       {/* Step 0: Choose Wordbook */}
       {step === 0 && (
         <div className="space-y-4">
-          <div className="text-center mb-6 space-y-1">
+          {/*
+            关闭出口：误点开向导 / 不想换书了 → 一键退回，词书保持不动。
+            此前没有出口，用户只能走完三步（换书路径也等于"打开了就必须选一本"）。
+            贴着标题行右上角放，跟随内容垂直居中，不会飘在 60vh 空盒的顶部。
+          */}
+          <div className="relative text-center mb-6 space-y-1">
+            {onClose && (
+              <button
+                onClick={onClose}
+                aria-label="关闭向导"
+                className="absolute -top-1 right-0 sm:-right-2 flex items-center gap-1 px-2.5 py-1.5 rounded-2xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="size-4" /><span className="text-xs font-bold">关闭</span>
+              </button>
+            )}
             <h2 className="text-xl font-black italic text-foreground">{onSwitchBook ? '切换词书' : '选择你的词书'}</h2>
             <p className="text-xs text-muted-foreground">
               {onSwitchBook ? '点一本直接切过去，学习方式保持不变' : '选择一本词书开始学习'}
@@ -155,13 +173,19 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook }: Setu
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
             {BOOKS.map(({ key, label, icon: BookIcon, color, desc, gradient }) => (
               <button key={key} onClick={() => handleBookSelect(key)}
-                className={cn('group rounded-[24px] p-4 text-left transition-all duration-300 bg-gradient-to-br border border-border/50 shadow-sm hover:shadow-lg hover:-translate-y-1 active:scale-[0.98]', gradient)}>
+                className={cn('group rounded-[24px] p-4 text-left transition-all duration-300 bg-gradient-to-br border shadow-sm hover:shadow-lg hover:-translate-y-1 active:scale-[0.98]',
+                  onSwitchBook && currentLevel === key ? 'border-[#00B894] ring-2 ring-[#00B894]/20' : 'border-border/50', gradient)}>
                 <div className="flex items-center gap-3">
                   <span className="size-10 rounded-2xl grid place-items-center shrink-0" style={{ background: `${color}1a`, color }}>
                     <BookIcon className="size-5" />
                   </span>
                   <div>
-                    <p className="text-sm font-black text-foreground">{label}</p>
+                    <p className="flex items-center gap-1.5 text-sm font-black text-foreground">
+                      {label}
+                      {onSwitchBook && currentLevel === key && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-[#00B894] text-white text-[9px] font-black leading-none">当前</span>
+                      )}
+                    </p>
                     <p className="text-[10px] text-muted-foreground">{desc}</p>
                     <p className="text-[10px] font-bold mt-1 opacity-50">{counts[key]?.toLocaleString() || '—'} 词</p>
                   </div>
@@ -169,8 +193,13 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook }: Setu
               </button>
             ))}
             <button onClick={() => handleBookSelect('all')}
-              className="col-span-full rounded-[24px] p-4 text-center transition-all border-2 border-dashed border-border/50 hover:border-[#00B894] hover:bg-emerald-50/30 dark:hover:bg-emerald-500/5">
-              <p className="text-sm font-black text-muted-foreground flex items-center justify-center gap-1.5"><Library className="size-4" />全部词库 · {TOTAL_UNIQUE_WORDS.toLocaleString()} 词</p>
+              className={cn('col-span-full rounded-[24px] p-4 text-center transition-all border-2 border-dashed hover:bg-emerald-50/30 dark:hover:bg-emerald-500/5',
+                onSwitchBook && currentLevel === 'all' ? 'border-[#00B894] bg-emerald-50/30' : 'border-border/50 hover:border-[#00B894]')}>
+              <p className="text-sm font-black text-muted-foreground flex items-center justify-center gap-1.5"><Library className="size-4" />全部词库 · {TOTAL_UNIQUE_WORDS.toLocaleString()} 词
+                {onSwitchBook && currentLevel === 'all' && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-[#00B894] text-white text-[9px] font-black leading-none">当前</span>
+                )}
+              </p>
               <p className="text-[10px] text-muted-foreground mt-0.5">加载较慢，建议选择单本词书</p>
             </button>
           </div>
@@ -419,8 +448,19 @@ export default function DeepVocabularyPage() {
     setSetupDone(true);
   };
 
-  /** Re-open the wizard to switch word book / learning mode */
-  const handleOpenWizard = () => setShowWizard(true);
+  /**
+   * Re-open the wizard to switch word book / learning mode.
+   *
+   * **必须同时回到顶部**：向导渲染在内容流里（紧接页头），而首页的六张模式卡比它高 ——
+   * 真机 393×851 下不滚动时向导从 y≈809 才开始，点完按钮屏幕看起来**毫无变化**，
+   * 用户结论就是"点击切换词书没有用"（真机反馈）。打开即回顶，保证第一屏见到的就是它。
+   */
+  const handleOpenWizard = () => {
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    // 布局里滚动容器是 <main overflow-y-auto>（Layout.tsx）：桌面窗口滚、窄屏由 main 兜底，两边都归零
+    document.querySelector('main')?.scrollTo?.({ top: 0 });
+    setShowWizard(true);
+  };
 
   const handleWizardComplete = (level: string, mode: string, dailyCount: number, revMode?: string) => {
     setSelectedLevel(level);
@@ -946,8 +986,13 @@ export default function DeepVocabularyPage() {
       </div>
       )}
 
-      {/* ── 模式选择主页（竖排 · 突出重点） ── */}
-      {!immersed && (
+      {/*
+        ── 模式选择主页（竖排 · 突出重点） ──
+        **向导打开时整块让位**：此前它无条件渲染，于是首页点「切换词书」后
+        向导被挤到六张模式卡下面（真机 393×851：向导从 y≈809 才开始，视口内只有 42px），
+        看起来"点了没反应"；而且向导开着时卡片仍可点，点进模式后会停在"向导 + 空内容"的怪状态。
+      */}
+      {!immersed && !showWizard && (
       <div className="flex flex-col gap-3 stagger">
 
         {/* 主推：每日学习 */}
@@ -1008,6 +1053,8 @@ export default function DeepVocabularyPage() {
           onComplete={handleWizardComplete}
           onContinue={handleWizardContinue}
           onSwitchBook={setupDone ? handleSwitchBook : undefined}
+          currentLevel={selectedLevel}
+          onClose={() => setShowWizard(false)}
         />
       )}
 

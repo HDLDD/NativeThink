@@ -1,7 +1,7 @@
 # NativeThink 项目交接手册（Agent Handover）
 
 > 面向**接手的 AI agent / 新同事**：只读这一份就能开工。
-> 最后校准：2026-09-29（线上 APK 已装机 2.0.28 / versionCode 73；**已打包 2.0.31 / versionCode 76 但因设备断线尚未装机验证**，真机那段走查仍欠）。
+> 最后校准：2026-09-30（设备已装 2.0.31 / versionCode 76 并抽验过向导/词书词数/朗读设置；**2026-09-30 的「换书向导可达性」与「闪卡换卡节奏/答错卡死」两项修复尚未打进新 APK** —— 见第 8 节末尾两条新坑）。
 > 相关文档：`AGENTS.md`（**索引**：跨模块约定 + 模块文档导航）、[`docs/modules/`](./modules/)（**每模块一篇：功能 / 实现方法 / 注意事项，带 `文件:行号`**）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
 
 ---
@@ -15,7 +15,7 @@
 | 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
 | 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-09 两轮全站质量优化已把拼写/跟读/写作/对话/语块也扫过一遍 |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 11 个 `scripts/verify-*.mjs` 断言脚本（2026-09-29 全绿：loading 45 · books-meta 222 · vocab-cards 254 · vocab-caches 21 · tts-progress 6175 · tts-hardening 15 · feedback-loop 56 · overlay-fit 16 · bundle-budget 10 · list-scaling 10）。**typecheck 是弱守卫**（继承 `strict:false`）；守卫覆盖不到的页面清单见 [modules/verification.md](./modules/verification.md) |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 17 个 `scripts/verify-*.mjs` 断言脚本（2026-09-30 实测 vocab-cards 284；其余最近一次全绿记录与完整断言数见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
 | 改某个模块前 | 读 [`docs/modules/`](./modules/) 里对应那一篇 —— 功能、实现方法、以及**逐条读代码核实过**的注意事项（本手册与 AGENTS.md 的若干旧说法在那里被推翻并已修正） |
 | 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
@@ -180,13 +180,13 @@ npm run preview             # 本地预览构建产物（:4173）
 node scripts/verify-wordbank-loading.mjs     # 词库加载层集成验证（45 项：显示数=出卡池子、九本全载不互抢、缓存双写只在 IDB 失败时兜底）
 node scripts/verify-wordbank-split.mjs --baseline <out.json>   # 数据层拆分校验：采基线（拆分前后都能采）
 node scripts/verify-wordbank-split.mjs --check <in.json>
-npm run verify:books-meta        # 书目/SCP 元数据 + 书库拆分 + 复习词高亮 + 乱码（213 断言）
-npm run verify:vocab-cards       # 背单词卡片交互契约（254 断言）
+npm run verify:books-meta        # 书目/SCP 元数据 + 书库拆分 + 复习词高亮 + 乱码（222 断言）
+npm run verify:vocab-cards       # 背单词卡片交互契约（284 断言；含换卡节奏数值锁 + 答错重排延后 + 换书路径）
 npm run verify:vocab-caches      # 词汇缓存基建契约（capped-cache / colloc-ai-cache 接线，21 断言）
-npm run verify:feedback-loop     # 反馈链路契约（挂载点 + 三档状态 + 后端 KV/飞书替身真实执行，56 断言）
+npm run verify:feedback-loop     # 反馈链路契约（挂载点 + 三档状态 + 后端 KV/飞书替身真实执行，58 断言）
 npm run verify:overlay-fit       # 窄视口浮层契约（Dialog 基座夹高度 + 朗读/AI 设置内部滚动，16 断言）
 npm run verify:bundle-budget     # 首屏下载预算 + 平台 SDK 禁止静态 import（从产物反查入口静态依赖图，10 断言；跑前必须先 build:web）
-npm run verify:list-scaling      # 长列表必须折叠/分页（写作题库 100 题默认 12 张 + 词库浏览分页，10 断言）
+npm run verify:list-scaling      # 长列表必须折叠/分页（写作题库默认 12 张 + 词库浏览分页 + 短语库字母段，18 断言）
 npm run verify:tts-progress      # 朗读切片/进度（6175 断言）
 node scripts/verify-tts-hardening.mjs        # TTS 降级/预合成守卫 + 设置面板网络卫生（15 项）
 npm run check:tts-voices         # 音色与模型资产一致性（package:apk 前置）
@@ -218,14 +218,14 @@ adb install -r release/NativeThink-mobile-debug.apk
 |---|---|---|
 | 静态 | `npm run typecheck` + `npm run lint:eslint` | 全量；pre-commit 强制 |
 | 构建 | `npm run build:web` | 打包可行性 + chunk 体积 |
-| 契约 | 7 个 `scripts/verify-*.mjs` | 词库加载/拆分、书目元数据、背单词卡片、背单词缓存、TTS 切片与进度、TTS 降级、反馈链路（前后端对接 + 后端替身执行） |
+| 契约 | 17 个 `scripts/verify-*.mjs`（全表见 [modules/verification.md](./modules/verification.md)） | 词库加载/拆分、书目元数据、背单词卡片（含换卡节奏数值锁 + 答错重排延后 + 换书路径）、背单词缓存、TTS 切片与进度、TTS 降级、反馈链路（前后端对接 + 后端替身执行）、拼写断点分键、跟读完成索引、云同步卫生、AI 解析约定、长列表折叠等 |
 | 真机 | adb + CDP（见第 7 节） | 只能在设备上发现的：safe-area、原生 TTS、手势、持久化 |
 
 **写守卫脚本的经验（血泪）**：
 1. **断言要重新推导，不能照抄**。改语义时必须连断言一起改 —— 历史上 `viewingPast = rated && isFlipped` 这个**错误定义被断言一起锁死**，导致"评分后自动跳转"永远不触发却一直是绿的。
 2. 断言里加**脚手架自检**（例如"解析到的条目数必须等于源文件条目数"），否则正则会静默漏项（曾漏掉含撇号的书名）。
 3. 数据文件混用单/双引号，正则要写 `(?:[^"\\]|\\.)*`；解析 TS 数据优先用 `ts.transpileModule` 而不是正则。
-4. 断言数会随功能增长（`verify-vocab-cards` 135 → 225 → 246），**只增不减**，除非删功能。
+4. 断言数会随功能增长（`verify-vocab-cards` 135 → 225 → 246 → 284），**只增不减**，除非删功能。
 
 ---
 
@@ -343,6 +343,13 @@ node scripts/device-eval.mjs back
 | 屏蔽（不再出现）的词又回来了 | 只在一个出卡路径过滤 `suspended`，别的漏滤 | **所有**出卡路径统一过滤（复习检测 `otherWords` 曾漏） |
 | 整页/整章翻译错位一行 | 失败段被 filter 后按"成功顺序"回填 | 翻译缓存 v2 按段索引 byIdx 精确回填；旧顺序缓存段数不吻合宁可不显示 |
 | 长任务结束时覆盖运行期间的新数据 | 用点击时的陈旧快照直接 set | 合并用 `setX((prev) => ...)` 函数式；与其它写路径互斥守卫 |
+
+**2026-09-30 词汇模块两条新坑（都由真机反馈驱动）**：
+
+| 现象 | 真正原因 | 修法 |
+|---|---|---|
+| 首页点「切换词书」没反应（2026-09-30 已修） | 向导**其实弹了**，但被渲染在六张模式卡**下面**（真机 393×851 从 y≈809 才开始，视口内只剩 42px）；且打开时页面没滚动归零 | 模式卡列表与向导**互斥渲染**（`{!immersed && !showWizard && …}`）+ 打开时 `window.scrollTo`/`main.scrollTo` 归零 + 向导带「当前」标记与「关闭」出口。切换逻辑本身没错，坏在"看不见有东西弹出来" |
+| 闪卡评分后要 ~1.1s 才换卡；答「完全忘了」直接卡死不动（2026-09-30 已修） | ①换卡延迟三源叠加：停留 550/900ms + `setTimeout(150)` 干等 + spring 退场被 `AnimatePresence mode="wait"` 串行等（≈400ms 尾巴）；②评分时同步 `scheduleRelearn` 就地改掉 `session.order[currentIdx]` → `currentKey` 当场变化 → `justRated` 失效、自动跳转定时器永远排不上 | 停留改 120/300、换卡一次批量、退场用定长 tween 0.18s（CDP 按帧实测 1122ms → ~330ms）；重排**延后到 `advance`**（`pendingRelearnRef`），答错 489ms 自动前进、重排词隔 4 张如约再现。守卫按**数值**锁（答对<答错、答错≤400ms） |
 
 ---
 
@@ -467,7 +474,7 @@ node scripts/device-eval.mjs back
 
 **改完代码**
 - [ ] `npm run typecheck`、`npm run lint:eslint`、`npm run build:web`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言（8 个脚本 2026-09-29 全绿：42 / 202 / 246 / 21 / 6175 / 15 / 56 / 16）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言（断言数以 [modules/verification.md](./modules/verification.md) 表格为准；2026-09-30 实测 vocab-cards 284 全绿）
 - [ ] 改过词库文件 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 真机装机验证（涉及 safe-area / 原生 TTS / 手势 / 持久化的改动**必须**真机验；动手前先报备，收尾 `force-stop`）
 
