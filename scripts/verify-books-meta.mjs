@@ -275,7 +275,12 @@ check(
   check(matchesHighlight('resilient', ['resilient']) === true, '高亮：长词精确命中');
 
   const appSrc2 = readFileSync(join(ROOT, 'src/pages/ArticlePage/ArticlePage.tsx'), 'utf8');
-  check(/highlightWords: words\.map\(\(w\) => w\.wordKey\)/.test(appSrc2), '「用复习词汇生成文章」把复习词交给阅读器高亮');
+  // 2026-09-30 重推导：复习词汇文章改造后，用词字段在 buildRvContent 里统一构造
+  // （点名的一批交给阅读器高亮，只有真出现在正文里的记为 rvWords）。
+  // 旧断言钉的是 `highlightWords: words.map(...)` 这个早已不存在的写法 —— rv-articles 改造当天它就已失效，
+  // 因为当时只跑了 rv-articles 那条守卫没人跑到这里。教训见 docs/modules/verification.md §5。
+  check(/highlightWords: args\.keys,[\s\S]{0,120}rvWords: args\.covered,/.test(appSrc2),
+    '「用复习词汇生成文章」把点名词交给阅读器高亮，只把真用上的记为 rvWords');
   check(/highlightWords\?: string\[\];/.test(readFileSync(join(ROOT, 'src/data/reading.ts'), 'utf8')), 'IReadingContent 有 highlightWords 字段');
   check(/setHighlightWords\(content\.highlightWords \?\? null\)/.test(pageReaderSrc), '阅读器进入时下发复习词、退出时清空');
   check(/HIGHLIGHT_COLORS\.map/.test(pageReaderSrc), '阅读设置里提供可选颜色');

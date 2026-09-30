@@ -4,7 +4,7 @@ import {
   Upload, Sparkles, BookOpen, Loader2,
   Search, ExternalLink, X, Globe, Library, Mic, Wand2, BookMarked,
   Clock, History, Newspaper, HelpCircle, ShieldAlert,
-  Heart, ChevronDown, Check,
+  Heart, ChevronDown, Check, RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAI } from '@/hooks/use-ai';
 import { useWordLearning } from '@/lib/use-word-learning';
 import { useFavorites } from '@/lib/use-favorites';
-import { usedReviewWordKeys, reviewWordRecord, planRvBatches } from '@/lib/rv-articles';
+import { usedReviewWordKeys, reviewWordRecord, planRvBatches, coveredReviewWords, rvParaCount, rvRegenKeys, buildRvPrompt } from '@/lib/rv-articles';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn, cleanText, extractJson } from '@/lib/utils';
@@ -42,11 +42,21 @@ type IBookListItem = IReadingContent | IBookMeta;
 const pageCountOf = (b: IBookListItem) => ('pageCount' in b ? b.pageCount : b.pages?.length ?? 0);
 
 /** 复习词汇文章：一次最多生成几篇。超出批次**不消费**（对应词留在列表里，下次继续） */
-const RV_BATCH_LIMIT = 3;
+const RV_BATCH_LIMIT = 6;
 /** 复习词汇文章：词表默认只画前 N 个词，其余折叠为「展开全部」 */
 const RV_MAX_CHIPS = 30;
-/** 复习词汇文章：每篇词数可选档位 */
-const RV_PER_OPTIONS = [8, 10, 15, 20, 30];
+/** 复习词汇文章：每篇词数可选档位（放开到 50 —— 一篇能塞下更多待复习词） */
+const RV_PER_OPTIONS = [8, 10, 15, 20, 30, 50];
+/** 体裁：进提示词，也存进文章（重写这一篇时保持同风格） */
+const RV_GENRES: { key: string; label: string }[] = [
+  { key: 'expository', label: '说明文' },
+  { key: 'narrative', label: '记叙文' },
+  { key: 'opinion', label: '议论文' },
+  { key: 'dialogue', label: '对话体' },
+  { key: 'letter', label: '书信' },
+];
+/** 主题：复用 AI 生成 tab 那套 TOPICS，另给一个「不限」 */
+const RV_TOPIC_FREE = 'free';
 
 const LEVELS: { key: Level; label: string; color: string; desc: string }[] = [
   { key: 'beginner', label: '初级', color: '#00B894', desc: '简单句式，常用词汇' },
@@ -171,6 +181,22 @@ export default function ArticlePage() {
   const saveAiArticle = (content: IReadingContent) => {
     setAiArticles((prev) => {
       const next = [content, ...prev].slice(0, 50);
+      safeStorage.setItem(AI_ARTICLES_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+  /**
+   * 按 id **原位替换**（「重写这一篇」用）。
+   * 为什么不删了再存：删除会走 `rvWords` 派生 → 那批词先回词表再被新文章消费，
+   * 中途任何一次重渲染都会让它显示成"待复习"；而收藏项存的是 `content = 文章 id`、
+   * 历史存的是 `meta.aiId` —— 换新 id 会让这两处一起断链。
+   */
+  const replaceAiArticle = (content: IReadingContent) => {
+    setAiArticles((prev) => {
+      const hit = prev.some((a) => a.id === content.id);
+      const next = hit
+        ? prev.map((a) => (a.id === content.id ? content : a))
+        : [content, ...prev].slice(0, 50);
       safeStorage.setItem(AI_ARTICLES_KEY, JSON.stringify(next));
       return next;
     });
@@ -533,6 +559,11 @@ export default function ArticlePage() {
   // ── 复习词汇文章：选词 + 分篇（词表 = 到期词 − 已排进文章的，派生逻辑见 rv-articles.ts）──
   const [rvSelected, setRvSelected] = useState<Set<string>>(new Set());
   const [rvPerArticle, setRvPerArticle] = useState(10);
+  /** 体裁/主题：进提示词（buildRvPrompt），并随文章存下来供「重写这一篇」沿用 */
+  const [rvGenre, setRvGenre] = useState('expository');
+  const [rvTopic, setRvTopic] = useState(RV_TOPIC_FREE);
+  /** 正在重写的那篇 id（同时只允许一篇在途，避免两个回包互相覆盖） */
+  const [rvRegenId, setRvRegenId] = useState<string | null>(null);
   const [rvOpen, setRvOpen] = useState<boolean | null>(null);   // null = 跟随词表有无自动展开
   const [rvShowAll, setRvShowAll] = useState(false);
   const [rvProgress, setRvProgress] = useState<string | null>(null);   // 「生成中 2/3 篇」
@@ -713,9 +744,30 @@ export default function ArticlePage() {
   };
 
   // ── AI article generation (from review words) ──
+  const rvGenreLabel = RV_GENRES.find((g) => g.key === rvGenre)?.label || '说明文';
+  const rvTopicLabel = rvTopic === RV_TOPIC_FREE ? '' : (TOPICS.find((t) => t.key === rvTopic)?.label || '');
+
+  /** 把一段生成结果组装成文章；`covered` 为空数组也照样返回（由调用方决定算不算成功） */
+  const buildRvContent = (args: {
+    id: string; keys: string[]; covered: string[]; title: string; paragraphs: IParagraph[];
+    genre: string; topic: string;
+  }): IReadingContent => ({
+    id: args.id, type: 'ai',
+    title: args.title, zhTitle: args.title,
+    author: 'AI Generated', source: '复习词汇生成',
+    topic: args.topic === RV_TOPIC_FREE ? 'vocabulary' : args.topic, difficulty: level,
+    pages: buildPages(args.paragraphs),
+    totalWords: args.paragraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
+    // 阅读器框出被点名的词（没出现的那个自然框不到）；rvWords 只记**真的出现在正文里**的词，
+    // 词表据此出队 —— 漏掉的词自动回到待复习列表，不会再出现"点名过就没影了"
+    highlightWords: args.keys,
+    rvWords: args.covered,
+    rvGenre: args.genre,
+  });
+
   /**
    * 分篇生成：选中的词按「每篇词数」切批，一次最多 RV_BATCH_LIMIT 篇，逐篇串行。
-   * 每篇成功即落盘（saveAiArticle + 历史带 aiId），其用词随即从词表消失（派生自 rvWords）；
+   * 每篇成功即落盘（saveAiArticle + 历史带 aiId），其**用掉的词**随即从词表消失（派生自 rvWords）；
    * 失败的篇与超出上限的批次**不消费** —— 对应词留在词表里，下次可继续选。
    */
   const generateFromReviewWords = useCallback(async () => {
@@ -724,48 +776,47 @@ export default function ArticlePage() {
     const batches = rvPlan.batches;
     if (!batches.length) return;
     setAiLoading(true);
-    let done = 0; let usedWords = 0; let failed = 0;
+    let done = 0; let usedWords = 0; let failed = 0; let dropped = 0;
     let first: IReadingContent | null = null;
     try {
       for (let bi = 0; bi < batches.length; bi++) {
         const batch = batches[bi];
         setRvProgress(`生成中 ${bi + 1}/${batches.length} 篇`);
-        const wordList = batch.map((w) => w.wordKey).join(', ');
-        /** 段落数随词数走（约每 3 词 1 段，下限 3 上限 8） */
-        const paraCount = Math.max(3, Math.min(8, Math.ceil(batch.length / 3)));
+        const keys = batch.map((w) => w.wordKey);
+        const paraCount = rvParaCount(batch.length);
         try {
-          const result = await aiChat([
-            { role: 'system', content: `Write an English article (${paraCount} paragraphs) for ${level} learners that naturally incorporates ALL of these words: ${wordList}. Every listed word must appear at least once. Return ONLY valid JSON: {"title":"...","paragraphs":[{"en":"paragraph","zh":"Chinese translation"}]}` },
-            { role: 'user', content: `Use all these words: ${wordList}.` },
-          ], { temperature: 0.7, maxTokens: 4096 });
+          const prompt = buildRvPrompt({
+            keys, paraCount, level, genre: rvGenre, topic: rvTopic,
+            genreLabel: rvGenreLabel, topicLabel: rvTopicLabel,
+          });
+          const result = await aiChat(
+            [{ role: 'system', content: prompt.system }, { role: 'user', content: prompt.user }],
+            { temperature: 0.7, maxTokens: 4096 },
+          );
           if (!result.trim()) { failed++; continue; }   // 空串 = 服务不可用，本篇跳过
           const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
           const safeParagraphs: IParagraph[] = (parsed?.paragraphs || [])
             .map((p: any) => ({ en: p?.en || '', zh: p?.zh || '' }))
             .filter((p: IParagraph) => p.en.trim());
           if (!safeParagraphs.length) { failed++; continue; }
-          const keys = batch.map((w) => w.wordKey);
-          const content: IReadingContent = {
-            id: `rv_${Date.now()}_${bi}`, type: 'ai',
-            title: parsed?.title || `复习词汇文章 ${bi + 1}`, zhTitle: parsed?.title || `复习词汇文章 ${bi + 1}`,
-            author: 'AI Generated', source: '复习词汇生成',
-            topic: 'vocabulary', difficulty: level,
-            pages: buildPages(safeParagraphs),
-            totalWords: safeParagraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
-            // 阅读器把这批词框出来（颜色可在阅读设置里换）；rvWords 是用词书面记录，词表据此出队
-            highlightWords: keys,
-            rvWords: keys,
-          };
+          const text = safeParagraphs.map((p) => p.en).join(' ');
+          const covered = coveredReviewWords(keys, text);
+          const content = buildRvContent({
+            id: `rv_${Date.now()}_${bi}`, keys, covered,
+            title: parsed?.title || `复习词汇文章 ${bi + 1}`,
+            paragraphs: safeParagraphs, genre: rvGenre, topic: rvTopic,
+          });
           saveAiArticle(content);
           saveToHistory(content.title, content.totalWords.toString(), 'review-words', { aiId: content.id });
           first = first ?? content;
-          done++; usedWords += batch.length;
+          done++; usedWords += covered.length; dropped += keys.length - covered.length;
         } catch { failed++; }
       }
       if (first) openReader(first);
       setRvSelected(new Set());   // 文章已重算词表，旧选择作废
       if (done > 0) {
         const parts = [`已生成 ${done} 篇（用掉 ${usedWords} 个词，已保存${first ? '，打开第一篇' : ''}）`];
+        if (dropped > 0) parts.push(`${dropped} 个词没进正文，已退回词表`);
         if (rvPlan.skippedBatches > 0) parts.push(`还有 ${rvPlan.skippedBatches} 篇的量留在词表`);
         if (failed > 0) parts.push(`${failed} 篇失败（对应词仍在列表）`);
         toast.success(parts.join(' · '));
@@ -776,7 +827,52 @@ export default function ArticlePage() {
       setRvProgress(null);
       setAiLoading(false);
     }
-  }, [isConfigured, rvPlan, rvSelectedWords, level, aiChat]);
+  }, [isConfigured, rvPlan, rvSelectedWords, level, aiChat, rvGenre, rvTopic, rvGenreLabel, rvTopicLabel]);
+
+  /**
+   * 重写单篇：按这篇文章**自己记下的用词与体裁/主题**重新生成，成功后原位替换（id 不变，
+   * 收藏与历史指针继续有效）；失败则**保留原文**，词表不动（这篇仍占着它用过的词）。
+   */
+  const regenerateRvArticle = useCallback(async (a: IReadingContent) => {
+    if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
+    if (rvRegenId) return;                       // 一次只改一篇，避免两个回包互相覆盖
+    const keys = rvRegenKeys(a);
+    if (keys.length < 1) { toast.error('这篇文章没有记录用词，无法重写'); return; }
+    setRvRegenId(a.id);
+    try {
+      const genre = a.rvGenre && RV_GENRES.some((g) => g.key === a.rvGenre) ? a.rvGenre : 'expository';
+      const topic = a.topic === 'vocabulary' ? RV_TOPIC_FREE : a.topic;
+      const prompt = buildRvPrompt({
+        keys, paraCount: rvParaCount(keys.length), level: a.difficulty || level,
+        genre, topic,
+        genreLabel: RV_GENRES.find((g) => g.key === genre)?.label || '说明文',
+        topicLabel: topic === RV_TOPIC_FREE ? '' : (TOPICS.find((t) => t.key === topic)?.label || ''),
+      });
+      const result = await aiChat(
+        [{ role: 'system', content: prompt.system }, { role: 'user', content: prompt.user }],
+        { temperature: 0.7, maxTokens: 4096 },
+      );
+      if (!result.trim()) { toast.error('AI 服务暂不可用，已保留原来那篇'); return; }
+      const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
+      const safeParagraphs: IParagraph[] = (parsed?.paragraphs || [])
+        .map((p: any) => ({ en: p?.en || '', zh: p?.zh || '' }))
+        .filter((p: IParagraph) => p.en.trim());
+      if (!safeParagraphs.length) { toast.error('这一篇没解析出正文，已保留原来那篇'); return; }
+      const covered = coveredReviewWords(keys, safeParagraphs.map((p) => p.en).join(' '));
+      const content = buildRvContent({
+        id: a.id, keys, covered,
+        title: parsed?.title || a.title, paragraphs: safeParagraphs, genre, topic,
+      });
+      replaceAiArticle(content);
+      openReader(content);
+      const dropped = keys.length - covered.length;
+      toast.success(`已重写《${content.title}》（用掉 ${covered.length} 个词${dropped ? `，${dropped} 个没进正文的词退回词表` : ''}）`);
+    } catch {
+      toast.error('重写失败，已保留原来那篇');
+    } finally {
+      setRvRegenId(null);
+    }
+  }, [isConfigured, rvRegenId, level, aiChat]);
 
   useEffect(() => { safeStorage.setItem(HISTORY_KEY, JSON.stringify(history)); }, [history]);
 
@@ -1136,7 +1232,7 @@ export default function ArticlePage() {
                   <p className="text-[10px] text-muted-foreground">
                     {rvRecord.length === 0
                       ? '词表空了：到期复习词都排进文章了'
-                      : `待复习 ${rvRecord.length} 词 · 自选词汇与每篇词数，一次最多 ${RV_BATCH_LIMIT} 篇`}
+                      : `待复习 ${rvRecord.length} 词 · 自选词汇、每篇词数与体裁主题，一次最多 ${RV_BATCH_LIMIT} 篇`}
                   </p>
                 </div>
                 <button
@@ -1174,6 +1270,49 @@ export default function ArticlePage() {
                     <button onClick={() => setRvSelected(new Set())} className="text-[10px] font-bold text-muted-foreground hover:underline">
                       清空
                     </button>
+                  </div>
+
+                  {/* 体裁：进提示词（buildRvPrompt）也存进文章，「重写这一篇」沿用同一风格 */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-bold text-muted-foreground">体裁</span>
+                    {RV_GENRES.map((g) => (
+                      <button
+                        key={g.key}
+                        onClick={() => setRvGenre(g.key)}
+                        className={cn(
+                          'px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors',
+                          rvGenre === g.key
+                            ? 'bg-ink-teal border-ink-teal text-white'
+                            : 'border-teal-200 dark:border-teal-500/30 text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-500/10',
+                        )}
+                      >{g.label}</button>
+                    ))}
+                  </div>
+
+                  {/* 主题：沿用 AI 生成 tab 那套 TOPICS，「不限」让模型自己找线索 */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-bold text-muted-foreground">主题</span>
+                    <button
+                      onClick={() => setRvTopic(RV_TOPIC_FREE)}
+                      className={cn(
+                        'px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors',
+                        rvTopic === RV_TOPIC_FREE
+                          ? 'bg-amber-500 border-amber-500 text-white'
+                          : 'border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10',
+                      )}
+                    >不限</button>
+                    {TOPICS.map((t) => (
+                      <button
+                        key={t.key}
+                        onClick={() => setRvTopic(t.key)}
+                        className={cn(
+                          'px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors',
+                          rvTopic === t.key
+                            ? 'bg-amber-500 border-amber-500 text-white'
+                            : 'border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10',
+                        )}
+                      >{t.label}</button>
+                    ))}
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto overscroll-contain">
@@ -1299,9 +1438,27 @@ export default function ArticlePage() {
                           <p className="text-[10px] text-muted-foreground mt-0.5">
                             {a.totalWords.toLocaleString()} 词 · {a.difficulty}
                             {a.rvWords?.length ? ` · 复习词 ${a.rvWords.length}` : ''}
+                            {a.rvGenre ? ` · ${RV_GENRES.find((g) => g.key === a.rvGenre)?.label || ''}` : ''}
+                            {a.source === '复习词汇生成' && a.topic && a.topic !== 'vocabulary'
+                              ? ` · ${TOPICS.find((t) => t.key === a.topic)?.label || ''}` : ''}
                           </p>
                         </div>
                         <div className="flex items-center gap-0.5 shrink-0">
+                          {!!rvRegenKeys(a).length && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); regenerateRvArticle(a); }}
+                              disabled={!!rvRegenId || aiLoading || !isConfigured}
+                              className={cn(
+                                'p-1 rounded-lg transition-colors disabled:opacity-40',
+                                rvRegenId === a.id
+                                  ? 'text-ink-teal'
+                                  : 'text-muted-foreground/30 hover:text-ink-teal hover:bg-teal-50 dark:hover:bg-teal-500/10',
+                              )}
+                              title={rvRegenId === a.id ? '正在重写…' : '用同一批复习词重写这篇（保留原风格，失败不覆盖原文）'}
+                            >
+                              <RefreshCw className={cn('size-3.5', rvRegenId === a.id && 'animate-spin')} />
+                            </button>
+                          )}
                           <button
                             onClick={(e) => { e.stopPropagation(); toggleAiArticleFav(a); }}
                             className={cn(

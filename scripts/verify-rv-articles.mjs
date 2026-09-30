@@ -32,17 +32,30 @@ const check = (cond, label, detail) => {
 };
 
 // ── 载入被测源码 ──
+// rv-articles 现在**复用** reader-highlight 的形态归并（coveredReviewWords），
+// 所以这里把两个模块都真转译出来一起跑 —— 不是拿假 matcher 测自己的规则。
+const TEMP = process.env.TEMP || '/tmp';
+const stripImports = (s) => s.replace(/^import[^\n]*\n/gm, '');
+const unexport = (s) => s.replace(/export (const|interface|function)/g, '$1');
+const opts = { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } };
+
+const rhFile = join(TEMP, 'nt-reader-highlight.mjs');
+writeFileSync(rhFile,
+  ts.transpileModule(unexport(stripImports(readFileSync(join(ROOT, 'src/lib/reader-highlight.ts'), 'utf8'))), opts).outputText
+  + '\nexport { matchesHighlight };', 'utf8');
+
 const rvSrc = readFileSync(join(ROOT, 'src/lib/rv-articles.ts'), 'utf8');
 const page = readFileSync(join(ROOT, 'src/pages/ArticlePage/ArticlePage.tsx'), 'utf8');
 const reading = readFileSync(join(ROOT, 'src/data/reading.ts'), 'utf8');
 
 const mod = ts.transpileModule(
-  rvSrc.replace(/export (const|interface|function)/g, '$1'),
-  { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
-).outputText + '\nexport { usedReviewWordKeys, reviewWordRecord, planRvBatches };';
-const outFile = join(process.env.TEMP || '/tmp', 'nt-rv-articles.mjs');
+  unexport(rvSrc).replace("'./reader-highlight'", "'./nt-reader-highlight.mjs'"),
+  opts,
+).outputText + '\nexport { usedReviewWordKeys, reviewWordRecord, planRvBatches, coveredReviewWords, rvParaCount, rvRegenKeys, buildRvPrompt, tokenizeWords };';
+const outFile = join(TEMP, 'nt-rv-articles.mjs');
 writeFileSync(outFile, mod, 'utf8');
-const { usedReviewWordKeys, reviewWordRecord, planRvBatches } = await import(pathToFileURL(outFile).href);
+const { usedReviewWordKeys, reviewWordRecord, planRvBatches,
+  coveredReviewWords, rvParaCount, rvRegenKeys, buildRvPrompt, tokenizeWords } = await import(pathToFileURL(outFile).href);
 
 // ══════════ ① usedReviewWordKeys：现存文章用词并集 ══════════
 {
@@ -125,12 +138,17 @@ check(/planRvBatches\(rvSelectedWords, rvPerArticle, RV_BATCH_LIMIT\)/.test(page
   '切批用共享常量 RV_BATCH_LIMIT（上限只有一处定义）');
 check(!/dueForReview\.slice\(0, 10\)/.test(page),
   '正对照：写死「只取前 10 个词」的旧缺陷不能再出现');
-check(/const RV_BATCH_LIMIT = 3;/.test(page) && /const RV_PER_OPTIONS = \[8, 10, 15, 20, 30\];/.test(page),
-  '每篇词数档位与批次上限是模块级常量（UI 与逻辑同源）');
+check(/const RV_BATCH_LIMIT = 6;/.test(page) && /const RV_PER_OPTIONS = \[8, 10, 15, 20, 30, 50\];/.test(page),
+  '每篇词数档位（放开到 50）与批次上限（6 篇）是模块级常量（UI 与逻辑同源）');
 
-// 生成的每篇必须：带上用词记录（出队依据） + 仍然高亮 + 落盘 + 进历史
-check(/rvWords: keys,/.test(page), '生成的文章写入 rvWords（用词书面记录）');
-check(/highlightWords: keys,/.test(page), '生成的文章仍把该批词交给阅读器高亮');
+// 生成的每篇必须：带上**真的出现在正文里**的用词（出队依据） + 仍然高亮被点名的词 + 落盘 + 进历史
+check(/rvWords: args\.covered,/.test(page), 'rvWords 记的是 coveredReviewWords 的结果，不是"点名清单"（漏用的词回词表）');
+check(/highlightWords: args\.keys,/.test(page), 'highlightWords 仍交给阅读器整批点名的词');
+check(/const covered = coveredReviewWords\(keys, text\);/.test(page), '生成路径真跑 coveredReviewWords 判覆盖');
+check(/const text = safeParagraphs\.map\(\(p\) => p\.en\)\.join\(' '\);/.test(page), '覆盖判定只看正文英文，不把译文算进去');
+check(/usedWords \+= covered\.length; dropped \+= keys\.length - covered\.length;/.test(page),
+  '成功计数按实际用掉的词，漏用的另记 dropped');
+check(/个词没进正文，已退回词表/.test(page), '有词没进正文时如实告诉用户（不再"点名即消失"）');
 check(/const keys = batch\.map\(\(w\) => w\.wordKey\);/.test(page), 'keys 取自本批词（不是整个选择）');
 check(/if \(!result\.trim\(\)\) \{ failed\+\+; continue; \}/.test(page),
   '空串（服务不可用）按本篇失败跳过，不误判格式错误、不中断整轮');
@@ -142,7 +160,8 @@ check(/saveAiArticle\(content\);/.test(page) && /saveToHistory\(content\.title, 
   // 必须**限定在生成函数体内**：全文件别处也有 saveAiArticle(content)（自由生成那两条路径），
   // 用整页 indexOf 会量到别的行，变异在函数内换序也照绿（本轮变异测试实测踩到过）
   const iFn = page.indexOf('const generateFromReviewWords = useCallback');
-  const iEnd = page.indexOf('}, [isConfigured, rvPlan, rvSelectedWords, level, aiChat]);');
+  // 依赖数组会随功能增长（体裁/主题进来后又多了几项）—— 锚点取"这一段的收尾"，不写死整串 deps
+  const iEnd = page.indexOf('}, [isConfigured, rvPlan,', iFn);
   const fnBody = iFn >= 0 && iEnd > iFn ? page.slice(iFn, iEnd) : '';
   const iSave = fnBody.indexOf('saveAiArticle(content);');
   const iDone = fnBody.indexOf('done++;');
@@ -195,6 +214,93 @@ check(!!favFnMatch, '已保存列表有收藏开关（函数体可定位）');
   check(iface && /rvWords\?: string\[\];/.test(iface[0]), 'IReadingContent 增加可选 rvWords（老数据无此字段仍然合法）');
   check(iface && /highlightWords\?: string\[\];/.test(iface[0]), 'highlightWords 仍在（阅读器高亮不受影响）');
   check(/刻意不做单独的"已用清单"（两份真相一定漂移）/.test(reading), '字段注释写明派生口径（防后人再加一份"已用清单"）');
+}
+
+// ══════════ ⑥ 放开词数后新增的纯函数：覆盖判定 / 段落数 / 提示词 / 重写取词 ══════════
+{
+  // 覆盖判定复用阅读器那套形态归并 —— 两处口径必须一致
+  check(coveredReviewWords(['abandon', 'benefit'], 'We abandoned the plan and it benefited us.').join(',') === 'abandon,benefit',
+    'coveredReviewWords：变形（abandoned/benefited）算命中（与高亮同源）');
+  check(coveredReviewWords(['abandon'], 'The plan was dropped.').join(',') === '',
+    'coveredReviewWords：没出现的词判为漏用（它会退回词表，不再"点名即消失"）');
+  check(coveredReviewWords(['elegant'], 'She is elegant.').join(',') === 'elegant', 'coveredReviewWords：原形命中');
+  // 正对照：不许过度归并 —— curiosity 不是 curious 的命中，否则无关词会被记成"已复习"
+  check(coveredReviewWords(['curious'], 'Human curiosity is old.').join(',') === '',
+    '正对照：curiosity 不算 curious（宁少不错，口径与 matchesHighlight 一致）');
+  check(coveredReviewWords(['keeps'], 'He keeps the keys.').join(',') === 'keeps', 'coveredReviewWords：键本身带后缀也能命中');
+  check(coveredReviewWords(['well-known'], 'a well known fact').join(',') === 'well-known',
+    'coveredReviewWords：短语键按连续 token 序列匹配');
+  check(coveredReviewWords(['take off'], 'The plane will take off soon.').join(',') === 'take off',
+    'coveredReviewWords：多词短语命中');
+  check(coveredReviewWords(['take off'], 'They took it off the shelf.').join(',') === '',
+    '正对照：短语中间插了别的词不算命中（不做激进模糊匹配）');
+  check(coveredReviewWords(['', 'alpha'], 'alpha').join(',') === 'alpha', 'coveredReviewWords：空键被忽略');
+  check(coveredReviewWords(['alpha'], '').join(',') === '', 'coveredReviewWords：空正文一律算漏用');
+  check(tokenizeWords("Don't put the well-known idea off.").join(',') === "don't,put,the,well-known,idea,off",
+    'tokenizeWords：词内撇号/连字符保留，标点剥掉');
+}
+{
+  check(rvParaCount(3) === 3 && rvParaCount(8) === 3, 'rvParaCount：下限 3 段（短文也要有起承转合）');
+  check(rvParaCount(20) === 7 && rvParaCount(30) === 10, 'rvParaCount：约每 3 词 1 段');
+  check(rvParaCount(50) === 12 && rvParaCount(200) === 12, 'rvParaCount：上限 12 段（防 4096 token 回复被截断）');
+  check(rvParaCount(0) === 3 && rvParaCount(-5) === 3, 'rvParaCount：0/负数夹到下限（不产生 0 段的提示词）');
+}
+{
+  const p = buildRvPrompt({
+    keys: ['abandon', 'benefit'], paraCount: 5, level: 'cet4',
+    genre: 'narrative', topic: 'tech', genreLabel: '记叙文', topicLabel: '科技',
+  });
+  check(p.system.includes('abandon, benefit'), 'buildRvPrompt：全部选中的词进提示词');
+  check(p.system.includes('exactly 5 paragraphs'), 'buildRvPrompt：段落数按 rvParaCount 的结果写死');
+  check(p.system.includes('记叙文'), 'buildRvPrompt：体裁进了提示词（选了就要有用）');
+  check(p.system.includes('科技'), 'buildRvPrompt：主题进了提示词');
+  check(p.system.includes('Return ONLY valid JSON'), 'buildRvPrompt：仍要求纯 JSON（extractJson 那套约定）');
+  check(p.user.includes('abandon'), 'buildRvPrompt：user 消息也点名一次');
+
+  const free = buildRvPrompt({
+    keys: ['alpha'], paraCount: 3, level: 'all',
+    genre: 'letter', topic: 'free', genreLabel: '书信', topicLabel: '',
+  });
+  check(!/topic of/.test(free.system), '正对照：选「不限」时不该硬塞主题进去');
+  check(free.system.includes('书信'), '正对照：不限主题时体裁仍然生效（提示词用的是中文体裁名）');
+}
+{
+  check(rvRegenKeys({ rvWords: ['a', 'b'] }).join(',') === 'a,b', 'rvRegenKeys：优先用文章记下的用词');
+  check(rvRegenKeys({ rvWords: [], highlightWords: ['c'] }).join(',') === 'c',
+    'rvRegenKeys：老文章没记 rvWords 时退回高亮词表（至少能重写）');
+  check(rvRegenKeys({}).join(',') === '', 'rvRegenKeys：两者都没有 → 空（不显示重写入口）');
+  check(rvRegenKeys({ rvWords: ['a', '', null] }).join(',') === 'a', 'rvRegenKeys：脏数据里的空项被滤掉');
+}
+
+// ══════════ ⑦ 主题化 / 单篇重写的接线 ══════════
+{
+  check(/const RV_GENRES: \{ key: string; label: string \}\[\] = \[/.test(page), '体裁表是模块级常量（提示词与 UI 同源）');
+  check(/const \[rvGenre, setRvGenre\] = useState\('expository'\)/.test(page), '体裁有默认值（不选也能生成）');
+  check(/const \[rvTopic, setRvTopic\] = useState\(RV_TOPIC_FREE\)/.test(page), '主题默认「不限」');
+  check(/RV_GENRES\.map\(\(g\) => \(\s*<button/.test(page), '体裁在面板上有可选芯片');
+  check(/TOPICS\.map\(\(t\) => \(\s*<button/.test(page), '主题芯片复用 AI 生成 tab 的 TOPICS（不另造一套）');
+  check(/genre: rvGenre, topic: rvTopic,/.test(page), '生成时把当前体裁/主题传给 buildRvPrompt');
+  check(/rvGenre: args\.genre,/.test(page), '体裁随文章落盘（重写才谈得上"保持同风格"）');
+
+  const iRegen = page.indexOf('const regenerateRvArticle = useCallback');
+  const iRegenEnd = page.indexOf('}, [isConfigured, rvRegenId, level, aiChat]);');
+  const regenBody = iRegen >= 0 && iRegenEnd > iRegen ? page.slice(iRegen, iRegenEnd) : '';
+  check(regenBody.length > 0, '重写函数体可定位（正对照的前提）');
+  check(/const keys = rvRegenKeys\(a\);/.test(regenBody), '重写取词走 rvRegenKeys（同一来源）');
+  check(/id: a\.id,/.test(regenBody), '重写保持原 id（收藏 content=文章 id 与历史 meta.aiId 不断链）');
+  check(/replaceAiArticle\(content\);/.test(regenBody), '重写在原位替换而非新增一份');
+  check(!/deleteAiArticle\(a\.id\)/.test(regenBody), '正对照：重写不许靠"先删再存"实现（会让词表瞬间回涨）');
+  check(/a\.rvGenre && RV_GENRES\.some\(\(g\) => g\.key === a\.rvGenre\) \? a\.rvGenre : 'expository'/.test(regenBody),
+    '重写沿用文章自己的体裁，脏值才回落到默认');
+  check(/已保留原来那篇/.test(regenBody), '重写失败时如实说明原文没动');
+  check(/if \(rvRegenId\) return;/.test(regenBody), '同时只允许一篇在途（两个回包不互相覆盖）');
+
+  const iList = page.indexOf('{/* Saved AI articles */}');
+  const iNext = page.indexOf('{/* ── SPEECHES TAB ── */}');
+  const listBody = iList >= 0 && iNext > iList ? page.slice(iList, iNext) : '';
+  check(/regenerateRvArticle\(a\)/.test(listBody), '保存列表里有重写入口');
+  check(/!!rvRegenKeys\(a\)\.length &&/.test(listBody), '只有能取到用词的文章才显示重写按钮');
+  check(/disabled=\{!!rvRegenId \|\| aiLoading \|\| !isConfigured\}/.test(listBody), '重写期间禁用入口');
 }
 
 // ── 汇总 ──

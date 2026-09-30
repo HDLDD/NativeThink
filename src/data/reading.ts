@@ -47,6 +47,12 @@ export interface IReadingContent {
    * 刻意不做单独的"已用清单"（两份真相一定漂移）。
    */
   rvWords?: string[];
+  /**
+   * 复习词汇文章的**体裁**（记叙/说明/议论/对话/书信），生成时由人选定。
+   * 存在文章上是"重写这一篇"能保持同一风格的前提 —— 风格属于这篇文章，
+   * 不属于面板当前的选择。
+   */
+  rvGenre?: string;
 }
 
 /** Build pages from paragraph pairs — autopaginate by word count (~200-400 words/page) */

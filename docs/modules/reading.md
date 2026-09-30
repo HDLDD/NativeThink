@@ -92,12 +92,13 @@ src/data/books-meta.ts   # 只含元数据，由 scripts/gen-books-meta.cjs 生�
 
 2026-09-30 重做（旧版写死 `dueForReview.slice(0, 10)`、用完即弃、不落盘 —— 用户报「生成词数只有十个左右，对不上完整的需要复习的单词」）。现在的口径：
 
-- **词表是派生的，不存"已用清单"**：`rvRecord = 到期词 − 所有现存 AI 文章的 rvWords 并集`（`src/lib/rv-articles.ts:18` `usedReviewWordKeys` / `:29` `reviewWordRecord`；页面接线 `ArticlePage.tsx:689-691`）。因此**删掉一篇生成的文章，它用掉的词立刻回到词表** —— 两份真相永不相漂。
-- **选词**：面板列出「待复习 N 词」的 chip（默认画前 `RV_MAX_CHIPS=30` 个，其余折叠为「展开全部」），点选/取消；「选前 N 词」按当前每篇词数取（`ArticlePage.tsx:1130-1225`）。
-- **每篇词数**：档位 `RV_PER_OPTIONS = [8,10,15,20,30]`（`:49`），选中词按它切批（`planRvBatches`，`rv-articles.ts:37`，`per ≤ 0` 夹到 1）。
-- **一次最多 `RV_BATCH_LIMIT = 3` 篇**（`:45`）：超出的批次**不消费**，对应词留在词表，UI 报「另有 X 篇的量留在词表」。
-- **逐篇串行生成**（`generateFromReviewWords`，`:721`）：每篇成功即 `saveAiArticle` + 历史 `{ aiId: 文章id }`（因此可重新打开），文章同时带 `rvWords`（出队依据）与 `highlightWords`（阅读器高亮）；空串（服务不可用）或解析不出的篇**不写任何记录**，词留在词表，toast 逐项报「已生成 N 篇 · 还有 X 篇的量 · Y 篇失败」。
-- **保存 / 收藏 / 删除**：生成的文章进「已保存的 AI 文章」（键 `__nativethink_ai_articles`，上限 50）；卡片有心形收藏（与阅读器内同口径：`type:'article'`、`content:文章id`、`category:'ai'` → 「我的收藏」可跳回并自动打开）与 X 删除（`ArticlePage.tsx:1277-1330`）。
+- **词表是派生的，不存"已用清单"**：`rvRecord = 到期词 − 所有现存 AI 文章的 rvWords 并集`（`src/lib/rv-articles.ts:22` `usedReviewWordKeys` / `:33` `reviewWordRecord`；页面接线 `ArticlePage.tsx:720-722`）。因此**删掉一篇生成的文章，它用掉的词立刻回到词表** —— 两份真相永不相漂。
+- **选词**：面板列出「待复习 N 词」的 chip（默认画前 `RV_MAX_CHIPS=30` 个，其余折叠为「展开全部」），点选/取消；「选前 N 词」按当前每篇词数取（面板 `ArticlePage.tsx:1250-1330`）。
+- **每篇词数**：档位 `RV_PER_OPTIONS = [8,10,15,20,30,50]`（`:49`，2026-09-30 放开到 50），选中词按它切批（`planRvBatches`，`rv-articles.ts:41`，`per ≤ 0` 夹到 1）。段落数 `rvParaCount`（`:97`）= 每 3 词 1 段、下限 3 上限 12（上限是防 4096 token 回复被截成坏 JSON）。
+- **一次最多 `RV_BATCH_LIMIT = 6` 篇**（`:45`）：超出的批次**不消费**，对应词留在词表，UI 报「另有 X 篇的量留在词表」。
+- **体裁 + 主题**：`RV_GENRES`（`:51`，说明文/记叙文/议论文/对话体/书信）与复用 AI 生成 tab 的 `TOPICS`（主题，含「不限」）经 `buildRvPrompt`（`rv-articles.ts:117`）进提示词 —— 唯一构造点，所以"选了没用"会被守卫 ⑥ 抓到；两者都随文章落盘（`rvGenre` 字段 + `topic`，`ArticlePage.tsx:751-767`）。
+- **逐篇串行生成**（`generateFromReviewWords`，`:773`）：每篇成功即 `saveAiArticle` + 历史 `{ aiId: 文章id }`（因此可重新打开），同时带 `highlightWords`（整批点名词，给阅读器高亮）与 **`rvWords` = `coveredReviewWords(keys, 正文英文)`**（`:91`）—— **只有真的出现在正文里的词才算"用掉"**，漏用的自动回到词表，toast 明说「N 个词没进正文，已退回词表」。形态归并口径直接复用阅读器 `reader-highlight.ts:107` `matchesHighlight`（不重写第二套 s/ed/ing 规则；`curiosity` 不算 `curious`，宁少不错）。空串（服务不可用）或解析不出的篇**不写任何记录**。
+- **保存 / 收藏 / 删除 / 重写**：文章进「已保存的 AI 文章」（键 `__nativethink_ai_articles`，上限 50）；卡片有心形收藏（`type:'article'`、`content:文章id` → 「我的收藏」跳回并自动打开）、X 删除、以及**「重写这篇」**（`regenerateRvArticle`，`:836`）：取词走 `rvRegenKeys`（`:134`，优先 `rvWords`，老数据回落 `highlightWords`），沿用**文章自己的**体裁主题，成功后 `replaceAiArticle`（`:194`）**原位替换且 id 不变**（换新 id 会让收藏 `content` 与历史 `meta.aiId` 一起断链；"先删再存"会让词表瞬间回涨），失败/坏数据一律**保留原文**并说明。同时只允许一篇在途（`rvRegenId`）。
 - **不改 SM-2**：生成文章不算一次复习，词的到期状态原样保留；"用掉"只是"已排进文章"的展示口径。
 
 ## 3. 注意事项
@@ -112,4 +113,4 @@ src/data/books-meta.ts   # 只含元数据，由 scripts/gen-books-meta.cjs 生�
 8. **AI 文章的历史可点性 = `meta.aiId` 对应的文章还在**：`ArticlePage.tsx:824` 的 `clickable` 现在还会查 `aiArticles`（新条目都带 `aiId`，含复习词汇文章与自由生成文章）；文章删掉后提示「文章已被删除」，**老条目**（2026-09-30 之前写入、没有 `meta.aiId` 的）仍显示「此条记录生成于旧版本，无法恢复」。改历史面板时别把这条分支删回去。
 9. **`scp.ts` 是抓取产物，勿手改**（`node scripts/fetch-scp.cjs`，约 1 req/s）；它带 `SCP_LICENSE`，条目必须保留 `sourceUrl`（CC BY-SA 要求署名到具体来源）。
 10. **模块 `src/data/` 下有 .bak 与进度文件**：`chunks.ts.bak`、`shadowing.ts.bak`、`shadowing.ts.expand-progress.json`（483KB）。它们不进包，但会迷惑人和增大仓库；确认生成器不再依赖后可清理。
-11. **守卫覆盖**：数据层有 `verify-tts-progress`（朗读反查表）与 `verify-books-meta` ⑤⑥（书目拆分/元数据）；复习词汇文章的**选词/分篇/用词出队**由 `verify-rv-articles`（55 断言，含 13 条变异测试）钉住。**切章对齐、翻译回填、进度百分比三件事仍没有脚本兜**，改这些要手动开真书验证：翻到中段 → 刷新看百分比 ≤100%，「翻译本章」后中文没有落到别章。
+11. **守卫覆盖**：数据层有 `verify-tts-progress`（朗读反查表）与 `verify-books-meta` ⑤⑥（书目拆分/元数据）；复习词汇文章的**选词/分篇/用词出队/体裁主题进提示词/覆盖判定/原位重写**由 `verify-rv-articles`（104 断言，含 27 条变异测试：13 条针对首版、14 条针对本次扩展）钉住。**切章对齐、翻译回填、进度百分比三件事仍没有脚本兜**，改这些要手动开真书验证：翻到中段 → 刷新看百分比 ≤100%，「翻译本章」后中文没有落到别章。

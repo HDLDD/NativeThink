@@ -67,7 +67,7 @@
 4. **`buildSessionQueue` 内部有副作用**：`markServed(queue)` 落盘（`use-spelling-learning.ts:289`）。**被调用一次就污染一次跨轮次状态**，而 `rebuildSession` 每次调用都会触发它 —— 不要把它当纯函数放进 `useMemo` 的依赖里反复求值。
 5. **当前句走 memo + ref 双轨兜底**：`currentSentenceRef.current = memo || ref.current`（`:409-411`）。memo 抖动时会保留上一条句子，而**判分和朗读都读它**。同类风险见 AGENTS.md「ref 不随组件重挂载归零」。
 6. **重排队列有 4 个入口**共用同一个 `importDirty` 自增（`:443,520-525,1144,1689,1786`），初始化 effect 条件里含 `sessionQueue.length`（`:508-518`），并且「全部完成」时自动清完成标记再重排。加第五个入口前先确认不会互相打环。
-7. ~~**`aiBatchAdd` 缺 `!raw.trim()` 前置**~~（**已修 2026-09-30**）：空串现在直接返回「AI 服务暂不可用，请稍后重试」，不再被喂进 `extractJson` 变成误导性的「解析失败」。守卫：`npm run verify:ai-parse` 全仓扫 24 个解析点。
+7. ~~**`aiBatchAdd` 缺 `!raw.trim()` 前置**~~（**已修 2026-09-30**）：空串现在直接返回「AI 服务暂不可用，请稍后重试」，不再被喂进 `extractJson` 变成误导性的「解析失败」。守卫：`npm run verify:ai-parse` 全仓扫 25 个解析点。
 8. **`sort(() => Math.random() - 0.5)` 是有偏洗牌**（`:117`）。仓库对"洗牌列表 + 下标定位当前题"的规定是用 `use-stable-shuffle.ts`（`AGENTS.md` 坑表）。这里因为洗完立刻 `slice` 且不跟下标绑定，暂时不会漂移；但填空位每次重渲染都可能变，别把它接到"按 index 定位题目"上。
 9. **预热语速与实播语速不同键，且预热不切句**：`prewarm(..., {rate:0.85})`（`:549,553`）vs `speak(en)` 用 `settings.rate`（默认 0.9，`:556`），而缓存键含语速（`sherpa-tts.ts:168-171`，`use-tts.ts:818-819` 明文说键不匹配会让预热白做）；超过 180 字符的句子，`prewarm` 的整句键和 `speak` 的分块键本就不同 —— 长句永远预热不命中。
 10. **「错词重练」在本页只有「重试错词」按钮**：只清空判错的格子、**保留判分可见**（`handleRetryWrong` `:675-695`），渲染条件 `mode === 'dictation' && results.score < results.total`（`:1499-1509`）→ fill 模式没有这个入口。错词计数确实持久化进 SM-2 的 `wrongWords`（`use-spelling-learning.ts:185-188`），但页面只用聚合值 `stats.totalWrongWords`（`:248`），**没有按词聚合的复习列表视图**。
