@@ -9,7 +9,7 @@ import { useCloudSync } from '@/lib/use-cloud-sync';
  */
 export default function CloudSyncProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
-  const { syncUp, syncDown, registerCloudWrite, unregister } = useCloudSync();
+  const { syncUp, syncDown, registerCloudWrite, unregister, needsResync } = useCloudSync();
   const lastSyncRef = useRef(0);
 
   // Auth-driven sync: pull cloud data on login, then push + register dual-write
@@ -32,12 +32,14 @@ export default function CloudSyncProvider({ children }: { children: React.ReactN
     if (!isAuthenticated) return;
     const id = setInterval(() => {
       syncDown().then(() => {
-        syncUp();
+        // 只在"有过失败/未落云的本地写入"时才做全量补推。
+        // 此前每 5 分钟都无条件 syncUp()，等于把整套数据整份再 POST 回云端一次。
+        if (needsResync()) syncUp();
         lastSyncRef.current = Date.now();
       });
     }, 5 * 60 * 1000);
     return () => clearInterval(id);
-  }, [isAuthenticated, syncDown, syncUp]);
+  }, [isAuthenticated, syncDown, syncUp, needsResync]);
 
   // Sync on page visibility change (user returns to tab)
   useEffect(() => {

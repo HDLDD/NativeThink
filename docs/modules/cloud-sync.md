@@ -48,12 +48,13 @@ B. 全量补推：syncUp 扫 localStorage，两道过滤
 
 ## 2. 注意事项
 
-1. **下行会把刚下载的数据原样再推回去**（回声）。`registerCloudWrite()` 在 `CloudSyncProvider.tsx:24` **同步**注册，而 `syncDown` 的 `:79` 在其之后异步执行 → 每一个下载键都触发双写处理器 → 进 `pendingRef` → 3 秒后再 POST 回云端。代码里**没有任何抑制回声/去重/版本号标记**。配合 5 分钟轮询，登录后即使什么都没做，也会周期性地把全量数据下载再上传一遍。
-2. **下行后大部分 hook 仍持陈旧内存态**：`nativethink-sync-down` 的订阅者实测**只有 3 个** —— `use-favorites.ts:53`、`use-learning-stats.ts:204`、`use-spelling-sentences.ts:41`。未订阅且会读到旧内存值的包括：`use-word-learning`、`use-phrase-learning`、`use-spelling-learning`、`use-sentence-review`、`custom-words`、`quickcard-history`、`word-notes`、`use-achievements`、`use-custom-scenarios`、`tts-settings`、`capped-cache`/`colloc-ai-cache`、`reader-highlight`、`services/ai-config`。表现：**A 设备改了，B 设备要重开页面才看到**；更糟的是 B 设备那个陈旧实例一有写入，就把刚拉下来的新值覆盖回去。
-3. **同步失败完全静默**。`use-cloud-sync.ts:31/66/85` 三个 `catch` 是空实现，该文件与 `CloudSyncProvider.tsx` 都没有 import `toast`（实测 grep 计数 0）。`syncing` / `lastSync` 虽然 return 了（`:117`），但**没有任何组件消费**（grep `.tsx` 无命中）→ 没有状态 UI。唯一的"同步"字样提示是 `AuthDialog.tsx:34/37` 的「登录成功！数据已同步」—— 那是乐观文案，不代表同步成功。**全站已经有了 `<Toaster />`（`src/index.tsx:93-98`）之后，这里补提示的成本已经降到一行**，但仍然没补。
-4. **KV 是全量覆盖式写入**，没有冲突解决：后写的值赢。跨设备并行学习会丢一边。
-5. **API Key 故意不上云**：`services/ai-config.ts` 用 7 处裸 `localStorage`（`ai_key_<provider>` / `ai_active_provider`），不经 `safeStorage` → 不进双写、不进全量扫描。换设备要重新配 Key，这是预期行为，别"顺手"迁到 safeStorage。
-6. **IndexedDB 里的东西一概不同步**：词库缓存、书籍全文解析、整书译文（`booktrans-*`）、TTS 结果。换设备后背单词进度能同步，但已经翻过的书要重新联网/重新解析，译好的整本书要重翻。
-7. **重装 APK 可能清掉 localStorage**（某些 ROM 的 WebView 行为）。同步是主要防线，但前提是用户**登录了**；没登录时只有「学习记录 → 导出」。
-8. **`functions/api/debug/` 是空目录**，别以为那里有什么调试端点。
-9. 账号侧的 JWT/加密在 `functions/_lib/{auth,jwt,crypto}.js`，`api-client.ts:31-45,62-77` 会把服务端 500/超时翻成友好文案 —— 然后被上面第 3 条的那些空 `catch` 吞掉。
+1. ~~**下行会把刚下载的数据原样再推回去**（回声）~~ → **【已修，2026-09-30】** 留档备查：`registerCloudWrite()` 在 `CloudSyncProvider.tsx:24` **同步**注册，而 `syncDown` 的 `safeStorage.setItem` 在其之后异步执行，于是每个下载键都触发双写处理器 → 进 `pendingRef` → 3 秒后再 POST 回云端。现在 `syncDown` 用 `applyingRemoteRef` + `try/finally` 包住落地循环，处理器开头 `if (applyingRemoteRef.current) return;` 跳过。守卫：`npm run verify:cloud-sync`（18 断言，A 段真跑：下载后 0 次 POST、同键在本地再写一次必须 1 次 POST 作正对照；变异实测删掉守卫行 → 行为断言立刻红）。
+2. **下行后大部分 hook 仍持陈旧内存态**（**未修**，本轮只把口径钉进守卫）：`nativethink-sync-down` 的订阅者实测**只有 3 个** —— `use-favorites.ts:53`、`use-learning-stats.ts:204`、`use-spelling-sentences.ts:41`。未订阅且会读到旧内存态的包括：`use-word-learning`、`use-phrase-learning`、`use-spelling-learning`、`use-sentence-review`、`custom-words`、`quickcard-history`、`word-notes`、`use-achievements`、`use-custom-scenarios`、`tts-settings`、`capped-cache`/`colloc-ai-cache`、`reader-highlight`、`services/ai-config`。表现：**A 设备改了，B 设备要重开页面才看到**；更糟的是 B 设备那个陈旧实例一有写入，就把刚拉下来的新值覆盖回去。守卫断言"订阅者 ≥ 3"（只增不减），补第 4 个订阅者时不会挡你。
+3. ~~**同步失败完全静默**~~ → **【已修，2026-09-30】**：`flushPending` 与 `syncUp` 失败给「云同步暂未成功，数据已保存在本机并会自动重试」，`syncDown` 失败给「云端数据暂未取回，本机数据不受影响」，下行单项写入失败（配额满）会如实说缺了几项。三类提示都按 60 秒去抖（`warnThrottled`），离线时不会变成闹钟。`syncing`/`lastSync` 仍然没有组件消费（要做状态 UI 时再用）。守卫：`verify:cloud-sync` 断言 `use-cloud-sync.ts` 里**空 catch 数为 0**。
+4. ~~**周期任务无条件全量 `syncUp()`**~~ → **【已修】**：5 分钟轮询改成 `if (needsResync()) syncUp()`，只在有过失败/未落云写入时补推；**登录那一次仍然无条件全量补推**（首启要把本地既有数据填满云端）。`needsResync` 必须 `useCallback` 稳定 —— 它在 provider 的 `setInterval` 依赖数组里，内联箭头函数会让 `setSyncing` 每次 render 都重建定时器，5 分钟永远走不满（这条也有断言守着）。
+5. **KV 是全量覆盖式写入**，没有冲突解决：后写的值赢。跨设备并行学习会丢一边。
+6. **API Key 故意不上云**：`services/ai-config.ts` 用 7 处裸 `localStorage`（`ai_key_<provider>` / `ai_active_provider`），不经 `safeStorage` → 不进双写、不进全量扫描。换设备要重新配 Key，这是预期行为，别"顺手"迁到 safeStorage。
+7. **IndexedDB 里的东西一概不同步**：词库缓存、书籍全文解析、整书译文（`booktrans-*`）、TTS 结果。换设备后背单词进度能同步，但已经翻过的书要重新联网/重新解析，译好的整本书要重翻（**导出备份现在会带上它**，见 dashboard-progress-favorites.md §5.4）。
+8. **重装 APK 可能清掉 localStorage**（某些 ROM 的 WebView 行为）。同步是主要防线，但前提是用户**登录了**；没登录时只有「学习记录 → 导出」。
+9. **`functions/api/debug/` 是空目录**，别以为那里有什么调试端点。
+10. 账号侧的 JWT/加密在 `functions/_lib/{auth,jwt,crypto}.js`，`api-client.ts:31-45,62-77` 会把服务端 500/超时翻成友好文案 —— 然后被上面第 3 条的那些空 `catch` 吞掉。
