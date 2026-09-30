@@ -203,11 +203,20 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   useEffect(() => { return () => { try { tts.cancel(); } catch { /* */ } }; }, []);
 
   // 复习词高亮：把当前内容的待复习词表推给 reader-highlight 模块
-  // （只有「用复习词汇生成文章」产出的内容带 highlightWords；退出阅读器时清空）
+  // （只有「用复习词汇生成文章」产出的内容带词表；退出阅读器时清空）
+  /**
+   * 词表口径与 `rv-articles.ts:rvRegenKeys` 保持一致：**新文章存 `highlightWords`，
+   * 改动之前存下的老复习词文章只有 `rvWords`**。真机（2026-09-30，83/2.0.38）实测过这个断层 ——
+   * 列表行明明写着「复习词 42」，点进阅读器却一个词都不高亮、设置里也没有「待复习词的颜色」那一行。
+   */
+  const reviewWords = useMemo(
+    () => (content.highlightWords?.length ? content.highlightWords : content.rvWords ?? []),
+    [content.highlightWords, content.rvWords],
+  );
   useEffect(() => {
-    setHighlightWords(content.highlightWords ?? null);
+    setHighlightWords(reviewWords.length ? reviewWords : null);
     return () => setHighlightWords(null);
-  }, [content.id, content.highlightWords]);
+  }, [content.id, reviewWords]);
   useEffect(() => { return () => {
     // Help GC by clearing translation cache and display content on unmount
     setTransCache({});
@@ -1463,11 +1472,11 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 </Button>
               </div>
             </div>
-            {/* 复习词高亮颜色 —— 只在当前内容确实有待复习词时出现 */}
-            {(content.highlightWords?.length ?? 0) > 0 && (
+            {/* 复习词高亮颜色 —— 只在当前内容确实有待复习词时出现（老文章走 rvWords 回退） */}
+            {reviewWords.length > 0 && (
               <div>
                 <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">
-                  待复习词的颜色（{content.highlightWords!.length} 个）
+                  待复习词的颜色（{reviewWords.length} 个）
                 </p>
                 <div className="flex items-center gap-2">
                   {HIGHLIGHT_COLORS.map((c) => (

@@ -282,7 +282,20 @@ check(
   check(/highlightWords: args\.keys,[\s\S]{0,120}rvWords: args\.covered,/.test(appSrc2),
     '「用复习词汇生成文章」把点名词交给阅读器高亮，只把真用上的记为 rvWords');
   check(/highlightWords\?: string\[\];/.test(readFileSync(join(ROOT, 'src/data/reading.ts'), 'utf8')), 'IReadingContent 有 highlightWords 字段');
-  check(/setHighlightWords\(content\.highlightWords \?\? null\)/.test(pageReaderSrc), '阅读器进入时下发复习词、退出时清空');
+  /**
+   * 2026-09-30 真机（83/2.0.38）实测到的断层：改造前存下的复习词文章只带 `rvWords`，
+   * 阅读器只认 `highlightWords` —— 列表行写着「复习词 42」，点进去一个词都不高亮，
+   * 阅读设置里连「待复习词的颜色」那一行都不出现。词表口径改成与 `rvRegenKeys` 一致（highlightWords 优先、否则 rvWords）。
+   */
+  check(/const reviewWords = useMemo\(\s*\(\) => \(content\.highlightWords\?\.length \? content\.highlightWords : content\.rvWords \?\? \[\]\)/.test(pageReaderSrc),
+    '阅读器复习词表按 highlightWords → rvWords 回退（与 rvRegenKeys 同口径）');
+  check(/setHighlightWords\(reviewWords\.length \? reviewWords : null\)/.test(pageReaderSrc), '进入阅读器下发回退后的词表');
+  check(/return \(\) => setHighlightWords\(null\)/.test(pageReaderSrc), '退出阅读器清掉高亮词表');
+  check((pageReaderSrc.match(/setHighlightWords\(/g) || []).length === 2,
+    'setHighlightWords 只有"下发"与"卸载清空"两处调用点');
+  check(!/setHighlightWords\(content\.highlightWords \?\? null\)/.test(pageReaderSrc),
+    '旧写法（只认 highlightWords）已消失 —— 留着它老复习词文章就没有高亮');
+  check(/reviewWords\.length > 0 && \(/.test(pageReaderSrc), '⑥「待复习词的颜色」那一行跟着回退后的词表出现');
   check(/HIGHLIGHT_COLORS\.map/.test(pageReaderSrc), '阅读设置里提供可选颜色');
   check(/matchesHighlight\(w, reviewWords\)/.test(readFileSync(join(ROOT, 'src/pages/ArticlePage/components/ReaderParagraph.tsx'), 'utf8')), '段落渲染按复习词加框');
 }
