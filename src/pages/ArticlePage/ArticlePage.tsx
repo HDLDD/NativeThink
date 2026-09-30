@@ -4,6 +4,7 @@ import {
   Upload, Sparkles, BookOpen, Loader2,
   Search, ExternalLink, X, Globe, Library, Mic, Wand2, BookMarked,
   Clock, History, Newspaper, HelpCircle, ShieldAlert,
+  Heart, ChevronDown, Check,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAI } from '@/hooks/use-ai';
 import { useWordLearning } from '@/lib/use-word-learning';
+import { useFavorites } from '@/lib/use-favorites';
+import { usedReviewWordKeys, reviewWordRecord, planRvBatches } from '@/lib/rv-articles';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn, cleanText, extractJson } from '@/lib/utils';
@@ -37,6 +40,13 @@ type MainTab = 'books' | 'webnovels' | 'scp' | 'publications' | 'ai' | 'speeches
  */
 type IBookListItem = IReadingContent | IBookMeta;
 const pageCountOf = (b: IBookListItem) => ('pageCount' in b ? b.pageCount : b.pages?.length ?? 0);
+
+/** 复习词汇文章：一次最多生成几篇。超出批次**不消费**（对应词留在列表里，下次继续） */
+const RV_BATCH_LIMIT = 3;
+/** 复习词汇文章：词表默认只画前 N 个词，其余折叠为「展开全部」 */
+const RV_MAX_CHIPS = 30;
+/** 复习词汇文章：每篇词数可选档位 */
+const RV_PER_OPTIONS = [8, 10, 15, 20, 30];
 
 const LEVELS: { key: Level; label: string; color: string; desc: string }[] = [
   { key: 'beginner', label: '初级', color: '#00B894', desc: '简单句式，常用词汇' },
@@ -150,6 +160,7 @@ export default function ArticlePage() {
   const { isConfigured, chat: aiChat } = useAI();
   const { dueForReview, state: sm2State } = useWordLearning('all');
   const { addStudyMinutes } = useLearningStats();
+  const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
   const [searchParams] = useSearchParams();
 
   // ── Saved AI articles — declared before effects that reference it ──
@@ -519,6 +530,13 @@ export default function ArticlePage() {
   const [aiTitle, setAiTitle] = useState('');
   const [aiTopicInput, setAiTopicInput] = useState('');
 
+  // ── 复习词汇文章：选词 + 分篇（词表 = 到期词 − 已排进文章的，派生逻辑见 rv-articles.ts）──
+  const [rvSelected, setRvSelected] = useState<Set<string>>(new Set());
+  const [rvPerArticle, setRvPerArticle] = useState(10);
+  const [rvOpen, setRvOpen] = useState<boolean | null>(null);   // null = 跟随词表有无自动展开
+  const [rvShowAll, setRvShowAll] = useState(false);
+  const [rvProgress, setRvProgress] = useState<string | null>(null);   // 「生成中 2/3 篇」
+
   // Reload AI articles when cloud sync pulls data from other devices
   useEffect(() => {
     const reload = () => {
@@ -666,36 +684,99 @@ export default function ArticlePage() {
     toast.error('该演讲暂不可用');
   }, [speechMeta, buildSpeechFn]);
 
+  // ── 复习词汇文章：派生状态（词表 = 到期词 − 已排进文章的）──
+  /** 所有现存 AI 文章用过的复习词（并集）。删除文章后它用掉的词自动回到词表 */
+  const rvUsedKeys = useMemo(() => usedReviewWordKeys(aiArticles), [aiArticles]);
+  /** 「记录」：待复习词去掉已被文章用掉的，保持到期顺序 */
+  const rvRecord = useMemo(() => reviewWordRecord(dueForReview, rvUsedKeys), [dueForReview, rvUsedKeys]);
+  const rvSelectedWords = useMemo(() => rvRecord.filter((w) => rvSelected.has(w.wordKey)), [rvRecord, rvSelected]);
+  const rvPlan = useMemo(() => planRvBatches(rvSelectedWords, rvPerArticle, RV_BATCH_LIMIT), [rvSelectedWords, rvPerArticle]);
+  /** null = 跟随词表有无自动开合；手动点过「收起/展开」后固定 */
+  const rvOpenNow = rvOpen ?? rvRecord.length > 0;
+  const toggleRv = (key: string) => setRvSelected((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  const selectFirstRvBatch = () => setRvSelected(new Set(rvRecord.slice(0, rvPerArticle).map((w) => w.wordKey)));
+
+  // 已保存 AI 文章的收藏开关 —— 与阅读器内文章收藏同一口径（content = 文章 id，category = type），
+  // 「我的收藏」里点击会走 /articles?open=<id> 跳回并直接打开
+  const toggleAiArticleFav = (a: IReadingContent) => {
+    if (isFavorited(a.id, 'article')) {
+      const f = favorites.find((x) => x.type === 'article' && x.content === a.id);
+      if (f) { removeFavorite(f.id); toast('已取消收藏'); }
+    } else {
+      addFavorite({ type: 'article', content: a.id, meaning: a.zhTitle || a.title, example: a.source, category: a.type });
+      toast.success('已收藏 — 在「我的收藏」查看');
+    }
+  };
+
   // ── AI article generation (from review words) ──
+  /**
+   * 分篇生成：选中的词按「每篇词数」切批，一次最多 RV_BATCH_LIMIT 篇，逐篇串行。
+   * 每篇成功即落盘（saveAiArticle + 历史带 aiId），其用词随即从词表消失（派生自 rvWords）；
+   * 失败的篇与超出上限的批次**不消费** —— 对应词留在词表里，下次可继续选。
+   */
   const generateFromReviewWords = useCallback(async () => {
     if (!isConfigured) { toast.error('请先配置 AI API Key'); return; }
-    const words = dueForReview.slice(0, 10);
-    if (words.length < 3) { toast.error('复习词汇不足（至少需要 3 个）'); return; }
+    if (rvSelectedWords.length < 3) { toast.error('请至少选择 3 个词'); return; }
+    const batches = rvPlan.batches;
+    if (!batches.length) return;
     setAiLoading(true);
+    let done = 0; let usedWords = 0; let failed = 0;
+    let first: IReadingContent | null = null;
     try {
-      const wordList = words.map((p) => p.wordKey).join(', ');
-      const result = await aiChat([
-        { role: 'system', content: `Write a short English article (3-5 paragraphs) that naturally incorporates ALL these words: ${wordList}. Return ONLY valid JSON: {"title":"...","paragraphs":[{"en":"paragraph","zh":"Chinese translation"}]}` },
-        { role: 'user', content: `Create an article using these words: ${wordList}. Level: ${level}.` },
-      ], { temperature: 0.7, maxTokens: 4096 });
-      const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
-      if (!parsed?.paragraphs?.length) { toast.error('AI 生成失败，请重试'); return; }
-      const content: IReadingContent = {
-        id: `rv_${Date.now()}`, type: 'ai',
-        title: parsed.title || '复习词汇文章', zhTitle: parsed.title || '复习词汇文章',
-        author: 'AI Generated', source: '复习词汇生成',
-        topic: 'vocabulary', difficulty: level,
-        pages: buildPages(parsed.paragraphs || []),
-        totalWords: (parsed.paragraphs || []).reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
-        // 把这批待复习词交给阅读器用颜色框出来（颜色可在阅读设置里换）
-        highlightWords: words.map((w) => w.wordKey),
-      };
-      openReader(content);
-      saveToHistory(parsed.title || '复习词汇文章', content.totalWords.toString(), 'review-words');
-      toast.success(`用 ${words.length} 个词汇生成了文章！`);
-    } catch { toast.error('生成失败'); }
-    finally { setAiLoading(false); }
-  }, [isConfigured, dueForReview, level, aiChat]);
+      for (let bi = 0; bi < batches.length; bi++) {
+        const batch = batches[bi];
+        setRvProgress(`生成中 ${bi + 1}/${batches.length} 篇`);
+        const wordList = batch.map((w) => w.wordKey).join(', ');
+        /** 段落数随词数走（约每 3 词 1 段，下限 3 上限 8） */
+        const paraCount = Math.max(3, Math.min(8, Math.ceil(batch.length / 3)));
+        try {
+          const result = await aiChat([
+            { role: 'system', content: `Write an English article (${paraCount} paragraphs) for ${level} learners that naturally incorporates ALL of these words: ${wordList}. Every listed word must appear at least once. Return ONLY valid JSON: {"title":"...","paragraphs":[{"en":"paragraph","zh":"Chinese translation"}]}` },
+            { role: 'user', content: `Use all these words: ${wordList}.` },
+          ], { temperature: 0.7, maxTokens: 4096 });
+          if (!result.trim()) { failed++; continue; }   // 空串 = 服务不可用，本篇跳过
+          const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
+          const safeParagraphs: IParagraph[] = (parsed?.paragraphs || [])
+            .map((p: any) => ({ en: p?.en || '', zh: p?.zh || '' }))
+            .filter((p: IParagraph) => p.en.trim());
+          if (!safeParagraphs.length) { failed++; continue; }
+          const keys = batch.map((w) => w.wordKey);
+          const content: IReadingContent = {
+            id: `rv_${Date.now()}_${bi}`, type: 'ai',
+            title: parsed?.title || `复习词汇文章 ${bi + 1}`, zhTitle: parsed?.title || `复习词汇文章 ${bi + 1}`,
+            author: 'AI Generated', source: '复习词汇生成',
+            topic: 'vocabulary', difficulty: level,
+            pages: buildPages(safeParagraphs),
+            totalWords: safeParagraphs.reduce((s: number, p: IParagraph) => s + p.en.split(/\s+/).filter(Boolean).length, 0),
+            // 阅读器把这批词框出来（颜色可在阅读设置里换）；rvWords 是用词书面记录，词表据此出队
+            highlightWords: keys,
+            rvWords: keys,
+          };
+          saveAiArticle(content);
+          saveToHistory(content.title, content.totalWords.toString(), 'review-words', { aiId: content.id });
+          first = first ?? content;
+          done++; usedWords += batch.length;
+        } catch { failed++; }
+      }
+      if (first) openReader(first);
+      setRvSelected(new Set());   // 文章已重算词表，旧选择作废
+      if (done > 0) {
+        const parts = [`已生成 ${done} 篇（用掉 ${usedWords} 个词，已保存${first ? '，打开第一篇' : ''}）`];
+        if (rvPlan.skippedBatches > 0) parts.push(`还有 ${rvPlan.skippedBatches} 篇的量留在词表`);
+        if (failed > 0) parts.push(`${failed} 篇失败（对应词仍在列表）`);
+        toast.success(parts.join(' · '));
+      } else {
+        toast.error('生成失败，请重试');
+      }
+    } finally {
+      setRvProgress(null);
+      setAiLoading(false);
+    }
+  }, [isConfigured, rvPlan, rvSelectedWords, level, aiChat]);
 
   useEffect(() => { safeStorage.setItem(HISTORY_KEY, JSON.stringify(history)); }, [history]);
 
@@ -736,7 +817,11 @@ export default function ArticlePage() {
             ) : (
               <div className="space-y-2 max-h-[200px] overflow-y-auto">
                 {history.slice(0, 20).map((h) => {
-                  const clickable = !!h.meta?.speechId || (!!h.meta?.bookId && !!books);
+                  // AI 文章（自由生成 / 复习词汇）只要还在「已保存的 AI 文章」里就能重新打开；
+                  // 老的复习词汇条目没有 meta.aiId，仍然只能提示无法恢复
+                  const clickable = !!h.meta?.speechId
+                    || (!!h.meta?.bookId && !!books)
+                    || (!!h.meta?.aiId && aiArticles.some((a) => a.id === h.meta!.aiId));
                   return (
                   <button
                     key={h.id}
@@ -746,7 +831,9 @@ export default function ArticlePage() {
                       'w-full flex items-center gap-2 text-xs text-left',
                       clickable ? 'hover:bg-muted rounded-lg p-1 -mx-1 cursor-pointer' : 'p-1',
                     )}
-                    title={clickable ? '点击重新打开' : (h.source === 'ai' || h.source === 'review-words' ? 'AI 生成内容无法恢复' : '数据未加载')}
+                    title={clickable ? '点击重新打开'
+                      : h.meta?.aiId ? '文章已被删除'
+                      : (h.source === 'ai' || h.source === 'review-words' ? '此条记录生成于旧版本，无法恢复' : '数据未加载')}
                   >
                     <Badge className="text-[8px] rounded-full px-2 py-0 shrink-0">{h.source}</Badge>
                     <span className="font-medium truncate flex-1">{h.title}</span>
@@ -1040,19 +1127,100 @@ export default function ArticlePage() {
       {/* ── AI TAB ── */}
       {mainTab === 'ai' && (
         <div className="space-y-4">
-          {/* Generate from review words */}
+          {/* Generate from review words — 选词 + 分篇 */}
           <Card className="rounded-[28px] border-border bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-500/10 dark:to-purple-500/10">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div>
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
                   <h3 className="text-sm font-black text-foreground">用复习词汇生成文章</h3>
-                  <p className="text-[10px] text-muted-foreground">用 SM-2 待复习单词创作文章（需 AI Key）</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {rvRecord.length === 0
+                      ? '词表空了：到期复习词都排进文章了'
+                      : `待复习 ${rvRecord.length} 词 · 自选词汇与每篇词数，一次最多 ${RV_BATCH_LIMIT} 篇`}
+                  </p>
                 </div>
-                <Button size="sm" onClick={generateFromReviewWords} disabled={aiLoading || !isConfigured} className="rounded-2xl bg-violet-500 hover:bg-violet-600 text-white text-[10px] font-bold">
-                  {aiLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
-                  <span className="ml-1">生成 ({dueForReview.length}词)</span>
-                </Button>
+                <button
+                  onClick={() => setRvOpen(!rvOpenNow)}
+                  className="shrink-0 flex items-center gap-0.5 text-[10px] font-bold text-violet-600 dark:text-violet-400"
+                >
+                  {rvOpenNow ? '收起' : '展开'}
+                  <ChevronDown className={cn('size-3.5 transition-transform', rvOpenNow && 'rotate-180')} />
+                </button>
               </div>
+
+              {rvOpenNow && (rvRecord.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  已经没有可用的复习词了。在「背单词」完成复习后新到期的词会回到这里；删除一篇复习词汇文章，它用掉的词也会立刻回到列表（同一篇里的词不会被别的文章重复使用）。
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-bold text-muted-foreground">每篇词数</span>
+                    {RV_PER_OPTIONS.map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setRvPerArticle(n)}
+                        className={cn(
+                          'px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors',
+                          rvPerArticle === n
+                            ? 'bg-violet-500 border-violet-500 text-white'
+                            : 'border-violet-200 dark:border-violet-500/30 text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10',
+                        )}
+                      >{n}</button>
+                    ))}
+                    <button onClick={selectFirstRvBatch} className="ml-auto text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:underline">
+                      选前 {rvPerArticle} 词
+                    </button>
+                    <button onClick={() => setRvSelected(new Set())} className="text-[10px] font-bold text-muted-foreground hover:underline">
+                      清空
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto overscroll-contain">
+                    {(rvShowAll ? rvRecord : rvRecord.slice(0, RV_MAX_CHIPS)).map((w) => {
+                      const on = rvSelected.has(w.wordKey);
+                      return (
+                        <button
+                          key={w.wordKey}
+                          onClick={() => toggleRv(w.wordKey)}
+                          className={cn(
+                            'flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold border transition-colors',
+                            on
+                              ? 'bg-violet-500 border-violet-500 text-white'
+                              : 'bg-white/70 dark:bg-white/5 border-border text-foreground hover:border-violet-300',
+                          )}
+                        >
+                          {on && <Check className="size-3" />}
+                          {w.wordKey}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {rvRecord.length > RV_MAX_CHIPS && !rvShowAll && (
+                    <button onClick={() => setRvShowAll(true)} className="text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:underline">
+                      展开全部 {rvRecord.length} 词
+                    </button>
+                  )}
+
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <span className="text-[10px] text-muted-foreground font-medium leading-tight">
+                      已选 {rvSelectedWords.length} 词
+                      {rvSelectedWords.length >= 3 && ` · 将生成 ${rvPlan.batches.length} 篇（每篇 ${rvPerArticle} 词）`}
+                      {rvPlan.skippedBatches > 0 && ` · 另有 ${rvPlan.skippedBatches} 篇的量留在词表`}
+                      {rvSelectedWords.length > 0 && rvSelectedWords.length < 3 && ' · 至少选 3 个'}
+                    </span>
+                    <Button
+                      size="sm"
+                      onClick={generateFromReviewWords}
+                      disabled={aiLoading || !isConfigured || rvSelectedWords.length < 3}
+                      className="rounded-2xl bg-violet-500 hover:bg-violet-600 text-white text-[10px] font-bold shrink-0"
+                    >
+                      {aiLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
+                      <span className="ml-1">{rvProgress || '生成'}</span>
+                    </Button>
+                  </div>
+                </>
+              ))}
             </CardContent>
           </Card>
 
@@ -1120,6 +1288,7 @@ export default function ArticlePage() {
                     key={a.id}
                     className="rounded-2xl border-border hover:border-[#00B894]/40 hover:shadow-sm transition-all cursor-pointer group"
                     onClick={() => openReader(a)}
+                    title={a.rvWords?.length ? `复习词：${a.rvWords.join(', ')}` : undefined}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-2">
@@ -1129,15 +1298,30 @@ export default function ArticlePage() {
                           </h4>
                           <p className="text-[10px] text-muted-foreground mt-0.5">
                             {a.totalWords.toLocaleString()} 词 · {a.difficulty}
+                            {a.rvWords?.length ? ` · 复习词 ${a.rvWords.length}` : ''}
                           </p>
                         </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deleteAiArticle(a.id); }}
-                          className="shrink-0 p-1 rounded-lg text-muted-foreground/30 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
-                          title="删除"
-                        >
-                          <X className="size-3.5" />
-                        </button>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleAiArticleFav(a); }}
+                            className={cn(
+                              'p-1 rounded-lg transition-colors',
+                              isFavorited(a.id, 'article')
+                                ? 'text-rose-500'
+                                : 'text-muted-foreground/30 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10',
+                            )}
+                            title={isFavorited(a.id, 'article') ? '取消收藏' : '收藏（在「我的收藏」里可一键打开）'}
+                          >
+                            <Heart className={cn('size-3.5', isFavorited(a.id, 'article') && 'fill-current')} />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); deleteAiArticle(a.id); }}
+                            className="p-1 rounded-lg text-muted-foreground/30 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                            title={a.rvWords?.length ? '删除（用掉的复习词会回到词表）' : '删除'}
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

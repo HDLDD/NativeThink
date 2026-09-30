@@ -1,7 +1,7 @@
 # 阅读（`/articles`）
 
 > 状态栏里叫「阅读」，路由是 `/articles`，模块 key 是 `articles`。
-> 这是全仓**代码量最大**的一块：列表页 1494 行 + 阅读器 1749 行 + 小说视图 903 行，外加 5 个数据层模块。
+> 这是全仓**代码量最大**的一块：列表页 1682 行 + 阅读器 1749 行 + 小说视图 645 行，外加 5 个数据层模块。
 
 ## 1. 功能
 
@@ -14,8 +14,8 @@
 | 演讲 | `speech` | `src/data/speeches.ts`（30 篇） | — |
 | 网文选段 | `webnovel` | `src/data/webnovels.ts` | — |
 | SCP 基金会 | `wikipedia`/`publication` | `src/data/scp.ts`（CC BY-SA，必须带 `sourceUrl`） | 188KB |
-| AI 生成 | `ai` | 页面即时生成，不落盘 | — |
-| 复习词汇文章 | `review-words` | 用当前到期复习词生成（`ArticlePage.tsx:690`） | — |
+| AI 生成 | `ai` | 自由生成/主题生成即时创作，**成功即存入 `__nativethink_ai_articles`**（见 §2.6） | — |
+| 复习词汇文章 | `ai`（`source:'复习词汇生成'`） | 用**自选**到期复习词分篇生成，见 §2.6（`ArticlePage.tsx:721`） | — |
 | 用户导入 | `book` | `src/data/imported-books.ts`，`IMPORTED_ID_PREFIX` | localStorage |
 
 阅读器两种视图，同一份数据骨架：
@@ -88,6 +88,18 @@ src/data/books-meta.ts   # 只含元数据，由 scripts/gen-books-meta.cjs 生�
 
 复习词高亮：`setHighlightWords()`（`src/lib/reader-highlight.ts`）模块级状态，`PageReader.tsx:205` 推入，颜色可选（柔和色系，6 种）。
 
+### 2.6 复习词汇文章：选词 / 分篇 / 用词出队
+
+2026-09-30 重做（旧版写死 `dueForReview.slice(0, 10)`、用完即弃、不落盘 —— 用户报「生成词数只有十个左右，对不上完整的需要复习的单词」）。现在的口径：
+
+- **词表是派生的，不存"已用清单"**：`rvRecord = 到期词 − 所有现存 AI 文章的 rvWords 并集`（`src/lib/rv-articles.ts:18` `usedReviewWordKeys` / `:29` `reviewWordRecord`；页面接线 `ArticlePage.tsx:689-691`）。因此**删掉一篇生成的文章，它用掉的词立刻回到词表** —— 两份真相永不相漂。
+- **选词**：面板列出「待复习 N 词」的 chip（默认画前 `RV_MAX_CHIPS=30` 个，其余折叠为「展开全部」），点选/取消；「选前 N 词」按当前每篇词数取（`ArticlePage.tsx:1130-1225`）。
+- **每篇词数**：档位 `RV_PER_OPTIONS = [8,10,15,20,30]`（`:49`），选中词按它切批（`planRvBatches`，`rv-articles.ts:37`，`per ≤ 0` 夹到 1）。
+- **一次最多 `RV_BATCH_LIMIT = 3` 篇**（`:45`）：超出的批次**不消费**，对应词留在词表，UI 报「另有 X 篇的量留在词表」。
+- **逐篇串行生成**（`generateFromReviewWords`，`:721`）：每篇成功即 `saveAiArticle` + 历史 `{ aiId: 文章id }`（因此可重新打开），文章同时带 `rvWords`（出队依据）与 `highlightWords`（阅读器高亮）；空串（服务不可用）或解析不出的篇**不写任何记录**，词留在词表，toast 逐项报「已生成 N 篇 · 还有 X 篇的量 · Y 篇失败」。
+- **保存 / 收藏 / 删除**：生成的文章进「已保存的 AI 文章」（键 `__nativethink_ai_articles`，上限 50）；卡片有心形收藏（与阅读器内同口径：`type:'article'`、`content:文章id`、`category:'ai'` → 「我的收藏」可跳回并自动打开）与 X 删除（`ArticlePage.tsx:1277-1330`）。
+- **不改 SM-2**：生成文章不算一次复习，词的到期状态原样保留；"用掉"只是"已排进文章"的展示口径。
+
 ## 3. 注意事项
 
 1. **`public/books/` 是 23MB，且已进 git**（`.git` 因此 48MB）。它同时被 Cloudflare Pages 托管和 `capacitor copy` 打进 APK。这是有意的取舍：随包全文消除了「联网失败 → 静默退回压缩节选 → 章节缺失 / 译文错章」。要动这个目录，先想清楚退回节选的后果，别只按「public 不放大数据」的直觉删。
@@ -97,7 +109,7 @@ src/data/books-meta.ts   # 只含元数据，由 scripts/gen-books-meta.cjs 生�
 5. **`fetchFullBook` 的 effect 不能用 ref 做一次性守卫**：`PageReader.tsx:318-319` 注释写明 StrictMode 双执行会取消第一次、又把第二次拦死，靠的是函数内的 `inFlight` Map 去重 + IDB 缓存。
 6. **以 `<html` 开头的 200 响应是假的正文**（SPA 兜底）。任何新增的「随包静态文件」读取都要带同样的 doctype 检查。
 7. **`__reader_*` 与 `__nativethink_*` 在同步上其实没有区别**。`use-cloud-sync.ts:8,55` 的 `DATA_PREFIX` 过滤**只作用于 `syncUp` 的全量扫描**；登录后 `registerCloudWrite()` 注册的双写处理器（`:91-105` ← `safe-storage.ts:170-177`）**不挑前缀**，任何 `safeStorage.setItem` 都会被推上云。所以阅读进度、段级译文缓存、最近查词都会同步，只是不参与登录时的全量补推。真正不上云的只有裸 `localStorage` 与 IndexedDB。详见 `docs/modules/storage-and-stats.md` §3.4。
-8. **AI 生成与复习词汇文章无法从历史恢复**：`ArticlePage.tsx:745` 明确提示「AI 生成内容无法恢复」，历史条目只对静态来源可点。别给它们加"重新打开"。
+8. **AI 文章的历史可点性 = `meta.aiId` 对应的文章还在**：`ArticlePage.tsx:824` 的 `clickable` 现在还会查 `aiArticles`（新条目都带 `aiId`，含复习词汇文章与自由生成文章）；文章删掉后提示「文章已被删除」，**老条目**（2026-09-30 之前写入、没有 `meta.aiId` 的）仍显示「此条记录生成于旧版本，无法恢复」。改历史面板时别把这条分支删回去。
 9. **`scp.ts` 是抓取产物，勿手改**（`node scripts/fetch-scp.cjs`，约 1 req/s）；它带 `SCP_LICENSE`，条目必须保留 `sourceUrl`（CC BY-SA 要求署名到具体来源）。
 10. **模块 `src/data/` 下有 .bak 与进度文件**：`chunks.ts.bak`、`shadowing.ts.bak`、`shadowing.ts.expand-progress.json`（483KB）。它们不进包，但会迷惑人和增大仓库；确认生成器不再依赖后可清理。
-11. **无守卫覆盖**：阅读器只有 `verify-tts-progress`（朗读反查表）和 `verify-books-meta` ⑤⑥（书目拆分/元数据）护住数据层，**切章对齐、翻译回填、进度百分比三件事没有脚本兜**。改这些要手动开真书验证：翻到中段 → 刷新看百分比 ≤100%，「翻译本章」后中文没有落到别章。
+11. **守卫覆盖**：数据层有 `verify-tts-progress`（朗读反查表）与 `verify-books-meta` ⑤⑥（书目拆分/元数据）；复习词汇文章的**选词/分篇/用词出队**由 `verify-rv-articles`（55 断言，含 13 条变异测试）钉住。**切章对齐、翻译回填、进度百分比三件事仍没有脚本兜**，改这些要手动开真书验证：翻到中段 → 刷新看百分比 ≤100%，「翻译本章」后中文没有落到别章。

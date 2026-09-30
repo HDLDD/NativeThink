@@ -1,7 +1,7 @@
 # NativeThink 项目交接手册（Agent Handover）
 
 > 面向**接手的 AI agent / 新同事**：只读这一份就能开工。
-> 最后校准：2026-09-30（设备已装 2.0.31 / versionCode 76 并抽验过向导/词书词数/朗读设置；**2026-09-30 的「换书向导可达性」与「闪卡换卡节奏/答错卡死」两项修复尚未打进新 APK** —— 见第 8 节末尾两条新坑）。
+> 最后校准：2026-09-30（设备已装 2.0.31 / versionCode 76 并抽验过向导/词书词数/朗读设置；**2026-09-30 的「换书向导可达性」「闪卡换卡节奏/答错卡死」「复习词汇文章改选词+分篇」三项修复尚未打进新 APK** —— 见第 8 节末尾三条新坑）。
 > 相关文档：`AGENTS.md`（**索引**：跨模块约定 + 模块文档导航）、[`docs/modules/`](./modules/)（**每模块一篇：功能 / 实现方法 / 注意事项，带 `文件:行号`**）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
 
 ---
@@ -15,7 +15,7 @@
 | 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
 | 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-09 两轮全站质量优化已把拼写/跟读/写作/对话/语块也扫过一遍 |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 17 个 `scripts/verify-*.mjs` 断言脚本（2026-09-30 实测 vocab-cards 284；其余最近一次全绿记录与完整断言数见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 18 个 `scripts/verify-*.mjs` 断言脚本（2026-09-30 实测 vocab-cards 284；其余最近一次全绿记录与完整断言数见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
 | 改某个模块前 | 读 [`docs/modules/`](./modules/) 里对应那一篇 —— 功能、实现方法、以及**逐条读代码核实过**的注意事项（本手册与 AGENTS.md 的若干旧说法在那里被推翻并已修正） |
 | 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
@@ -218,7 +218,7 @@ adb install -r release/NativeThink-mobile-debug.apk
 |---|---|---|
 | 静态 | `npm run typecheck` + `npm run lint:eslint` | 全量；pre-commit 强制 |
 | 构建 | `npm run build:web` | 打包可行性 + chunk 体积 |
-| 契约 | 17 个 `scripts/verify-*.mjs`（全表见 [modules/verification.md](./modules/verification.md)） | 词库加载/拆分、书目元数据、背单词卡片（含换卡节奏数值锁 + 答错重排延后 + 换书路径）、背单词缓存、TTS 切片与进度、TTS 降级、反馈链路（前后端对接 + 后端替身执行）、拼写断点分键、跟读完成索引、云同步卫生、AI 解析约定、长列表折叠等 |
+| 契约 | 18 个 `scripts/verify-*.mjs`（全表见 [modules/verification.md](./modules/verification.md)） | 词库加载/拆分、书目元数据、背单词卡片（含换卡节奏数值锁 + 答错重排延后 + 换书路径）、背单词缓存、TTS 切片与进度、TTS 降级、反馈链路（前后端对接 + 后端替身执行）、拼写断点分键、跟读完成索引、云同步卫生、AI 解析约定、长列表折叠等 |
 | 真机 | adb + CDP（见第 7 节） | 只能在设备上发现的：safe-area、原生 TTS、手势、持久化 |
 
 **写守卫脚本的经验（血泪）**：
@@ -344,12 +344,13 @@ node scripts/device-eval.mjs back
 | 整页/整章翻译错位一行 | 失败段被 filter 后按"成功顺序"回填 | 翻译缓存 v2 按段索引 byIdx 精确回填；旧顺序缓存段数不吻合宁可不显示 |
 | 长任务结束时覆盖运行期间的新数据 | 用点击时的陈旧快照直接 set | 合并用 `setX((prev) => ...)` 函数式；与其它写路径互斥守卫 |
 
-**2026-09-30 词汇模块两条新坑（都由真机反馈驱动）**：
+**2026-09-30 三条新坑（都由真机反馈驱动）**：
 
 | 现象 | 真正原因 | 修法 |
 |---|---|---|
 | 首页点「切换词书」没反应（2026-09-30 已修） | 向导**其实弹了**，但被渲染在六张模式卡**下面**（真机 393×851 从 y≈809 才开始，视口内只剩 42px）；且打开时页面没滚动归零 | 模式卡列表与向导**互斥渲染**（`{!immersed && !showWizard && …}`）+ 打开时 `window.scrollTo`/`main.scrollTo` 归零 + 向导带「当前」标记与「关闭」出口。切换逻辑本身没错，坏在"看不见有东西弹出来" |
 | 闪卡评分后要 ~1.1s 才换卡；答「完全忘了」直接卡死不动（2026-09-30 已修） | ①换卡延迟三源叠加：停留 550/900ms + `setTimeout(150)` 干等 + spring 退场被 `AnimatePresence mode="wait"` 串行等（≈400ms 尾巴）；②评分时同步 `scheduleRelearn` 就地改掉 `session.order[currentIdx]` → `currentKey` 当场变化 → `justRated` 失效、自动跳转定时器永远排不上 | 停留改 120/300、换卡一次批量、退场用定长 tween 0.18s（CDP 按帧实测 1122ms → ~330ms）；重排**延后到 `advance`**（`pendingRelearnRef`），答错 489ms 自动前进、重排词隔 4 张如约再现。守卫按**数值**锁（答对<答错、答错≤400ms） |
+| 复习词汇生成文章只出 ~10 个词、用过的词下轮又出现、文章删不掉且历史点不开（2026-09-30 已修） | 旧实现把 `dueForReview.slice(0, 10)` 写死，生成后不落盘、不用词记录 | 词表改**派生**（到期词 − 现存文章 `rvWords`，刻意不做两份真相）＋自选词汇与每篇词数、串行逐篇落盘（最多 3 篇），已保存文章可收藏/删除，删文章词自动回词表；失败批次对应词留在列表。守卫 `verify:rv-articles`（55 断言含 13 条变异测试），阅读器 `highlightWords` 与 `rvWords` 同源 |
 
 ---
 
@@ -385,6 +386,11 @@ node scripts/device-eval.mjs back
   全新 profile 进 `/vocabulary` 就是 18 个词库 chunk / 3.16MB / 15 个长任务合计 1.6s，而用户连一本都还没选。
   现在没 `setupDone` 一律不预载，模式子树也等 `dataReady` 才挂载（顺带修掉"数据晚到但 memo 不重算 → 本书进度整块消失"）。
 - **词汇向导「少点一步」两修（2026-09-29）**：① 换书与首启拆成两条路 —— 已选过词书的人点任意一本书**一步生效**（保持当前学习方式、不清该书今日配额），三步进度条只在首启出现，「全部」不再拿四级图标冒充；② 走完向导（含点「开始学习」与「继续上次的选择」）**直接落进所选模式**，不再退回模式列表逼用户点第二下。`verify-vocab-cards.mjs` 补 21 条断言（含三条变异正对照），并用本机无头 Chrome + CDP 把 A/B/C/D 四段路径真实点了一遍（23 项行为断言全绿，截图见下条）。
+- **2026-09-30 真机反馈三项全修**（`0121807` + 本轮 `rv-articles`）：
+  ① 换书向导被模式卡盖住 → 互斥渲染 + 滚动归零（`verify-vocab-cards` 数值锁换卡节奏）；
+  ② 闪卡换卡 ~1.1s 与答「完全忘了」卡死 → 退场定长 tween 0.18s + 重排延后到 `advance`（CDP 按帧实测 1122ms → ~330ms）；
+  ③ 复习词汇文章改「自选词汇 + 每篇词数 + 一次最多 3 篇」串行逐篇落盘，保存/收藏/删除齐全，
+  未选中的词留在词表、删文章词自动回队（词表派生自 `到期词 − 现存文章 rvWords`）。新增守卫 `npm run verify:rv-articles`（55 断言，13 条变异全红，CDP e2e 40/40 含 AI 通道 mock）。
 
 ### 未完成 / 已知短板
 1. ~~**切换词书必须多走一步「学习方式」**~~（2026-09-29 用户报，**已修**）。

@@ -1,11 +1,11 @@
 # 验证体系
 
-> 本项目**没有测试框架**。防线是：`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 17 个 `scripts/verify-*.mjs` + 无头 Chrome/CDP 行为验收 + 真机 CDP 通道。
+> 本项目**没有测试框架**。防线是：`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 18 个 `scripts/verify-*.mjs` + 无头 Chrome/CDP 行为验收 + 真机 CDP 通道。
 > 一句话原则：**证据来自产物和真运行，不来自读代码**。
 
 ## 1. 契约守卫（`scripts/verify-*.mjs`）
 
-2026-09-29 实测全绿；2026-09-30 复测并校准 vocab-cards（284）。断言数如下：
+2026-09-29 实测全绿；2026-09-30 复测并校准 vocab-cards（284）、新增 rv-articles（55，13 条变异测试全红）。断言数如下：
 
 | 脚本 | 断言 | 守什么 | 什么时候必须跑 |
 |------|------|--------|----------------|
@@ -26,12 +26,14 @@
 | `verify-overlay-fit.mjs` | 16 | 窄视口浮层契约：Dialog/Popover 基座 + 朗读设置/AI 设置面板结构 | 改 `ui/dialog` 基座或那两个面板 |
 | `verify-bundle-budget.mjs` | 10 | 从**产物**反查入口静态依赖图：首屏必需集合里不许出现 recharts/markdown/词库数据 chunk；gzip 总量 ≤ 预算 | 改 `vite.config` 的 manualChunks、壳里新增静态 import/require |
 | `verify-list-scaling.mjs` | 18 | 一屏渲染不完的列表必须折叠/分页：写作题库默认 12 张、词库浏览分页、**语块短语库每字母段默认 6 条且 A-Z 跳转仍可达每一段**（各配「不许退回全量 `.map`」的正对照） | 新增长列表页 |
+| `verify-rv-articles.mjs` | 55 | 复习词汇文章：3 个纯函数全边界单测（并集/**删文章即回词表**/切批与上限、余量不消费）+ 页面接线（`rvWords` 落盘、逐篇串行、先落盘再计成功、失败/超量不消费、历史 `aiId` 可重开、收藏口径）+ 旧缺陷正对照（`slice(0,10)` 不许回来） | 改 `rv-articles.ts` / `ArticlePage` 复习词汇面板 / 已保存文章列表 |
 
 命令（`AGENTS.md` 的「常用命令」有全集）：
 
 ```bash
 node scripts/verify-wordbank-loading.mjs
 npm run verify:feedback-loop          # 只有这一个有 npm script
+npm run verify:rv-articles            # 同上，也有 npm script（本轮新增）
 node scripts/verify-tts-hardening.mjs # 注意：这个没有 npm script，只能裸跑
 node scripts/verify-bundle-budget.mjs # 必须先 npm run build:web
 ```

@@ -31,7 +31,7 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 |-----------|------|--------|
 | 背单词 `/vocabulary` | [modules/vocabulary.md](./docs/modules/vocabulary.md) | 6 种模式、三个正交开关（`setupDone`/`showWizard`/`immersed`）、SM-2、三套并行重排实现 |
 | 词库数据 | [modules/wordbank-data.md](./docs/modules/wordbank-data.md) | 两层去重、核心/detail 拆分、IDB 主 + localStorage 兜底、改完必跑的两个脚本 |
-| 阅读 `/articles` | [modules/reading.md](./docs/modules/reading.md) | 五种来源一套阅读器、运行时全文升级、**两套切章必须对齐** |
+| 阅读 `/articles` | [modules/reading.md](./docs/modules/reading.md) | 五种来源一套阅读器、运行时全文升级、**两套切章必须对齐**、复习词文章词表是派生的（删文章即回词表） |
 | 朗读 TTS | [modules/tts.md](./docs/modules/tts.md) | 引擎降级链、切片 180 由上游 200 硬上限钉死、闪退自愈、音色四处同步 |
 | AI 服务与端侧模型 | [modules/ai-services.md](./docs/modules/ai-services.md) | Key 优先级、服务端免费档回退、端侧回落条件、`extractJson` 规定由 `verify:ai-parse` 全仓扫 |
 | 母语思维 `/think` | [modules/think-in-english.md](./docs/modules/think-in-english.md) | 4 tab；换题不 abort 导致流式内容串题 |
@@ -115,6 +115,7 @@ node scripts/verify-sentence-lab.mjs              # 16   拆句训练主干判�
 node scripts/verify-spelling-resume.mjs           # 24   拼写断点按词书分键 + 迁移 + 重置枚举
 node scripts/verify-ai-parse.mjs                  # 10   AI 解析约定：24 个解析点判空 + 无贪婪正则（元判据固件自证）
 npm run verify:feedback-loop                      # 58   反馈链路（后端 handler 用忠实替身真实执行）
+npm run verify:rv-articles                        # 55   复习词汇文章：选词/分篇/用词出队/可重开（含旧 slice(0,10) 正对照）
 ```
 
 **数据生成 / 资产**：
@@ -286,7 +287,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 284 / 21 / 6175 / 15 / 16 / 10 / 18 / 23 / 16 / 18 / 10 / 16 / 24 + feedback-loop 58）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 284 / 21 / 6175 / 15 / 16 / 10 / 18 / 23 / 16 / 18 / 10 / 16 / 24 / 55 + feedback-loop 58）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`

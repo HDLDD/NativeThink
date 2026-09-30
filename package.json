@@ -23,6 +23,7 @@
     "verify:tts-progress": "node scripts/verify-tts-progress.mjs",
     "verify:books-meta": "node scripts/verify-books-meta.mjs",
     "verify:vocab-cards": "node scripts/verify-vocab-cards.mjs",
+    "verify:rv-articles": "node scripts/verify-rv-articles.mjs",
     "wordbank:split": "node scripts/split-wordbank-detail.mjs",
     "books:gen-meta": "node scripts/gen-books-meta.cjs",
     "package:web": "npm run version:apk-bump && node scripts/fetch-android-tts.cjs && npm run build:web",

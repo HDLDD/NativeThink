@@ -40,6 +40,13 @@ export interface IReadingContent {
    * 阅读器会把这些词用可选的颜色框出来，提示"这是待复习的词"。
    */
   highlightWords?: string[];
+  /**
+   * 「用复习词汇生成文章」的用词书面记录（小写 wordKey）。
+   * 待复习词表把**任何一篇现存文章用过的词**视为"已排进文章"而不再出现；
+   * 删除文章它会自动回到词表 —— 派生逻辑见 `src/lib/rv-articles.ts`，
+   * 刻意不做单独的"已用清单"（两份真相一定漂移）。
+   */
+  rvWords?: string[];
 }
 
 /** Build pages from paragraph pairs — autopaginate by word count (~200-400 words/page) */
