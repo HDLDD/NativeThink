@@ -25,7 +25,7 @@ APK 依赖 `dist/client`（`capacitor.config.json:4`），所以顺序不能省�
 
 ## 2. 版本号与产物命名
 
-`android/version.properties` 当前 `versionCode=81` / `versionName=2.0.36`（2026-09-30 打，含当天全部 8 项改动；设备上还是 76/2.0.31，待装）。`scripts/bump-android-version.cjs:19,24,26`：**两个字段都改** —— code +1，name 只递增 patch（沿用文件里写的 `major.minor`；文件缺省时 code 1→2、name 2.0.0→2.0.1）。
+`android/version.properties` 当前 `versionCode=82` / `versionName=2.0.37`（2026-09-30 打，含当天全部 8 项改动；设备上还是 76/2.0.31，待装）。`scripts/bump-android-version.cjs:19,24,26`：**两个字段都改** —— code +1，name 只递增 patch（沿用文件里写的 `major.minor`；文件缺省时 code 1→2、name 2.0.0→2.0.1）。
 
 `versionCode` 必须每次递增：Android 拒绝非递增的升级安装，会要求先卸载 → **丢本地数据**。
 

@@ -1194,7 +1194,13 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   }
 
   return (
-    <div className={cn('fixed inset-0 z-50 bg-background flex flex-col', readerTheme === 'paper' && 'reader-paper', readerTheme === 'night' && 'reader-night')} data-reader-mode={readerMode}>
+    <div className={cn(
+      // safe-area 必须自己补：这是 `fixed inset-0` 的全屏浮层，**跳出了 Layout 外壳那层 safe-area 内缩**，
+      // 真机（Android 15+ edge-to-edge，状态栏 inset 实测 47px）上顶部控制栏会被状态栏整个压住。
+      'fixed inset-0 z-50 bg-background flex flex-col safe-area-top safe-area-bottom',
+      readerTheme === 'paper' && 'reader-paper',
+      readerTheme === 'night' && 'reader-night',
+    )} data-reader-mode={readerMode}>
       {/* ════ 小说模式：章节目录 + 章内滚动阅读（起点式） ════ */}
       {readerMode === 'novel' && (
         <NovelReader

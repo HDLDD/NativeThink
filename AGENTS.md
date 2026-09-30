@@ -105,7 +105,7 @@ node scripts/verify-tts-hardening.mjs             # 15   TTS 降级/在途去重
 node scripts/verify-books-meta.mjs                # 222  书目元数据 + 复习词高亮
 node scripts/verify-vocab-cards.mjs               # 284  背单词卡片契约 + 手势决策表 + 换卡节奏 + 答错重排延后
 node scripts/verify-vocab-caches.mjs              # 67   缓存封顶 + 存储写失败可见（替身真跑）
-node scripts/verify-overlay-fit.mjs               # 16   窄视口浮层契约
+node scripts/verify-overlay-fit.mjs               # 23   窄视口浮层契约 + 全屏层自带 safe-area
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
 node scripts/verify-list-scaling.mjs              # 18   长列表必须折叠/分页（写作题库 + 词库浏览 + 短语库字母段）
 node scripts/verify-shadowing-completion.mjs      # 23   跟读完成标记的索引契约（纯函数真跑 + 接线）
@@ -266,6 +266,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 | 功能"两端都写了却点不到" | 组件与云函数都存在，但没有页面挂载；静态检查看不出断线 | 挂载点写进回归断言（`verify:feedback-loop` 检查 Header 是否渲染 `<FeedbackDialog />`）；新功能入口必须真机/真页面验证可达 |
 | 提交类操作谎报成功 | 后端只有一个 boolean，503（通道未配）与网络失败都归成"没成功"，UI 一律 toast 成功 | 结果分档返回（`delivered`/`stored`/`failed`），UI 按档给不同提示；失败保留条目并提供重试入口 |
 | 全站 toast 提示不出现 | `ui/sonner.tsx` 有 `Toaster` 但没人挂载 | 唯一出口在 `src/index.tsx`；新页面不要再挂第二个，`verify:feedback-loop` 会断言 |
+| 全屏浮层顶部被手机状态栏压住 | `fixed inset-0` 的浮层脱离文档流，**绕过了外壳 `SidebarProvider` 那层 safe-area 内缩**（Android 15+ edge-to-edge 下 inset 实测 47px） | 浮层根节点自己补 `safe-area-top safe-area-bottom`（阅读器 `PageReader.tsx:1197`，2026-09-30 真机反馈已修）；新增贴顶全屏层同理，`verify-overlay-fit` ④ 会扫；本机验收用 CDP `Emulation.setSafeAreaInsetsOverride`（insets 传对象）强制 47/24 量顶栏 top |
 | 顶部内容被一条空条遮住 | 无内容但带 `bg-*` 的 sticky 元素仍占位 | 只在有内容时渲染 |
 | 图表数值压住标题 | 容器高度装不下「值+柱+轴」三层 | 容器高度 ≥ 三层实测高度 |
 | 打出的 APK 里是上一次的 web 产物 | `package:apk` **不重建 web**，只拷 `dist/client` 现成的东西；打包日志与 versionCode 全都正常，看不出来 | `scripts/ensure-web-build.mjs` 已是 `package:apk`/`package:desktop` 前置（源码比产物新、或产物内版本 ≠ version.properties 就自动补跑 `build:web`）；复核靠入口 chunk 的内容哈希比对，见 [build-release.md](./docs/modules/build-release.md) §1 |
@@ -292,7 +293,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 222 · vocab-cards 284 · vocab-caches 67 · tts-progress 6175 · tts-hardening 15 · overlay-fit 16 · bundle-budget 10 · list-scaling 18 · shadowing 23 · backup-idb 16 · cloud-sync 43 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · rv-articles 104 · study-credit 74 · chain-verdict 36 · feedback-loop 58；合计 7,256）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 222 · vocab-cards 284 · vocab-caches 67 · tts-progress 6175 · tts-hardening 15 · overlay-fit 23 · bundle-budget 10 · list-scaling 18 · shadowing 23 · backup-idb 16 · cloud-sync 43 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · rv-articles 104 · study-credit 74 · chain-verdict 36 · feedback-loop 58；合计 7,263）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`

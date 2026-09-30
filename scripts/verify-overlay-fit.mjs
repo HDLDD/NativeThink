@@ -86,6 +86,31 @@ function classNameOf(src, tagRe, label) {
   check(!/max-h-4[48][^"]*overflow-y-auto/.test(src), '朗读设置：音色网格等不再嵌第二层小滚动');
 }
 
+// ── ④ 全屏浮层必须自己补 safe-area（2026-09-30 真机反馈：AI 生成文章顶部被状态栏压住）──
+{
+  const css = readFileSync(join(ROOT, 'src/index.css'), 'utf8');
+  check(/\.safe-area-top \{ padding-top: env\(safe-area-inset-top, 0px\); \}/.test(css),
+    '④ safe-area-top 工具类有定义（历史上 safe-area-bottom 曾"用了但没定义"）');
+  check(/\.safe-area-bottom \{ padding-bottom: env\(safe-area-inset-bottom, 0px\); \}/.test(css),
+    '④ safe-area-bottom 工具类有定义');
+
+  const reader = readFileSync(join(ROOT, 'src/pages/ArticlePage/components/PageReader.tsx'), 'utf8');
+  // 阅读器是 `fixed inset-0` 的全屏浮层 —— 它跳出了 Layout 外壳那层内缩，所以必须自己补
+  const rootLine = (reader.match(/'fixed inset-0[^']*'/) || [''])[0];
+  check(rootLine.length > 0, '④ 阅读器根节点可定位（正对照的前提）');
+  check(rootLine.includes('safe-area-top'),
+    '④ 阅读器根节点带 safe-area-top（否则 Android 15+ edge-to-edge 下顶栏被 47px 状态栏整个压住）', rootLine);
+  check(rootLine.includes('safe-area-bottom'), '④ 阅读器根节点带 safe-area-bottom（底部翻页条不被手势条压住）');
+  // 正对照：不许有第二个"贴顶内容层"漏掉内缩。
+  // 正则要同时吃单/双引号 —— 第一版只匹配单引号，把双引号写的 className 全漏了；
+  // 而扫描前必须先剥注释，否则我们自己写在注释里的 `fixed inset-0` 会被当成一个浮层（第二版就是这么红的）。
+  const readerCode = reader.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const overlays = [...readerCode.matchAll(/["'`]fixed inset-0[^"'`]*["'`]/g)].map((m) => m[0]);
+  check(overlays.length >= 2, '④ 阅读器文件里的全屏层都能被扫到（正则覆盖单/双引号）', `扫到 ${overlays.length} 个`);
+  const bad = overlays.filter((o) => !o.includes('safe-area-top') && !/items-center|bg-black\/|pointer-events-none/.test(o));
+  check(bad.length === 0, '④ 阅读器里没有"贴顶内容层漏 safe-area"的第二处', JSON.stringify(bad));
+}
+
 console.log('');
 console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
 if (fail) {

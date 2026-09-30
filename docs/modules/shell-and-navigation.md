@@ -44,6 +44,8 @@
 
 桌面抽屉是 shadcn `Sidebar collapsible="icon"`（`AppSidebar:70`）；edge-to-edge 避让在最外层 `SidebarProvider className="safe-area-top safe-area-left safe-area-right"`（`Layout.tsx:113`，`targetSdk 36` 时 WebView 铺到系统栏下面，外壳必须自己补 safe-area；`env()` 在桌面浏览器恒为 0）。`focus` 模式隐藏侧栏 + 头 + 底栏（`:114/116/129`）。
 
+**但外壳那层内缩救不了 `fixed inset-0` 的全屏浮层** —— 它们脱离文档流、直接铺满视口，等于绕过了 `SidebarProvider` 的 padding。2026-09-30 真机反馈"AI 生成文章顶部被状态栏压住"就是这条：`PageReader.tsx:1197` 的阅读器根节点只有 `fixed inset-0 … flex flex-col`，在小米 onyx 上实测 `env(safe-area-inset-top)=47px`，顶栏（含「退出阅读」）整个藏进状态栏。修法是根节点自己补 `safe-area-top safe-area-bottom`（底部翻页条同理躲手势条）。**以后新增任何贴顶的全屏层都要自带内缩**，`verify-overlay-fit` ④ 会扫 `PageReader.tsx` 里所有 `fixed inset-0`（单/双引号都吃、先剥注释）并要求非居中的那些带 `safe-area-top`。验收用 CDP `Emulation.setSafeAreaInsetsOverride`（参数是 `insets: {top,bottom,left,right}` **对象**，写成数组会 Invalid parameters）把 inset 强制成 47/24，量顶栏 `top` 从 0 变 47。
+
 ## 4. 新增一个页面：实际是六处，不是四处
 
 AGENTS.md 说的"四件套"确实都还在，但**还有两处隐性要求**，漏了不报错、只是显示退化：
