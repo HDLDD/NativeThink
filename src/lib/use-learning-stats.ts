@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { safeStorage } from './safe-storage';
+import { useSyncDown } from './sync-down';
 import { formatDate } from './utils';
 
 const STATS_KEY = '__nativethink_learning_stats';
@@ -199,11 +200,7 @@ export function useLearningStats() {
   }, [loadFromStorage]);
 
   // Re-load when cloud sync completes (syncDown populates localStorage)
-  useEffect(() => {
-    const onSyncDown = () => loadFromStorage();
-    window.addEventListener('nativethink-sync-down', onSyncDown);
-    return () => window.removeEventListener('nativethink-sync-down', onSyncDown);
-  }, [loadFromStorage]);
+  useSyncDown(loadFromStorage);
 
   // 跨实例同步：Header / Dashboard / 各练习页各自持有 hook 状态，
   // 任一实例写入后其它实例必须重读，否则改目标会用陈旧 stats 覆盖进度。

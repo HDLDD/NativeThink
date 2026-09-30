@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { safeStorage } from '@/lib/safe-storage';
+import { useSyncDown } from '@/lib/sync-down';
 import type { IWordEntry } from '@/data/wordbank/schema';
 import { getRandomWords } from '@/data/wordbank';
 
@@ -83,7 +84,14 @@ function loadState(level: string): ILearningState {
 const STATE_EVENT = 'nativethink-word-learning-changed';
 
 function saveState(level: string, state: ILearningState) {
-  safeStorage.setItem(storageKey(level), JSON.stringify(state));
+  const json = JSON.stringify(state);
+  /**
+   * 与存储里一字不差时不写。
+   * 主要是掐掉**下行回声**：`syncDown` 落地 → 广播 → 本 hook 重读 → 回写 effect 原样再写一遍
+   * → safeStorage 的双写把它 POST 回云端。数据没变却来回搬，正是 `verify-cloud-sync` 要防的那类事。
+   */
+  if (safeStorage.getItem(storageKey(level)) === json) return;
+  safeStorage.setItem(storageKey(level), json);
   try { window.dispatchEvent(new CustomEvent(STATE_EVENT)); } catch { /* ignore */ }
 }
 
@@ -253,13 +261,26 @@ export function useWordLearning(level: string) {
     isAllLevels ? aggregateAllLevels() : loadState(level),
   );
   const [dailyQuota, setDailyQuota] = useState<number>(() => loadDailyQuota(level));
+  /**
+   * 「这份 state 是从 storage 原样读进来的」标记：回写 effect 见到同一个对象引用就跳过。
+   *
+   * 为什么不能只靠 saveState 里的字符串比对：`loadState` 会补齐缺省字段，
+   * 重读后再 `JSON.stringify` 出来的字节序列可能与存储里那份不同（键序/新增字段），
+   * 于是"看起来没变"的写入照样发生 —— 登录后它会被双写 POST 回云端，正是回声。
+   * 对象引用一致 = 逻辑上没有任何改动，这个判据更硬。
+   */
+  const loadedFromStorageRef = useRef<ILearningState | null>(null);
 
   // Reload state + quota when level changes (separate word pools per level)
   useEffect(() => {
     if (isAllLevels) {
-      setState(aggregateAllLevels());
+      const next = aggregateAllLevels();
+      loadedFromStorageRef.current = next;
+      setState(next);
     } else {
-      setState(loadState(level));
+      const next = loadState(level);
+      loadedFromStorageRef.current = next;
+      setState(next);
     }
     setDailyQuota(loadDailyQuota(level));
   }, [level, isAllLevels]);
@@ -272,9 +293,25 @@ export function useWordLearning(level: string) {
     }
   }, [state.lastActiveDate]);
 
+  /**
+   * 云同步下行后**重读**（2026-09-30 补）。以前只有收藏/学习统计/拼写句子库三个 hook 订阅，
+   * SM-2 进度这份最要好的数据不在里面 —— 别的设备复习完，这台要重开页面才更新；
+   * 而这台的陈旧实例下一次评分会把刚拉下来的进度整份覆盖回去。
+   */
+  useSyncDown(() => {
+    const next = isAllLevels ? aggregateAllLevels() : loadState(level);
+    loadedFromStorageRef.current = next;
+    setState(next);
+    setDailyQuota(loadDailyQuota(level));
+  });
+
   // Persist: for 'all' mode we write back to sub-levels via recordReview; skip bulk save
   useEffect(() => {
     if (isAllLevels) return; // 'all' is read-only aggregation; writes go to sub-levels
+    if (loadedFromStorageRef.current === state) {
+      loadedFromStorageRef.current = null;   // 一次性：这是刚从 storage 读进来的，原样写回去没有意义
+      return;
+    }
     saveState(level, state);
   }, [level, state, isAllLevels]);
   useEffect(() => {

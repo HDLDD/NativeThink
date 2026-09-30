@@ -5,7 +5,7 @@
 
 ## 1. 契约守卫（`scripts/verify-*.mjs`）
 
-2026-09-29 实测全绿；2026-09-30 复测并校准 vocab-cards（284）、新增 study-credit（74，14 条变异全红）、把 vocab-caches 从 21 扩到 67（10 条变异全红，新增注入 localStorage 替身真跑）、rv-articles 从 55 扩到 104（累计 27 条变异全红 + 42 项 CDP 行为验收）。断言数如下：
+2026-09-29 实测全绿；2026-09-30 复测并校准 vocab-cards（284）、新增 study-credit（74，14 条变异全红）、把 vocab-caches 从 21 扩到 67（10 条变异全红，新增注入 localStorage 替身真跑）、rv-articles 从 55 扩到 104（累计 27 条变异全红 + 42 项 CDP 行为验收）、cloud-sync 从 18 扩到 43（10 条变异全红 + 12 项 CDP，含 `sync-down` 用假 target 真跑）。**收尾一律 `npm run verify:all`**（§5）。断言数如下：
 
 | 脚本 | 断言 | 守什么 | 什么时候必须跑 |
 |------|------|--------|----------------|
@@ -14,7 +14,7 @@
 | `verify-sentence-lab.mjs` | 16 | 拆句训练主干判定**索引同源**：真转译 `sentence-parse.ts` 跑出 `stdParts` 与 `segments` 的分歧（缩约形式跨意群那个真实例子）、坏数据不再产生假成功；守 ChunkDrill 候选来自 resolved、reveal 在 grade 之前拦 | 改 `sentence-parse.ts` / `ChunkDrill.tsx` |
 | `verify-spelling-resume.mjs` | 24 | 拼写断点**按词书分键**：注入替身真跑 persist/读/迁移/清理，含「旧全局单键只剩最后一本」的正对照；守页面与重置流程都走同一模块 | 改 `spelling-resume.ts` / `SpellingPage` 断点 / 拼写重置 |
 | `verify-ai-parse.mjs` | 10 | AI 解析约定全仓扫：每个 `extractJson` 调用点前必须有 `.trim()` 判空、不许残留贪婪 `match(/…[\s\S]*…/)`；**注释行不参与判定**，并用三段固件自证检查器本身有效 | 新增/改动任何 AI 调用点 |
-| `verify-cloud-sync-hygiene.mjs` | 18 | 云同步三条不变量：转译**真实** `use-cloud-sync` + `safe-storage` 在 Node 里驱动 —— 下行后 0 次 POST（回声）、同键本地再写必须 1 次 POST（正对照）、空 catch 数为 0、周期补推按需且 `needsResync` 引用稳定 | 改 `use-cloud-sync.ts` / `CloudSyncProvider.tsx` / `safe-storage.ts` 的双写钩子 |
+| `verify-cloud-sync-hygiene.mjs` | 43 | 云同步四条不变量：转译**真实** `use-cloud-sync` + `safe-storage` 在 Node 里驱动 —— 下行后 0 次 POST（回声）、同键本地再写必须 1 次 POST（正对照）、空 catch 数为 0、周期补推按需且 `needsResync` 引用稳定；④ 新增**用假 target 真跑 `sync-down`**（通知/退订/异常隔离/事件名一致）+ 7 个订阅者逐个点名 + "没有任何 hook 再自己拼事件名" + SM-2/语块两道回声判据都在 | 改 `use-cloud-sync.ts` / `sync-down.ts` / `CloudSyncProvider.tsx` / `safe-storage.ts` 双写钩子 / 任何 `useSyncDown` 调用点 |
 | `verify-wordbank-loading.mjs` | 45 | 加载层集成：显示数 = 出卡池子、九本不互抢、IDB 失败才兜底 localStorage | 改词库或加载层 |
 | `verify-wordbank-split.mjs` | 数据全量比对 | 拆分校验：`--baseline` 采基线（**拆分前后都能采**）、`--check` 逐项断言 | 改词库拆分 |
 | `verify-books-meta.mjs` | 222 | ①–④ 生成器与数据不漂移；⑤ books/book-clean/books-meta 拆分（**实际加载两个模块交叉核对**）；⑥ HelpGuide 文案 vs `meta.ts`/`ai-config.ts` | 改书单、scp、reader-highlight |
@@ -83,7 +83,7 @@ npm run verify:all        # scripts/verify-all.mjs：typecheck + 全部 verify-*
 
 它自动发现 `scripts/verify-*.mjs`，所以新增守卫不用登记。两处刻意跳过：`verify-wordbank-split`（要 `--baseline/--check` 的基线文件）、`verify-bundle-budget`（没有 `dist/client` 产物时跳过 —— **先 `npm run build:web` 再跑才算真验过体积**）。
 
-2026-09-30 实测：typecheck + 18 条守卫全绿，**断言合计 7,195 条**（其中 tts-progress 6,175；数字来自各脚本自己的汇总行相加：45+6175+15+222+284+67+16+18+23+16+18+16+24+10+104+74+58+10）。
+2026-09-30 实测：typecheck + 18 条守卫全绿，**断言合计 7,220 条**（tts-progress 一条就占 6,175；其余 17 条相加：45+222+284+67+15+16+10+18+23+16+43+16+24+10+104+74+58 = 1,045）。
 
 ## 6. 静态检查的已知弱度
 

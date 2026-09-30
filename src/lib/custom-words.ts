@@ -12,6 +12,7 @@
  *  - 转成 IWordEntry 时补齐词库 schema 的必填字段（默认值），避免下游到处判空。
  */
 import { useEffect, useState, useCallback } from 'react';
+import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
 import type { IWordEntry } from '@/data/wordbank/schema';
 
@@ -89,6 +90,8 @@ export function useCustomWords(): { words: ICustomWord[]; remove: (w: string) =>
     window.addEventListener(EVENT, onChange);
     return () => window.removeEventListener(EVENT, onChange);
   }, []);
+  // 云同步下行后也重读：生词本在另一台设备上增删过，这台不该继续显示旧的整份列表
+  useSyncDown(() => setWords(read()));
   const remove = useCallback((w: string) => removeCustomWord(w), []);
   return { words, remove };
 }

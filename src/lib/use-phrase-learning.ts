@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { safeStorage } from '@/lib/safe-storage';
+import { useSyncDown } from '@/lib/sync-down';
 import { formatDate } from '@/lib/utils';
 import type { IChunk } from '@/data/chunks';
 
@@ -62,7 +63,10 @@ function loadState(): IPhraseLearningState {
 }
 
 function saveState(state: IPhraseLearningState) {
-  safeStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const json = JSON.stringify(state);
+  // 与存储一字不差就不写：掐掉"下行重读 → 回写 → 双写再把同一份推回云端"的回声
+  if (safeStorage.getItem(STORAGE_KEY) === json) return;
+  safeStorage.setItem(STORAGE_KEY, json);
 }
 
 // SM-2 algorithm: returns updated progress
@@ -106,6 +110,8 @@ function sm2Update(prev: IPhraseProgress, quality: number): IPhraseProgress {
 
 export function usePhraseLearning(allPhrases: IChunk[]) {
   const [state, setState] = useState<IPhraseLearningState>(loadState);
+  /** 「这份 state 是刚从 storage 读进来的」标记：回写 effect 见同一引用就跳过（防下行回声，见 use-word-learning 的同款注释） */
+  const loadedFromStorageRef = useRef<IPhraseLearningState | null>(null);
   const [dailyQuota, setDailyQuota] = useState<number>(() => {
     try { const v = safeStorage.getItem(DAILY_QUOTA_KEY); return v ? parseInt(v) : 10; } catch { return 10; }
   });
@@ -125,8 +131,25 @@ export function usePhraseLearning(allPhrases: IChunk[]) {
     }
   }, [state.lastActiveDate]);
 
+  /** 云同步下行后重读（语块复习进度与每日配额），否则这台设备拿着陈旧状态，下一次评分会把远端新值盖掉 */
+  useSyncDown(() => {
+    const next = loadState();
+    loadedFromStorageRef.current = next;
+    setState(next);
+    try {
+      const v = safeStorage.getItem(DAILY_QUOTA_KEY);
+      setDailyQuota(v ? parseInt(v) : 10);
+    } catch { /* 保持当前值 */ }
+  });
+
   // Persist
-  useEffect(() => { saveState(state); }, [state]);
+  useEffect(() => {
+    if (loadedFromStorageRef.current === state) {
+      loadedFromStorageRef.current = null;
+      return;
+    }
+    saveState(state);
+  }, [state]);
 
   // Persist daily quota
   useEffect(() => { safeStorage.setItem(DAILY_QUOTA_KEY, String(dailyQuota)); }, [dailyQuota]);

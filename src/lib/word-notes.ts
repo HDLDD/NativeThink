@@ -8,6 +8,7 @@
  * 存储：safeStorage 一个 Map<wordKey, string>，按词 key（小写）存，不写进词库数据。
  */
 import { useEffect, useState, useCallback } from 'react';
+import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
 
 const KEY = '__nativethink_word_notes';
@@ -58,6 +59,8 @@ export function useWordNote(word: string): [string, (note: string) => void] {
     window.addEventListener(EVENT, onChange);
     return () => window.removeEventListener(EVENT, onChange);
   }, [word]);
+  // 云同步下行后重读这个词的助记（另一台设备改过就要看得见，否则本机的旧文本会在下次编辑时盖回去）
+  useSyncDown(() => setNote(getWordNote(word)));
   const update = useCallback((next: string) => setWordNote(word, next), [word]);
   return [note, update];
 }

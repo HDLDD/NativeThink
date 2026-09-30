@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useAuth } from './auth-provider';
 import { apiFetch } from './api-client';
 import { safeStorage, setCloudSyncHandler } from './safe-storage';
+import { emitSyncDown } from './sync-down';
 
 const DATA_PREFIX = '__nativethink_';
 
@@ -133,8 +134,8 @@ export function useCloudSync() {
         }
       }
       lastSyncRef.current = Date.now();
-      // Notify other hooks that localStorage was updated from cloud
-      window.dispatchEvent(new Event('nativethink-sync-down'));
+      // Notify data hooks that localStorage was just replaced by cloud data（事件名只在 sync-down.ts 里定义）
+      emitSyncDown();
     } catch {
       // 下行失败 = "没拿到别的设备的最新数据"，本机数据不受影响
       warnThrottled('down', '云端数据暂未取回，本机数据不受影响');

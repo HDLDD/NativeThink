@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { safeStorage } from './safe-storage';
+import { useSyncDown } from './sync-down';
 
 const FAVORITES_KEY = '__nativethink_favorites';
 /** Legacy unprefixed backup key — read once for migration, then removed */
@@ -48,11 +49,7 @@ export function useFavorites() {
   }, [loadFromStorage]);
 
   // Re-load when cloud sync completes (syncDown populates localStorage)
-  useEffect(() => {
-    const onSyncDown = () => loadFromStorage();
-    window.addEventListener('nativethink-sync-down', onSyncDown);
-    return () => window.removeEventListener('nativethink-sync-down', onSyncDown);
-  }, [loadFromStorage]);
+  useSyncDown(loadFromStorage);
 
   // Re-load when another tab/component updates favorites
   useEffect(() => {

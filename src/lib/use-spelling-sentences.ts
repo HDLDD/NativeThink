@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { safeStorage } from './safe-storage';
+import { useSyncDown } from './sync-down';
 import { persistJson, warnStorageFull, appendCapped } from './capped-cache';
 import { extractJson } from './utils';
 import type { ISpellingSentence, SpellingDifficulty, SpellingSentenceSource } from '@/types/spelling';
@@ -46,12 +47,8 @@ export function useSpellingSentences() {
     setLoaded(true);
   }, []);
 
-  // Reload on cloud sync
-  useEffect(() => {
-    const onSyncDown = () => setSentences(loadSentences());
-    window.addEventListener('nativethink-sync-down', onSyncDown);
-    return () => window.removeEventListener('nativethink-sync-down', onSyncDown);
-  }, []);
+  // Reload on cloud sync（走 sync-down 的单一出口，别处不再自己拼事件名）
+  useSyncDown(() => setSentences(loadSentences()));
 
   const persist = useCallback((items: ISpellingSentence[]) => {
     setSentences(items);

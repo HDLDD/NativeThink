@@ -42,10 +42,26 @@ globalThis.localStorage = {
   key: (i) => [...store.keys()][i] ?? null,
 };
 const dispatched = [];
+// 订阅者要真跑（onSyncDown 收 cb → dispatch 后必须被叫到），所以这里做一份**带注册表**的 window，
+// 而不是空的 addEventListener —— 空替身会让"订阅了但从来收不到"这类缺陷测不出来。
+const listeners = new Map();
 globalThis.window = {
-  dispatchEvent: (e) => { dispatched.push(e?.type); return true; },
-  addEventListener: () => {},
-  removeEventListener: () => {},
+  dispatchEvent: (e) => {
+    dispatched.push(e?.type);
+    const arr = listeners.get(e?.type) || [];
+    // 复制一份再遍历：订阅者在回调里退订不该跳过别人
+    for (const fn of [...arr]) { try { fn(e); } catch { /* 页面自己吞，这里也别让守卫崩 */ } }
+    return true;
+  },
+  addEventListener: (type, fn) => {
+    if (!listeners.has(type)) listeners.set(type, []);
+    listeners.get(type).push(fn);
+  },
+  removeEventListener: (type, fn) => {
+    const arr = listeners.get(type) || [];
+    const i = arr.indexOf(fn);
+    if (i >= 0) arr.splice(i, 1);
+  },
 };
 
 const posts = [];
@@ -108,16 +124,20 @@ const compile = (rel, outName, rewrites = []) => {
 };
 
 compile('src/lib/safe-storage.ts', 'safe-storage.mjs');
+const SYNC_DOWN_MJS = compile('src/lib/sync-down.ts', 'sync-down.mjs', [
+  ["from 'react'", "from './react-shim.mjs'"],
+]);
 compile('src/lib/use-cloud-sync.ts', 'use-cloud-sync.mjs', [
   ["from 'react'", "from './react-shim.mjs'"],
   ["from 'sonner'", "from './sonner-shim.mjs'"],
   ["from './auth-provider'", "from './auth-shim.mjs'"],
   ["from './api-client'", "from './api-client-shim.mjs'"],
   ["from './safe-storage'", "from './safe-storage.mjs'"],
+  ["from './sync-down'", "from './sync-down.mjs'"],
 ]);
 
 // 脚手架自检：不允许有未替换成相对路径的 import（否则加载会失败，或拿到 node_modules 里的真 react）
-for (const f of ['safe-storage.mjs', 'use-cloud-sync.mjs']) {
+for (const f of ['safe-storage.mjs', 'use-cloud-sync.mjs', 'sync-down.mjs']) {
   const bare = [...fs.readFileSync(path.join(TMP, f), 'utf8')
     .matchAll(/^\s*import\s[^;]*?from\s+'([^']*)'/gm)]
     .map((m) => m[1])
@@ -201,14 +221,8 @@ ok(/syncDown\(\)\.then\(\(\) => \{\s*syncUp\(\);/.test(PROVIDER),
 ok(/if \(!appKey\.startsWith\(DATA_PREFIX\)\) continue;/.test(SYNC),
   'DATA_PREFIX 过滤仍在 syncUp 全量扫描里（它不是唯一的同步入口）');
 const subs = [...fs.readdirSync(path.join(ROOT, 'src/lib'))].filter((f) => f.endsWith('.ts'));
-let subCount = 0;
-for (const f of subs) {
-  const t = fs.readFileSync(path.join(ROOT, 'src/lib', f), 'utf8');
-  if (/addEventListener\('nativethink-sync-down'/.test(t)) subCount++;
-}
-ok(subCount >= 3,
-  '下行事件的订阅者不少于 3 个（历史缺陷是"下行后多数 hook 仍持陈旧内存态"，只增不减）',
-  `subscribers=${subCount}`);
+// （旧断言"addEventListener('nativethink-sync-down') 的订阅者 ≥3"已由 ④ 的清单取代：
+//   订阅改成 onSyncDown 单点归属后，按字面量数字符串只会数出 0，是假红不是假绿。）
 
 /* needsResync 的行为：成功一次全量补推后应清标记 */
 posts.length = 0;
@@ -221,6 +235,100 @@ ok(!/needsResync:\s*\(\)\s*=>\s*needsResyncRef\.current/.test(SYNC),
   'needsResync 不在 return 里内联新建（必须 useCallback 稳定，否则周期轮询会被反复重建）');
 ok(/const needsResyncProbe = useCallback\(\(\) => needsResyncRef\.current/.test(SYNC),
   'needsResync 走 useCallback 定义的稳定引用');
+
+/* ───────── ④ 下行广播本身真跑（sync-down.ts）+ 订阅者清单 ─────────
+ * 历史缺陷：`syncDown` 落地后只有 3 个 hook 重读，其余持陈旧内存态 ——
+ * 别的设备改了要重开页面才看见，而且这台一写入就把刚拉下来的新值盖回去。
+ * 现在订阅收进 `onSyncDown/useSyncDown` 一个出口，事件名只有一处定义，
+ * "谁订阅了"从"文档里的一句话"变成可数的断言。
+ */
+const sd = await import(pathToFileURL(SYNC_DOWN_MJS).href);
+ok(typeof sd.onSyncDown === 'function' && typeof sd.emitSyncDown === 'function' && typeof sd.useSyncDown === 'function',
+  '④ sync-down 导出 onSyncDown / emitSyncDown / useSyncDown');
+ok(sd.SYNC_DOWN_EVENT === 'nativethink-sync-down',
+  '④ 事件名与历史一致（老订阅者不会因为我们改名而收不到）', sd.SYNC_DOWN_EVENT);
+
+// 注入一个私有 target 真跑订阅语义
+const mkTarget = () => {
+  const map = new Map();
+  return {
+    calls: 0,
+    addEventListener: (t, fn) => { if (!map.has(t)) map.set(t, []); map.get(t).push(fn); },
+    removeEventListener: (t, fn) => { const a = map.get(t) || []; const i = a.indexOf(fn); if (i >= 0) a.splice(i, 1); },
+    fire: (t) => { for (const fn of [...(map.get(t) || [])]) fn({ type: t }); },
+    size: (t) => (map.get(t) || []).length,
+  };
+};
+{
+  const tgt = mkTarget();
+  let hits = 0;
+  const off = sd.onSyncDown(() => { hits++; }, tgt);
+  tgt.fire(sd.SYNC_DOWN_EVENT);
+  ok(hits === 1, '④ 下行事件一到，订阅者真的被叫到（不是只 add 了个没人调的函数）', `hits=${hits}`);
+  tgt.fire(sd.SYNC_DOWN_EVENT);
+  ok(hits === 2, '④ 每次都通知（不是 once 语义）');
+  off();
+  tgt.fire(sd.SYNC_DOWN_EVENT);
+  ok(hits === 2, '④ 退订后不再收到（组件卸载不留悬挂订阅）');
+  ok(tgt.size(sd.SYNC_DOWN_EVENT) === 0, '④ 退订把监听器从注册表里摘干净', `left=${tgt.size(sd.SYNC_DOWN_EVENT)}`);
+
+  // 一个坏订阅者不该拖垮其他人。注：真实 EventTarget 本来就会隔离各监听器的异常，
+  // 这里的 try/catch 是因为 onSyncDown 也允许被直接函数调用/替身 target 驱动（本段就是这么跑的）——
+  // 断言的是"cb 抛错不会外溢到调用方"，不是"浏览器不隔离"。
+  const t2 = mkTarget();
+  let good = 0;
+  sd.onSyncDown(() => { throw new Error('订阅者炸了'); }, t2);
+  sd.onSyncDown(() => { good++; }, t2);
+  try { t2.fire(sd.SYNC_DOWN_EVENT); } catch { /* 外溢了 —— 下一条断言会变红 */ }
+  ok(good === 1, '④ 前一个订阅者抛错不影响后一个（下行要通知全部 hook）', `good=${good}`);
+}
+
+// emitSyncDown 走的是同一个事件名，且用得到真 window（页面里靠它唤醒所有订阅者）
+{
+  let viaWindow = 0;
+  const off = sd.onSyncDown(() => { viaWindow++; });   // 默认 target = globalThis.window（本脚本的注册表替身）
+  sd.emitSyncDown();
+  ok(viaWindow === 1, '④ emitSyncDown() 能让默认 window 上的订阅者收到', `viaWindow=${viaWindow}`);
+  ok(dispatched.includes(sd.SYNC_DOWN_EVENT), '④ emitSyncDown 派发的事件名正确');
+  off();
+}
+
+const SYNC_SRC = fs.readFileSync(path.join(ROOT, 'src/lib/use-cloud-sync.ts'), 'utf8');
+ok(/emitSyncDown\(\);/.test(SYNC_SRC) && !/new Event\('nativethink-sync-down'\)/.test(SYNC_SRC),
+  '④ syncDown 通过唯一出口发通知（事件名不再在四处散落拼字符串）');
+
+const SUBSCRIBERS = [
+  'use-favorites.ts', 'use-learning-stats.ts', 'use-spelling-sentences.ts',
+  'use-word-learning.ts', 'use-phrase-learning.ts', 'custom-words.ts', 'word-notes.ts',
+];
+for (const f of SUBSCRIBERS) {
+  const t = fs.readFileSync(path.join(ROOT, 'src/lib', f), 'utf8');
+  ok(/useSyncDown\(/.test(t) || /onSyncDown\(/.test(t),
+    `④ ${f} 订阅下行后重读（陈旧内存态与"写回盖掉远端"的源头）`);
+}
+let legacy = 0;
+for (const f of subs) {
+  const t = fs.readFileSync(path.join(ROOT, 'src/lib', f), 'utf8');
+  if (/addEventListener\('nativethink-sync-down'/.test(t)) legacy++;
+}
+ok(legacy === 0,
+  '④ 没有任何 hook 再自己拼事件名（订阅单点归属，正对照：拼回来立刻红）', `legacy=${legacy}`);
+
+// SM-2 / 语块进度有"回写"effect：重读后原样再写一遍会变成一次真实的上行 POST。
+// 两道判据都要在：① 对象引用一致（刚从 storage 读进来的那份）就不写；② 序列化后与存储一字不差也不写。
+// 真跑量出来的教训（2026-09-30）：只有②的时候浏览器里仍会发生一次回写 ——
+// loadState 会补齐缺省字段，重串出来的字节与存储里那份不同。
+for (const [f, label] of [['use-word-learning.ts', 'SM-2 词学习'], ['use-phrase-learning.ts', '语块学习']]) {
+  const t = fs.readFileSync(path.join(ROOT, 'src/lib', f), 'utf8');
+  ok(/if \(safeStorage\.getItem\([^\n]*\) === json\) return;/.test(t),
+    `④ ${label} 的 saveState 内容与存储一致时不写`);
+  ok(/useSyncDown\(\(\) => \{[\s\S]{0,200}loadedFromStorageRef\.current = next;/.test(t),
+    `④ ${label} 的**下行回调里**记下"这份来自 storage"（不是只在换书时记一次）`);
+  ok(/if \(loadedFromStorageRef\.current === state\) \{[\s\S]{0,120}return;/.test(t),
+    `④ ${label} 的回写 effect 对"刚读进来的那份"直接跳过（回声的真正来源）`);
+  ok(/useSyncDown\(\(\) => \{[\s\S]{0,200}setState\(next\)/.test(t),
+    `④ ${label} 的下行重读走 useSyncDown 且真的 setState`);
+}
 
 /* ───────────────────────── 汇总 ───────────────────────── */
 const failed = results.filter((r) => !r.pass);
