@@ -425,6 +425,8 @@ export default function ArticlePage() {
         { role: 'system', content: `Write an English article about "${topic}" for ${levelLabel} learners (3-5 paragraphs). Return ONLY valid JSON: {"title":"...","paragraphs":[{"en":"paragraph","zh":"Chinese translation"}]}` },
         { role: 'user', content: `Topic: ${topic}. Level: ${levelLabel}.` },
       ], { temperature: 0.8, maxTokens: 4096 });
+      // 空串 = 服务不可用（use-ai 失败返回 ''，见 use-ai.ts:82-85）；先分开报，别和"格式异常"混为一谈
+      if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
       const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
       if (!parsed || !parsed.paragraphs?.length) { toast.error('AI 生成失败，请重试'); return; }
       // Safety: ensure all paragraphs have en/zh fields
@@ -603,6 +605,7 @@ export default function ArticlePage() {
           { role: 'system', content: `You are an English writer. Write a mini-book with ${genChapters} chapters about "${genTopic}" for ${levelLabel} English learners. Total ~${genWordCount} words. Each chapter should be 2-3 paragraphs. Return ONLY valid JSON: {"title":"book title","chapters":[{"chapterTitle":"Chapter 1 title","paragraphs":[{"en":"English paragraph","zh":"Chinese translation"}]}]}` },
           { role: 'user', content: `Write a ${genChapters}-chapter mini-book about ${genTopic} (~${genWordCount} words total). Level: ${levelLabel}.` },
         ], { temperature: 0.8, maxTokens: 4096 });
+        if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
         const parsed = extractJson<{ title?: string; chapters?: { chapterTitle?: string; paragraphs: IParagraph[] }[] }>(result);
         if (!parsed?.chapters?.length) { toast.error('AI 生成失败，请重试'); return; }
         const allParagraphs: IParagraph[] = [];
@@ -627,6 +630,7 @@ export default function ArticlePage() {
           { role: 'system', content: `You are an English writer. Write an engaging English ${genType === 'publication' ? 'magazine article' : 'article'} about "${genTopic}" for ${levelLabel} learners (~${genWordCount} words). Return ONLY valid JSON: {"title":"...","paragraphs":[{"en":"English paragraph","zh":"Chinese translation"}]}` },
           { role: 'user', content: `Write an article about ${genTopic} (~${genWordCount} words). Level: ${levelLabel}.` },
         ], { temperature: 0.8, maxTokens: 4096 });
+        if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
         const parsed = extractJson<{ title?: string; paragraphs?: IParagraph[] }>(result);
         if (!parsed?.paragraphs?.length) { toast.error('AI 生成失败，请重试'); return; }
         const safeParagraphs: IParagraph[] = (parsed.paragraphs || []).map((p: any) => ({ en: p?.en || '', zh: p?.zh || '' })).filter((p: IParagraph) => p.en.trim());

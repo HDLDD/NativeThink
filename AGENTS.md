@@ -33,10 +33,10 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 词库数据 | [modules/wordbank-data.md](./docs/modules/wordbank-data.md) | 两层去重、核心/detail 拆分、IDB 主 + localStorage 兜底、改完必跑的两个脚本 |
 | 阅读 `/articles` | [modules/reading.md](./docs/modules/reading.md) | 五种来源一套阅读器、运行时全文升级、**两套切章必须对齐** |
 | 朗读 TTS | [modules/tts.md](./docs/modules/tts.md) | 引擎降级链、切片 180 由上游 200 硬上限钉死、闪退自愈、音色四处同步 |
-| AI 服务与端侧模型 | [modules/ai-services.md](./docs/modules/ai-services.md) | Key 优先级、服务端免费档回退、端侧回落条件、`extractJson` 规定与 4 处违规 |
+| AI 服务与端侧模型 | [modules/ai-services.md](./docs/modules/ai-services.md) | Key 优先级、服务端免费档回退、端侧回落条件、`extractJson` 规定由 `verify:ai-parse` 全仓扫 |
 | 母语思维 `/think` | [modules/think-in-english.md](./docs/modules/think-in-english.md) | 4 tab；换题不 abort 导致流式内容串题 |
-| 语块 `/chunks` | [modules/chunks.md](./docs/modules/chunks.md) | 2713 行最大单文件；**useMemo 里洗牌**、phrases 全量渲染 748 条 |
-| 对话 `/conversation` | [modules/conversation.md](./docs/modules/conversation.md) | 场景选择↔聊天；**`mountedRef` 在 dev 下恒 false 让对话永远空白** |
+| 语块 `/chunks` | [modules/chunks.md](./docs/modules/chunks.md) | 2713 行最大单文件；练习池走 `useStableShuffle`、phrases 全量渲染 748 条仍待折叠 |
+| 对话 `/conversation` | [modules/conversation.md](./docs/modules/conversation.md) | 场景选择↔聊天；`mountedRef` 每轮挂载需复位（dev 下曾恒 false 让对话永远空白） |
 | 影子跟读 `/shadowing` | [modules/shadowing.md](./docs/modules/shadowing.md) | 连播/循环/录音评分；完成标记按**合并索引**存，索引换算单点在 `shadowing-progress.ts` |
 | 写作 `/writing` | [modules/writing.md](./docs/modules/writing.md) | 100 题 + AI 批改（Markdown 不是 JSON）；默认折叠 12 张 |
 | 句子学习 `/sentences` | [modules/sentence-lab.md](./docs/modules/sentence-lab.md) | 158 句语料、意群运行时定位；**主干判定三处索引不同源** |
@@ -47,7 +47,7 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 云同步与账号 | [modules/cloud-sync.md](./docs/modules/cloud-sync.md) | 两条上行口径不同；回声抑制/失败提示/按需补推由 `verify:cloud-sync` 守；仍只有 3 个 hook 订阅下行 |
 | 反馈链路 | [modules/feedback.md](./docs/modules/feedback.md) | 本机优先 + 三档诚实结果 + KV/飞书双出路；限流记账时机 |
 | 构建与发布 | [modules/build-release.md](./docs/modules/build-release.md) | 脚本地图与重复 bump、**缺资产静默出残包**、APK 版本线与产物命名 |
-| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 14 个契约守卫 + 无头 Chrome/CDP + 真机通道 + 写守卫四条硬规矩 |
+| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 15 个契约守卫 + 无头 Chrome/CDP + 真机通道 + 写守卫四条硬规矩 |
 
 ---
 
@@ -111,6 +111,7 @@ node scripts/verify-list-scaling.mjs              # 10   长列表必须折叠/�
 node scripts/verify-shadowing-completion.mjs      # 23   跟读完成标记的索引契约（纯函数真跑 + 接线）
 node scripts/verify-backup-idb.mjs                # 16   导出学习数据真的含整书译文
 node scripts/verify-cloud-sync-hygiene.mjs        # 18   云同步：下行回声/失败可见/按需补推（真跑真实模块）
+node scripts/verify-ai-parse.mjs                  # 10   AI 解析约定：24 个解析点判空 + 无贪婪正则（元判据固件自证）
 npm run verify:feedback-loop                      # 56   反馈链路（后端 handler 用忠实替身真实执行）
 ```
 
@@ -254,7 +255,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 | 一屏渲染不完的列表拖垮首屏 | 一次性铺全部条目 | 默认折叠/分页 + 展开入口（**不许削弱用户入口**）；补 `verify-list-scaling` 式断言 |
 | 弹窗打开时按 Esc 连带退出当前流程 | Radix 在 document 冒泡阶段**同步 flush** 关弹窗 | 键盘监听用捕获阶段 `addEventListener('keydown', fn, true)` |
 | 按词累积的缓存撑爆 localStorage | 只增不减，写失败后整份静默丢失 | 新缓存一律走 `capped-cache.ts`；落盘走 persist effect |
-| AI 生成内容"格式异常"误报 | `use-ai` 失败返回 `''`，页面把空串当解析失败 | **先判 `result.trim()` 为空 → 服务不可用**；解析一律 `extractJson`，勿用贪婪正则 |
+| AI 生成内容"格式异常"误报 | `use-ai` 失败返回 `''`，页面把空串当解析失败 | **先判 `result.trim()` 为空 → 服务不可用**；解析一律 `extractJson`，勿用贪婪正则。全仓 24 个解析点由 `npm run verify:ai-parse` 扫 |
 | 功能"两端都写了却点不到" | 组件与云函数都存在，但没有页面挂载；静态检查看不出断线 | 挂载点写进回归断言（`verify:feedback-loop` 检查 Header 是否渲染 `<FeedbackDialog />`）；新功能入口必须真机/真页面验证可达 |
 | 提交类操作谎报成功 | 后端只有一个 boolean，503（通道未配）与网络失败都归成"没成功"，UI 一律 toast 成功 | 结果分档返回（`delivered`/`stored`/`failed`），UI 按档给不同提示；失败保留条目并提供重试入口 |
 | 全站 toast 提示不出现 | `ui/sonner.tsx` 有 `Toaster` 但没人挂载 | 唯一出口在 `src/index.tsx`；新页面不要再挂第二个，`verify:feedback-loop` 会断言 |
@@ -283,7 +284,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 254 / 21 / 6175 / 15 / 56 / 16 / 10 / 10 / 23 / 16 / 18 + feedback-loop 56）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 264 / 21 / 6175 / 15 / 56 / 16 / 10 / 10 / 23 / 16 / 18 / 10 + feedback-loop 56）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`

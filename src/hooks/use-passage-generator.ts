@@ -5,6 +5,7 @@ import { useAI } from './use-ai';
 import { useAuth } from '@/lib/auth-provider';
 import { apiFetch } from '@/lib/api-client';
 import { getAPIKey, getActiveProvider } from '@/services/ai-config';
+import { extractJson } from '@/lib/utils';
 
 export interface GeneratedPassage {
   id: string;
@@ -56,9 +57,16 @@ export function usePassageGenerator() {
           { temperature: 0.7, maxTokens: 1024 },
         );
 
-        const match = result.match(/\{[\s\S]*\}/);
-        if (match) {
-          const parsed = JSON.parse(match[0]);
+        // extractJson 用括号配平取第一段 JSON，替代原先的 /\{[\s\S]*\}/ 贪婪正则
+        // （贪婪匹配会跨多个 JSON 片段把中间文本一起吞进同一个匹配）
+        if (!result.trim()) return null;   // 空串 = 服务不可用，不是"格式异常"
+        let parsed: any = null;
+        try {
+          parsed = extractJson<any>(result);
+        } catch {
+          parsed = null;
+        }
+        if (parsed) {
           const passage: GeneratedPassage = {
             id: crypto.randomUUID(),
             title: parsed.title || 'Review Passage',

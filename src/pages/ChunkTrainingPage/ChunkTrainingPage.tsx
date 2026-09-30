@@ -113,15 +113,46 @@ const AWKWARD_MAP: Record<string, string> = {
   'piece of cake': 'very easy to do',
 };
 
-function generateReplacementExercises(chunks: IChunk[]) {
-  // Randomly select chunks and shuffle
-  const shuffled = [...chunks].sort(() => Math.random() - 0.5).slice(0, 20);
-  return shuffled.map((chunk) => {
+/**
+ * 由**已稳定洗牌**的语块序列生成替换练习题。
+ *
+ * 关键约束：**给定同一个入参数组，输出必须逐字相同**（纯函数，不许含 Math.random）。
+ * 原先这里是 `[...chunks].sort(() => Math.random() - 0.5).slice(0, 20)` + 两次随机取干扰项/随机排选项，
+ * 外面又包在 `useMemo(..., [allChunks])` 里 —— 依赖是数组身份，于是 AI 生成语块、删除自定义语块
+ * 都会让整套题重排：`currentQIdx` 没变，指向的题却换了，用户正在作答的题面被悄悄替换
+ * （AGENTS.md 坑表「洗牌列表 + 下标定位当前题悄悄漂移」，思维训练/语块两页都踩过）。
+ *
+ * 随机感来自上层 `useStableShuffle(allChunks)` 的顺序（进页面洗一次，之后只增删）；
+ * 干扰项与选项位置用内容哈希推导 —— 同一道题的选项顺序固定，但不同题不会都落在同一个位置上。
+ */
+function hashString(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+function generateReplacementExercises(shuffledChunks: IChunk[]) {
+  const picked = shuffledChunks.slice(0, 20);
+  return picked.map((chunk, pickIdx) => {
     const awkward = AWKWARD_MAP[chunk.content] || 'do it in a normal way';
     const sentence = chunk.example.replace(chunk.content, `[ ${awkward} ]`);
-    // Generate 4 random option including correct one
-    const wrongOpts = chunks.filter((c) => c.id !== chunk.id).sort(() => Math.random() - 0.5).slice(0, 3).map((c) => c.content);
-    const options = [chunk.content, ...wrongOpts].sort(() => Math.random() - 0.5);
+    // 干扰项：从稳定序列里按固定步长取 3 个别的语块（跳掉自己），不随重渲染变化
+    const wrongOpts: string[] = [];
+    const pool = shuffledChunks.length > 1 ? shuffledChunks : [chunk];
+    const stride = Math.max(1, Math.floor(pool.length / 4)) + pickIdx;
+    for (let k = 1; k <= pool.length && wrongOpts.length < 3; k++) {
+      const cand = pool[(pickIdx * stride + k * stride) % pool.length];
+      if (cand.id === chunk.id) continue;
+      if (wrongOpts.includes(cand.content)) continue;
+      wrongOpts.push(cand.content);
+    }
+    // 选项顺序：按题目内容哈希做确定性旋转（同一题恒定，跨题不同位置）
+    const opts = [chunk.content, ...wrongOpts];
+    const rot = opts.length > 0 ? hashString(`${chunk.id}|${chunk.content}`) % opts.length : 0;
+    const options = [...opts.slice(rot), ...opts.slice(0, rot)];
     return { id: chunk.id, sentence, awkwardPhrase: awkward, correctChunk: chunk.content, meaning: chunk.meaning, example: chunk.example, category: chunk.category, options };
   });
 }
@@ -324,8 +355,8 @@ export default function ChunkTrainingPage() {
         ],
         { temperature: 0.9, maxTokens: 1536 },
       );
+      if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
       const parsed = extractJson<any[]>(result);
-      if (!Array.isArray(parsed) || parsed.length === 0) { toast.error('AI 未生成有效内容'); return; }
       if (!Array.isArray(parsed) || parsed.length === 0) { toast.error('AI 未生成有效短语'); return; }
       const newChunks: IChunk[] = parsed.map((item: any, i: number) => ({
         id: `ai_phrase_${Date.now()}_${i}`,
@@ -508,18 +539,19 @@ export default function ChunkTrainingPage() {
     } catch { /* ignore */ }
   }, [allChunks]);
 
-  /** 「随便看看」推荐（未学过的语块随机 5 个）—— memo 化，避免每次敲搜索词推荐区跳序 */
-  const suggestPhrases = useMemo(() => {
-    const pool = allChunks.filter((c) => !phraseState.progress[c.content.toLowerCase()]);
-    const arr = [...pool];
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr.slice(0, 5);
-  }, [allChunks, phraseState.progress]);
+  /**
+   * 练习池的稳定洗牌顺序 —— 进页面洗一次，之后集合变化只做增量同步（新条目追加到末尾）。
+   * 替换训练与「随便看看」都以它为准，所以 AI 生成/删除语块都不会让正在作答的题目漂移。
+   */
+  const exercisePool = useStableShuffle(allChunks);
 
-  const staticExercises = useMemo(() => generateReplacementExercises(allChunks), [allChunks]);
+  /** 「随便看看」推荐（未学过的语块取 5 个）—— 顺序取自 exercisePool，不再各自洗牌 */
+  const suggestPhrases = useMemo(
+    () => exercisePool.filter((c) => !phraseState.progress[c.content.toLowerCase()]).slice(0, 5),
+    [exercisePool, phraseState.progress],
+  );
+
+  const staticExercises = useMemo(() => generateReplacementExercises(exercisePool), [exercisePool]);
   const replacementExercises = aiReplacements.length > 0 ? aiReplacements : staticExercises;
 
   // Split filtered chunks by source
@@ -897,6 +929,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
         ],
         { temperature: 0.9, maxTokens: 1024 },
       );
+      if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
       const parsed = extractJson<any[]>(result);
       if (!Array.isArray(parsed) || parsed.length === 0) { toast.error('AI 未生成有效例句，请重试'); return; }
       const items = parsed.map((item: { en?: string; zh?: string }) => ({
@@ -951,9 +984,16 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
         ],
         { temperature: 0.9, maxTokens: 2048 },
       );
-      const jsonMatch = result.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) { toast.error('AI 返回格式异常'); return; }
-      const parsed = JSON.parse(jsonMatch[0]);
+      // 原先是 `result.match(/\[[\s\S]*\]/)` + JSON.parse：贪婪正则跨片段吞并中间文本，
+      // 且空返回时报的是误导性的「AI 返回格式异常」。统一走 extractJson（括号配平）。
+      if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
+      let parsed: any;
+      try {
+        parsed = extractJson<any[]>(result);
+      } catch {
+        toast.error('AI 返回格式异常');
+        return;
+      }
       if (!Array.isArray(parsed) || parsed.length === 0) { toast.error('AI 未生成有效题目'); return; }
       const exercises = parsed.map((item: { sentence: string; correctChunk: string; meaning: string; options: string[] }, i: number) => ({
         id: `ai_rep_${Date.now()}_${i}`,
@@ -987,6 +1027,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
         ],
         { temperature: 0.9, maxTokens: 512 },
       );
+      if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
       const parsed = extractJson<{ chunk?: string; meaning?: string; scenario?: string }>(result);
       if (!parsed.chunk || !parsed.meaning) { toast.error('AI 未生成有效题目'); return; }
       setAiChainChallenge({ chunk: parsed.chunk, meaning: parsed.meaning, scenario: parsed.scenario || '' });

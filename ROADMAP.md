@@ -35,11 +35,12 @@
     - ~~**云同步下行会把刚下载的数据再推回去**（回声）~~（**已修**：`syncDown` 用 `applyingRemoteRef` + `try/finally` 包住落地循环，双写处理器开头跳过回声；5 分钟轮询不再无条件全量 `syncUp`，改由 `needsResync()` 决定 —— 且 `needsResync` 必须 `useCallback` 稳定，否则定时器每次 render 都被重建。新增 `npm run verify:cloud-sync` 18 断言：转译真实 `use-cloud-sync` + `safe-storage` 在 Node 里驱动，下载后 0 次 POST、同键本地再写必须 1 次 POST 作正对照，变异实测删掉守卫行立刻红）。
     - ~~**同步失败完全静默**~~（**已修**：上行/下行/单项配额失败各给诚实提示，60 秒去抖；守卫断言 `use-cloud-sync.ts` 空 catch 数为 0）。
     - **下行后多数 hook 仍持陈旧内存态**（**未修**，只有 3 个订阅者）：A 设备改了，B 设备要重开页面才看到；陈旧实例一有写入还会把刚拉下来的新值覆盖回去。
-    - **四处把「AI 服务不可用」报成「格式异常」**（首页每日一句最靠近用户眼睛），另有一处走禁用的贪婪正则。（跟读那两处已随本轮修好）
-    - **语块替换训练在 `useMemo` 里洗牌**（违反 `use-stable-shuffle` 规定）→ AI 生成/删除语块即整套题漂移；**phrases tab 一次铺全部 748 条**、**跟读两栏全量渲染**是仅剩的两个长列表。
-    - **对话页 `mountedRef` 在 StrictMode 双挂载后恒 false** → dev 下对话永远空白（生产不受影响，但会把人带偏去查 AI 层）。
-    - **快速闪卡不读 `__nativethink_vocab_autospeak`**：词汇里关了自动朗读，进快速闪卡照样出声（要么补读取，要么统一文案说"三处"）。
-    - 反馈历史把 `stored` 显示成「已送达」，与提交时的诚实 toast 自相矛盾；**拼写批量加句缺 `!result.trim()` 前置**。
+    - ~~**四处把「AI 服务不可用」报成「格式异常」**，另有一处走禁用的贪婪正则~~（**已修**：实际清点是 **7 处缺判空**而不是 4 处 —— 阅读页 3、背单词页 3、拼写批量加句 1，加上原记的 4 处贪婪正则/缺判空站点，24 个解析点全部补齐判空并统一 `extractJson`。新增 `npm run verify:ai-parse` 10 断言：全仓扫、注释行不参与判定、三段固件自证检查器本身有效；顺带把首页每日一句的 `category`/`difficulty` 夹进 `IChunk` 取值域）。
+    - ~~**语块替换训练在 `useMemo` 里洗牌**~~（**已修**：`exercisePool = useStableShuffle(allChunks)` + `generateReplacementExercises` 改成给定同一入参输出逐字相同的纯函数；「随便看看」也改用稳定池，学一个词不再跳序）。**phrases tab 一次铺全部 748 条**、**跟读两栏全量渲染**是仅剩的两个长列表。
+    - ~~**对话页 `mountedRef` 在 StrictMode 双挂载后恒 false**~~（**已修**：effect 体内复位为 true。原先 dev 下 `:214/:281/:393` 的 `if (!mountedRef.current) break` 会静默丢弃全部流式内容 → 对话永远空白；生产不受影响，但极易把人带偏去查 AI 层）。
+    - ~~**快速闪卡不读 `__nativethink_vocab_autospeak`**~~（**已修**：读键门控朗读 effect + 进度行加开关，默认开与其余三处同口径 —— 真机上别处的提示语本来就写着「与快速闪卡共用此设置」。`verify:vocab-cards` 补 10 条断言，含「门控必须位于 `tts.speak` 之前」的正对照）。
+    - 反馈历史把 `stored` 显示成「已送达」，与提交时的诚实 toast 自相矛盾（**未修**）。
+    - 句子学习**主干判定的三处索引不同源**（`stdParts` / `item.segments` / `resolved`）与**拼写断点键不按 level 分**（**未修**）。
     - 文案口径：设置页「Qwen2.5-0.5B（约 400MB）」磁盘实为 750MiB；`使用攻略.md:60` 把拼写写成四种练法（实为 2 mode × 2 音频）。
 
 

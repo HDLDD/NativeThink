@@ -65,14 +65,13 @@ scripts/.apikey（gitignore，.gitignore:4）
 
 ## 3. 注意事项
 
-1. **`extractJson()` 是硬规定，但仍有 4 个调用点在用贪婪正则**：
-   - `src/hooks/use-passage-generator.ts:59`、`src/pages/ChunkTrainingPage/ChunkTrainingPage.tsx:954`（`\{[\s\S]*\}` / `\[[\s\S]*\]`）
-   - `src/pages/DashboardPage/DashboardPage.tsx:161`
-   - `src/pages/DeepVocabularyPage/components/DailyLearningMode.tsx:157`
+1. **`extractJson()` 是硬规定，且现在由守卫全仓扫**。历史上违反过两件事，2026-09-30 已全部清零：
+   - **贪婪正则**：`use-passage-generator.ts:59`、`ChunkTrainingPage.tsx`（原 `:954`）、`DashboardPage.tsx:161`、`DailyLearningMode.tsx:157` 四处用 `match(/\{[\s\S]*\}/)` 之类 —— 贪婪 `.*` 会跨多个 JSON 片段把中间说明文字一起吞进同一个匹配（`utils.ts:34` 注释就是这条的理由）。现在四处都换 `extractJson`。
+   - **缺判空前置**：原记 4 处，**实际清点出 7 处**（`ArticlePage.tsx` 3 处、`DeepVocabularyPage.tsx` 3 处、`use-spelling-sentences.ts` 1 处）—— 这类问题只会随新增调用点继续长，所以做成了全仓扫描的守卫。
 
-   贪婪 `.*` 会跨多个 JSON 片段把中间文本一起吞进同一个匹配（`utils.ts:34` 注释）。改这些调用点时**没有守卫会替你把关**，也没有守卫会反对你改。
+   **守卫：`npm run verify:ai-parse`**（24 个解析点，注释行不参与判定）。元判据自证：同一段 `inspect()` 函数先跑三个固件（缺判空 / 贪婪正则 / 写对了），前两个必须各报 1 条、第三个必须 0 条 —— 否则"全仓 0 违规"可能只是检查器坏了。另有行为证据：真转译 `extractJson` 并断言 `extractJson('')` 抛的就是那句会被误读成"格式异常"的文案，以及同一份夹带文本的输入下贪婪匹配比 `extractJson` 多吞一段。变异实测：删掉任一判空前置会立刻红。
 
-2. **空串不等于解析失败**。`use-ai.ts:61-89` 失败时 toast 后返回 `''` / `yield {content:'',done:true}`，AbortError 静默返回。所以调用方**必须先判 `!result.trim()`** 当作「服务不可用」，再谈解析。拼写批量加句 `use-spelling-sentences.ts:197-219` **少了这道前置**，直接喂 `extractJson('')` 会抛「无法从 AI 返回中提取有效 JSON」，用户看到的就是误导性的「格式异常」—— 写作页有（`WritingPage.tsx:646`），这是两条路径的现存差异。
+2. **空串不等于解析失败**。`use-ai.ts:61-89` 失败时 toast 后返回 `''` / `yield {content:'',done:true}`，AbortError 静默返回。所以调用方**必须先判 `!result.trim()`** 当作「服务不可用」，再谈解析。全仓 24 个解析点现在都有这道前置，由 `npm run verify:ai-parse` 每次扫。
 
 3. **AGENTS.md 旧说法有误**：use-ai 失败并**不**统一 toast「AI 服务暂不可用，请稍后重试」，它 toast 的是 `err.message`（`use-ai.ts:69,84`）；那句文案是各页面自己发的。
 

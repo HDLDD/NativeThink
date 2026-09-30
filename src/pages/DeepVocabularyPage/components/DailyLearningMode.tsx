@@ -21,7 +21,7 @@ import { translateWithLocalMt, isLocalMtReady } from '@/lib/local-mt';
 import { useAI } from '@/hooks/use-ai';
 import { FitWord } from '@/components/FitWord';
 import { safeStorage } from '@/lib/safe-storage';
-import { cn, cleanText } from '@/lib/utils';
+import { cn, cleanText, extractJson } from '@/lib/utils';
 import { toast } from 'sonner';
 
 type ReviewMode = 'flashcard' | 'choice' | 'spelling' | 'listening' | 'matching' | 'fillblank';
@@ -154,9 +154,14 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
           ],
           { temperature: 0.2, maxTokens: 400 },
         );
-        const m = res.match(/\{[\s\S]*\}/);
-        if (m) {
-          const parsed = JSON.parse(m[0]) as { t?: { i: number; zh: string }[] };
+        // 括号配平取 JSON，替代贪婪的 /\{[\s\S]*\}/；解析不了就保持未翻译（用户可再点）
+        let parsed: { t?: { i: number; zh: string }[] } | null = null;
+        try {
+          parsed = extractJson<{ t?: { i: number; zh: string }[] }>(res);
+        } catch {
+          parsed = null;
+        }
+        if (parsed) {
           for (const item of parsed.t || []) {
             const idx = Number(item.i) - 1;
             const src = still[idx];

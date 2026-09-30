@@ -20,7 +20,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import {
-  Zap, Check, X, RefreshCw, ArrowRight, ArrowLeft, Volume2, Shuffle, Target,
+  Zap, Check, X, RefreshCw, ArrowRight, ArrowLeft, Volume2, VolumeX, Shuffle, Target,
   BookOpen, History, RotateCcw, Trash2, ChevronDown, ChevronUp, ListChecks,
   ChevronLeft, Eye, Link2, Sparkles, Quote, Star,
 } from 'lucide-react';
@@ -53,6 +53,13 @@ const ROUND_ALL = 0;
 const RELEARN_GAP = 4;
 /** 同一个词一轮最多重排几次，防止一个词反复出现拖长一轮 */
 const MAX_RELEARN = 2;
+/**
+ * 自动发音开关 —— 与复习检测/每日学习/语块复习共用同一个持久化键
+ * （`FlashcardMode.tsx:33`、`DailyLearningMode.tsx:34`、`ChunkTrainingPage.tsx:100`）。
+ * 此前快速闪卡**完全不读它**，出卡无条件朗读：用户在别处关了自动发音，
+ * 进快速闪卡照样出声，而别处的提示语写着「与复习检测/快速闪卡共用此设置」。
+ */
+const AUTO_SPEAK_KEY = '__nativethink_vocab_autospeak';
 const ROUND_KEY = '__nativethink_quickcard_round';
 const POS_KEY = '__nativethink_quickcard_pos';
 
@@ -79,6 +86,18 @@ export default function QuickCardMode({ level }: { level: string }) {
   const { recordReview } = useWordLearning(level);
   const { addStudyMinutes } = useLearningStats();
   const tts = useTTS();
+
+  /** 自动发音：默认**开**（只有显式存过 '0' 才算关），与其余三处同口径；localStorage 不可用也返回 true */
+  const [autoSpeak, setAutoSpeak] = useState(() => {
+    try { return safeStorage.getItem(AUTO_SPEAK_KEY) !== '0'; } catch { return true; }
+  });
+  const toggleAutoSpeak = useCallback(() => {
+    // 持久化与提示放在更新函数**外** —— StrictMode 下更新函数被调用两次会双弹提示
+    const next = !autoSpeak;
+    setAutoSpeak(next);
+    try { safeStorage.setItem(AUTO_SPEAK_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+    toast(next ? '已开启自动发音' : '已关闭自动发音', { duration: 1200 });
+  }, [autoSpeak]);
 
   const [roundSize, setRoundSize] = useState<number>(() => {
     try { return parseRoundSize(safeStorage.getItem(ROUND_KEY)); } catch { return 20; }
@@ -297,14 +316,15 @@ export default function QuickCardMode({ level }: { level: string }) {
     return () => { alive = false; };
   }, [detailShown, detailTick]);
 
-  // 自动朗读当前单词（与其它模式一致）
+  // 自动朗读当前单词 —— 与复习检测/每日学习/语块共用 __nativethink_vocab_autospeak，
+  // 关了就该真的安静（原先无条件朗读，与别处「与快速闪卡共用此设置」的提示矛盾）
   useEffect(() => {
-    if (!inSession || !cw) return;
+    if (!inSession || !cw || !autoSpeak) return;
     const key = `${idx}-${cw.word}`;
     if (lastSpokenRef.current === key) return;
     lastSpokenRef.current = key;
     try { tts.speak(cw.word, { rate: 0.9 }); } catch { /* ignore */ }
-  }, [inSession, cw, idx, tts]);
+  }, [inSession, cw, idx, tts, autoSpeak]);
 
   /**
    * 翻面后才按需拉 detail —— 例句/搭配只在真正要看释义时才需要，
@@ -893,6 +913,21 @@ export default function QuickCardMode({ level }: { level: string }) {
         <span className="text-xs font-black text-muted-foreground tabular-nums">{answeredCount}/{uniqueTotal}</span>
         <span className="text-[10px] font-bold text-emerald-600 tabular-nums">✓{knownCount}</span>
         <span className="text-[10px] font-bold text-amber-500 tabular-nums">✗{unknownCount}</span>
+        {/* 自动发音开关：与复习检测/每日学习/语块共用同一个设置，一处关闭处处安静 */}
+        <button
+          type="button"
+          onClick={toggleAutoSpeak}
+          aria-label={autoSpeak ? '关闭自动发音（与复习检测/每日学习共用此设置）' : '开启自动发音（与复习检测/每日学习共用此设置）'}
+          title="自动发音 —— 与复习检测/每日学习/语块复习共用此设置"
+          className={cn(
+            'shrink-0 size-7 rounded-xl flex items-center justify-center border transition-colors',
+            autoSpeak
+              ? 'border-[#00B894]/40 bg-[#00B894]/10 text-ink-teal'
+              : 'border-border bg-muted/40 text-muted-foreground',
+          )}
+        >
+          {autoSpeak ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
+        </button>
       </div>
 
       {/* 卡片：只有单词 —— 点一下即翻面看释义 */}

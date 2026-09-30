@@ -196,6 +196,13 @@ export function useSpellingSentences() {
       const messages = buildMessages(systemPrompt, userContent);
       const raw = await aiChat(messages);
 
+      // 空串 = 服务不可用（use-ai 失败返回 ''，见 use-ai.ts:82-85）。
+      // 少了这道前置时，空串会被喂进 extractJson 抛错，用户看到误导性的
+      // 「AI 返回数据解析失败」，其实是 Key 没配 / 限流 / 断网。
+      if (!raw.trim()) {
+        return { success: false, count: 0, error: 'AI 服务暂不可用，请稍后重试' };
+      }
+
       try {
         const result = extractJson<{ sentences: { en: string; zh: string }[] }>(raw);
         if (!result.sentences || !Array.isArray(result.sentences) || result.sentences.length === 0) {

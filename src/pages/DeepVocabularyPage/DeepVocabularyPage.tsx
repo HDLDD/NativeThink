@@ -567,6 +567,7 @@ export default function DeepVocabularyPage() {
         ],
         { temperature: 0.5, maxTokens: 1024 },
       );
+      if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
       const parsed = extractJson<{ phrase?: string; meaning?: string; examples?: { en: string; zh: string }[] }>(result);
       const detail = {
         phrase: parsed.phrase || phrase,
@@ -600,6 +601,7 @@ export default function DeepVocabularyPage() {
             ],
             { temperature: 0.5, maxTokens: 512 },
           );
+          if (!result.trim()) continue;   // 后台预取：服务不可用时保持未翻译，不打扰用户
           const parsed = extractJson<{ phrase?: string; meaning?: string; examples?: { en: string; zh: string }[] }>(result);
           if (parsed.meaning || (parsed.examples && parsed.examples.length > 0)) {
             const entry = {
@@ -698,6 +700,7 @@ export default function DeepVocabularyPage() {
         ],
         { temperature: 0.8, maxTokens: 1024 },
       );
+      if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
       const parsed = extractJson<{ en: string; zh: string }[]>(result);
       if (!Array.isArray(parsed) || parsed.length === 0) { toast.error('AI 未生成有效例句'); return; }
       const items = parsed

@@ -149,7 +149,18 @@ export default function ConversationPage() {
   const [convHistory, setConvHistory] = useState<ISavedConversation[]>(loadConvHistory);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
-  useEffect(() => { return () => { mountedRef.current = false; abortRef.current?.abort(); }; }, []);
+  /**
+   * 必须在 effect 体内把 `mountedRef` 置回 true：`useRef(true)` 只在首帧初始化，
+   * 而 cleanup 会把它置 false。开发环境 `src/index.tsx:86` 开着 `<StrictMode>`，
+   * effect 是「mount → cleanup → mount」，于是第二次挂载后它**恒为 false**，
+   * 而 `:214/:281/:393` 都是 `if (!mountedRef.current) break;`
+   * → dev 下对话页永远空白、且不报任何错（生产构建不受影响）。
+   * 这正是 AGENTS.md 坑表「ref 不随组件重挂载归零」的教科书案例。
+   */
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; abortRef.current?.abort(); };
+  }, []);
   const abortRef = useRef<AbortController | null>(null);
 
   // Translation state

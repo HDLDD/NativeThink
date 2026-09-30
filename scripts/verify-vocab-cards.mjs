@@ -47,6 +47,31 @@ check(/if \(!autoSpeak\) return;/.test(fc), '自动朗读/预合成受开关控�
 // 开关必须参与 effect 依赖，否则切换后不会重新预热
 check(/\[sessionEntries, autoSpeak\]/.test(fc), '预热 effect 依赖 autoSpeak（切换后立即生效）');
 
+/**
+ * ── ①b 「一处关闭，处处安静」：同一个键必须真的被四个入口读取 ──
+ * 历史缺陷：FlashcardMode / DailyLearningMode / ChunkTrainingPage 都读 `__nativethink_vocab_autospeak`，
+ * 而 QuickCardMode **完全不读**、出卡无条件朗读 —— 但别处的提示语写的是
+ * 「与复习检测/快速闪卡共用此设置」，用户在真机上关掉后快速闪卡照样出声。
+ * 2026-09-30 补齐快速闪卡：读键 + 门控朗读 effect + 面板上给开关。
+ */
+const SHARED_KEY = '__nativethink_vocab_autospeak';
+const qc = readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/QuickCardMode.tsx'), 'utf8');
+const dl = readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/DailyLearningMode.tsx'), 'utf8');
+const ct = readFileSync(join(ROOT, 'src/pages/ChunkTrainingPage/ChunkTrainingPage.tsx'), 'utf8');
+for (const [name, src] of [['快速闪卡', qc], ['每日学习', dl], ['语块复习', ct]]) {
+  check(src.includes(SHARED_KEY), `${name} 读同一个自动发音持久化键（否则「共用此设置」是假话）`);
+}
+check(/const AUTO_SPEAK_KEY = '__nativethink_vocab_autospeak';/.test(qc), '快速闪卡定义共享键');
+check(/if \(!inSession \|\| !cw \|\| !autoSpeak\) return;/.test(qc), '快速闪卡的自动朗读受开关门控');
+check(/\[inSession, cw, idx, tts, autoSpeak\]/.test(qc), '快速闪卡朗读 effect 依赖 autoSpeak（切换后立即生效）');
+check(/safeStorage\.getItem\(AUTO_SPEAK_KEY\) !== '0'/.test(qc), '快速闪卡默认开（与其余三处同口径）');
+check(/onClick=\{toggleAutoSpeak\}/.test(qc), '快速闪卡有自动发音开关入口（不能只读键不给开关）');
+// 正对照：门控真的在 speak 之前，而不是写在后面当摆设
+const qcSpeakIdx = qc.indexOf('tts.speak(cw.word');
+const qcGuardIdx = qc.indexOf('!autoSpeak) return');
+check(qcGuardIdx >= 0 && qcGuardIdx < qcSpeakIdx, '正对照：快速闪卡的开关判断位于朗读之前');
+check((qc.match(/AUTO_SPEAK_KEY/g) ?? []).length >= 3, '快速闪卡读键 + 写键都在（切换能持久化）', `出现 ${(qc.match(/AUTO_SPEAK_KEY/g) ?? []).length} 次`);
+
 // ── ② detail（搭配/例句/深度解释）懒加载后必须重读词条 ──
 check(/preloadDetail\(\[cw\.level\]\)/.test(fc), '按当前词的等级懒加载 detail');
 check(/findWord\(cw\.word\) \?\? cw/.test(fc), 'detail 到位后重新 findWord（applyDetail 是就地补字段）');

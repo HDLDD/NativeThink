@@ -17,7 +17,7 @@ import {
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useFavorites } from '@/lib/use-favorites';
 import type { IChunk } from '@/data/chunks';
-import { cn, formatDate } from '@/lib/utils';
+import { cn, formatDate, extractJson } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
 import { toast } from 'sonner';
 import { useAI } from '@/hooks/use-ai';
@@ -31,6 +31,16 @@ import { QuickStartGrid } from './QuickStartGrid';
 import { ModuleProgressCard } from './ModuleProgressCard';
 import { HistoryCalendar } from './HistoryCalendar';
 import { LEARNING_OPTIONS } from './constants';
+
+/** 每日一句 AI 生成的返回形态（提示词要求单个 JSON 对象，见 handleAiGenerateChunk） */
+interface IAiChunkFields {
+  content?: string;
+  meaning?: string;
+  example?: string;
+  exampleZh?: string;
+  category?: string;
+  difficulty?: string;
+}
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -158,17 +168,29 @@ export default function DashboardPage() {
         ],
         { temperature: 0.9, maxTokens: 512 },
       );
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) { toast.error('AI 返回格式异常'); return; }
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (!parsed.content || !parsed.meaning) { toast.error('AI 生成内容不完整'); return; }
-      const c = {
+      // 空串 = 服务不可用（use-ai 失败返回 ''，见 use-ai.ts:82-85），不能当"格式异常"。
+      // 解析走 extractJson（括号配平），原先的 /\{[\s\S]*\}/ 是贪婪正则：跨多个 JSON 片段
+      // 会把中间文本一起吞进同一个匹配，且空返回时报的是误导性的"AI 返回格式异常"。
+      if (!result.trim()) { toast.error('AI 服务暂不可用，请稍后重试'); return; }
+      let parsed: IAiChunkFields | null = null;
+      try {
+        parsed = extractJson<IAiChunkFields>(result);
+      } catch {
+        toast.error('AI 返回格式异常');
+        return;
+      }
+      if (!parsed?.content || !parsed?.meaning) { toast.error('AI 生成内容不完整'); return; }
+      // category / difficulty 要夹到 IChunk 的取值域：原先 `parsed.category || 'daily'`
+      // 会把模型随口返回的 "travel2" 之类原样存进历史与每日一句，取色/标签处按联合类型查表会拿到 undefined
+      const catPool: readonly string[] = ['daily', 'workplace', 'social', 'emotion'];
+      const diffPool: readonly string[] = ['beginner', 'intermediate', 'advanced'];
+      const c: IChunk = {
         id: `ai_${Date.now()}`,
         content: parsed.content,
         meaning: parsed.meaning,
         example: parsed.example || `Here's an example with "${parsed.content}".`,
-        category: parsed.category || 'daily',
-        difficulty: parsed.difficulty || 'intermediate',
+        category: (catPool.includes(parsed.category) ? parsed.category : 'daily') as IChunk['category'],
+        difficulty: (diffPool.includes(parsed.difficulty) ? parsed.difficulty : 'intermediate') as IChunk['difficulty'],
         usage: 'AI 生成的日常表达',
       };
       setDailyChunk(c);

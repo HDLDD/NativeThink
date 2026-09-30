@@ -35,7 +35,7 @@
 
 ## 3. 注意事项
 
-1. **`mountedRef` 在开发环境会把流式内容全部丢掉**（真 bug，dev-only，但极难查）：
+1. ~~**`mountedRef` 在开发环境会把流式内容全部丢掉**~~（**已修 2026-09-30**：effect 体内显式 `mountedRef.current = true`）。原形态留档备查：
 
    ```
    :151  const mountedRef = useRef(true);

@@ -89,7 +89,7 @@
 
 1. **切片上限 180 不能改大**。改成 200 以上，整条云端链路会失败并**静默**降级到更差的引擎，看起来"能读"但音质/延迟都变了。守卫会红：`node scripts/verify-tts-progress.mjs`。
 2. **引擎候选顺序没有任何脚本断言**。`verify-tts-hardening.mjs` 只读 `sherpa-tts.ts`/Java/`TTSSettings.tsx`，**不覆盖 `use-tts.ts:425-433`**。改排序要真机验证四种排法（默认 / 选在线音色 / 只用系统引擎 / 护栏已停用）。
-3. **自动朗读开关 `__nativethink_vocab_autospeak` 实际只有三处生效**：复习检测 `FlashcardMode.tsx:64-67`、每日学习 `DailyLearningMode.tsx:219-221`、语块复习 `ChunkTrainingPage.tsx:373-379`。**快速闪卡 `QuickCardMode.tsx:300-306` 不读这个键，`inSession` 时无条件 `tts.speak()`** —— 与 AGENTS.md 原先写的"四处共用"不符。要么补上读取，要么把说法改成三处；当前先按事实记录。
+3. **自动朗读开关 `__nativethink_vocab_autospeak` 现在真的四处共用**（2026-09-30 补齐）：复习检测 `FlashcardMode.tsx:64-67`、每日学习 `DailyLearningMode.tsx:219-221`、语块复习 `ChunkTrainingPage.tsx:373-379`、**快速闪卡 `QuickCardMode.tsx`**（本轮新增：读键门控朗读 effect + 进度行上给开关，默认开与其余三处同口径）。此前快速闪卡完全不读它，而别处的提示语写着「与复习检测/快速闪卡共用此设置」—— 用户关掉后快速闪卡照样出声。守卫：`verify:vocab-cards` 断言四处都读同一键、快速闪卡门控位于 `tts.speak` 之前、且开关入口与写键都在。
 4. **刻意不自动朗读**：配对 `matching`（视觉任务，`DailyLearningMode.tsx:291`）、拼写/填空（`:303`「那等于把答案念出来」）、句子拼写的 fill 模式（`SpellingPage.tsx:556` 只在 dictation 自动读）。新增子模式时先想清楚朗读会不会泄答案。
 5. **预合成与实播的键可能不同**，两种情况都会让预热白做：① 语速不一致 —— 预热写死 `rate: 0.85`（`SpellingPage.tsx:549,553`）而 `speak()` 用 `settings.rate`（默认 0.9）；② 长句 —— `prewarm` 不切句、`speak` 走 `chunkText(…, 180)`（`use-tts.ts:807-824` vs `:844`），超 180 字符的句子预热键与分块键本就不同。缓存键含语速这件事在 `use-tts.ts:818-819` 有明文注释。
 6. **Kokoro 音色总数三个口径不一致**（实测以磁盘为准）：Java 注释与 `fetch-android-tts.cjs:31` 写 103，`check-tts-voices.cjs:35` 写 54；`voices.bin` 实测 28,200,960 B ÷ 522,240 B/音色 = **54.0**。前端只用了其中 11 个，所以不影响功能，但 `numSpeakers` 的注释得改。
