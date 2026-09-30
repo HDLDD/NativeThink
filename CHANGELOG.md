@@ -8,6 +8,7 @@
 
 
 ## 2026-09-30
+- fix(reading): 阅读器复习词高亮按 highlightWords → rvWords 回退 (`50ea54e`)
 - docs(vocabulary): 快速闪卡去档位的 CDP 记录补全（18 项，含 393px 顶栏不换行不溢出） (`75a562e`)
 - fix(vocabulary): 快速闪卡训练页不再提供每轮词数，避免中途切换清空本轮进度 (`090ed6f`)
 - fix(reader): 阅读器全屏层自带 safe-area，顶栏不再被状态栏压住 (`be64f2f`)

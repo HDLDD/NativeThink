@@ -285,10 +285,11 @@ check(
   /**
    * 2026-09-30 真机（83/2.0.38）实测到的断层：改造前存下的复习词文章只带 `rvWords`，
    * 阅读器只认 `highlightWords` —— 列表行写着「复习词 42」，点进去一个词都不高亮，
-   * 阅读设置里连「待复习词的颜色」那一行都不出现。词表口径改成与 `rvRegenKeys` 一致（highlightWords 优先、否则 rvWords）。
+   * 阅读设置里连「待复习词的颜色」那一行都不出现。两套字段改成互为兜底：
+   * 高亮优先"点名的一整批"（highlightWords），老数据回落 rvWords；`rvRegenKeys` 反向优先 rvWords（重生成要用真出现过的词）。
    */
   check(/const reviewWords = useMemo\(\s*\(\) => \(content\.highlightWords\?\.length \? content\.highlightWords : content\.rvWords \?\? \[\]\)/.test(pageReaderSrc),
-    '阅读器复习词表按 highlightWords → rvWords 回退（与 rvRegenKeys 同口径）');
+    '阅读器复习词表按 highlightWords → rvWords 回退（老复习词文章不再有高亮断层）');
   check(/setHighlightWords\(reviewWords\.length \? reviewWords : null\)/.test(pageReaderSrc), '进入阅读器下发回退后的词表');
   check(/return \(\) => setHighlightWords\(null\)/.test(pageReaderSrc), '退出阅读器清掉高亮词表');
   check((pageReaderSrc.match(/setHighlightWords\(/g) || []).length === 2,

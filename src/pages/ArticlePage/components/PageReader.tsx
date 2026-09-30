@@ -205,9 +205,10 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   // 复习词高亮：把当前内容的待复习词表推给 reader-highlight 模块
   // （只有「用复习词汇生成文章」产出的内容带词表；退出阅读器时清空）
   /**
-   * 词表口径与 `rv-articles.ts:rvRegenKeys` 保持一致：**新文章存 `highlightWords`，
-   * 改动之前存下的老复习词文章只有 `rvWords`**。真机（2026-09-30，83/2.0.38）实测过这个断层 ——
-   * 列表行明明写着「复习词 42」，点进阅读器却一个词都不高亮、设置里也没有「待复习词的颜色」那一行。
+   * 两套字段互为兜底（`rv-articles.ts:rvRegenKeys` 同样两套，只是优先方向相反 —— 那边要"真用上的词"重生成，
+   * 这边要"点名的一整批"高亮）：**新文章两个都有，改造之前存下的老复习词文章只有 `rvWords`**。
+   * 真机（2026-09-30，83/2.0.38）实测到断层 —— 列表行明明写着「复习词 42」，
+   * 点进阅读器却一个词都不高亮、设置里也没有「待复习词的颜色」那一行。
    */
   const reviewWords = useMemo(
     () => (content.highlightWords?.length ? content.highlightWords : content.rvWords ?? []),
