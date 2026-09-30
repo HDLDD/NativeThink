@@ -10,18 +10,22 @@
 | `build` | `bash scripts/build.sh`（miaoda 分包；`CF_PAGES=1` 时 `:32-36` 提前退出） |
 | `build:web` | `vite build --outDir dist/client --emptyOutDir` + **把 `index.html` 复制成 `404.html`**（Pages 的 SPA 兜底副本） |
 | `package:web` | `version:apk-bump` → `fetch-android-tts.cjs` → `build:web` |
-| `package:apk` | `version:apk-bump` → `check:tts-voices` → `capacitor copy android` → `android-copy-models.cjs` → `cd android && gradlew.bat assembleDebug` → 复制到 `release/NativeThink-mobile-debug.apk` |
+| `package:apk` | `version:apk-bump` → **`ensure-web-build.mjs`（缺则自动补跑 `build:web`）** → `check:tts-voices` → `capacitor copy android` → `android-copy-models.cjs` → `cd android && gradlew.bat assembleDebug` → 复制到 `release/NativeThink-mobile-debug.apk` |
 | `android:apk` | `package:web` + `package:apk`（**于是 bump 两次**） |
 | `package:desktop` | `pack-app.mjs --skip-web`（复用已有 `dist`，`pack-app.mjs:68-73`） |
 | `package:all` | `package:web` 之后 **concurrently 并行** `package:apk` + `package:desktop`（两者都 bump 版本、都写 `release/`） |
 
 APK 依赖 `dist/client`（`capacitor.config.json:4`），所以顺序不能省。
 
+**`scripts/ensure-web-build.mjs`（2026-09-30 加）堵的就是这条顺序**：`package:apk` **自己不构建 web**，`capacitor copy` 拷的是 `dist/client` 里现成的东西。当天改完语块接龙判定直接 `package:apk`，打出来的 78/2.0.33 里装的还是 16:05 那次 `build:web` 的产物 —— 修复根本没进包，而 `BUILD SUCCESSFUL`、versionCode、体积构成全都正常，**从打包日志上完全看不出来**。现在它是 `package:apk` / `package:desktop` 的前置，两个触发条件任一成立就自动补跑 `build:web`：① 有被跟踪的源码（`src`/`functions`/`electron`/`server`）比 `dist/client/index.html` 新；② `dist/client` 入口 chunk 里内嵌的 `__APP_VERSION__` 与 `version.properties` 的 `versionName` 不一致 —— ②顺带治了**重复 bump 的连带后果**（`package:all`/`package:apk` 都 bump，包里的 Android 版本可以是 2.0.36 而 App 内展示与反馈上报的还是上一次构建的 2.0.34）。判据②扫的是产物里**所有** `x.y.z` 字面量看当前版本在不在里面：define 替换后 `typeof __APP_VERSION__` 的三元式会被整个折掉，压缩产物里只剩 `` appVersion:`2.0.36` ``，第一版抠固定形态的写法因此静默失效（永远报"一致"）。扫不到版本号时**不触发**，宁可漏报也不误伤发布流程。
+
+**打完包要自己复核**（本轮实际用的三条）：`aapt dump badging release/NativeThink-mobile-debug.apk | head -1` 看内嵌版本；拿 `dist/client/index.html` 引用的入口 chunk 名去 `unzip -p` 包里比对 —— **chunk 名是内容哈希，对得上才证明包里就是这份产物**；再在页面 chunk 里 grep 本次改动的标志性字符串（新串要在、旧串该是 0）。
+
 桌面版生产依赖只有 `jose` / `undici` / `msedge-tts`（`pack-app.mjs:100`），其余靠硬链接拷 Electron 运行时 + `dist/server/functions/electron`。
 
 ## 2. 版本号与产物命名
 
-`android/version.properties` 当前 `versionCode=76` / `versionName=2.0.31`。`scripts/bump-android-version.cjs:19,24,26`：**两个字段都改** —— code +1，name 只递增 patch（沿用文件里写的 `major.minor`；文件缺省时 code 1→2、name 2.0.0→2.0.1）。
+`android/version.properties` 当前 `versionCode=81` / `versionName=2.0.36`（2026-09-30 打，含当天全部 8 项改动；设备上还是 76/2.0.31，待装）。`scripts/bump-android-version.cjs:19,24,26`：**两个字段都改** —— code +1，name 只递增 patch（沿用文件里写的 `major.minor`；文件缺省时 code 1→2、name 2.0.0→2.0.1）。
 
 `versionCode` 必须每次递增：Android 拒绝非递增的升级安装，会要求先卸载 → **丢本地数据**。
 
