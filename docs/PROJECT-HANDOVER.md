@@ -1,7 +1,7 @@
 # NativeThink 项目交接手册（Agent Handover）
 
 > 面向**接手的 AI agent / 新同事**：只读这一份就能开工。
-> 最后校准：2026-09-30（设备已装 2.0.31 / versionCode 76 并抽验过向导/词书词数/朗读设置；**2026-09-30 的「换书向导可达性」「闪卡换卡节奏/答错卡死」「复习词汇文章改选词+分篇」三项修复尚未打进新 APK** —— 见第 8 节末尾三条新坑）。
+> 最后校准：2026-09-30（设备已装 2.0.31 / versionCode 76 并抽验过向导/词书词数/朗读设置；**2026-09-30 全天的 7 项改动都还没进新 APK** —— 换书向导可达性、闪卡换卡节奏/答错卡死、复习词汇文章选词+分篇、复习词文章扩展（词数放开/体裁主题/原位重写/漏用回词表）、学习时长按动作计+去重、落盘失败可见+累积缓存封顶、云同步下行后 7 个 hook 重读。证据链见 §8 末尾与 §9）。
 > 相关文档：`AGENTS.md`（**索引**：跨模块约定 + 模块文档导航）、[`docs/modules/`](./modules/)（**每模块一篇：功能 / 实现方法 / 注意事项，带 `文件:行号`**）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
 
 ---
@@ -15,7 +15,7 @@
 | 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
 | 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-09 两轮全站质量优化已把拼写/跟读/写作/对话/语块也扫过一遍 |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 19 个 `scripts/verify-*.mjs` 断言脚本（2026-09-30 实测 vocab-cards 284；其余最近一次全绿记录与完整断言数见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 18 条可跑的 `scripts/verify-*.mjs` 断言脚本（另有 verify-wordbank-split 需基线参数、verify-all 是全量跑法）（2026-09-30 实测 vocab-cards 284；其余最近一次全绿记录与完整断言数见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
 | 改某个模块前 | 读 [`docs/modules/`](./modules/) 里对应那一篇 —— 功能、实现方法、以及**逐条读代码核实过**的注意事项（本手册与 AGENTS.md 的若干旧说法在那里被推翻并已修正） |
 | 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
@@ -84,7 +84,7 @@
 - **禁止往 `public/` 放 APK 或大二进制**：Vite 会把 `public/` 原样拷进 `dist/client`，导致 web / 主 APK / 桌面三份产物各白背体积（历史事故：227.5MB 的 CetThink apk 回流进 public，主 APK 里又套一个 APK）。
 - **当前 APK 体积构成**（2.0.25 实测，`node scripts/report-apk-size.cjs`，包内占用 = 压缩后）：离线小模型 541.3MB（未压 877.9MB）+ Kokoro 113.0MB + Piper 音色 65.1MB + web 产物 40.3MB + 原生库 29.3MB + dex/res 14.7MB = **803.7MB**。要减体积先动 `models-bundled`（离线 LLM/翻译模型），别去动 TTS 栈。
   ⑤ 四个功能页（思维/语块/对话/写作）静态 import 平台 AI 插件客户端（`@lark-apaas/client-toolkit-lite`，507KB raw / 160KB gzip）—— 而它只在"用户没配 AI Key"那条平台兜底分支才被碰到。改走 `src/lib/capability-client.ts` 的动态加载后，这四条路由各少下载整个 chunk。
-- **首屏下载口径**（2026-09-29 起）：`npm run verify:bundle-budget` 守的是"入口 chunk 沿**静态** import 递归出来的集合"，实测 11 个 chunk / **198.1KB gzip**（预算线 600KB）。APK 里 WebView 不压缩本地资源，所以这个数直接就是手机首次进 App 的下载 + 解析量。
+- **首屏下载口径**（2026-09-29 起）：`npm run verify:bundle-budget` 守的是"入口 chunk 沿**静态** import 递归出来的集合"，实测 11 个 chunk / **199.5KB gzip**（2026-09-30 复测；预算线 600KB）。APK 里 WebView 不压缩本地资源，所以这个数直接就是手机首次进 App 的下载 + 解析量。
 
 ---
 
@@ -218,7 +218,7 @@ adb install -r release/NativeThink-mobile-debug.apk
 |---|---|---|
 | 静态 | `npm run typecheck` + `npm run lint:eslint` | 全量；pre-commit 强制 |
 | 构建 | `npm run build:web` | 打包可行性 + chunk 体积 |
-| 契约 | 19 个 `scripts/verify-*.mjs`（全表见 [modules/verification.md](./modules/verification.md)） | 词库加载/拆分、书目元数据、背单词卡片（含换卡节奏数值锁 + 答错重排延后 + 换书路径）、背单词缓存、TTS 切片与进度、TTS 降级、反馈链路（前后端对接 + 后端替身执行）、拼写断点分键、跟读完成索引、云同步卫生、AI 解析约定、长列表折叠、复习词汇文章选词/分篇/出队、学习时长记账闸门等 |
+| 契约 | 18 条可跑的 `scripts/verify-*.mjs` + `npm run verify:all` 全量（全表见 [modules/verification.md](./modules/verification.md)） | 词库加载/拆分、书目元数据、背单词卡片（含换卡节奏数值锁 + 答错重排延后 + 换书路径）、背单词缓存、TTS 切片与进度、TTS 降级、反馈链路（前后端对接 + 后端替身执行）、拼写断点分键、跟读完成索引、云同步卫生、AI 解析约定、长列表折叠、复习词汇文章选词/分篇/出队、学习时长记账闸门等 |
 | 真机 | adb + CDP（见第 7 节） | 只能在设备上发现的：safe-area、原生 TTS、手势、持久化 |
 
 **写守卫脚本的经验（血泪）**：
@@ -350,7 +350,15 @@ node scripts/device-eval.mjs back
 |---|---|---|
 | 首页点「切换词书」没反应（2026-09-30 已修） | 向导**其实弹了**，但被渲染在六张模式卡**下面**（真机 393×851 从 y≈809 才开始，视口内只剩 42px）；且打开时页面没滚动归零 | 模式卡列表与向导**互斥渲染**（`{!immersed && !showWizard && …}`）+ 打开时 `window.scrollTo`/`main.scrollTo` 归零 + 向导带「当前」标记与「关闭」出口。切换逻辑本身没错，坏在"看不见有东西弹出来" |
 | 闪卡评分后要 ~1.1s 才换卡；答「完全忘了」直接卡死不动（2026-09-30 已修） | ①换卡延迟三源叠加：停留 550/900ms + `setTimeout(150)` 干等 + spring 退场被 `AnimatePresence mode="wait"` 串行等（≈400ms 尾巴）；②评分时同步 `scheduleRelearn` 就地改掉 `session.order[currentIdx]` → `currentKey` 当场变化 → `justRated` 失效、自动跳转定时器永远排不上 | 停留改 120/300、换卡一次批量、退场用定长 tween 0.18s（CDP 按帧实测 1122ms → ~330ms）；重排**延后到 `advance`**（`pendingRelearnRef`），答错 489ms 自动前进、重排词隔 4 张如约再现。守卫按**数值**锁（答对<答错、答错≤400ms） |
-| 复习词汇生成文章只出 ~10 个词、用过的词下轮又出现、文章删不掉且历史点不开（2026-09-30 已修） | 旧实现把 `dueForReview.slice(0, 10)` 写死，生成后不落盘、不用词记录 | 词表改**派生**（到期词 − 现存文章 `rvWords`，刻意不做两份真相）＋自选词汇与每篇词数、串行逐篇落盘（最多 3 篇），已保存文章可收藏/删除，删文章词自动回词表；失败批次对应词留在列表。守卫 `verify:rv-articles`（55 断言含 13 条变异测试），阅读器 `highlightWords` 与 `rvWords` 同源 |
+| 复习词汇生成文章只出 ~10 个词、用过的词下轮又出现、文章删不掉且历史点不开（2026-09-30 已修，同日又扩展） | 旧实现把 `dueForReview.slice(0, 10)` 写死，生成后不落盘、不用词记录 | 词表改**派生**（到期词 − 现存文章 `rvWords`，刻意不做两份真相）＋自选词汇与每篇词数、串行逐篇落盘，已保存文章可收藏/删除/**重写这篇**，删文章词自动回词表；失败批次对应词留在列表。扩展后每篇最多 50 词、一次最多 6 篇，体裁+主题进 `buildRvPrompt` 唯一构造点并随文章存下；`rvWords` 只记**真的出现在正文里**的词（`coveredReviewWords` 复用阅读器 `matchesHighlight`），漏用的退回词表并如实提示。守卫 `verify:rv-articles`（104 断言，累计 27 条变异），阅读器 `highlightWords` 与 `rvWords` 同源 |
+
+**2026-09-30 下午自查出的三条**（不来自真机反馈，来自读代码 + 全量跑守卫）：
+
+| 现象 | 真正原因 | 修法 |
+|---|---|---|
+| 同一句话连点几次提交，今日分钟数 / 进度环 / 日历 / 连胜一起往上刷 | **不是**"AI 挂了还计时"（那是刻意选的「按动作计」口径，模块文档里本来写着）—— 破口是**同一次作答重复记账**，而 `addStudyMinutes` 一次动四处 | `src/lib/study-credit.ts` 闸门：`creditOnce(module, creditKey(动作, 题面, 用户原文))`，同一键只放行一次（FIFO 400）；**本地动作**（闪卡翻面、拼写判分、语块复习打分）不套闸门。守卫 74 断言 + 14 条变异双向锁（既拦"绕过闸门"，也拦"改成 AI 回了才计"） |
+| 落盘失败完全无声，症状只是"刷新后数据没了" | `safeStorage.setItem` 里 `catch {}` 吞掉配额错误；9 个"用户创作、不可重算"的清单每次状态变化整份重写 | `setItem` 返回布尔；effect 一律 `if (!persistJson(k, x)) warnStorageFull()`（全站 60s 去抖 + 指路清理入口）。派生可重算的三份语块缓存 FIFO 封顶；拼写句子库 `appendCapped` 到 1200 条**只拒绝新增、绝不裁剪已有**并报 `skipped` |
+| A 设备改了数据，B 设备要重开页面才看到；B 一写入还把刚拉下来的新值盖回去 | `syncDown` 落地后只广播给 3 个订阅者，SM-2 词学习等核心数据持陈旧内存态；重读后"state 变了就回写"的 effect 又原样写一遍 → 登录后成一次上行回声 | 订阅收进 `src/lib/sync-down.ts`（事件名唯一、`onSyncDown` 可用假 target 真跑），订阅者 3 → 7；回声两道判据：下行回调记下"这份来自 storage"的对象引用（**主力** —— `loadState` 会补齐缺省字段，重串出来的字节与存储不同，所以只靠同值不写不够）＋ `saveState` 序列化同值不写 |
 
 ---
 
@@ -391,6 +399,12 @@ node scripts/device-eval.mjs back
   ② 闪卡换卡 ~1.1s 与答「完全忘了」卡死 → 退场定长 tween 0.18s + 重排延后到 `advance`（CDP 按帧实测 1122ms → ~330ms）；
   ③ 复习词汇文章改「自选词汇 + 每篇词数 + 一次最多 3 篇」串行逐篇落盘，保存/收藏/删除齐全，
   未选中的词留在词表、删文章词自动回队（词表派生自 `到期词 − 现存文章 rvWords`）。新增守卫 `npm run verify:rv-articles`（55 断言，13 条变异全红，CDP e2e 40/40 含 AI 通道 mock）。
+- **2026-09-30 下午：四轮优化 + 一轮扩展**（`8f2a603` / `d242cf4` / `9b1e263` / `cb6c180`）：
+  ① **学习时长不再被重复刷**（`8f2a603`）：先纠正 ROADMAP 那条旧记录 —— 计时写在 `await` 之前是**刻意的「按动作计」口径**（写了但 AI 挂了那次是真实投入），真正的破口是同一次作答重复提交重复记账，而 `addStudyMinutes` 一次动今日分钟数/进度环/日历/连胜四处。新增 `src/lib/study-credit.ts`（`creditKey` 动作+题面+原文、FIFO 400 闸门），接思维 4 处 / 对话 / 语块接龙 / 写作交卷 / 句子学习造句（后者保持"拿到反馈才计"，只补去重）；**本地动作刻意不套闸门**。`verify:study-credit` 74 断言 + 14 条变异全红 + CDP 31 项。
+  ② **落盘失败不再静默**（`d242cf4`）：`safeStorage.setItem` 返回布尔（过去 `catch {}` 吞配额错误），9 个不可重算清单的 effect 一律 `if (!persistJson(…)) warnStorageFull()`（全站 60s 去抖，指路清理入口）；AI 派生可重算的三份语块缓存 FIFO 封顶（200 键·每键 30 条 / 400 / 300），拼写句子库用 `appendCapped`（1200 条上限，**只拒绝新增、绝不裁剪已有**，`skipped` 如实报出）。`verify-vocab-caches` 21 → 67 断言（注入 localStorage 替身真跑）+ 10 条变异 + CDP 20 项。
+  ③ **复习词汇文章扩展**（`9b1e263`，用户选定方向）：每篇词数放开到 50、一次最多 6 篇；体裁（说明/记叙/议论/对话/书信）+ 主题（复用 `TOPICS`，含"不限"）经 `buildRvPrompt` 唯一构造点进提示词并随文章存下；`rvWords` 只记**真的出现在正文里**的词（`coveredReviewWords` 复用阅读器 `matchesHighlight` 的形态归并，不过度归并），漏用的自动退回词表并如实提示；已保存文章可「重写这篇」—— `replaceAiArticle` 原位替换保持 id（收藏 `content` 与历史 `meta.aiId` 不断链）、沿用文章自己的体裁主题、失败保留原文。`verify-rv-articles` 55 → 104 断言（累计 27 条变异全红）+ CDP 42 项。
+  ④ **云同步下行后 7 个 hook 都重读**（`cb6c180`）：订阅收成单一出口 `src/lib/sync-down.ts`（事件名只定义一次、`onSyncDown` 可用假 target 真跑），新增 SM-2 词学习 / 语块学习 / 生词本 / 我的助记；顺带掐掉回声写（下行重读后原样回写 = 登录后一次 POST）—— 引用一致跳过为主、序列化同值不写为辅。`verify-cloud-sync` 18 → 43 断言 + 10 条变异 + CDP 12 项。
+- **新增 `npm run verify:all`**（同日）：自动发现全部 `scripts/verify-*.mjs` + typecheck，一条红就非零退出。理由是一条真实翻车：改复习词汇文章当天 `verify-rv-articles` 全绿，而 `verify-books-meta` 里盯同一处源码的断言**早已失效** —— 只有全量跑法能发现这种跨守卫漂移（已写进 `AGENTS.md` 提交前清单与 `docs/modules/verification.md` §5）。当前基线：**18 条契约守卫 / 断言合计 7,220 条**、`npm run build:web` 通过、首屏必需 JS 199.5KB gzip。
 
 ### 未完成 / 已知短板
 1. ~~**切换词书必须多走一步「学习方式」**~~（2026-09-29 用户报，**已修**）。

@@ -1,6 +1,7 @@
 # NativeThink 开发路线
 
-> 校准：2026-09-29（已装机 APK **2.0.28 / versionCode 73**；**2.0.31 / versionCode 76 已打包、因设备断线尚未装机**）。
+> 校准：2026-09-30（设备已装 **2.0.31 / versionCode 76**；**2026-09-30 全天的 7 项改动都还没进新 APK** —— 打包与真机走查按用户要求留到"末尾再议"，本机验收一律用无头 Chrome + CDP）。
+> **收尾必跑 `npm run verify:all`**（typecheck + 全部 `verify-*.mjs`；只跑"自己那条"会漏掉引用同一份源码的其他守卫 —— 2026-09-30 真翻过一次）。
 > 现状细节与坑表见 [`docs/PROJECT-HANDOVER.md`](./docs/PROJECT-HANDOVER.md)，跨模块约定与文档导航见 [`AGENTS.md`](./AGENTS.md)，**每模块的功能/实现/注意事项见 [`docs/modules/`](./docs/modules/)**，产品与 UI 规范见 [`docs/PRODUCT-SPEC.md`](./docs/PRODUCT-SPEC.md)。
 > **重点研发的两条线是 APK 与网站**（Electron 桌面只是顺带产物）；站点 `functions/api/*` 同时是 APK 的线上后端 —— APK 内 `/api/*` 被重写到 `https://nativethink.pages.dev`。
 
@@ -8,14 +9,14 @@
 
 ## 现状（已上线、已验证）
 
-- **形态**：一份前端 → Web SPA（Cloudflare Pages）+ Capacitor Android + Electron 桌面；**首屏必需 JS 198.1KB gzip**（11 个 chunk，`verify:bundle-budget` 守，预算线 600KB）；状态只进 localStorage / IndexedDB，无业务后端库（云端只有 Pages Functions + KV）。
+- **形态**：一份前端 → Web SPA（Cloudflare Pages）+ Capacitor Android + Electron 桌面；**首屏必需 JS 199.5KB gzip**（11 个 chunk，`verify:bundle-budget` 守，预算线 600KB）；状态只进 localStorage / IndexedDB，无业务后端库（云端只有 Pages Functions + KV）。
 - **背单词**：四个入口 —— 每日学习（六方式：闪卡/选择/拼写/听写/配对/填空）、复习检测（SM-2 五档）、快速闪卡、词库浏览 + 搭配 + 词汇量测试。**四个模式的断点续学已全部覆盖**（切 tab / 杀 App / 刷新都能接续），断点键按词书（level）分开。
 - **词库**：75,113 个词条 / 全局去重 **21,736** 个可学单词 / 9 等级。**卡上显示的就是出卡池子**（书内去重，与加载了哪几本无关）：中考 1,987 · 高考 3,743 · 四级 4,542 · 六级 7,404 · 雅思 6,609 · 托福 10,367 · 考研 5,047 · 专业 4,464 · 高阶 18,470。主文件只留核心字段，detail 按需加载。
 - **阅读**：22 本公版书（中文对照随包；书单只下元数据 5KB，正文点开才下 231KB，清洗函数独立成 `book-clean.ts`）+ 20 篇 SCP + 维基百科 + 演讲 + AI 生成；整书翻译走断点队列（批合并 + 每批落盘 + 可中止），翻译缓存 v2 按段索引回填；复习词 6 色高亮。
 - **朗读**：三级降级（内置 sherpa 离线 → 系统引擎 → 云端）。默认 piper lessac（真机 RTF **0.076**），Kokoro int8 11 个英语音色作音质选项（RTF **1.008**，长文物理上无法连续播放）；云端走 `functions/api/tts.js`，上游硬上限 200 字符 → 客户端切片上限 180。
 - **句子学习**：158 句语料（手写 24 + 补充 12 + 脚本自动标注 122），拆句 / 句型 / 造句 / 语法，含错句复习队列与跟读评价。
 - **端侧 AI 兜底**：随包 Qwen2.5-0.5B-Instruct（q4）+ Xenova/opus-mt-en-zh（q8）；打包版同源 `/models/` 零下载，网页版回落 hf-mirror。云端 AI 失败时 `streamChat/chat` 自动切端侧小模型。
-- **验证体系**：没有测试框架，靠 `typecheck` + `lint:eslint` + `build:web` + 19 个 `scripts/verify-*.mjs`（完整断言数表见 [docs/modules/verification.md](./docs/modules/verification.md)；2026-09-30 复测 vocab-cards 284、新增 rv-articles 55 与 study-credit 74、其余最近一次全绿 2026-09-29：loading 45 · books-meta 222 · vocab-caches 21 · tts-progress 6175 · tts-hardening 15 · feedback-loop 58 · overlay-fit 16 · bundle-budget 10 · list-scaling 18），再加**本机无头 Chrome + CDP 真点一遍**的行为验收（静态检查看不见"入口在但状态不写回"那类缺陷）。其中 `verify:feedback-loop` 会用忠实的 KV / webhook 替身**真实执行**反馈后端。
+- **验证体系**：没有测试框架，靠 `typecheck` + `lint:eslint` + `build:web` + 18 条可跑的 `scripts/verify-*.mjs`（收尾用 `npm run verify:all` 一次跑完）（完整断言数表见 [docs/modules/verification.md](./docs/modules/verification.md)；2026-09-30 复测 vocab-cards 284、新增 rv-articles 55 与 study-credit 74、其余最近一次全绿 2026-09-29：loading 45 · books-meta 222 · vocab-caches 21 · tts-progress 6175 · tts-hardening 15 · feedback-loop 58 · overlay-fit 16 · bundle-budget 10 · list-scaling 18），再加**本机无头 Chrome + CDP 真点一遍**的行为验收（静态检查看不见"入口在但状态不写回"那类缺陷）。其中 `verify:feedback-loop` 会用忠实的 KV / webhook 替身**真实执行**反馈后端。
 
 ## 下一步
 

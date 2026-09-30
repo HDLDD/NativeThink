@@ -38,7 +38,7 @@ APK 依赖 `dist/client`（`capacitor.config.json:4`），所以顺序不能省�
 
 `vite.config.ts:199-236` 现存 `manualChunks` 规则：react / router / radix / icons / date-fns / zod；`:238-246` 九个 `wordbank-*` 数据 chunk。**recharts、react-markdown、framer-motion 的强制规则被有意删除**（`:214-227` 附实测数字）—— 给只有懒加载页面用的库写强制分块，会让它变成**入口 chunk 的静态依赖**，方向正好相反。
 
-`verify-bundle-budget.mjs`：从 `dist/client/index.html` 的 modulepreload + 入口 chunk 的**静态** import 递归 BFS 出「首屏必需集合」（`:52-63`），断言集合里没有 recharts/markdown/词库数据 chunk，且 gzip 总量 ≤ `BUDGET = 600`（`:79`）。当前实测 **198.1KB / 10 项全绿**。没有 `dist` 直接 `exit 1`（`:31-34`）；含正对照（`:83-87`）和「禁止静态 import 平台 SDK」的 `git grep`（`:96-107`）。
+`verify-bundle-budget.mjs`：从 `dist/client/index.html` 的 modulepreload + 入口 chunk 的**静态** import 递归 BFS 出「首屏必需集合」（`:52-63`），断言集合里没有 recharts/markdown/词库数据 chunk，且 gzip 总量 ≤ `BUDGET = 600`（`:79`）。当前实测 **199.5KB / 10 项全绿**（2026-09-30）。没有 `dist` 直接 `exit 1`（`:31-34`）；含正对照（`:83-87`）和「禁止静态 import 平台 SDK」的 `git grep`（`:96-107`）。
 
 ## 4. Cloudflare Pages 侧
 
