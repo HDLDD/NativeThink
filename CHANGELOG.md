@@ -8,6 +8,7 @@
 
 
 ## 2026-09-30
+- fix(vocabulary): 快速闪卡训练页不再提供每轮词数，避免中途切换清空本轮进度 (`090ed6f`)
 - fix(reader): 阅读器全屏层自带 safe-area，顶栏不再被状态栏压住 (`be64f2f`)
 - fix(packaging): package:apk 前置 ensure-web-build，杜绝把上一次 web 产物打进新包 (`cdf2a6e`)
 - docs(chunks): 接龙三档判定的 CDP 真点补齐（39 项），删掉未覆盖的自认缺口 (`f02db88`)
