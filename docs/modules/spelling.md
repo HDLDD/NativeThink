@@ -63,7 +63,7 @@
 
 1. **自动朗读只在 dictation 生效**：`if (mode === 'dictation' && autoRead) tts.speak(...)`（`:556`，500ms 延时）。fill 模式整句朗读等于把被挖空的答案念出来 —— 同族决策在背单词侧有明文注释（`DailyLearningMode.tsx:303`）。
 2. **页内自动朗读开关是本地 state、不持久化、默认 true**（`:441`），**与背单词那个 `__nativethink_vocab_autospeak` 键无关**。用户在词汇里关了自动朗读，进拼写页还是会响。
-3. **断点键是单个全局键、不按 level 分**（`:971-987` 存 `{activeLevel, currentIndex}`），与 AGENTS.md「断点续学键按（模式, level）分」的约定不符。后果：它只能记住**一本**的位置 —— 在 A 书读到 20 句、切去 B 书读 3 句，回来 A 的位置已经没了。挂载时会自动恢复上一本词书并带位置（`:990-1016` 自动进书、`:1019-1031` 恢复 index，`pendingResumeIndex` 在 `rebuildSession` 消费 `:484-486`）。
+3. ~~断点键是单个全局键、不按 level 分~~（**已修 2026-09-30**）：逻辑抽到 **`src/lib/spelling-resume.ts`**（纯函数，可注入替身存储），键改成 `__nativethink_spelling_resume_<level>` + `__nativethink_spelling_resume_last` 指针；老用户的全局键在首次读取时一次性搬走并删除，**且目标键已有数据时不被旧值覆盖**。守卫：`npm run verify:spelling-resume`（24 断言）真跑迁移/跨书互不覆盖/坏 JSON/负数下标/按前缀重置，并带「旧全局单键在同样操作后只剩最后一本」的正对照；变异实测：把 `persistResume` 改回写单个全局键会红 4 条。挂载时仍自动恢复上一本并带位置。
 4. **`buildSessionQueue` 内部有副作用**：`markServed(queue)` 落盘（`use-spelling-learning.ts:289`）。**被调用一次就污染一次跨轮次状态**，而 `rebuildSession` 每次调用都会触发它 —— 不要把它当纯函数放进 `useMemo` 的依赖里反复求值。
 5. **当前句走 memo + ref 双轨兜底**：`currentSentenceRef.current = memo || ref.current`（`:409-411`）。memo 抖动时会保留上一条句子，而**判分和朗读都读它**。同类风险见 AGENTS.md「ref 不随组件重挂载归零」。
 6. **重排队列有 4 个入口**共用同一个 `importDirty` 自增（`:443,520-525,1144,1689,1786`），初始化 effect 条件里含 `sessionQueue.length`（`:508-518`），并且「全部完成」时自动清完成标记再重排。加第五个入口前先确认不会互相打环。
@@ -74,4 +74,4 @@
 11. **CHANGELOG 里的「听写语速滑杆」不是本页**：提交 `e33a780` 只改了 `DeepVocabularyPage/components/DailyLearningMode.tsx`（+83/−3），属于**背单词的拼写/听写子模式**。全站语速滑杆在 `TTSSettings.tsx:614-623`（0.5–1.5，默认 0.9）。`SpellingPage.tsx` 里没有任何 `Slider`，三处 `rate` 全是硬编码（`:419,549,553`）。
 12. **死代码**：`types/spelling.ts:7` 的 `'user_created'` 无写入点；`use-spelling-sentences.ts:12` 的 `BATCH_COUNTER_KEY` 声明后从未使用。
 13. **`使用攻略.md:60` 与代码不符**：写着「练法有单词拼写、句子拼写、听写、填空」四种，代码是 2 个 mode（dictation/fill）× 2 个音频模式（sentence/word）。
-14. **无守卫**：拼写页没有任何 verify 脚本命中（见 `sentence-lab.md` 第 9 条）。改队列顺序、`markServed` 剪枝、断点恢复都得手动跑一轮：出一轮题 → 刷新 → 看是否接着上次位置、且不重复刚出过的。
+14. **守卫**：`npm run verify:spelling-resume`（24 断言）覆盖断点分键/迁移/重置枚举/非法下标，`npm run verify:ai-parse` 扫批量加句的解析约定。**仍未被覆盖**：`buildSessionQueue` 的顺序与 `markServed` 副作用、`served` 超 4000 条剪枝、预热与实播的键匹配 —— 改这些仍要手动跑一轮：出一轮题 → 刷新 → 看是否接着上次位置、且不重复刚出过的。

@@ -56,6 +56,12 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { safeStorage } from '@/lib/safe-storage';
+import {
+  readResumeIndex,
+  readLastResumeLevel,
+  persistResume,
+  migrateLegacyResume,
+} from '@/lib/spelling-resume';
 import { useTTS } from '@/lib/use-tts';
 import { sfxCorrect, sfxWrong, sfxComplete } from '@/lib/sfx';
 import { useFavorites } from '@/lib/use-favorites';
@@ -106,6 +112,12 @@ function getAllSentences(hookSentences: ISpellingSentence[]): ISpellingSentence[
   if (_wbCacheAll) return [...hookSentences, ..._wbCacheAll];
   return [...hookSentences, ...Object.values(_wbCache).flat()];
 }
+
+/**
+ * 断点续学按词书（level）分键 —— 实现与迁移都在 `src/lib/spelling-resume.ts`（纯逻辑，
+ * 可被 `scripts/verify-spelling-resume.mjs` 注入替身真跑）。原先这里是单个全局键
+ * `__nativethink_spelling_resume`，只能记住一本的位置。
+ */
 
 /** Select blank indices for fill mode — prefer longer (content) words */
 function selectBlanks(words: string[]): number[] {
@@ -964,15 +976,13 @@ export default function SpellingPage() {
   }, [extractLevelSentences, rebuildSession]);
 
   // ── Position memory (resume last position) ──
-  const RESUME_KEY = '__nativethink_spelling_resume';
   const resumeTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const pendingResumeIndex = useRef<number | null>(null);
   const resumeDoneRef = useRef(false);
+  /** 落盘按 level 分键 —— 在 A 书写下的位置不会因为切去 B 书而被抹掉 */
   const persistPosition = useCallback((level: string, idx: number) => {
     if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
-    resumeTimerRef.current = setTimeout(() => {
-      try { safeStorage.setItem(RESUME_KEY, JSON.stringify({ activeLevel: level, currentIndex: idx })); } catch { /* ignore */ }
-    }, 200);
+    resumeTimerRef.current = setTimeout(() => persistResume(level, idx), 200);
   }, []);
 
   // Save position when index or level changes
@@ -992,42 +1002,32 @@ export default function SpellingPage() {
   useEffect(() => {
     if (autoEnterRef.current) return;
     autoEnterRef.current = true;
-    try {
-      const raw = safeStorage.getItem(RESUME_KEY);
-      if (!raw) return; // 首次使用 → 显示词书选择页
-      const saved = JSON.parse(raw);
-      if (!saved?.activeLevel) return;
-      (async () => {
-        setAutoEntering(true);
-        try {
-          if (saved.activeLevel === 'all') {
-            // 「全部词库」同样要带上断点位置 —— 此前只重建词库，位置丢失回到第 1 句
-            pendingResumeIndex.current = saved.currentIndex ?? 0;
-            await handleBuildDatabase();
-          } else {
-            pendingResumeIndex.current = saved.currentIndex ?? 0;
-            await handleLevelChange(saved.activeLevel);
-          }
-        } catch { /* ignore */ }
-        // 加载失败（缓存仍为空）→ 回退到词书选择页
-        if (getWBSentences().length === 0) setAutoEntering(false);
-      })();
-    } catch { /* ignore */ }
+    migrateLegacyResume();
+    const savedLevel = readLastResumeLevel();
+    if (!savedLevel) return; // 首次使用 → 显示词书选择页
+    const savedIndex = readResumeIndex(savedLevel) ?? 0;
+    (async () => {
+      setAutoEntering(true);
+      pendingResumeIndex.current = savedIndex;
+      try {
+        if (savedLevel === 'all') await handleBuildDatabase();
+        else await handleLevelChange(savedLevel);
+      } catch { /* ignore */ }
+      // 加载失败（缓存仍为空）→ 回退到词书选择页
+      if (getWBSentences().length === 0) setAutoEntering(false);
+    })();
   }, []);
 
   // Restore saved position on mount (after sentences are loaded)
   useEffect(() => {
     if (sentences.length === 0 || resumeDoneRef.current) return;
     resumeDoneRef.current = true;
-    try {
-      const raw = safeStorage.getItem(RESUME_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      if (saved.activeLevel && saved.activeLevel !== 'all' && saved.activeLevel !== activeLevel) {
-        pendingResumeIndex.current = saved.currentIndex ?? 0;
-        handleLevelChange(saved.activeLevel);
-      }
-    } catch { /* ignore */ }
+    migrateLegacyResume();
+    const savedLevel = readLastResumeLevel();
+    if (savedLevel && savedLevel !== 'all' && savedLevel !== activeLevel) {
+      pendingResumeIndex.current = readResumeIndex(savedLevel) ?? 0;
+      handleLevelChange(savedLevel);
+    }
   }, [sentences.length]);
 
   // Progress  // Progress

@@ -603,13 +603,20 @@ export default function ChunkTrainingPage() {
     } catch { return new Set<string>(); }
   });
   const [memoryFilter, setMemoryFilter] = useState<'all' | 'memorized' | 'unmemorized'>('all');
+  /**
+   * 落盘走 persist effect（原先写在 setMemorizedChunks 的 updater 里 —— StrictMode 双调用
+   * 会把同一份数据写两遍，且违反"capped-cache.ts:32-35 的 updater 保持纯"约定）。
+   * 初始值来自 useState 的同步读取，所以首帧就把已有数据原样写回，不会抹掉历史。
+   */
+  useEffect(() => {
+    try { safeStorage.setItem(MEMORIZED_KEY, JSON.stringify([...memorizedChunks])); } catch { /* */ }
+  }, [memorizedChunks]);
   const toggleMemorized = (chunkId: string) => {
-    setMemorizedChunks((prev) => {
-      const next = new Set(prev);
-      if (next.has(chunkId)) { next.delete(chunkId); } else { next.add(chunkId); }
-      try { safeStorage.setItem(MEMORIZED_KEY, JSON.stringify([...next])); } catch { /* */ }
-      return next;
-    });
+    // updater 保持纯：StrictMode 会双调用更新函数，原先在里面写 safeStorage 等于写两遍
+    // （见 src/lib/capped-cache.ts:32-35 的同款约定）。落盘交给下面的 persist effect。
+    const next = new Set(memorizedChunks);
+    if (next.has(chunkId)) { next.delete(chunkId); } else { next.add(chunkId); }
+    setMemorizedChunks(next);
   };
 
   // Apply memory filter to built-in chunks

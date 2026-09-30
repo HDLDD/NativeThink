@@ -8,6 +8,7 @@
 
 
 ## 2026-09-30
+- fix(chunks,feedback,copy): 短语库按测量结果折叠；反馈历史区分已送达/已留档；体积与练法文案纠正 (`ca61085`)
 - fix(ai-parse,chunks,conversation,quickcard): 补齐清单里剩下四项，并把 AI 解析约定做成全仓守卫 (`8e9cf74`)
 - fix(cloud-sync): 抑制下行回声、失败不再全静默、周期任务不再无条件全量重推 (`519defd`)
 - fix(backup): 导出学习数据真的带上整书对照翻译缓存 (`c5e60a7`)

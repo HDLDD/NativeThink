@@ -90,7 +90,15 @@ export function BuildPractice() {
         ],
         { temperature: 0.3, maxTokens: 1200, signal: ctrl.signal, task: 'chat' },
       );
-      setFeedback(out || '（没有返回内容，请重试）');
+      // 空串 = 服务不可用（use-ai.ts:82-85 吞掉异常后返回 ''）。
+      // 不判空时原先写 `setFeedback(out || '（没有返回内容，请重试）')` 然后**照样 +0.5 分钟** ——
+      // 用户看到的是一段假反馈，进度环也涨了；而且提示"请重试"意味着同一次作答会被记第二遍。
+      // 现在：假反馈与重复记账一起去掉 —— 只有真拿到反馈才落反馈、才计时长。
+      if (!out.trim()) {
+        toast.error('AI 服务暂不可用，你的句子已保留，可稍后重试');
+        return;
+      }
+      setFeedback(out);
       addStudyMinutes(0.5, 'sentences');
     } catch (e) {
       if (!ctrl.signal.aborted) toast.error('反馈生成失败，请稍后重试');

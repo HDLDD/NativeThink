@@ -65,16 +65,15 @@ export default function ThinkInEnglishPage() {
     } catch { return []; }
   });
   const recordDetectorHistory = (input: string) => {
-    setDetectorHistory((prev) => {
-      const next = [input, ...prev.filter((s) => s !== input)].slice(0, 8);
-      try {
-        const raw = safeStorage.getItem('__nativethink_practice_history');
-        const list: unknown[] = raw ? JSON.parse(raw) : [];
-        list.unshift({ type: 'detector', userInput: input, feedback: '', createdAt: Date.now() });
-        safeStorage.setItem('__nativethink_practice_history', JSON.stringify(list.slice(0, 50)));
-      } catch { /* ignore */ }
-      return next;
-    });
+    // updater 必须是纯的：原先在这里面 getItem → unshift → setItem，
+    // StrictMode 双调用 updater 会把**同一条历史写两遍**（`capped-cache.ts:32-35` 就是这条约定）。
+    // 所以状态更新与落盘都移到事件层，updater 只留去重与截断。
+    const raw = safeStorage.getItem('__nativethink_practice_history');
+    let list: unknown[] = [];
+    try { list = raw ? JSON.parse(raw) : []; } catch { list = []; }
+    list.unshift({ type: 'detector', userInput: input, feedback: '', createdAt: Date.now() });
+    try { safeStorage.setItem('__nativethink_practice_history', JSON.stringify(list.slice(0, 50))); } catch { /* ignore */ }
+    setDetectorHistory((prev) => [input, ...prev.filter((s) => s !== input)].slice(0, 8));
   };
 
   // Translation exercise

@@ -37,7 +37,9 @@
     "verify:shadowing-completion": "node scripts/verify-shadowing-completion.mjs",
     "verify:backup-idb": "node scripts/verify-backup-idb.mjs",
     "verify:cloud-sync": "node scripts/verify-cloud-sync-hygiene.mjs",
-    "verify:ai-parse": "node scripts/verify-ai-parse.mjs"
+    "verify:ai-parse": "node scripts/verify-ai-parse.mjs",
+    "verify:spelling-resume": "node scripts/verify-spelling-resume.mjs",
+    "verify:sentence-lab": "node scripts/verify-sentence-lab.mjs"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "^8.0.2",

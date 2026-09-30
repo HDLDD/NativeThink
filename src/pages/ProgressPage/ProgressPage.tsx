@@ -44,6 +44,7 @@ import { usePageMemory } from '@/lib/use-page-memory';
 import { EmptyState } from '@/components/EmptyState';
 import { safeStorage } from '@/lib/safe-storage';
 import { exportBackup, importBackup, type IBackupFile } from '@/lib/backup';
+import { clearAllResume, resumeStorageWithKeys } from '@/lib/spelling-resume';
 import { WORD_COUNTS } from '@/data/wordbank/meta';
 import { cn, cleanText, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -111,11 +112,14 @@ export default function ProgressPage() {
     toast.success('学习统计已重置');
     setShowResetDialog(false); setResetConfirm(null);
   };
-  /** 句子拼写：进度 + 已完成 + 出题记录 + 导入词书 */
+  /** 句子拼写：进度 + 已完成 + 出题记录 + 导入词书 + 断点（按词书分键，必须枚举） */
   const handleResetSpelling = () => {
     for (const k of ['__nativethink_spelling_progress', '__nativethink_spelling_completed', '__nativethink_spelling_served', '__nativethink_spelling_sentences', '__nativethink_spelling_round_size']) {
       safeStorage.removeItem(k);
     }
+    // 断点键是 `__nativethink_spelling_resume_<level>`（每本一个）+ `..._resume_last`，
+    // 写死列表清不干净；漏了它的表现是"重置后刷新又自动跳回上次那本词书"。
+    clearAllResume(resumeStorageWithKeys());
     toast.success('句子拼写进度已重置（刷新页面后生效）');
     setShowResetDialog(false); setResetConfirm(null);
   };

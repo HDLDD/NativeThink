@@ -59,17 +59,17 @@ src/data/sentence-lab.ts:448-452
 
 ## 3. 注意事项
 
-1. **主干判定的下标和数据数组不是同一个来源 —— 会静默错一个意群**。按钮来自 `stdParts`（`ChunkDrill.tsx:386` = `splitByBreaks(item.en, breaks)`），而判定用 `item.segments[backbonePick]?.r === 'core'`（`:119`），揭晓视图用 `resolved`（`:409-420` = `resolveSegments`）。三者只有在 `stdParts.length === item.segments.length` 时索引才等价，而 `standardBreaks` 里有两处会让长度掉下去：
+1. ~~主干判定的下标和数据数组不是同一个来源~~（**已修 2026-09-30**）：候选按钮改成来自 `backboneOptions`（由 `resolved` 逐块映射 `seg.t`，长度与 `item.segments` **恒等**），评分与候选从此同源。原缺陷：按钮来自 `stdParts`（= `splitByBreaks(item.en, breaks)`），判定却用 `item.segments[backbonePick]?.r === 'core'`，而 `standardBreaks` 有两处会让长度掉下去：
    - `wordStarts.findIndex((p) => p >= start)` 找不到时 `continue`（`sentence-parse.ts:88-90`）—— 该意群的断点被丢弃，`stdParts` 少一段；
    - 两个意群起点落在同一个词序号时，`Set` 去重 —— 同样少一段。
 
-   表现：**用户点了「看起来对」的那块，被判成选错主干**，且不报错。改切分口径后必须逐句核对 `stdParts.length === item.segments.length`。
-2. **`resolveSegments` 返回 `null` 时整条链塌成 1 段**：`standardBreaks` 返回空集 → `stdParts` 只有 1 段、只有一个主干按钮；`checkSplit` 里 `breaks.size === 0`，用户**什么都不切就算「断句完全正确 · 0 处断点全中」**。语料一旦改了原文而没同步改 `segments`，就会出现这种"看起来能玩其实全对"的静默退化。
+   **守卫里用真实语料把这个分歧跑出来了**（不是引用注释）：`I’m going home.` 按 `'I' / '’m' / 'going home.'` 切分时，`’m` 与 `going` 都映射到同一个词序号 → `stdParts` 只有 2 段而 `segments` 有 3 段 —— 旧写法下用户点「看起来对」的那块就被判成选错主干，且不报错。守卫：`npm run verify:sentence-lab`（16 断言，A 段真转译 `sentence-parse.ts`），变异实测把渲染改回 `stdParts.map` 会红 2 条。
+2. ~~定位失败时"什么都不切就算全对"~~（**已修 2026-09-30**）：`resolved === null` 现在被当作**数据问题**而不是成绩 —— `checkSplit` 提示「这句的标注与原文对不上，暂时无法判分」，`reveal` 在 `grade()` / `addStudyMinutes()` 之前直接 return，坏数据既不进复习队列也不涨进度环。判据用 `!resolved` 而不是 `breaks.size === 0`：单意群句子的断点本来就是 0，那是合法情形，不能被跳过计分（守卫专门钉了这条）。
 3. **`runDemo` 的定时器没有清理**（`ChunkDrill.tsx:134`）：`window.setTimeout(() => setPhase('reveal'), 1800)`。1.8s 窗口内换句或离开页面，`phase` 会被旧定时器推到 `reveal` 而内容是另一句。
 4. **生成器文件不能手改**：`sentence-lab-auto.ts:3` 写「请勿手改」，因为 `expand-sentence-corpus.cjs` 每次续跑用 `fs.writeFileSync` **整体重写**（`:22,380-396`），内容全来自进度文件 `scripts/.sentence-auto-state.json`（`:23,422,491`）。`sentence-explain.ts` 同理（状态 `.sentence-explain-state.json`，另有 `--rewrite` 全量重写）。手写两批 s01–s36 可以直接编辑，但要同时保证片段能逐字定位（见第 2 条）。
 5. **页头文案与语料不是一个口径**：`SentenceLabPage.tsx:47` 写「22 本公版书 + 30 篇演讲 + 站内刊物」，那是**素材池**（`books.ts:1` 22 本、`speeches.ts:29` 30 条）；语料里实际出现的标题是 19 本书 + 22 个演讲标签。别把这句当语料数。
-6. **造句即使失败也记 0.5 分钟**：`BuildPractice.tsx:93-94` `setFeedback(out || '（没有返回内容，请重试）')` 之后无条件 `addStudyMinutes(0.5, 'sentences')`。空串是「服务不可用」（`use-ai.ts:82-85`），这时不该记时长。
+6. ~~造句即使失败也记 0.5 分钟~~（**已修 2026-09-30**）：原先 `setFeedback(out || '（没有返回内容，请重试）')` 后**无条件** `addStudyMinutes(0.5)` —— 空串是服务不可用（`use-ai.ts:82-85`），用户既看到一段假反馈、进度环又涨了；而提示"请重试"意味着同一次作答会被记第二遍。现在空串直接 `toast.error` + return，只有真拿到反馈才落反馈、才计时长。
 7. **tab 状态不持久化**：`useState('explain')`（`SentenceLabPage.tsx:22`）。同页的 `writing-prompt-tab` 用了 `usePageMemory`，这里没用 —— 想改就一起改，别只改一处。
 8. **长句的断点列表是 O(n²)**：`ChunkDrill.tsx:313-343` 每个词 2 个按钮，`wordIdx` 用 `tokens.slice(0,i).filter(...)` 每格重算（`:315`）。
-9. **完全没有守卫**：`scripts/verify-*.mjs` 里 grep `SpellingPage|SentenceLab` 命中为 0。生成器的结构校验（`expand-sentence-corpus.cjs:6-8,305`：意群必须按序逐字出现在原句、必须有 core、字段齐全）只保证**写进数据的东西自洽**，不覆盖页面行为。改 `sentence-parse.ts` 的断点口径、改 `use-sentence-review.ts` 的 SM-2 规则，只能手动开 `/sentences` 逐句验。
+9. **守卫**：`npm run verify:sentence-lab`（16 断言）覆盖意群定位、断点丢弃导致的位置变化、主干候选与评分同源、坏数据不判分也不计时长；`npm run verify:ai-parse` 扫本页 AI 调用点。生成器的结构校验（`expand-sentence-corpus.cjs:6-8,305`：意群必须按序逐字出现在原句、必须有 core、字段齐全）只保证**写进数据的东西自洽**，不覆盖页面行为。**仍未被覆盖**：语法地图、句型库、句子精讲三个 tab —— 改它们还是要手动开 `/sentences` 逐 tab 看。
 10. **`sentence-explain.ts:5` 的注释指向 `sentence-grammar-link.ts`，该文件不存在**（同款注释在 `annotate-sentence-explain.cjs:106`）。语法映射的真实实现其实在 `SentenceExplain.tsx:35-53`。

@@ -348,6 +348,15 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
 
   // Auto-speak when sentence index changes while in "playing" mode
   const [autoPlay, setAutoPlay] = usePageMemory('shadowing-autoplay', false);
+  /**
+   * 依赖数组按「句子身份 + 开关」触发，不是原先的 `[currentSentenceIdx]`：
+   *  - 只用下标时，**换语料后下标相同 → 内容变了也不会重读**（用户看到新句子却没有声音，
+   *    或反过来旧语料的朗读进度条停在不存在的句子上）；改依赖为 `currentSentence` 即可覆盖。
+   *  - `playbackRate` / `accent` **刻意不进依赖**：它们是"下一句起生效"的参数 ——
+   *    拖语速滑杆时若重新触发，每动一格就把当前句从头再读一遍，比原来更糟。
+   *    `tts.speak` 是稳定引用（`use-tts.ts:827` 的 useCallback，deps 只有 ssCancel），
+   *    带着它是为了满足 exhaustive-deps，不会引起额外触发。
+   */
   useEffect(() => {
     if (autoPlay && currentSentence) {
       tts.speak(currentSentence.text, {
@@ -355,7 +364,7 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
         rate: playbackRate,
       });
     }
-  }, [currentSentenceIdx]);  
+  }, [autoPlay, currentSentence, tts.speak]);
 
   const prevSentence = useCallback(() => {
     tts.cancel();

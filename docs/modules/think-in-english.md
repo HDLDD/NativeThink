@@ -36,7 +36,7 @@
 
 ## 3. 注意事项
 
-1. **`addStudyMinutes(1, 'think')` 的四调用点（`:149/:228/:308/:435`）全在 `await` 之前** —— AI 失败也照记时长。用户什么都没学到，进度环却涨了。
+1. **`addStudyMinutes(1, 'think')` 的四调用点（`:149/:228/:308/:435`）在 `await` 之前** —— 这是**有意的**：记的是"用户提交了这道题的作答"这个动作本身，AI 只负责给反馈，反馈失败不撤销这次作答。真正的小瑕疵是**重复计**：失败后用户重交同一题会再 +1。改成"只在拿到反馈时计"会让"写了但 AI 挂了"那次彻底不计，两种口径都成立，但要选一个并写清楚 —— 现在选的是"按动作计"。
 2. **换题不 abort 正在跑的流**：`nextExercise`（`:375`）、`nextBackExercise`（`:400`）、`nextNativeExercise`（`:505`）只清 `input`/`result`，**不碰 `translationAbortRef`**；abort 只在卸载时执行（`:133-140`）。后果：**上一题的流式内容会写进下一题的结果框**。这是 AGENTS.md 坑表「换题目但旧异步回调还在跑」在本页的具体形态 —— 加任何"离开当前题"的路径都要显式 abort（对照写作页 `WritingPage.tsx:478-481` 的做法）。
 3. **`recordDetectorHistory` 在 `setDetectorHistory` 的 updater 内部写 safeStorage**（`:68-77`）。`src/index.tsx:86` 开着 StrictMode，updater 被双调用 → **同一条历史写两遍**。仓库规则：副作用提到事件层，updater 保持纯（`capped-cache.ts:32-35` 注释就是这个）。
 4. **三个 custom 键没有上限**（第 2 节表格），与「按条累积的缓存一律走 `capped-cache.ts`」的约定不符。

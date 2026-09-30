@@ -41,7 +41,8 @@
     - ~~**快速闪卡不读 `__nativethink_vocab_autospeak`**~~（**已修**：读键门控朗读 effect + 进度行加开关，默认开与其余三处同口径 —— 真机上别处的提示语本来就写着「与快速闪卡共用此设置」。`verify:vocab-cards` 补 10 条断言，含「门控必须位于 `tts.speak` 之前」的正对照）。
     - ~~反馈历史把 `stored` 显示成「已送达」~~（**已修**：新增 `pushed` 字段，历史标签分「已送达 / 已留档（未即时推送）/ 服务端已收到」三档；`verify:feedback-loop` 那条 `markSynced` 断言按新语义**重新推导**而不是放宽，另加一刀切标签的正对照）。
     - ~~文案口径~~（**已修**：设置页改成「约 780MB；另需 22.5MB 运行时」并带上实测字节数；`使用攻略.md` 拼写一段改成真实的 2 种练法 × 2 种播放）。
-    - **仍未修**：句子学习主干判定三处索引不同源（`stdParts` / `item.segments` / `resolved`）；拼写断点键不按 level 分；多处 `addStudyMinutes` 写在 await 之前（失败也记时长）；云同步下行只有 3 个 hook 订阅（其余持陈旧内存态）；写作/拼写/语块的自定义条目缓存无 `capped-cache` 上限；`ShadowingPage` autoplay effect 依赖数组不全。
+    - ~~句子学习主干判定三处索引不同源~~、~~拼写断点键不按 level 分~~、~~`ShadowingPage` autoplay effect 依赖数组不全~~（**均已修**：主干候选改由 `resolved` 映射，与评分同源；断点抽成 `src/lib/spelling-resume.ts` 按 level 分键 + 一次性迁移 + 重置按前缀枚举；autoplay 依赖换成句子身份（语速/口音刻意不进依赖，否则拖滑杆会把当前句从头重读）。新增 `verify:sentence-lab` 16 断言与 `verify:spelling-resume` 24 断言，都含正对照与变异实测）。
+    - **仍未修**：多处 `addStudyMinutes` 写在 `await` 之前（思维 4 处、对话 1 处、语块 1 处、造句失败也记）—— AI 挂了进度环照涨；云同步下行只有 3 个 hook 订阅，其余持陈旧内存态；写作/拼写/语块的自定义条目缓存没走 `capped-cache` 上限；语块接龙判定把「非 FAIL 即通过」当默认（改严会误伤正确造句，动之前先想清楚）。
 
 
 ## 打包

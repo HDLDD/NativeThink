@@ -72,6 +72,20 @@ export function ChunkDrill() {
   const breaks = useMemo(() => standardBreaks(item), [item]);
   const resolved = useMemo(() => resolveSegments(item), [item]);
   const stdParts = useMemo(() => splitByBreaks(item.en, breaks), [item, breaks]);
+  /**
+   * 主干候选必须与**评分用的数组同源**。
+   * 历史缺陷：候选按钮来自 `stdParts`（把整句按断点切开），而判定用
+   * `item.segments[backbonePick]?.r === 'core'`。两者只在 `standardBreaks` 一个断点都没丢
+   * 的时候等长 —— 而 `sentence-parse.ts:88-90` 有两处会让断点数掉下来
+   * （意群起点落在最后一个词之后 → `findIndex` 返回 -1 被 continue；
+   *   两个意群起点落在同一个词 → Set 去重）。一旦少一段，索引整体错位，
+   *   用户点了真正的主干却被判选错，且不报错。
+   * `resolved` 是 `item.segments` 逐块定位的结果，长度与 segments 恒等 → 用它出题。
+   */
+  const backboneOptions = useMemo(
+    () => (resolved ? resolved.map((r) => r.seg.t.trim()) : stdParts),
+    [resolved, stdParts],
+  );
   const coreCount = useMemo(() => item.segments.filter((s) => s.r === 'core').length, [item]);
   const faved = isFavorited(item.en, 'expression');
 
@@ -109,13 +123,25 @@ export function ChunkDrill() {
     const wrong = userBreaks.size - hit;
     setScore({ hit, missed, wrong });
     setPhase('backbone');
-    if (missed === 0 && wrong === 0) toast.success(`断句完全正确 · ${breaks.size} 处断点全中`);
+    /**
+     * `resolveSegments` 返回 null 只有一种可能：数据里某片段的文本在原句中对不上
+     * （`sentence-parse.ts:29-49` 逐块定位失败）。这时 `standardBreaks` 直接返回空集
+     * （`:74-75`），"什么都不切"会被算成「断句完全正确 · 0 处断点全中」——
+     * 那是**数据坏了的假成功**，不能当成绩。
+     * 注意判据是 `!resolved` 而不是 `breaks.size === 0`：单意群的句子断点本来就是 0，
+     * 那是合法情形，不该被跳过计分。
+     */
+    if (!resolved) {
+      toast.info('这句的标注与原文对不上，暂时无法判分（已跳过计分）', { duration: 2600 });
+    } else if (missed === 0 && wrong === 0) toast.success(`断句完全正确 · ${breaks.size} 处断点全中`);
     else toast.info(`命中 ${hit}/${breaks.size} · 漏切 ${missed} · 多切 ${wrong}`);
   };
 
   /** 揭晓即结账：把这次表现折算成 SM-2 的 quality 记入复习队列 */
   const reveal = () => {
     setPhase('reveal');
+    // 定位失败时不参与排期：既不记成绩也不加时长，免得坏数据把复习队列和进度都污染
+    if (!resolved) return;
     const splitPerfect = !!score && score.missed === 0 && score.wrong === 0;
     const backboneRight = backbonePick !== null && item.segments[backbonePick]?.r === 'core';
     const quality = splitPerfect && backboneRight ? 5 : backboneRight ? 3 : 2;
@@ -383,7 +409,7 @@ export function ChunkDrill() {
                   第 2 步：哪一块是这句的主干（谁 + 做了什么）？
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {stdParts.map((p, i) => (
+                  {backboneOptions.map((p, i) => (
                     <button
                       key={i}
                       type="button"

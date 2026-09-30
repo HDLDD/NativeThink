@@ -31,7 +31,7 @@
 
 朗读：`autoRead` 开则开场白自动读（`:222`，默认语速），回复读**末 500 字符**、rate **0.95**（`:313-315`）；手动喇叭 `:990`。**未接** `__nativethink_vocab_autospeak`。
 
-学习时长：只有 `:248` 一处 `addStudyMinutes(1, 'conversation')`，**在 await 之前 → 发送失败也记**。
+学习时长：只有 `:248` 一处 `addStudyMinutes(1, 'conversation')`，在 `await` 之前 —— 记的是"发了一句"这个动作，AI 回复失败不撤销它（与思维训练同口径）；代价是重发同一句会再记一次。
 
 ## 3. 注意事项
 
