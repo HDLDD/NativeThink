@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAI } from '@/hooks/use-ai';
 import { useTTS } from '@/lib/use-tts';
 import { useFavorites } from '@/lib/use-favorites';
-import { useLearningStats } from '@/lib/use-learning-stats';
+import { useStudyCredit, creditKey } from '@/lib/study-credit';
 import { cn } from '@/lib/utils';
 import { MOCK_BACK_TRANSLATIONS } from '@/data/backtranslation';
 
@@ -35,7 +35,7 @@ export function BuildPractice() {
   const { isConfigured, chat } = useAI();
   const { speak } = useTTS();
   const { addFavorite } = useFavorites();
-  const { addStudyMinutes } = useLearningStats();
+  const { creditOnce } = useStudyCredit();
 
   const pool = useMemo(
     () => MOCK_BACK_TRANSLATIONS.filter((b) => b.referenceSentence && b.keyword).slice(0, 400),
@@ -99,7 +99,9 @@ export function BuildPractice() {
         return;
       }
       setFeedback(out);
-      addStudyMinutes(0.5, 'sentences');
+      // 这一处刻意保持「拿到反馈才计」（AI 反馈就是这次练习的产物，见 sentence-lab.md §3.6），
+      // 但重试成功不再重复计 —— 同一题同一句只放行一次。
+      creditOnce('sentences', creditKey('build', item.keyword, text), 0.5);
     } catch (e) {
       if (!ctrl.signal.aborted) toast.error('反馈生成失败，请稍后重试');
     } finally {

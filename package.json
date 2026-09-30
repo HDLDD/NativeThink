@@ -40,6 +40,7 @@
     "verify:cloud-sync": "node scripts/verify-cloud-sync-hygiene.mjs",
     "verify:ai-parse": "node scripts/verify-ai-parse.mjs",
     "verify:spelling-resume": "node scripts/verify-spelling-resume.mjs",
+    "verify:study-credit": "node scripts/verify-study-credit.mjs",
     "verify:sentence-lab": "node scripts/verify-sentence-lab.mjs"
   },
   "dependencies": {

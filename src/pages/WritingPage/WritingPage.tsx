@@ -37,6 +37,7 @@ import { getCapabilityClient } from '@/lib/capability-client';
 import { toast } from 'sonner';
 import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { useLearningStats } from '@/lib/use-learning-stats';
+import { useStudyCredit, creditKey } from '@/lib/study-credit';
 import { Heart } from 'lucide-react';
 import { useFavorites } from '@/lib/use-favorites';
 import { useAI } from '@/hooks/use-ai';
@@ -354,6 +355,7 @@ const WRITING_PROMPTS: IWritingPrompt[] = [
 
 export default function WritingPage() {
   const { addStudyMinutes } = useLearningStats();
+  const { creditOnce } = useStudyCredit();
   const { isConfigured, streamChat: aiStream, chat: aiChat } = useAI();
   const tts = useTTS();
   const [promptTab, setPromptTab] = usePageMemory('writing-prompt-tab', 'all');
@@ -494,7 +496,9 @@ export default function WritingPage() {
     setIsSubmitting(true);
     setFeedback('');
     setTimerRunning(false);
-    addStudyMinutes(3, 'writing');
+    // 交一篇作文记 3 分钟，按动作计（批改失败不撤销这次真实写作）；
+    // 但同一题同一篇只记一次 —— 批改挂了连点提交不再刷 +3。
+    creditOnce('writing', creditKey('submit', selectedPrompt.id, text), 3);
 
     const controller = new AbortController();
     abortRef.current = controller;

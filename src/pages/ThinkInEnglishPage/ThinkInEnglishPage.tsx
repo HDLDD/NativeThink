@@ -28,7 +28,7 @@ import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { MOCK_THINK_EXERCISES, type IThinkExercise } from '@/data/thinkexercises';
 import { MOCK_BACK_TRANSLATIONS, type IBackTranslation } from '@/data/backtranslation';
 import { MOCK_NATIVE_TRANSLATES, type INativeTranslate } from '@/data/nativetranslate';
-import { useLearningStats } from '@/lib/use-learning-stats';
+import { useStudyCredit, creditKey } from '@/lib/study-credit';
 import { useFavorites } from '@/lib/use-favorites';
 import { useAI } from '@/hooks/use-ai';
 import { useTTS } from '@/lib/use-tts';
@@ -44,7 +44,7 @@ const EXAMPLE_SENTENCES = [
 ];
 
 export default function ThinkInEnglishPage() {
-  const { addStudyMinutes } = useLearningStats();
+  const { creditOnce } = useStudyCredit();
   const { isConfigured, streamChat: aiStream, chat: aiChat } = useAI();
   const { addFavorite, removeFavorite, isFavorited, favorites } = useFavorites();
   const tts = useTTS();
@@ -145,7 +145,8 @@ export default function ThinkInEnglishPage() {
 
     setDetectorLoading(true);
     setDetectorResult('');
-    addStudyMinutes(1, 'think');
+    // 口径：按「提交了这次作答」的动作计时；同一题同一句只记一次（连点不刷进度环）
+    creditOnce('think', creditKey('detector', input));
 
     const controller = new AbortController();
     detectorAbortRef.current = controller;
@@ -205,6 +206,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
           }
         }
       }
+      // 历史只在真拿到内容时留档；计时按「提交这次作答」的动作计（见 study-credit.ts 头部口径说明）
       if (full.trim()) recordDetectorHistory(input);
     } catch (err) {
       toast.error('AI 服务暂不可用，请稍后重试');
@@ -224,7 +226,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
     setTranslationLoading(true);
     setTranslationResult('');
     setShowNativeRef(true);
-    addStudyMinutes(1, 'think');
+    creditOnce('think', creditKey('translation', exercise.prompt, input));
 
     const controller = new AbortController();
     translationAbortRef.current = controller;
@@ -304,7 +306,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
     setBackLoading(true);
     setBackResult('');
     setShowBackRef(true);
-    addStudyMinutes(1, 'think');
+    creditOnce('think', creditKey('back', exercise.keyword, input));
 
     const controller = new AbortController();
     backAbortRef.current = controller;
@@ -431,7 +433,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
     setNativeLoading(true);
     setNativeResult('');
     setShowNativeThinkRef(true);
-    addStudyMinutes(1, 'think');
+    creditOnce('think', creditKey('native', exercise.chineseText, input));
 
     const controller = new AbortController();
     nativeAbortRef.current = controller;

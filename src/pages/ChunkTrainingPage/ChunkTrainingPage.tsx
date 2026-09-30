@@ -49,6 +49,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { MOCK_CHUNKS, type IChunk } from '@/data/chunks';
 import { useFavorites } from '@/lib/use-favorites';
 import { useLearningStats } from '@/lib/use-learning-stats';
+import { useStudyCredit, creditKey } from '@/lib/study-credit';
 import { usePhraseLearning } from '@/lib/use-phrase-learning';
 import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
 import { useStableShuffle } from '@/lib/use-stable-shuffle';
@@ -169,6 +170,7 @@ export default function ChunkTrainingPage() {
   const { addFavorite, removeFavorite, isFavorited, favorites } = useFavorites();
   const tts = useTTS();
   const { addStudyMinutes } = useLearningStats();
+  const { creditOnce } = useStudyCredit();
   const { isConfigured, streamChat: aiStream, chat: aiChat } = useAI();
 
   const [memory, setMemory] = usePageMemory('chunk-page', { tab: 'library', category: 'all', difficulty: 'all' });
@@ -724,7 +726,8 @@ export default function ChunkTrainingPage() {
 
     setChainLoading(true);
     setChainFeedback(null);
-    addStudyMinutes(1, 'chunks');
+    // 口径同思维训练/对话：按「交了这次造句」的动作计时，同一语块同一句只记一次
+    creditOnce('chunks', creditKey('chain', chunkContent, input));
 
     const controller = new AbortController();
     chainAbortRef.current = controller;

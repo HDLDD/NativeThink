@@ -41,7 +41,7 @@
 | `__nativethink_writing_history` | 落盘 `slice(-50)`（`:418`），首页只列最后 5 条（`:867`），点开走历史 Dialog（`:888-902`） |
 | `__nativethink_custom_prompts` | 每次 `customPrompts` 变化整份重写（`:432-434`） |
 
-学习时长：选题 +0.5（`:487`），提交批改 +3（`:497`）→ `moduleProgress.writing`。收藏类型 `writing_prompt`，`content = prompt.title`（`:1140-1150`）。
+学习时长：选题 +0.5（`:489`，本地动作直调 `addStudyMinutes`），提交批改 +3（`:501` 走 `creditOnce('writing', creditKey('submit', selectedPrompt.id, text), 3)` —— 按交卷动作计，同一题同一篇只记一次，批改失败连点不再刷 +3）→ `moduleProgress.writing`。收藏类型 `writing_prompt`，`content = prompt.title`（`:1140-1150`）。
 
 ## 3. 注意事项
 

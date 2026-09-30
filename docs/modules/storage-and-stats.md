@@ -40,6 +40,7 @@
 - **以 localStorage 为权威源**：`addStudyMinutes` 先 `readStatsFromStorage()` 拿 base 再叠加（`:244-246`），因为多组件实例的本地 state 可能过期；写完 `notifyChanged` 广播（`:278`）。
 - 跨实例同步：`STATS_CHANGED_EVENT = 'nativethink-stats-changed'`、`CALENDAR_CHANGED_EVENT = 'nativethink-calendar-changed'`（`:9-10`），hook 内已订阅并重读（`:212-216`），带防回环（重读回来的同内容不回写）。还订阅 `visibilitychange` 检查（`:169`）与 `nativethink-sync-down`（`:204`）。
 - `addStudyMinutes(minutes, moduleKey)` 的真实语义（`:266-271`）：`moduleProgress[key] += minutes * 0.5`，**上限 100**；`todayMinutes` 与日历按原值累加。
+- **一次调用动四处**（今日分钟数 / 进度环 / 日历 `checkedIn+minutes` / 跨零点的连胜与总天数），所以"重复计"的代价不止进度环。提交类动作（思维 4 处、对话、语块接龙、写作交卷、句子学习造句）2026-09-30 起统一经 `src/lib/study-credit.ts` 的闸门：`creditOnce(module, creditKey(动作, 题面, 用户原文), minutes)` —— 同一键只放行一次，FIFO 保留 400 条。**本地动作**（闪卡翻面、拼写判分、语块复习打分、选择题判定）仍直调 `addStudyMinutes`，不许被套上闸门。口径分裂是有意的：思维/对话/接龙按**动作**计，句子学习造句按**拿到反馈**计，见 `verify:study-credit` ④。
 - 跨零点：`lastStudyDate !== today` 时 `todayMinutes` 归零、`streakDays` 只在"昨天也学过"时 +1 否则重置为 1、`totalDays + 1`（`:249-260`）。
 - 日期一律 `formatDate()`（本地日期，`:243`）。
 

@@ -15,7 +15,7 @@
 | 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
 | 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-09 两轮全站质量优化已把拼写/跟读/写作/对话/语块也扫过一遍 |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 18 个 `scripts/verify-*.mjs` 断言脚本（2026-09-30 实测 vocab-cards 284；其余最近一次全绿记录与完整断言数见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 19 个 `scripts/verify-*.mjs` 断言脚本（2026-09-30 实测 vocab-cards 284；其余最近一次全绿记录与完整断言数见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
 | 改某个模块前 | 读 [`docs/modules/`](./modules/) 里对应那一篇 —— 功能、实现方法、以及**逐条读代码核实过**的注意事项（本手册与 AGENTS.md 的若干旧说法在那里被推翻并已修正） |
 | 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
@@ -218,7 +218,7 @@ adb install -r release/NativeThink-mobile-debug.apk
 |---|---|---|
 | 静态 | `npm run typecheck` + `npm run lint:eslint` | 全量；pre-commit 强制 |
 | 构建 | `npm run build:web` | 打包可行性 + chunk 体积 |
-| 契约 | 18 个 `scripts/verify-*.mjs`（全表见 [modules/verification.md](./modules/verification.md)） | 词库加载/拆分、书目元数据、背单词卡片（含换卡节奏数值锁 + 答错重排延后 + 换书路径）、背单词缓存、TTS 切片与进度、TTS 降级、反馈链路（前后端对接 + 后端替身执行）、拼写断点分键、跟读完成索引、云同步卫生、AI 解析约定、长列表折叠等 |
+| 契约 | 19 个 `scripts/verify-*.mjs`（全表见 [modules/verification.md](./modules/verification.md)） | 词库加载/拆分、书目元数据、背单词卡片（含换卡节奏数值锁 + 答错重排延后 + 换书路径）、背单词缓存、TTS 切片与进度、TTS 降级、反馈链路（前后端对接 + 后端替身执行）、拼写断点分键、跟读完成索引、云同步卫生、AI 解析约定、长列表折叠、复习词汇文章选词/分篇/出队、学习时长记账闸门等 |
 | 真机 | adb + CDP（见第 7 节） | 只能在设备上发现的：safe-area、原生 TTS、手势、持久化 |
 
 **写守卫脚本的经验（血泪）**：

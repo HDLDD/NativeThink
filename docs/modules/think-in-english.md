@@ -36,7 +36,7 @@
 
 ## 3. 注意事项
 
-1. **`addStudyMinutes(1, 'think')` 的四调用点（`:149/:228/:308/:435`）在 `await` 之前** —— 这是**有意的**：记的是"用户提交了这道题的作答"这个动作本身，AI 只负责给反馈，反馈失败不撤销这次作答。真正的小瑕疵是**重复计**：失败后用户重交同一题会再 +1。改成"只在拿到反馈时计"会让"写了但 AI 挂了"那次彻底不计，两种口径都成立，但要选一个并写清楚 —— 现在选的是"按动作计"。
+1. **四个提交点的计时口径：按动作计 + 同一作答只记一次**（`:149/:229/:309/:436` 改成 `creditOnce('think', creditKey(动作类型, 题面, 用户原文))`，闸门在 `src/lib/study-credit.ts`）。记的是"提交了这道题的作答"这个动作本身 —— AI 只负责给反馈，反馈失败不撤销这次真实投入；但同一题同一句**连点只放行一次**（2026-09-30 前的破口正是"失败后重交同一题再 +1"，而 `addStudyMinutes` 一次动今日分钟数、进度环、日历与连胜四处）。刻意**不**改成"拿到反馈才计"：那会让"写了但 AI 挂了"那次彻底归零。`npm run verify:study-credit` 钉住两个方向（口径不许往任一方向漂），变异测试 M1=绕过闸门、M2=改成请求后才计、M11=键里去掉题面。历史留档仍按内容判（`if (full.trim()) recordDetectorHistory(input)`，`:209`）。
 2. **换题不 abort 正在跑的流**：`nextExercise`（`:375`）、`nextBackExercise`（`:400`）、`nextNativeExercise`（`:505`）只清 `input`/`result`，**不碰 `translationAbortRef`**；abort 只在卸载时执行（`:133-140`）。后果：**上一题的流式内容会写进下一题的结果框**。这是 AGENTS.md 坑表「换题目但旧异步回调还在跑」在本页的具体形态 —— 加任何"离开当前题"的路径都要显式 abort（对照写作页 `WritingPage.tsx:478-481` 的做法）。
 3. **`recordDetectorHistory` 在 `setDetectorHistory` 的 updater 内部写 safeStorage**（`:68-77`）。`src/index.tsx:86` 开着 StrictMode，updater 被双调用 → **同一条历史写两遍**。仓库规则：副作用提到事件层，updater 保持纯（`capped-cache.ts:32-35` 注释就是这个）。
 4. **三个 custom 键没有上限**（第 2 节表格），与「按条累积的缓存一律走 `capped-cache.ts`」的约定不符。

@@ -35,7 +35,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { getCapabilityClient } from '@/lib/capability-client';
 import { toast } from 'sonner';
 import { PLUGIN_IDS } from '@/lib/plugin-ids';
-import { useLearningStats } from '@/lib/use-learning-stats';
+import { useStudyCredit, creditKey } from '@/lib/study-credit';
 import { useAI } from '@/hooks/use-ai';
 import { cn } from '@/lib/utils';
 import { useCustomScenarios, ICON_OPTIONS, COLOR_OPTIONS, type IconName } from '@/lib/use-custom-scenarios';
@@ -134,7 +134,7 @@ const ICON_MAP: Record<IconName, LucideIcon> = {
 };
 
 export default function ConversationPage() {
-  const { addStudyMinutes } = useLearningStats();
+  const { creditOnce } = useStudyCredit();
   const { isConfigured, streamChat: aiStream, chat: aiChat } = useAI();
   const { scenarios: customScenarios, addScenario, removeScenario } = useCustomScenarios();
   const tts = useTTS();
@@ -256,7 +256,8 @@ export default function ConversationPage() {
     setMessages(newMessages);
     setInput('');
     setIsLoading(true);
-    addStudyMinutes(1, 'conversation');
+    // 口径：按「发出去一句」的动作计时；同一场景同一句话只记一次（连点/重发不刷进度环）
+    creditOnce('conversation', creditKey('send', selectedScenario?.name, text));
 
     const controller = new AbortController();
     abortRef.current = controller;

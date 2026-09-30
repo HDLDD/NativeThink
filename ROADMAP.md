@@ -15,7 +15,7 @@
 - **朗读**：三级降级（内置 sherpa 离线 → 系统引擎 → 云端）。默认 piper lessac（真机 RTF **0.076**），Kokoro int8 11 个英语音色作音质选项（RTF **1.008**，长文物理上无法连续播放）；云端走 `functions/api/tts.js`，上游硬上限 200 字符 → 客户端切片上限 180。
 - **句子学习**：158 句语料（手写 24 + 补充 12 + 脚本自动标注 122），拆句 / 句型 / 造句 / 语法，含错句复习队列与跟读评价。
 - **端侧 AI 兜底**：随包 Qwen2.5-0.5B-Instruct（q4）+ Xenova/opus-mt-en-zh（q8）；打包版同源 `/models/` 零下载，网页版回落 hf-mirror。云端 AI 失败时 `streamChat/chat` 自动切端侧小模型。
-- **验证体系**：没有测试框架，靠 `typecheck` + `lint:eslint` + `build:web` + 17 个 `scripts/verify-*.mjs`（完整断言数表见 [docs/modules/verification.md](./docs/modules/verification.md)；2026-09-30 复测 vocab-cards 284、其余最近一次全绿 2026-09-29：loading 45 · books-meta 222 · vocab-caches 21 · tts-progress 6175 · tts-hardening 15 · feedback-loop 58 · overlay-fit 16 · bundle-budget 10 · list-scaling 18），再加**本机无头 Chrome + CDP 真点一遍**的行为验收（静态检查看不见"入口在但状态不写回"那类缺陷）。其中 `verify:feedback-loop` 会用忠实的 KV / webhook 替身**真实执行**反馈后端。
+- **验证体系**：没有测试框架，靠 `typecheck` + `lint:eslint` + `build:web` + 19 个 `scripts/verify-*.mjs`（完整断言数表见 [docs/modules/verification.md](./docs/modules/verification.md)；2026-09-30 复测 vocab-cards 284、新增 rv-articles 55 与 study-credit 74、其余最近一次全绿 2026-09-29：loading 45 · books-meta 222 · vocab-caches 21 · tts-progress 6175 · tts-hardening 15 · feedback-loop 58 · overlay-fit 16 · bundle-budget 10 · list-scaling 18），再加**本机无头 Chrome + CDP 真点一遍**的行为验收（静态检查看不见"入口在但状态不写回"那类缺陷）。其中 `verify:feedback-loop` 会用忠实的 KV / webhook 替身**真实执行**反馈后端。
 
 ## 下一步
 
@@ -42,7 +42,8 @@
     - ~~反馈历史把 `stored` 显示成「已送达」~~（**已修**：新增 `pushed` 字段，历史标签分「已送达 / 已留档（未即时推送）/ 服务端已收到」三档；`verify:feedback-loop` 那条 `markSynced` 断言按新语义**重新推导**而不是放宽，另加一刀切标签的正对照）。
     - ~~文案口径~~（**已修**：设置页改成「约 780MB；另需 22.5MB 运行时」并带上实测字节数；`使用攻略.md` 拼写一段改成真实的 2 种练法 × 2 种播放）。
     - ~~句子学习主干判定三处索引不同源~~、~~拼写断点键不按 level 分~~、~~`ShadowingPage` autoplay effect 依赖数组不全~~（**均已修**：主干候选改由 `resolved` 映射，与评分同源；断点抽成 `src/lib/spelling-resume.ts` 按 level 分键 + 一次性迁移 + 重置按前缀枚举；autoplay 依赖换成句子身份（语速/口音刻意不进依赖，否则拖滑杆会把当前句从头重读）。新增 `verify:sentence-lab` 16 断言与 `verify:spelling-resume` 24 断言，都含正对照与变异实测）。
-    - **仍未修**：多处 `addStudyMinutes` 写在 `await` 之前（思维 4 处、对话 1 处、语块 1 处、造句失败也记）—— AI 挂了进度环照涨；云同步下行只有 3 个 hook 订阅，其余持陈旧内存态；写作/拼写/语块的自定义条目缓存没走 `capped-cache` 上限；语块接龙判定把「非 FAIL 即通过」当默认（改严会误伤正确造句，动之前先想清楚）。
+    - ~~**多处 `addStudyMinutes` 写在 `await` 之前，重复提交重复记账**~~（**已修 2026-09-30**，但**先纠正这条记录本身**：计时写在请求之前是**刻意的「按动作计」口径**（写了但 AI 挂了那次是真实投入，不该归零），模块文档里本来就写着；真正的缺陷是**同一个作答重复提交会重复记账**，而 `addStudyMinutes` 一次动今日分钟数 / 进度环 / 日历 / 连胜四处。修法是新闸门 `src/lib/study-credit.ts`：`creditOnce(module, creditKey(动作, 题面, 用户原文), minutes)`，同一键只放行一次（FIFO 400）。接了思维 4 处、对话、语块接龙、写作交卷、句子学习造句（后者**保持**"拿到反馈才计"，只补去重）。新增 `npm run verify:study-credit`（74 断言 + 14 条变异全红），并用无头 Chrome + CDP 真点验收 31 项：AI 回 500 时第一次提交仍 +1、连点三次只 +1 且**三次请求真的发出去了**（正对照）、换句/换 tab 能再涨、连胜与总天数不被重复推高。**本地动作**（闪卡翻面、拼写判分、语块复习打分与选择题）刻意不套闸门，守卫 ④ 钉住这条。
+    - **仍未修**：云同步下行只有 3 个 hook 订阅，其余持陈旧内存态；写作/拼写/语块的自定义条目缓存没走 `capped-cache` 上限；语块接龙判定把「非 FAIL 即通过」当默认（改严会误伤正确造句，动之前先想清楚）。
 
 
 ## 打包

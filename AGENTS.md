@@ -47,7 +47,7 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 云同步与账号 | [modules/cloud-sync.md](./docs/modules/cloud-sync.md) | 两条上行口径不同；回声抑制/失败提示/按需补推由 `verify:cloud-sync` 守；仍只有 3 个 hook 订阅下行 |
 | 反馈链路 | [modules/feedback.md](./docs/modules/feedback.md) | 本机优先 + 三档诚实结果 + KV/飞书双出路；限流记账时机 |
 | 构建与发布 | [modules/build-release.md](./docs/modules/build-release.md) | 脚本地图与重复 bump、**缺资产静默出残包**、APK 版本线与产物命名 |
-| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 17 个契约守卫 + 无头 Chrome/CDP + 真机通道 + 写守卫四条硬规矩 |
+| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 19 个契约守卫 + 无头 Chrome/CDP + 真机通道 + 写守卫四条硬规矩 |
 
 ---
 
@@ -116,6 +116,7 @@ node scripts/verify-spelling-resume.mjs           # 24   拼写断点按词书�
 node scripts/verify-ai-parse.mjs                  # 10   AI 解析约定：24 个解析点判空 + 无贪婪正则（元判据固件自证）
 npm run verify:feedback-loop                      # 58   反馈链路（后端 handler 用忠实替身真实执行）
 npm run verify:rv-articles                        # 55   复习词汇文章：选词/分篇/用词出队/可重开（含旧 slice(0,10) 正对照）
+npm run verify:study-credit                       # 74   学习时长记账：闸门真跑 + 七个提交点接线 + 口径双向锁（本地动作不许套闸门）
 ```
 
 **数据生成 / 资产**：
@@ -287,7 +288,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 284 / 21 / 6175 / 15 / 16 / 10 / 18 / 23 / 16 / 18 / 10 / 16 / 24 / 55 + feedback-loop 58）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`（当前基线：45 / 222 / 284 / 21 / 6175 / 15 / 16 / 10 / 18 / 23 / 16 / 18 / 10 / 16 / 24 / 55 / 74 + feedback-loop 58）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`
