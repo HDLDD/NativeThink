@@ -15,7 +15,7 @@
 | 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
 | 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-09 两轮全站质量优化已把拼写/跟读/写作/对话/语块也扫过一遍 |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 18 条可跑的 `scripts/verify-*.mjs` 断言脚本（另有 verify-wordbank-split 需基线参数、verify-all 是全量跑法）（2026-09-30 实测 vocab-cards 303；其余最近一次全绿记录与完整断言数见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 18 条可跑的 `scripts/verify-*.mjs` 断言脚本（另有 verify-wordbank-split 需基线参数、verify-all 是全量跑法）（2026-10-01 实测 vocab-cards 310；其余最近一次全绿记录与完整断言数见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
 | 改某个模块前 | 读 [`docs/modules/`](./modules/) 里对应那一篇 —— 功能、实现方法、以及**逐条读代码核实过**的注意事项（本手册与 AGENTS.md 的若干旧说法在那里被推翻并已修正） |
 | 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
@@ -97,7 +97,6 @@ src/
 ├── components/
 │   ├── AppSidebar.tsx      侧边栏 + 路由预取 + 待复习角标
 │   ├── Header.tsx / Layout.tsx / MobileBottomNav.tsx
-│   ├── FitWord.tsx         长词自适应字号
 │   └── ui/                 shadcn 组件（勿改）
 ├── lib/                    ★ 业务逻辑主战场（见下表）
 ├── pages/<Page>/<Page>.tsx + components/
@@ -181,7 +180,7 @@ node scripts/verify-wordbank-loading.mjs     # 词库加载层集成验证（45 
 node scripts/verify-wordbank-split.mjs --baseline <out.json>   # 数据层拆分校验：采基线（拆分前后都能采）
 node scripts/verify-wordbank-split.mjs --check <in.json>
 npm run verify:books-meta        # 书目/SCP 元数据 + 书库拆分 + 复习词高亮 + 乱码（227 断言）
-npm run verify:vocab-cards       # 背单词卡片交互契约（303 断言；含换卡节奏数值锁 + 答错重排延后 + 换书路径）
+npm run verify:vocab-cards       # 背单词卡片交互契约（310 断言；含换卡节奏数值锁 + 答错重排延后 + 换书路径 + 单词字号三档）
 npm run verify:vocab-caches      # 词汇缓存基建契约（capped-cache / colloc-ai-cache 接线，21 断言）
 npm run verify:feedback-loop     # 反馈链路契约（挂载点 + 三档状态 + 后端 KV/飞书替身真实执行，58 断言）
 npm run verify:overlay-fit       # 窄视口浮层契约（Dialog 基座夹高度 + 朗读/AI 设置内部滚动，16 断言）
@@ -503,7 +502,7 @@ node scripts/device-eval.mjs back
 
 **改完代码**
 - [ ] `npm run typecheck`、`npm run lint:eslint`、`npm run build:web`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言（断言数以 [modules/verification.md](./modules/verification.md) 表格为准；2026-09-30 实测 vocab-cards 303 全绿）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言（断言数以 [modules/verification.md](./modules/verification.md) 表格为准；2026-10-01 实测 vocab-cards 310 全绿）
 - [ ] 改过词库文件 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 真机装机验证（涉及 safe-area / 原生 TTS / 手势 / 持久化的改动**必须**真机验；动手前先报备，收尾 `force-stop`）
 

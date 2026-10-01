@@ -14,7 +14,6 @@ import { findWord, getWordCounts, getTotalLearnableCount, preloadDetail } from '
 import { useWordLearning, saveSession, loadSession, clearSession, type ISavedSession } from '@/lib/use-word-learning';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useImmersive } from '@/lib/focus-mode';
-import { FitWord } from '@/components/FitWord';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn, cleanText } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -898,10 +897,11 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                         </span>
                       )}
                     </Badge>
-                    <div data-fit-box className="flex items-center justify-center gap-2 mb-4 max-w-full">
-                      <h2 className="text-foreground min-w-0 max-w-full">
-                        <FitWord text={shown!.word} maxPx={40} minPx={18} reservePx={52} />
-                      </h2>
+                    <div data-fit-box className="flex items-center justify-center gap-3 mb-2 max-w-full">
+                      <h2 className={cn(
+                        'font-black italic text-foreground tracking-tight break-words min-w-0',
+                        shown!.word.length > 14 ? 'text-2xl sm:text-3xl' : shown!.word.length > 10 ? 'text-3xl sm:text-4xl' : 'text-4xl',
+                      )}>{shown!.word}</h2>
                       <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(shown!.word, { rate: 0.9 }); }}
                         className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-violet"><Volume2 className="size-5" /></Button>
                     </div>

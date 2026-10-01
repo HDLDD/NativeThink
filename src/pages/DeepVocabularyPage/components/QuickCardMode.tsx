@@ -38,7 +38,6 @@ import { useTTS } from '@/lib/use-tts';
 import { useImmersive } from '@/lib/focus-mode';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { sfxTick, sfxComplete } from '@/lib/sfx';
-import { FitWord } from '@/components/FitWord';
 import { safeStorage } from '@/lib/safe-storage';
 import { cleanText, cn } from '@/lib/utils';
 import { useFavorites, type IFavoriteItem } from '@/lib/use-favorites';
@@ -939,11 +938,10 @@ export default function QuickCardMode({ level }: { level: string }) {
             >
               <CardContent className="p-8 text-center space-y-3">
                 <div data-fit-box className="flex items-center justify-center gap-2 max-w-full">
-                  <h2 className="text-foreground min-w-0 max-w-full">
-                    {/* reserve 必须覆盖**两个**按钮（朗读 + 收藏 ≈ 96px）——
-                        此前只留 52px，长单词按 (宽-52) 缩放，右端被按钮盖住（真机反馈） */}
-                    <FitWord text={cw.word} maxPx={48} minPx={20} reservePx={100} />
-                  </h2>
+                  <h2 className={cn(
+                    'font-black italic text-foreground tracking-tight break-words min-w-0',
+                    cw.word.length > 14 ? 'text-3xl' : cw.word.length > 10 ? 'text-4xl' : 'text-5xl',
+                  )}>{cw.word}</h2>
                   <Button
                     variant="ghost" size="icon"
                     onClick={(e) => { e.stopPropagation(); speak(cw.word); }}

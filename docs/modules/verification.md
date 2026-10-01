@@ -18,7 +18,7 @@
 | `verify-wordbank-loading.mjs` | 45 | 加载层集成：显示数 = 出卡池子、九本不互抢、IDB 失败才兜底 localStorage | 改词库或加载层 |
 | `verify-wordbank-split.mjs` | 数据全量比对 | 拆分校验：`--baseline` 采基线（**拆分前后都能采**）、`--check` 逐项断言 | 改词库拆分 |
 | `verify-books-meta.mjs` | 227 | ①–④ 生成器与数据不漂移；⑤ books/book-clean/books-meta 拆分（**实际加载两个模块交叉核对**）；⑥ HelpGuide 文案 vs `meta.ts`/`ai-config.ts` | 改书单、scp、reader-highlight |
-| `verify-vocab-cards.mjs` | 303 | 背单词卡片交互契约 + 手势决策表 + 换卡节奏（数值锁）+ 答错重排延后 + 静默契约 + 换书路径 + 预载门 + HelpGuide 内容 | 改 FlashcardMode/QuickCardMode/vocab-* |
+| `verify-vocab-cards.mjs` | 310 | 背单词卡片交互契约 + 手势决策表 + 换卡节奏（数值锁）+ 答错重排延后 + 静默契约 + 换书路径 + 预载门 + HelpGuide 内容 + 单词字号三档（FitWord 不许复活） | 改 FlashcardMode/QuickCardMode/vocab-* |
 | `verify-vocab-caches.mjs` | 67 | 缓存与存储写入基建：`cappedPut`/`mergeCollocAiCache`/`appendCapped` 纯函数**真跑** + **注入 localStorage 替身真跑 safe-storage/capped-cache**（配额满时 `setItem`/`persistJson` 返回 false、`warnStorageFull` 60s 只提示一次）+ 九个不可重算清单的接线与派生缓存的上限数值 | 改缓存基建接线 / 改任何 `persistJson`·`cappedPut` 调用点 |
 | `verify-tts-progress.mjs` | 6175 | 「读到哪」反查表恒等式：各段词数之和 === 各切片词数之和（书目 22 / 页 419 / 切片 3785 + 5 项脚手架自检） | 改 TTS 切片上限或阅读器朗读逻辑 |
 | `verify-tts-hardening.mjs` | 15 | A 原生静态（无 `new Thread().start()`、有界线程池 + 队列上限）4 项；B 真实模块在途去重 6 项；C 桌面限定 5 项 | 改降级链路或预合成 |
@@ -94,7 +94,7 @@ npm run verify:all        # scripts/verify-all.mjs：typecheck + 全部 verify-*
 
 它自动发现 `scripts/verify-*.mjs`，所以新增守卫不用登记。两处刻意跳过：`verify-wordbank-split`（要 `--baseline/--check` 的基线文件）、`verify-bundle-budget`（没有 `dist/client` 产物时跳过 —— **先 `npm run build:web` 再跑才算真验过体积**）。
 
-2026-09-30 实测：typecheck + 19 条守卫全绿，**断言合计 7,287 条**（tts-progress 一条就占 6,175；其余 18 条相加：45+227+303+67+15+16+10+18+23+23+16+43+16+24+10+104+74+36+58 = 1,112。旧版这条漏算了 shadowing-completion 的 23，两个口径已对齐；books-meta 227 = 原 222 + 复习词高亮回退那 6 条（其中一条是"旧写法必须消失"的反向正对照））。
+2026-10-01 实测：typecheck + 19 条守卫全绿，**断言合计 7,294 条**（tts-progress 一条就占 6,175；其余 18 条相加：45+227+310+67+15+16+10+18+23+23+16+43+16+24+10+104+74+36+58 = 1,119。vocab-cards 310 = 原 303 + 单词字号回退那 7 条（FitWord 不许复活 + 三模式档位与 `break-words` 各一条，变异 4/4 变红）；books-meta 227 = 原 222 + 复习词高亮回退那 6 条（其中一条是"旧写法必须消失"的反向正对照））。
 
 ## 6. 静态检查的已知弱度
 

@@ -11,7 +11,7 @@
  *
  * 用法：node scripts/verify-vocab-cards.mjs
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
@@ -728,6 +728,30 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/export function listSignature/.test(hist2), '词表指纹函数');
   check(/const rest = read\(\)\.filter\(\(r\) => !\(r\.level === entry\.level && listSignature\(r\.words\) === sig\)\)/.test(hist2),
     '同一词书 + 同词表 → 替换旧条目而不是新增（列表不重复）');
+
+  /**
+   * ⑭ 卡面单词 = 按词长三档字号（2026-10-01 用户口径：「单词卡片大小不一，有得太大有得太小，
+   * 还有的会后面变小，都回退到之前的模样」）。
+   *
+   * 819a007 引入的 FitWord（canvas measureText 按容器宽缩放、nowrap 永不换行）在真机上的
+   * 观感被用户否掉：同一轮里每个词一个字号、同屏对比忽大忽小，短词被容器宽拉满显得过大，
+   * 长词缩到很小；且 ResizeObserver 首帧后重算，用户看到"先大后小"的跳变。
+   * 回退 = 改造前原样：break-words 的 h2 + 三档字号（≤10 最大 / 11–14 中 / >14 小）。
+   * 三模式档位不同是改造前各自的既有样式，勿"顺手统一"。
+   * data-fit-box 是无样式锚点（自动化找词面用，verification.md §3 有记载），保留。
+   */
+  check(!existsSync(join(ROOT, 'src/components/FitWord.tsx')) && !/FitWord/.test(fc + dl + qc),
+    '⑭ 自适应字号组件已删除且三模式无引用（防止无人重推导就复活）');
+  const tieredWord = [
+    ['FlashcardMode', fc, /shown!\.word\.length > 14 \? 'text-2xl sm:text-3xl' : shown!\.word\.length > 10 \? 'text-3xl sm:text-4xl' : 'text-4xl'/],
+    ['DailyLearningMode', dl, /currentWord\.word\.length > 14 \? 'text-3xl' : currentWord\.word\.length > 10 \? 'text-4xl' : 'text-5xl'/],
+    ['QuickCardMode', qc, /cw\.word\.length > 14 \? 'text-3xl' : cw\.word\.length > 10 \? 'text-4xl' : 'text-5xl'/],
+  ];
+  for (const [name, src, re] of tieredWord) {
+    check(re.test(src), `⑭ ${name}：单词按词长三档字号（>14 小 / 11–14 中 / ≤10 大）`);
+    check(/'font-black italic text-foreground tracking-tight break-words min-w-0',/.test(src),
+      `⑭ ${name}：词面保留 break-words（长词可以折，不再 nowrap 硬缩）`);
+  }
 }
 
 console.log('');console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
