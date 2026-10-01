@@ -133,7 +133,7 @@ node scripts/fetch-android-tts.cjs         # 拉 TTS 资产（幂等，--force �
 # 品牌视觉资产（APK 图标/启动图/favicon），改字标或配色后重跑
 pwsh -File scripts/gen-app-brand.ps1 -Preview docs/brand-assets-preview.png
 
-# 真机 WebView 调试（无线 adb 无 INJECT_EVENTS 时的标准通道）
+# 真机 WebView 调试（该 ROM 对 adb shell 拒 INJECT_EVENTS，USB/无线都一样，CDP 是唯一通道）
 # 先建转发：adb forward tcp:9223 localabstract:webview_devtools_remote_<pid>
 # （socket 名：adb shell cat /proc/net/unix | grep webview_devtools_remote）
 node scripts/device-eval.mjs eval "document.title"
