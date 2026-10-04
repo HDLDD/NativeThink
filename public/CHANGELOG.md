@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-10-05
+- refactor(feedback): 整体下架反馈功能（入口/服务/云函数/守卫/文档全清） (`ac6ebf2`)
 
 ## 2026-10-01
 - docs(verification): 修正 INJECT_EVENTS 拒权的通道口径 + 补 USB 复测结果 (`302b183`)

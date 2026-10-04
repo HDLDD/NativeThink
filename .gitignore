@@ -26,3 +26,6 @@ android/app/src/main/assets/tts/
 .zcode/
 .zcode-restore-backup-*/
 .sentence-explain-state.json
+
+# Cloudflare Pages 本地构建残留（wrangler 生成，不入库）
+.wrangler/

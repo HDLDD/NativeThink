@@ -9,20 +9,35 @@ COMMIT_HASH=$(git log -1 --format="%h")
 
 # Check if changelog exists
 if [ ! -f "$CHANGELOG" ]; then
-  echo "# NativeThink 开发日志\n" > "$CHANGELOG"
+  printf '# NativeThink 开发日志\n' > "$CHANGELOG"
 fi
 
-# Check if today's date header already exists
+# 空行规整 + 新日期标题插入。旧写法 `sed i\` 在标题上方固定留一行空行，
+# 每来一个新日期就多堆一行（2026-10-05 已堆到 10 行），这里改成一次全文件重写：
+# 连续空行压成一行；需要新标题时插在首个日期标题之前，两侧各留一个空行。
 TODAY_HEADER="## $COMMIT_DATE"
-if ! grep -q "$TODAY_HEADER" "$CHANGELOG"; then
-  # Insert new date header after the title line
-  if grep -q "^## [0-9]" "$CHANGELOG"; then
-    # Find the first date header and insert before it
-    FIRST_DATE=$(grep -n "^## [0-9]" "$CHANGELOG" | head -1 | cut -d: -f1)
-    sed -i "${FIRST_DATE}i\\\n## $COMMIT_DATE\n" "$CHANGELOG"
-  else
-    echo -e "\n## $COMMIT_DATE\n" >> "$CHANGELOG"
-  fi
+NEED_INSERT=0
+if ! grep -q "$TODAY_HEADER" "$CHANGELOG" && grep -q "^## [0-9]" "$CHANGELOG"; then
+  NEED_INSERT=1
+fi
+TMP="$CHANGELOG.tmp"
+awk -v d="$COMMIT_DATE" -v need="$NEED_INSERT" '
+  /^[[:space:]]*$/ { blanks++; next }
+  {
+    if (need == 1 && !ins && $0 ~ /^## [0-9]/) {
+      if (blanks > 0) print ""
+      printf "## %s\n\n", d
+      ins = 1
+      blanks = 0
+    }
+    if (blanks > 0) { print ""; blanks = 0 }
+    print
+  }
+' "$CHANGELOG" > "$TMP" && mv "$TMP" "$CHANGELOG"
+
+# 首次写入（文件里还没有任何日期标题）：直接追加
+if ! grep -q "^## [0-9]" "$CHANGELOG"; then
+  printf '\n## %s\n' "$COMMIT_DATE" >> "$CHANGELOG"
 fi
 
 # Append commit message as bullet after the date header
