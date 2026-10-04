@@ -9,6 +9,7 @@
 
 
 ## 2026-10-01
+- docs(verification): 修正 INJECT_EVENTS 拒权的通道口径 + 补 USB 复测结果 (`302b183`)
 - docs(verification): 真机走查补记 —— 字体缩放 ×1.1 / 无线通道两条限制 / 本轮实测结果 (`48b84f5`)
 - fix(vocabulary): 卡片单词回退到按词长三档字号（撤 FitWord 自适应缩放） (`e0da84c`)
 - fix(vocabulary): 练习界面不再一张接一张弹提示（用户口径：任何提示都不要） (`a613431`)
