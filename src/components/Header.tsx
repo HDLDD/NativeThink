@@ -18,7 +18,6 @@ import { ExternalLink } from 'lucide-react';
 import AISettings from '@/components/AISettings';
 import TTSSettings from '@/components/TTSSettings';
 import HelpGuide from '@/components/HelpGuide';
-import FeedbackDialog from '@/components/FeedbackDialog';
 import GlobalWordSearch from '@/components/GlobalWordSearch';
 import ChangelogDialog from '@/components/ChangelogDialog';
 
@@ -151,7 +150,6 @@ export default function Header() {
               <ExternalLink className="size-4.5" />
             </button>
             <HelpGuide />
-            <FeedbackDialog />
             <GlobalWordSearch />
             <AISettings />
             <TTSSettings />

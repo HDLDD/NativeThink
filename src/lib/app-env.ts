@@ -1,20 +1,13 @@
 /**
- * 运行环境与版本标识 —— 单一来源，供反馈上报、诊断信息、设置页展示复用。
+ * 运行环境标识 —— 单一来源。
  *
- * 版本号在构建时由 `vite.config.ts` 从 `android/version.properties` 的 `versionName` 注入
- * （读不到时退回 `package.json` 的 version）。这样 APK 与网页版报上来的版本，
- * 和 `aapt dump badging` 看到的安装包版本始终是同一个口径。
- *
- * 注意：`__APP_VERSION__` 是 define 替换，产物里会被换成字符串字面量；
- * 但类型检查时它不存在，所以一律先 `typeof` 再取（与 ai-config 处理出厂 Key 同法）。
+ * 历史上这里有 APP_VERSION / envSummary（反馈上报随诊断信息带版本用）；
+ * 反馈功能 2026-10-05 整体下架后已无消费方，随之删除。版本号只在构建期
+ * 盖进 index.html 的 <meta name="app-version">（vite.config.ts 从
+ * android/version.properties 的 versionName 读，保证与 aapt dump badging 同口径），
+ * 供 scripts/ensure-web-build.mjs 拦「打进上次产物」—— 见该脚本注释。
  */
 import { Capacitor } from '@capacitor/core';
-
-declare const __APP_VERSION__: string;
-
-/** 构建时注入的版本名；未注入时为空串（不谎报） */
-export const APP_VERSION: string =
-  typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '';
 
 export type PlatformTag = 'android' | 'ios' | 'desktop' | 'web';
 
@@ -33,10 +26,4 @@ export function platformTag(): PlatformTag {
     if (/Electron|NativeThink\//i.test(ua)) return 'desktop';
   } catch { /* 环境异常一律按网页版 */ }
   return 'web';
-}
-
-/** 反馈/诊断用的一行环境串，例如 `web · 2.0.25 · zh-CN` */
-export function envSummary(): string {
-  const locale = typeof navigator !== 'undefined' ? (navigator.language || '') : '';
-  return [platformTag(), APP_VERSION || 'dev', locale || 'unknown'].join(' · ');
 }

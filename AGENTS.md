@@ -45,9 +45,8 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 外壳与导航 | [modules/shell-and-navigation.md](./docs/modules/shell-and-navigation.md) | 启动顺序、双层 ErrorBoundary、预取时机、**新增页面实际是六处** |
 | 存储与学习统计 | [modules/storage-and-stats.md](./docs/modules/storage-and-stats.md) | 四套存储、safeStorage 前缀自愈、`addStudyMinutes` 真实语义、同步边界 |
 | 云同步与账号 | [modules/cloud-sync.md](./docs/modules/cloud-sync.md) | 两条上行口径不同；回声抑制/失败提示/按需补推由 `verify:cloud-sync` 守；下行重读订阅收进 `sync-down.ts`（7 个 hook 已接） |
-| 反馈链路 | [modules/feedback.md](./docs/modules/feedback.md) | 本机优先 + 三档诚实结果 + KV/飞书双出路；限流记账时机 |
-| 构建与发布 | [modules/build-release.md](./docs/modules/build-release.md) | 脚本地图与重复 bump、**缺资产静默出残包**、APK 版本线与产物命名 |
-| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 18 条可跑的契约守卫 + verify:all 全量跑法 + 无头 Chrome/CDP + 真机通道 + 写守卫四条硬规矩 |
+| 构建与发布 | [modules/build-release.md](./docs/modules/build-release.md) | 脚本地图与重复 bump、**缺资产静默出残包**、APK 版本线与产物命名、产物版本核对走构建期 meta |
+| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 19 条可跑的契约守卫 + verify:all 全量跑法 + 无头 Chrome/CDP + 真机通道 + 写守卫四条硬规矩 |
 
 ---
 
@@ -105,7 +104,7 @@ node scripts/verify-tts-hardening.mjs             # 15   TTS 降级/在途去重
 node scripts/verify-books-meta.mjs                # 227  书目元数据 + 复习词高亮
 node scripts/verify-vocab-cards.mjs               # 310  背单词卡片契约 + 手势决策表 + 换卡节奏 + 答错重排延后 + 单词字号三档
 node scripts/verify-vocab-caches.mjs              # 67   缓存封顶 + 存储写失败可见（替身真跑）
-node scripts/verify-overlay-fit.mjs               # 23   窄视口浮层契约 + 全屏层自带 safe-area
+node scripts/verify-overlay-fit.mjs               # 28   窄视口浮层契约 + 全屏层自带 safe-area + 全站唯一 Toaster 出口
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
 node scripts/verify-list-scaling.mjs              # 18   长列表必须折叠/分页（写作题库 + 词库浏览 + 短语库字母段）
 node scripts/verify-shadowing-completion.mjs      # 23   跟读完成标记的索引契约（纯函数真跑 + 接线）
@@ -115,7 +114,7 @@ node scripts/verify-sentence-lab.mjs              # 16   拆句训练主干判�
 node scripts/verify-spelling-resume.mjs           # 24   拼写断点按词书分键 + 迁移 + 重置枚举
 node scripts/verify-chain-verdict.mjs             # 36   语块接龙判定三档（未判定不计分也不判错）
 node scripts/verify-ai-parse.mjs                  # 10   AI 解析约定：25 个解析点判空 + 无贪婪正则（元判据固件自证）
-npm run verify:feedback-loop                      # 58   反馈链路（后端 handler 用忠实替身真实执行）
+node scripts/verify-app-version.mjs                 # 11   版本号单一载体：meta 注入链路 + 产物一致性（产物段先 build:web）
 npm run verify:rv-articles                        # 104  复习词汇文章：选词/分篇/覆盖出队/体裁主题/原位重写（含旧 slice(0,10) 正对照）
 npm run verify:study-credit                       # 74   学习时长记账：闸门真跑 + 七个提交点接线 + 口径双向锁（本地动作不许套闸门）
 npm run verify:all                                # —    收尾必跑：typecheck + 全部 verify-*（自动发现，新增守卫不用登记）
@@ -183,7 +182,7 @@ src/
 ├── components/
 │   ├── AppSidebar.tsx      # 侧边栏 + 路由预取
 │   ├── Layout.tsx          # Suspense /  safe-area / focus 模式
-│   ├── Header.tsx          # 反馈入口挂载点
+│   ├── Header.tsx          # 帮助 / 全站搜索 / 主题入口挂载点
 │   └── ui/                 # shadcn 组件（dialog 基座含窄视口兜底）
 ├── lib/
 │   ├── use-learning-stats.ts   # 学习统计（storage 权威 + 跨实例广播）
@@ -263,9 +262,9 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 | 按词累积的缓存撑爆 localStorage | 只增不减，写失败后整份静默丢失（症状是"刷新后数据没了"） | **分两类**：AI 派生可重算 → `cappedPut` FIFO 封顶；用户创作不可重算 → `appendCapped` **只拒绝新增、绝不裁剪** |
 | 落盘失败完全无声 | `safeStorage.setItem` 过去 `catch {}` 吞掉配额错误 | 现在返回布尔（`safe-storage.ts:175`）；写用户清单的 effect 一律 `if (!persistJson(k, x)) warnStorageFull()`（全站 60s 去抖一条 toast，`capped-cache.ts:48`） |
 | AI 生成内容"格式异常"误报 | `use-ai` 失败返回 `''`，页面把空串当解析失败 | **先判 `result.trim()` 为空 → 服务不可用**；解析一律 `extractJson`，勿用贪婪正则。全仓 25 个解析点由 `npm run verify:ai-parse` 扫 |
-| 功能"两端都写了却点不到" | 组件与云函数都存在，但没有页面挂载；静态检查看不出断线 | 挂载点写进回归断言（`verify:feedback-loop` 检查 Header 是否渲染 `<FeedbackDialog />`）；新功能入口必须真机/真页面验证可达 |
-| 提交类操作谎报成功 | 后端只有一个 boolean，503（通道未配）与网络失败都归成"没成功"，UI 一律 toast 成功 | 结果分档返回（`delivered`/`stored`/`failed`），UI 按档给不同提示；失败保留条目并提供重试入口 |
-| 全站 toast 提示不出现 | `ui/sonner.tsx` 有 `Toaster` 但没人挂载 | 唯一出口在 `src/index.tsx`；新页面不要再挂第二个，`verify:feedback-loop` 会断言 |
+| 功能"两端都写了却点不到" | 组件与云函数都存在，但没有页面挂载；静态检查看不出断线 | 挂载点写进回归断言（`verify-overlay-fit` ⑤ 剥注释全仓扫描：`<Toaster />` 只许挂 `src/index.tsx` 一处、Layout 必须渲染 Header）；新功能入口必须真机/真页面验证可达 |
+| 提交类操作谎报成功 | 后端只有一个 boolean，503（通道未配）与网络失败都归成"没成功"，UI 一律 toast 成功 | 结果分档返回，UI 按档给不同提示；失败保留条目并提供重试入口 |
+| 全站 toast 提示不出现 | `ui/sonner.tsx` 有 `Toaster` 但没人挂载 | 唯一出口在 `src/index.tsx`；新页面不要再挂第二个，`verify-overlay-fit` ⑤ 剥注释全仓扫描会断言 |
 | 全屏浮层顶部被手机状态栏压住 | `fixed inset-0` 的浮层脱离文档流，**绕过了外壳 `SidebarProvider` 那层 safe-area 内缩**（Android 15+ edge-to-edge 下 inset 实测 47px） | 浮层根节点自己补 `safe-area-top safe-area-bottom`（阅读器 `PageReader.tsx:1210`，2026-09-30 真机反馈已修）；新增贴顶全屏层同理，`verify-overlay-fit` ④ 会扫；本机验收用 CDP `Emulation.setSafeAreaInsetsOverride`（insets 传对象）强制 47/24 量顶栏 top |
 | 练习界面一张接一张弹提示 | 评分/翻面/收藏/开关各处都挂 toast，答 30 张就是几十条（用户两次要求静默，最后一条是「不要在练习界面有任何提示」） | 三个练习模式只剩**白名单**：失败/空队列 + 唯一撤销入口；其余反馈交给界面计数（已评 / Flame 连对 / 今天新学 x/y / ★ 实心 / 进度条）。新增提示必须先改守卫 ⑧d 白名单，见 [vocabulary.md](./docs/modules/vocabulary.md) 注意事项 13 |
 | 顶部内容被一条空条遮住 | 无内容但带 `bg-*` 的 sticky 元素仍占位 | 只在有内容时渲染 |
@@ -294,10 +293,10 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 310 · vocab-caches 67 · tts-progress 6175 · tts-hardening 15 · overlay-fit 23 · bundle-budget 10 · list-scaling 18 · shadowing 23 · backup-idb 16 · cloud-sync 43 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · rv-articles 104 · study-credit 74 · chain-verdict 36 · feedback-loop 58；合计 7,294）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 310 · vocab-caches 67 · tts-progress 6175 · tts-hardening 15 · overlay-fit 28 · bundle-budget 10 · list-scaling 18 · shadowing 23 · backup-idb 16 · cloud-sync 43 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · rv-articles 104 · study-credit 74 · chain-verdict 36；合计 7,252，2026-10-05 复测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`
 - [ ] 改过 `ui/dialog` 基座或设置面板 → `verify-overlay-fit`
-- [ ] 改过 `functions/` → 想清楚网页/APK/桌面三条路；动过反馈 → `npm run verify:feedback-loop`
+- [ ] 改过 `functions/` → 想清楚网页/APK/桌面三条路；改过 index.html 版本 meta 或 `version.properties` → `node scripts/verify-app-version.mjs`（产物段先 build:web）
 - [ ] 新增/修改模块行为 → 同步更新 `docs/modules/` 对应那篇（**带 `文件:行号`**）

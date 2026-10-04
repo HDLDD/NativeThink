@@ -5,7 +5,7 @@
 
 ## 1. 契约守卫（`scripts/verify-*.mjs`）
 
-2026-09-29 实测全绿；2026-09-30 复测并校准 vocab-cards（284 → 290 → 298：⑤b「每轮数量只在起跑页改」7 条 + ⑧c「复习检测评分静默」+ ⑧d「练习界面零提示」共 13 条）、新增 study-credit（74，14 条变异全红）、把 vocab-caches 从 21 扩到 67（10 条变异全红，新增注入 localStorage 替身真跑）、rv-articles 从 55 扩到 104（累计 27 条变异全红 + 42 项 CDP 行为验收）、cloud-sync 从 18 扩到 43（10 条变异全红 + 12 项 CDP，含 `sync-down` 用假 target 真跑）。**收尾一律 `npm run verify:all`**（§5）。断言数如下：
+2026-09-29 实测全绿；2026-09-30 复测并校准 vocab-cards（284 → 290 → 298：⑤b「每轮数量只在起跑页改」7 条 + ⑧c「复习检测评分静默」+ ⑧d「练习界面零提示」共 13 条）、新增 study-credit（74，14 条变异全红）、把 vocab-caches 从 21 扩到 67（10 条变异全红，新增注入 localStorage 替身真跑）、rv-articles 从 55 扩到 104（累计 27 条变异全红 + 42 项 CDP 行为验收）、cloud-sync 从 18 扩到 43（10 条变异全红 + 12 项 CDP，含 `sync-down` 用假 target 真跑）。2026-10-05：反馈功能下架 —— `verify-feedback-loop`（58 断言）随功能删除，其中的**挂载类断言**（Layout 挂 Header、全站唯一 `<Toaster />`）迁移并强化进 overlay-fit ⑤，另新增 `verify-app-version`（11 断言）钉版本号 meta 链路。**收尾一律 `npm run verify:all`**（§5）。断言数如下：
 
 | 脚本 | 断言 | 守什么 | 什么时候必须跑 |
 |------|------|--------|----------------|
@@ -22,8 +22,8 @@
 | `verify-vocab-caches.mjs` | 67 | 缓存与存储写入基建：`cappedPut`/`mergeCollocAiCache`/`appendCapped` 纯函数**真跑** + **注入 localStorage 替身真跑 safe-storage/capped-cache**（配额满时 `setItem`/`persistJson` 返回 false、`warnStorageFull` 60s 只提示一次）+ 九个不可重算清单的接线与派生缓存的上限数值 | 改缓存基建接线 / 改任何 `persistJson`·`cappedPut` 调用点 |
 | `verify-tts-progress.mjs` | 6175 | 「读到哪」反查表恒等式：各段词数之和 === 各切片词数之和（书目 22 / 页 419 / 切片 3785 + 5 项脚手架自检） | 改 TTS 切片上限或阅读器朗读逻辑 |
 | `verify-tts-hardening.mjs` | 15 | A 原生静态（无 `new Thread().start()`、有界线程池 + 队列上限）4 项；B 真实模块在途去重 6 项；C 桌面限定 5 项 | 改降级链路或预合成 |
-| `verify-feedback-loop.mjs` | 58 | 反馈前后端对接：**用忠实 KV + webhook 替身真实执行后端 handler**，含正对照；并断言 Header 挂载 `<FeedbackDialog />`、全站 `<Toaster />` 挂载、以及历史标签按 `pushed` 区分「已送达 / 已留档」 | 改 FeedbackDialog / use-feedback / `functions/api/feedback/submit.js` |
-| `verify-overlay-fit.mjs` | 23 | 窄视口浮层契约：Dialog/Popover 基座 + 朗读设置/AI 设置面板结构 | 改 `ui/dialog` 基座或那两个面板 |
+| `verify-app-version.mjs` | 11 | 版本号**单一载体**链路：version.properties（源）→ vite 构建期替换 `{{appVersion}}`（注入）→ index.html 占位符 meta（载体）→ ensure-web-build 按 meta 核对且不再引用 `__APP_VERSION__`（消费）→ 产物存在时 index/404 两页 meta 与源一致且非占位符（端到端）；全仓剥注释扫旧 define 不许复活。缺 dist 时产物段声明跳过 | 改版本号管线（`version.properties` / `vite.config` 的 fixHtmlPlaceholders / `ensure-web-build.mjs` / index.html 的 meta） |
+| `verify-overlay-fit.mjs` | 28 | 窄视口浮层契约：Dialog/Popover 基座 + 朗读设置/AI 设置面板结构 + ④ 贴顶全屏层自带 safe-area + ⑤ 全站唯一 `<Toaster />` 出口（剥注释全仓扫描，Layout 必须渲染 Header；迁移并强化自已删的 verify-feedback-loop） | 改 `ui/dialog` 基座、那两个面板或 `src/index.tsx`/`Layout.tsx` 挂载点 |
 | `verify-bundle-budget.mjs` | 10 | 从**产物**反查入口静态依赖图：首屏必需集合里不许出现 recharts/markdown/词库数据 chunk；gzip 总量 ≤ 预算 | 改 `vite.config` 的 manualChunks、壳里新增静态 import/require |
 | `verify-list-scaling.mjs` | 18 | 一屏渲染不完的列表必须折叠/分页：写作题库默认 12 张、词库浏览分页、**语块短语库每字母段默认 6 条且 A-Z 跳转仍可达每一段**（各配「不许退回全量 `.map`」的正对照） | 新增长列表页 |
 | `verify-rv-articles.mjs` | 104 | 复习词汇文章：纯函数**真跑**（并集/**删文章即回词表**/切批与上限、`rvParaCount` 上下限、`buildRvPrompt` 带体裁与主题且「不限」不硬塞、`coveredReviewWords` 用阅读器那套形态归并且**不过度归并**、`rvRegenKeys` 取词优先级）+ 页面接线（`rvWords` 只记真出现的词、覆盖只看英文正文、逐篇串行、先落盘再计成功、历史 `aiId` 可重开、收藏口径、**重写保持原 id 且不靠先删再存**）+ 旧缺陷正对照（`slice(0,10)` 不许回来） | 改 `rv-articles.ts` / `ArticlePage` 复习词汇面板 / 已保存文章列表 |
@@ -33,10 +33,10 @@
 
 ```bash
 node scripts/verify-wordbank-loading.mjs
-npm run verify:feedback-loop          # 只有这一个有 npm script
-npm run verify:rv-articles            # 同上，也有 npm script（本轮新增）
+npm run verify:rv-articles            # 有 npm script
 node scripts/verify-tts-hardening.mjs # 注意：这个没有 npm script，只能裸跑
 node scripts/verify-bundle-budget.mjs # 必须先 npm run build:web
+node scripts/verify-app-version.mjs   # 产物段同样依赖 build:web（缺 dist 会声明跳过）
 ```
 
 `npm run check:tts-voices` 是资产校验（不是断言计数，输出 errors 列表），已嵌进 `package:apk` 前置，失败 `exit 1` 阻断打包。
@@ -83,7 +83,7 @@ node scripts/device-eval.mjs shot .screen.png
 
 这几条都是从真实翻车上来的，不是风格偏好：
 
-1. **替身必须忠实于真实接口**。`verify-feedback-loop` 的 KV 替身形状对齐 `KV.put(key, value)`、飞书替身对齐「200 + body.code」。替身比真实行为宽松 = 假绿。
+1. **替身必须忠实于真实接口**。`verify-vocab-caches` 的 localStorage 替身必须真抛 `QuotaExceededError`（只存值不抛错，配额失败路径就测不出来）；`verify-cloud-sync` 的假 target 要对齐 `sync-down` 真跑用的事件名与退订形状。替身比真实行为宽松 = 假绿。
 2. **元判据要带正对照（counterfactual）**。每条"不许出现 X"的断言，都要配一条"该出现的地方确实在出现"。例：`verify-tts-hardening` C1 断言只有桌面发请求，正对照是 Electron UA 下仍发 12 次；`verify-list-scaling` 断言折叠存在，正对照是不许有 `allPrompts.map(` 全量渲染。
 3. **文案变了要重新推导对齐断言，而不是放宽它**。断言数**只增不减**，除非删功能。
 4. **没定性就停住，别改绿**。自己抓到的反例：HelpGuide 的词数断言在变异掉两处出现之一后仍然通过 → 重写成「计数 + 禁止出现词条数那个数字」，再跑变异才变红。
@@ -100,12 +100,14 @@ npm run verify:all        # scripts/verify-all.mjs：typecheck + 全部 verify-*
 
 2026-10-01 实测：typecheck + 19 条守卫全绿，**断言合计 7,294 条**（tts-progress 一条就占 6,175；其余 18 条相加：45+227+310+67+15+16+10+18+23+23+16+43+16+24+10+104+74+36+58 = 1,119。vocab-cards 310 = 原 303 + 单词字号回退那 7 条（FitWord 不许复活 + 三模式档位与 `break-words` 各一条，变异 4/4 变红）；books-meta 227 = 原 222 + 复习词高亮回退那 6 条（其中一条是"旧写法必须消失"的反向正对照））。
 
+2026-10-05 反馈下架后复测：typecheck + 19 条守卫全绿，**断言合计 7,252 条**（= 7,294 − 58 + 5 + 11：删除 verify-feedback-loop 58；overlay-fit 23 → 28，新增的 5 条是迁入的挂载类断言；新增 verify-app-version 11。tts-progress 6,175；其余 18 条相加：45+227+310+67+15+16+10+18+28+23+16+43+16+24+10+104+74+36+11 = 1,077）。
+
 ## 6. 静态检查的已知弱度
 
 - **`npm run typecheck` 是弱守卫**：`tsconfig.app.json` 从 `node_modules/@lark-apaas/coding-presets-react/lib/tsconfig/tsconfig.app.json` 继承了 `strict: false`、`noImplicitAny: false`、`noUnusedLocals: false`、`noUnusedParameters: false`。所以"类型过了"不等于"类型检查过了"。
-- **「两端都写了却点不到」静态检查看不出来**：组件与云函数都存在、没有任何页面挂载 → 只有把挂载点写成断言才守得住（`verify:feedback-loop` 检查 Header 渲染 `<FeedbackDialog />`）。
+- **「两端都写了却点不到」静态检查看不出来**：组件与云函数都存在、没有任何页面挂载 → 只有把挂载点写成断言才守得住（`verify-overlay-fit` ⑤ 剥注释全仓扫描，`<Toaster />` 只许挂在 `src/index.tsx` 一处，Layout 必须渲染 Header）。
 - **「源码里是 lazy、产物里不是」也看不出来**：强制 `manualChunks` 或壳里同步 `require` 都会把库变成入口 chunk 的静态依赖 → 只有 `verify-bundle-budget` 从产物反查才看得见。
-- **`verify-bundle-budget` 的预算是 600KB**（`:79`），当前实测首屏必需 JS **199.5KB gzip**（2026-09-30）。预算头寸很大是有意的（壳 + react/router/radix/motion/icons + 词库加载器 + utils 的天然体量），但别把它当"体积没问题"的证明 —— 具体数字每次都打印，看那一行。
+- **`verify-bundle-budget` 的预算是 600KB**（`:79`），当前实测首屏必需 JS **195.9KB gzip / 11 个 chunk**（2026-10-05，反馈下架后；反馈组件与它的挂载代码让入口 chunk 减了近 4KB）。预算头寸很大是有意的（壳 + react/router/radix/motion/icons + 词库加载器 + utils 的天然体量），但别把它当"体积没问题"的证明 —— 具体数字每次都打印，看那一行。
 - **TTS 引擎候选顺序没有任何断言**（`verify-tts-hardening` 只读 `sherpa-tts.ts`/Java/`TTSSettings.tsx`）。
 - **句子学习与句子拼写各有自己的守卫**（`verify-sentence-lab` 16 条、`verify-spelling-resume` 24 条），但只覆盖"主干索引同源/断点分键"这类关键契约，其余交互仍要靠无头 Chrome 真点。
-- **`.wrangler/` 是本地构建残留，不要 commit**。
+- **`.wrangler/` 是本地构建残留，不要 commit**（2026-10-05 已进 `.gitignore`）。

@@ -9,14 +9,14 @@
 
 ## 现状（已上线、已验证）
 
-- **形态**：一份前端 → Web SPA（Cloudflare Pages）+ Capacitor Android + Electron 桌面；**首屏必需 JS 199.5KB gzip**（11 个 chunk，`verify:bundle-budget` 守，预算线 600KB）；状态只进 localStorage / IndexedDB，无业务后端库（云端只有 Pages Functions + KV）。
+- **形态**：一份前端 → Web SPA（Cloudflare Pages）+ Capacitor Android + Electron 桌面；**首屏必需 JS 195.9KB gzip**（11 个 chunk，`verify:bundle-budget` 守，预算线 600KB）；状态只进 localStorage / IndexedDB，无业务后端库（云端只有 Pages Functions + KV）。
 - **背单词**：四个入口 —— 每日学习（六方式：闪卡/选择/拼写/听写/配对/填空）、复习检测（SM-2 五档）、快速闪卡、词库浏览 + 搭配 + 词汇量测试。**四个模式的断点续学已全部覆盖**（切 tab / 杀 App / 刷新都能接续），断点键按词书（level）分开。
 - **词库**：75,113 个词条 / 全局去重 **21,736** 个可学单词 / 9 等级。**卡上显示的就是出卡池子**（书内去重，与加载了哪几本无关）：中考 1,987 · 高考 3,743 · 四级 4,542 · 六级 7,404 · 雅思 6,609 · 托福 10,367 · 考研 5,047 · 专业 4,464 · 高阶 18,470。主文件只留核心字段，detail 按需加载。
 - **阅读**：22 本公版书（中文对照随包；书单只下元数据 5KB，正文点开才下 231KB，清洗函数独立成 `book-clean.ts`）+ 20 篇 SCP + 维基百科 + 演讲 + AI 生成；整书翻译走断点队列（批合并 + 每批落盘 + 可中止），翻译缓存 v2 按段索引回填；复习词 6 色高亮。
 - **朗读**：三级降级（内置 sherpa 离线 → 系统引擎 → 云端）。默认 piper lessac（真机 RTF **0.076**），Kokoro int8 11 个英语音色作音质选项（RTF **1.008**，长文物理上无法连续播放）；云端走 `functions/api/tts.js`，上游硬上限 200 字符 → 客户端切片上限 180。
 - **句子学习**：158 句语料（手写 24 + 补充 12 + 脚本自动标注 122），拆句 / 句型 / 造句 / 语法，含错句复习队列与跟读评价。
 - **端侧 AI 兜底**：随包 Qwen2.5-0.5B-Instruct（q4）+ Xenova/opus-mt-en-zh（q8）；打包版同源 `/models/` 零下载，网页版回落 hf-mirror。云端 AI 失败时 `streamChat/chat` 自动切端侧小模型。
-- **验证体系**：没有测试框架，靠 `typecheck` + `lint:eslint` + `build:web` + 18 条可跑的 `scripts/verify-*.mjs`（收尾用 `npm run verify:all` 一次跑完）（完整断言数表见 [docs/modules/verification.md](./docs/modules/verification.md)；2026-09-30 复测 vocab-cards 298、新增 rv-articles 55 与 study-credit 74、其余最近一次全绿 2026-09-29：loading 45 · books-meta 227 · vocab-caches 21 · tts-progress 6175 · tts-hardening 15 · feedback-loop 58 · overlay-fit 16 · bundle-budget 10 · list-scaling 18），再加**本机无头 Chrome + CDP 真点一遍**的行为验收（静态检查看不见"入口在但状态不写回"那类缺陷）。其中 `verify:feedback-loop` 会用忠实的 KV / webhook 替身**真实执行**反馈后端。
+- **验证体系**：没有测试框架，靠 `typecheck` + `lint:eslint` + `build:web` + 19 条可跑的 `scripts/verify-*.mjs`（收尾用 `npm run verify:all` 一次跑完）（完整断言数表与最近复测记录见 [docs/modules/verification.md](./docs/modules/verification.md)，计数以那张表为准），再加**本机无头 Chrome + CDP 真点一遍**的行为验收（静态检查看不见"入口在但状态不写回"那类缺陷）。
 
 ## 下一步
 
@@ -24,10 +24,10 @@
 2. **词库真人发音包**：单词集合有限，可预录；先定体积方案（大文件绝不能进 `public/`，会同时拖累 web/APK/桌面三份产物）。
 3. **11 个 Kokoro 音色逐个真机试听**，核对 `src/lib/tts-voice-catalog.ts` 的 `speakerId`（名不符实只改前端表，不必动原生）。
 4. **语料回填**：语法条目继续扩、导入书离线翻译、书籍译文仍有待回填空段（口径沿用上一版 ROADMAP）。
-5. **开通反馈通道**：链路已接好（入口在顶栏，后端先写 KV 留档、再推飞书），但线上 Pages 项目目前只有 `JWT_SECRET` 一个 secret，实测 POST 仍回 503 `Webhook not configured`。加 `FEISHU_WEBHOOK_URL`（飞书群机器人）和/或确认 KV 绑定生效，用户看到的才从「暂未送出」变成「已送达」。
+5. ~~**开通反馈通道**~~ —— **已决定不做（2026-10-05）**：反馈功能整体下架（入口 / 服务 / 云函数 / 守卫 / 帮助文案全清），不再需要 `FEISHU_WEBHOOK_URL`；同日的连带迁移：产物版本核对改走构建期 `<meta name="app-version">`（`verify-app-version` 守）。
 6. **文档债（帮助中心）**：`HelpGuide.tsx` 的过期口径已于 2026-09-29 修正并钉进 `verify:books-meta` 第 ⑥ 节；仍待做的是把里面偏长的"各模块介绍"逐条对着现在的功能面再过一遍。
 7. **品牌字体要不要自托管**：`fonts.googleapis.com` 对大陆用户不可达 —— 线上每条路由一次资源错误、Plus Jakarta Sans / Noto Sans SC 从未生效（非阻塞 + 系统字兜底，所以只是不好看）。选项见交接手册 §9 第 16 条。
-8. 顺手项：`.githooks/post-commit` 插入日期标题时带固定空行（`CHANGELOG.md` 头部已堆 4 行，无害）。
+8. ~~顺手项：`.githooks/post-commit` 插入日期标题时带固定空行~~（**2026-10-05 已修**）：旧 `sed i\` 写法每来一个新日期就在标题上方多堆一行空行（已堆到 10 行）；改写为一次全文件 awk 重写 —— 连续空行压成一行、新日期标题插在首个日期标题之前且两侧各留一空行，存量空行已一并清理。
 9. ~~**真机补验 2.0.28**~~ → **真机走查已做完（APK 2.0.31 / versionCode 76）**：装机其实早已完成（`lastUpdateTime` 09-29 21:12，此前记的"未装机"是错的）。本轮经 WebView CDP 在真机核对：九本词书词数与文档口径逐一对上（六级 7,404 / 考研 5,047 / 全部 21,736）、考研能开卡（`1/10 新学 craft`）、换书一步生效、朗读设置浮层 764px 落在 851 视口内且「测试声音 / 朗读自检」全可达、AI 设置不再上下各裁 43px、`/api/tts-voices` 请求数 0。收尾 `force-stop` 已归位。
 10. **文档写作期间新核实、尚未修的缺陷**（按"用户能感觉到"排序，每条都在 `docs/modules/` 里有 `文件:行号` 与复现路径）：
     - ~~**跟读删 AI 追加句会弄乱完成标记**，100% 横幅与重置按钮随之消失~~（**已修**：索引换算收进 `src/lib/shadowing-progress.ts` 纯函数，删除路径只收合并索引；新增 `npm run verify:shadowing-completion` 23 断言，含"退回旧调用方式"的正对照 + 变异实测会红）。
@@ -40,7 +40,7 @@
     - ~~**语块替换训练在 `useMemo` 里洗牌**~~（**已修**：`exercisePool = useStableShuffle(allChunks)` + `generateReplacementExercises` 改成给定同一入参输出逐字相同的纯函数；「随便看看」也改用稳定池，学一个词不再跳序）。**phrases tab 一次铺全部 748 条**。跟读两栏量过之后**判定不动**（2,219 元素 / 页高 2,256px，与写作页折叠后同量级），理由与数字见 shadowing.md §3.2 第 4 条。
     - ~~**对话页 `mountedRef` 在 StrictMode 双挂载后恒 false**~~（**已修**：effect 体内复位为 true。原先 dev 下 `:214/:281/:393` 的 `if (!mountedRef.current) break` 会静默丢弃全部流式内容 → 对话永远空白；生产不受影响，但极易把人带偏去查 AI 层）。
     - ~~**快速闪卡不读 `__nativethink_vocab_autospeak`**~~（**已修**：读键门控朗读 effect + 进度行加开关，默认开与其余三处同口径 —— 真机上别处的提示语本来就写着「与快速闪卡共用此设置」。`verify:vocab-cards` 补 10 条断言，含「门控必须位于 `tts.speak` 之前」的正对照）。
-    - ~~反馈历史把 `stored` 显示成「已送达」~~（**已修**：新增 `pushed` 字段，历史标签分「已送达 / 已留档（未即时推送）/ 服务端已收到」三档；`verify:feedback-loop` 那条 `markSynced` 断言按新语义**重新推导**而不是放宽，另加一刀切标签的正对照）。
+    - ~~反馈历史把 `stored` 显示成「已送达」~~（**已修**：新增 `pushed` 字段，历史标签分「已送达 / 已留档（未即时推送）/ 服务端已收到」三档；`verify:feedback-loop` 那条 `markSynced` 断言按新语义**重新推导**而不是放宽，另加一刀切标签的正对照）。**该功能与守卫已于 2026-10-05 整体下架。**
     - ~~文案口径~~（**已修**：设置页改成「约 780MB；另需 22.5MB 运行时」并带上实测字节数；`使用攻略.md` 拼写一段改成真实的 2 种练法 × 2 种播放）。
     - ~~句子学习主干判定三处索引不同源~~、~~拼写断点键不按 level 分~~、~~`ShadowingPage` autoplay effect 依赖数组不全~~（**均已修**：主干候选改由 `resolved` 映射，与评分同源；断点抽成 `src/lib/spelling-resume.ts` 按 level 分键 + 一次性迁移 + 重置按前缀枚举；autoplay 依赖换成句子身份（语速/口音刻意不进依赖，否则拖滑杆会把当前句从头重读）。新增 `verify:sentence-lab` 16 断言与 `verify:spelling-resume` 24 断言，都含正对照与变异实测）。
     - ~~**多处 `addStudyMinutes` 写在 `await` 之前，重复提交重复记账**~~（**已修 2026-09-30**，但**先纠正这条记录本身**：计时写在请求之前是**刻意的「按动作计」口径**（写了但 AI 挂了那次是真实投入，不该归零），模块文档里本来就写着；真正的缺陷是**同一个作答重复提交会重复记账**，而 `addStudyMinutes` 一次动今日分钟数 / 进度环 / 日历 / 连胜四处。修法是新闸门 `src/lib/study-credit.ts`：`creditOnce(module, creditKey(动作, 题面, 用户原文), minutes)`，同一键只放行一次（FIFO 400）。接了思维 4 处、对话、语块接龙、写作交卷、句子学习造句（后者**保持**"拿到反馈才计"，只补去重）。新增 `npm run verify:study-credit`（74 断言 + 14 条变异全红），并用无头 Chrome + CDP 真点验收 31 项：AI 回 500 时第一次提交仍 +1、连点三次只 +1 且**三次请求真的发出去了**（正对照）、换句/换 tab 能再涨、连胜与总天数不被重复推高。**本地动作**（闪卡翻面、拼写判分、语块复习打分与选择题）刻意不套闸门，守卫 ④ 钉住这条。

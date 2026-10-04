@@ -17,7 +17,7 @@
  *
  * 用法：node scripts/verify-overlay-fit.mjs
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -109,6 +109,35 @@ function classNameOf(src, tagRe, label) {
   check(overlays.length >= 2, '④ 阅读器文件里的全屏层都能被扫到（正则覆盖单/双引号）', `扫到 ${overlays.length} 个`);
   const bad = overlays.filter((o) => !o.includes('safe-area-top') && !/items-center|bg-black\/|pointer-events-none/.test(o));
   check(bad.length === 0, '④ 阅读器里没有"贴顶内容层漏 safe-area"的第二处', JSON.stringify(bad));
+}
+
+/* ───────────── 5. 全站唯一 toast 出口（由已删的 verify-feedback-loop 迁移并强化） ─────────────
+ * 史实（2026-09-28 实测）：只 import 了 sonner 的 toast() 却从未挂载 <Toaster />，
+ * 所有 toast 提示全部静默 —— 反馈的"暂未送出"就这样无声无息过。
+ * 迁移理由：反馈功能整体下架（2026-10-05），但"提示出口必须挂载且唯一"与反馈无关，是站级契约。
+ */
+{
+  const root = read('src/index.tsx');
+  check(/import \{ Toaster \} from ["']@\/components\/ui\/sonner["']/.test(root), '⑤ 根节点导入 Toaster');
+  check(/<Toaster[\s\S]{0,220}position="top-center"/.test(root), '⑤ 根节点挂载 <Toaster />（所有 toast 可见的前提）');
+  check(/mobileOffset/.test(root), '⑤ 手机版 toast 位置避让状态栏（edge-to-edge）');
+
+  // 强化正对照：全仓只允许 src/index.tsx 一处挂载 —— 挂第二次会出双份 toast。
+  // 扫描前必须剥注释：use-cloud-sync.ts 的说明文字里就写着 `<Toaster />`，
+  // 不剥会把注释当成第二个挂载点（同类误报在 ④ 已踩过一次）。
+  const stripComments = (s) => s.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const mounts = [];
+  for (const rel of readdirSync(join(ROOT, 'src'), { recursive: true })) {
+    if (!/\.(tsx|ts)$/.test(rel)) continue;
+    const code = stripComments(readFileSync(join(ROOT, 'src', rel), 'utf8'));
+    if (/<Toaster\b/.test(code)) mounts.push(rel.replace(/\\/g, '/'));
+  }
+  check(mounts.length === 1 && mounts[0] === 'index.tsx',
+    '⑤ 全仓只有 src/index.tsx 一处挂载 <Toaster />（重复挂载出双份 toast）', JSON.stringify(mounts));
+
+  // Header 是非沉浸模式的常驻挂载点（帮助/搜索/主题等入口的家），反馈没了它也得在
+  const layout = read('src/components/Layout.tsx');
+  check(/!focused && <Header\s*\/>/.test(layout), '⑤ Layout 在非沉浸模式下渲染 Header');
 }
 
 console.log('');

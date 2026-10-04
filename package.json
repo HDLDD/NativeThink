@@ -31,7 +31,6 @@
     "package:desktop": "node scripts/ensure-web-build.mjs && node scripts/pack-app.mjs --skip-web",
     "package:all": "npm run package:web && concurrently -n apk,desktop -c cyan,magenta \"npm run package:apk\" \"npm run package:desktop\"",
     "verify:vocab-caches": "node scripts/verify-vocab-caches.mjs",
-    "verify:feedback-loop": "node scripts/verify-feedback-loop.mjs",
     "verify:overlay-fit": "node scripts/verify-overlay-fit.mjs",
     "verify:bundle-budget": "node scripts/verify-bundle-budget.mjs",
     "verify:list-scaling": "node scripts/verify-list-scaling.mjs",

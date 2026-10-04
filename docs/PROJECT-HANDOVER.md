@@ -66,13 +66,13 @@
 | 项 | 现状 |
 |---|---|
 | 分支 | `main`，HEAD = `3dcee7e`。**与 `origin/main` 完全同步**（`git rev-list --count origin/main..HEAD` = 0） |
-| 未提交改动 | 稳态两条：`M CHANGELOG.md` + `M public/CHANGELOG.md`（上一条提交的日志落入这一条，**是预期**）。反馈链路一轮（未提交）：`M src/index.tsx`（挂 Toaster）`M src/components/{Header,FeedbackDialog}.tsx` `M src/lib/use-feedback.ts` `?? src/lib/app-env.ts` `M functions/api/feedback/submit.js` `M functions/_lib/kv.js` `M vite.config.ts` `M package.json` `?? scripts/verify-feedback-loop.mjs` + 本轮文档（AGENTS/ROADMAP/交接手册/使用攻略）。另有 2 个真机截图残留未跟踪：`.screen1.png`、`.screen2.png`（别 commit） |
+| 未提交改动 | 稳态两条：`M CHANGELOG.md` + `M public/CHANGELOG.md`（上一条提交的日志落入这一条，**是预期**）。`.wrangler/`（本地构建残留）已进 `.gitignore`；历史上的 2 个真机截图残留（`.screen1.png`/`.screen2.png`）已清理，反馈链路一轮已随 2026-10-05 的下架提交落地 |
 | 远端 | `ssh://git@ssh.github.com:443/HDLDD/NativeThink.git`（**HTTPS 通道在本机不可用**：SSL unable to get local issuer certificate）。`core.sshCommand` 已指向系统 ssh，普通 `git push` 可用 |
 | 部署 | **Cloudflare Pages 的 Git 集成**从 `main` 构建并直接上 production（`nativethink.pages.dev`）—— 证据：Pages 部署记录里 production 那条的 Source 就是刚推的 commit sha，而 2026-09-28 那次 push 的两条 GitHub Actions 全是红的，线上照样更新。**仓库内不再有部署 workflow**（`deploy-cf.yml` 与 `deploy.yml` 已于 2026-09-28 删除：前者缺 `CLOUDFLARE_API_TOKEN` 长期失败、且与 Git 集成重复；后者指向从来没启用的 GitHub Pages，`hdlld.github.io/NativeThink` 实测 404）。**push 即上线**，所以 push 前必须跑过 typecheck + guards + 相关 verify 脚本 |
 | Git 钩子 | `core.hooksPath=.githooks`。`pre-commit` 跑 `npm run precommit`（typecheck + eslint，失败即阻断，**不要 `--no-verify`**）；`post-commit` 把提交标题追加进 `CHANGELOG.md` + `public/CHANGELOG.md` 并 `git add` |
-| 已知钩子缺陷 | 日期标题 `###`/`##` 不一致的那条**已修**（现在写与查都是 `## $COMMIT_DATE`）。仍存：插入日期标题时带固定空行 → `CHANGELOG.md` 文件头累积了 4 行空行（无害，看着难受） |
+| 钩子缺陷史 | 日期标题 `###`/`##` 不一致**已修**（写与查都是 `## $COMMIT_DATE`）；空行堆积**已修（2026-10-05）**：旧 `sed i\` 每插入一个新日期就多堆一行空行（曾堆到 10 行），现改为一次全文件 awk 重写 —— 连续空行压成一行、新日期标题插在首个日期标题前且两侧各留一空行，存量空行已清 |
 | 稳态现象 | 工作树长期保留 **1 条已暂存的 CHANGELOG 行**（提交 N 的日志落入提交 N+1），这是预期，不要"清理干净" |
-| 版本线 | APK **2.x**（已装 2.0.28 / versionCode 73）。`android/version.properties` 的 `versionCode` 每次打包必须递增 |
+| 版本线 | APK **2.x**（真机最新核验 2.0.43 / versionCode 88；`android/version.properties` 现为 2.0.44 / 89，本批未打包）。`android/version.properties` 的 `versionCode` 每次打包必须递增 |
 
 ### 2.1 APK / 桌面产物约定
 
@@ -84,7 +84,7 @@
 - **禁止往 `public/` 放 APK 或大二进制**：Vite 会把 `public/` 原样拷进 `dist/client`，导致 web / 主 APK / 桌面三份产物各白背体积（历史事故：227.5MB 的 CetThink apk 回流进 public，主 APK 里又套一个 APK）。
 - **当前 APK 体积构成**（2.0.25 实测，`node scripts/report-apk-size.cjs`，包内占用 = 压缩后）：离线小模型 541.3MB（未压 877.9MB）+ Kokoro 113.0MB + Piper 音色 65.1MB + web 产物 40.3MB + 原生库 29.3MB + dex/res 14.7MB = **803.7MB**。要减体积先动 `models-bundled`（离线 LLM/翻译模型），别去动 TTS 栈。
   ⑤ 四个功能页（思维/语块/对话/写作）静态 import 平台 AI 插件客户端（`@lark-apaas/client-toolkit-lite`，507KB raw / 160KB gzip）—— 而它只在"用户没配 AI Key"那条平台兜底分支才被碰到。改走 `src/lib/capability-client.ts` 的动态加载后，这四条路由各少下载整个 chunk。
-- **首屏下载口径**（2026-09-29 起）：`npm run verify:bundle-budget` 守的是"入口 chunk 沿**静态** import 递归出来的集合"，实测 11 个 chunk / **199.5KB gzip**（2026-09-30 复测；预算线 600KB）。APK 里 WebView 不压缩本地资源，所以这个数直接就是手机首次进 App 的下载 + 解析量。
+- **首屏下载口径**（2026-09-29 起）：`npm run verify:bundle-budget` 守的是"入口 chunk 沿**静态** import 递归出来的集合"，实测 11 个 chunk / **195.9KB gzip**（2026-10-05 反馈下架后复测；预算线 600KB）。APK 里 WebView 不压缩本地资源，所以这个数直接就是手机首次进 App 的下载 + 解析量。
 
 ---
 
@@ -149,23 +149,18 @@ docs/                       设计与交接文档
 
 - **部署**：Cloudflare Pages 项目 `nativethink` → `nativethink.pages.dev`，**由 Pages 自己的 Git 集成从 `main` 构建**（仓库内已无部署 workflow，见第 2 节）。`wrangler.toml` 里 `pages_build_output_dir = "dist/client"`，KV 绑定名必须是 `KV`（wrangler.toml 写的 id 是 `68391cb5146345739b4ca78181141017`；**该 id 与 Pages 项目实际绑定的命名空间是否同一个仍待核** —— 线上写进去的键在这个命名空间里查不到）。SPA 路由兜底靠**构建时把 `index.html` 复制成 `404.html`** + `public/_redirects`（`/api/* 200` 透传、`/models/* 404` 是**故意**的 —— 404 让 transformers 回落远程下载、`/* → /index.html`）。`public/_headers` 给 COOP/COEP 头（多线程 WASM 需要）。
 - **APK 为什么依赖站点**：`index.html` 头部脚本 `if (window.Capacitor)` 把 `/api/*` 重写成 `https://nativethink.pages.dev/api/*`，`functions/_lib/cors.js` 为 APK 的 `https://localhost` 源补 CORS 头 + OPTIONS 预检。**少任何一个 `withCors` 包一层，手机端该类请求就全挂**，而网页版照常 —— 极易误判成"只有手机有问题"。
-- **端点清单**（`functions/api/`）：`ai/chat`（SSE 流式；8 个 provider；GLM 免费档按 `[task 主选, 请求模型, glm-4-flash-250414, glm-4-flash, glm-4v-flash, glm-4.7-flash]` 链式降级，只在 429/5xx 重试）、`ai/passage`、`ai/transcribe`、`tts`（代理 Google TTS，**上游硬上限 200 字符**，边缘缓存 1 年 immutable）、`auth/register|login|me`、`data/sync`（KV 批量 upsert/delete + 按前缀 list 下载）、`feedback/submit`、`gutenberg`、`wikipedia`、`word-image`、`bilibili-info|subtitle|transcribe`。公共层 `functions/_lib/`：`cors.js` / `jwt.js`（HS256，**`JWT_SECRET` 缺失直接抛错**，30 天有效）/ `auth.js`（Bearer → verify）/ `kv.js`（`users:data:<userId>:<key>`）/ `crypto.js`。
+- **端点清单**（`functions/api/`）：`ai/chat`（SSE 流式；8 个 provider；GLM 免费档按 `[task 主选, 请求模型, glm-4-flash-250414, glm-4-flash, glm-4v-flash, glm-4.7-flash]` 链式降级，只在 429/5xx 重试）、`ai/passage`、`ai/transcribe`、`tts`（代理 Google TTS，**上游硬上限 200 字符**，边缘缓存 1 年 immutable）、`auth/register|login|me`、`data/sync`（KV 批量 upsert/delete + 按前缀 list 下载）、`gutenberg`、`wikipedia`、`word-image`、`bilibili-info|subtitle|transcribe`。公共层 `functions/_lib/`：`cors.js` / `jwt.js`（HS256，**`JWT_SECRET` 缺失直接抛错**，30 天有效）/ `auth.js`（Bearer → verify）/ `kv.js`（`users:data:<userId>:<key>`）/ `crypto.js`。
 - **Key 的来源与优先级**：`api/ai/chat` 取 `客户端 body.apiKey` → `env[AI_KEY_<PROVIDER 大写>]` → `env.SERVER_AI_KEY`，都没有就返回 503（前端会提示"服务端 AI Key 未配置"）。出厂 Key 走另一条路：`vite.config.ts` 读 gitignore 的 `scripts/.apikey` 注入 `__FACTORY_API_KEY__`，**不进仓库**，换 Key 只改该文件重新打包。
 - **dev 侧**：`vite.config.ts` 把 `/api/*` 全部代理到线上 pages.dev —— **新加 functions 端点要同时在这里补一条 proxy**，否则 dev 环境该功能静默 404（历史上插图接口就这么漏配过）。
 - **端侧兜底**：`src/lib/local-llm.ts`（Qwen2.5-0.5B-Instruct，q4）+ `local-mt.ts`（Xenova/opus-mt-en-zh，q8）。APK/桌面从同源 `/models/` 零下载（`assets/public/models` 878MB），网页版回落 hf-mirror 现下；`streamChat/chat` 在云端失败、且自动回落开关（`__nativethink_local_llm_auto`）打开、小模型已就位时才切端侧，否则原样抛错并 toast 提示可下载离线备用模型。设置入口在 `components/AISettings.tsx` 的「离线备用小模型」卡片。
 
-### 3.4 反馈链路（2026-09-28 补全前后端对接）
+### 3.4 全站提示出口（Toaster）与反馈功能的下架
 
-`src/components/FeedbackDialog.tsx`（弹窗，自带触发按钮）→ `src/lib/use-feedback.ts`（本地历史 + 限流 + 提交）→ `functions/api/feedback/submit.js`（服务端）→ 两条出路：**先写 KV 留档**（`feedback:<13位毫秒时间戳>:<id>`，见 `functions/_lib/kv.js` 的 `feedbackKey`），**再推飞书群机器人**（`FEISHU_WEBHOOK_URL`，可选通道）。
+**反馈功能已整体下架（2026-10-05，用户决定）**。2026-09-28 曾把它补成完整链路：`FeedbackDialog`（弹窗）→ `use-feedback`（限流 + 本地历史）→ `functions/api/feedback/submit.js`（KV 留档 + 飞书推送两档结局）。下架时入口 / 服务 / 云函数 / 守卫 / 帮助文案全清 —— 想追溯当时形态看 git 历史或当日 CHANGELOG。
 
-- **曾经的真相**：组件和函数都写好了，但**没有任何页面挂载弹窗**，而且提交失败一律 toast 成功。现在入口挂在 `Header.tsx` 工具栏（`<FeedbackDialog />`，非沉浸模式下可见），后端返回 `{delivered, archived, id}` 三档真实状态，前端分别提示；失败条目留在「历史反馈」里可**重试**。
-- **服务端必做的收敛**：`type` 白名单、`title≤100` / `description≤1000`、`rating` 钳到 0..5、HTML 标签与控制符清洗、蜜罐 `hp` 命中则假装成功且不落库；飞书即使回 200 也要看 body 的 `code`，非 0 不算送达。
-- **`use-feedback` 的写入规则**（照仓库既有约定）：`setFeedbacks` 用函数式合并，落盘走 `useEffect([feedbacks, loaded])`，且 `loaded` 之前绝不写 —— 否则首帧空数组会抹掉本机历史。
-- **版本与平台**：`src/lib/app-env.ts` 单一来源（`__APP_VERSION__` 由 `vite.config.ts` 从 `android/version.properties` 注入，读不到退回 `package.json`），随反馈一起上报，用来区分"只有手机上出问题"。
-- **线上现状（2026-09-28 实测）**：`wrangler pages secret list --project-name=nativethink` 只列出 `JWT_SECRET`，**没有 `FEISHU_WEBHOOK_URL`**，所以飞书那一路必然不通；但新版函数已上线 —— POST 线上回 `200 {"ok":true,"delivered":false,"archived":true,...,"detail":"webhook_not_configured"}`，反馈不再被丢弃。**待核**：用本账号能列出的唯一命名空间（`68391cb5146345739b4ca78181141017`，title `KV`，也就是 `wrangler.toml` 里那个）查不到任何键 —— `kv key list --binding=KV --prefix=feedback` 返回 `[]`，按返回 id 反推的键名 `kv key get` 也 "Value not found"。说明 Pages 项目实际绑的命名空间可能不是这个 id，去 Pages → Settings → Functions → KV namespace bindings 核对后再回填本节。要真"送达"自己，加 `FEISHU_WEBHOOK_URL` secret：`npx wrangler pages secret put FEISHU_WEBHOOK_URL --project-name=nativethink`。
-- **回归防线**：`npm run verify:feedback-loop`（56 断言）—— 用**忠实的 KV / webhook 替身真实执行 handler**（留档顺序、飞书业务码、蜜罐、截断、CORS、405/400/503 全覆盖），并断言挂载点存在。正对照已实测会报红：把 `<FeedbackDialog />` 从 Header 摘掉、或把 `<Toaster />` 的 `position` 改掉，脚本立刻 FAIL。
-- **顺带修掉的全站缺陷**：`src/components/ui/sonner.tsx` 里有 shadcn 的 `Toaster`，但**过去没有任何地方挂载它**（全项目搜不到 `<Toaster`）—— 于是几十处 `toast.*`（AI 不可用、每日目标、音色回退、朗读降级提示、反馈结果…）全部静默。现在 `src/index.tsx` 挂唯一出口：`position="top-center"`、`offset.top=88px`（避开 sticky 头）、`mobileOffset.top=calc(env(safe-area-inset-top)+84px)`（APK edge-to-edge 不被状态栏吃掉）。**新页面不要再挂第二个 Toaster**。
-- **真浏览器验收（2026-09-28，无头 Chrome + CDP 打预览服 4173）**：顶栏按钮存在 → 弹出「用户反馈」→ 填描述 → 提交 → 因线上无接收通道，实测 toast 为「反馈暂未送出 / 内容已保存在本机「历史反馈」，可在里面点重试」；本机 `feedback_list` 该条 `synced:false`、`appVersion:"2.0.25"`，历史区显示「未送达 · 已存本机」+「重试」。限流同样实测生效（紧接着第二次提交被"请等待 N 秒后再提交"挡住）。
+**留存下来的站级契约（与反馈无关）**：`src/index.tsx` 是 `<Toaster />` 的**唯一挂载点** —— `position="top-center"`、`offset.top=88px`（避开 sticky 头）、`mobileOffset.top=calc(env(safe-area-inset-top)+84px)`（APK edge-to-edge 不被状态栏吃掉）。历史上它**从未被挂载**，几十处 `toast.*`（AI 不可用、每日目标、音色回退、朗读降级…）全部静默；现在 `verify-overlay-fit` ⑤ 剥注释全仓扫描，第二个挂载点出现即红。**新页面不要再挂。**
+
+**版本号也跟着离开了前端**：`src/lib/app-env.ts` 的 `APP_VERSION` / `envSummary`（反馈上报带版本用的）已删除，只留 `platformTag`。版本号现在只在构建期盖进 `index.html` 的 `<meta name="app-version">`（`vite.config.ts` 从 `android/version.properties` 读，与 `aapt dump badging` 同口径），`scripts/ensure-web-build.mjs` 靠它拦「打进上次产物」；整条链由 `node scripts/verify-app-version.mjs`（11 断言）钉住。
 
 ```powershell
 # 开发 / 构建
@@ -181,9 +176,9 @@ node scripts/verify-wordbank-split.mjs --baseline <out.json>   # 数据层拆分
 node scripts/verify-wordbank-split.mjs --check <in.json>
 npm run verify:books-meta        # 书目/SCP 元数据 + 书库拆分 + 复习词高亮 + 乱码（227 断言）
 npm run verify:vocab-cards       # 背单词卡片交互契约（310 断言；含换卡节奏数值锁 + 答错重排延后 + 换书路径 + 单词字号三档）
-npm run verify:vocab-caches      # 词汇缓存基建契约（capped-cache / colloc-ai-cache 接线，21 断言）
-npm run verify:feedback-loop     # 反馈链路契约（挂载点 + 三档状态 + 后端 KV/飞书替身真实执行，58 断言）
-npm run verify:overlay-fit       # 窄视口浮层契约（Dialog 基座夹高度 + 朗读/AI 设置内部滚动，16 断言）
+npm run verify:vocab-caches      # 词汇缓存基建契约（capped-cache / colloc-ai-cache 接线，67 断言）
+node scripts/verify-app-version.mjs  # 版本号单一载体：meta 注入链路 + 产物一致性（11 断言；产物段先 build:web）
+npm run verify:overlay-fit       # 窄视口浮层契约（Dialog 基座夹高度 + 朗读/AI 设置内部滚动 + 全屏层 safe-area + 唯一 Toaster 出口，28 断言）
 npm run verify:bundle-budget     # 首屏下载预算 + 平台 SDK 禁止静态 import（从产物反查入口静态依赖图，10 断言；跑前必须先 build:web）
 npm run verify:list-scaling      # 长列表必须折叠/分页（写作题库默认 12 张 + 词库浏览分页 + 短语库字母段，18 断言）
 npm run verify:tts-progress      # 朗读切片/进度（6175 断言）
@@ -217,7 +212,7 @@ adb install -r release/NativeThink-mobile-debug.apk
 |---|---|---|
 | 静态 | `npm run typecheck` + `npm run lint:eslint` | 全量；pre-commit 强制 |
 | 构建 | `npm run build:web` | 打包可行性 + chunk 体积 |
-| 契约 | 18 条可跑的 `scripts/verify-*.mjs` + `npm run verify:all` 全量（全表见 [modules/verification.md](./modules/verification.md)） | 词库加载/拆分、书目元数据、背单词卡片（含换卡节奏数值锁 + 答错重排延后 + 换书路径）、背单词缓存、TTS 切片与进度、TTS 降级、反馈链路（前后端对接 + 后端替身执行）、拼写断点分键、跟读完成索引、云同步卫生、AI 解析约定、长列表折叠、复习词汇文章选词/分篇/出队、学习时长记账闸门等 |
+| 契约 | 19 条可跑的 `scripts/verify-*.mjs` + `npm run verify:all` 全量（全表见 [modules/verification.md](./modules/verification.md)） | 词库加载/拆分、书目元数据、背单词卡片（含换卡节奏数值锁 + 答错重排延后 + 换书路径）、背单词缓存、TTS 切片与进度、TTS 降级、版本号 meta 链路、拼写断点分键、跟读完成索引、云同步卫生、AI 解析约定、长列表折叠、复习词汇文章选词/分篇/出队、学习时长记账闸门等 |
 | 真机 | adb + CDP（见第 7 节） | 只能在设备上发现的：safe-area、原生 TTS、手势、持久化 |
 
 **写守卫脚本的经验（血泪）**：
@@ -373,7 +368,7 @@ node scripts/device-eval.mjs back
 - **每日学习（六方式）2026-09-27 一轮**：断点续学补齐（**四个主模式现已全部可续学**：复习检测 / 每日学习 / 快速闪卡 / 语块复习）、闪卡背面『不再出现』（与复习检测对齐、可撤销）、词条详情弹窗读写『我的助记』（复用快速闪卡的 `WordInfoDialog`）、配对不再自动朗读（视觉任务）、自动发音四模式共键。
 - **全站两轮质量优化**（`4f45167` / `e33a780`）：`useStableShuffle` 统一洗牌、快速闪卡状态机三连修、断点按词书分键、屏蔽词全路径过滤、写作 reset/换题打断在途批改流、拼写错词重练入口 + 听写语速滑杆、跟读 100% 完成成就横幅、复习检测键盘弹窗守卫、危险操作两段确认、四个只增不减的缓存 FIFO 封顶 + 键迁移（`capped-cache` / `colloc-ai-cache`）、模式首页角标订阅刷新、贪婪正则换 `extractJson`、emoji 图标换 lucide。
 - **系统层**：Android 15+ edge-to-edge 适配（`viewport-fit=cover` + safe-area 工具类）、词库 5,909 处 U+FFFD 乱码清理、品牌视觉资产重建（`gen-app-brand.ps1`）、真机 CDP 通道 `device-eval.mjs`。
-- **反馈链路对接补全（2026-09-28）**：入口挂上 `Header`，后端改为「先 KV 留档、再可选推飞书」，返回三档真实状态（`delivered`/`stored`/`failed`），失败可在历史里重试；新增 `src/lib/app-env.ts` 统一版本与平台上报，新增守卫 `npm run verify:feedback-loop`（53 断言，含正对照）。详见 §3.4。
+- **反馈链路对接补全（2026-09-28）**：入口挂上 `Header`，后端改为「先 KV 留档、再可选推飞书」，返回三档真实状态（`delivered`/`stored`/`failed`），失败可在历史里重试；新增 `src/lib/app-env.ts` 统一版本与平台上报，新增守卫 `verify:feedback-loop`（当年的 53 断言，含正对照）。**该功能已于 2026-10-05 整体下架**（入口/服务/云函数/守卫全清），留存与迁移说明见 §3.4。
 - **首屏下载体检与瘦身（2026-09-29）**：从**产物**反查入口静态依赖图，抓到五处"运行时明明不执行、却压进入口"的重依赖 ——
   ① `vite.config` 给 recharts/d3 与 react-markdown 写了强制 `manualChunks`，效果**正好相反**：被强制归组的 chunk 变成入口静态依赖，
   全站只有 `/progress` 用得着的图表库（111KB gzip）与只有几页用得着的 Markdown 渲染器（45KB）每条路由都得下载；
@@ -404,7 +399,7 @@ node scripts/device-eval.mjs back
   ③ **复习词汇文章扩展**（`9b1e263`，用户选定方向）：每篇词数放开到 50、一次最多 6 篇；体裁（说明/记叙/议论/对话/书信）+ 主题（复用 `TOPICS`，含"不限"）经 `buildRvPrompt` 唯一构造点进提示词并随文章存下；`rvWords` 只记**真的出现在正文里**的词（`coveredReviewWords` 复用阅读器 `matchesHighlight` 的形态归并，不过度归并），漏用的自动退回词表并如实提示；已保存文章可「重写这篇」—— `replaceAiArticle` 原位替换保持 id（收藏 `content` 与历史 `meta.aiId` 不断链）、沿用文章自己的体裁主题、失败保留原文。`verify-rv-articles` 55 → 104 断言（累计 27 条变异全红）+ CDP 42 项。
   ④ **云同步下行后 7 个 hook 都重读**（`cb6c180`）：订阅收成单一出口 `src/lib/sync-down.ts`（事件名只定义一次、`onSyncDown` 可用假 target 真跑），新增 SM-2 词学习 / 语块学习 / 生词本 / 我的助记；顺带掐掉回声写（下行重读后原样回写 = 登录后一次 POST）—— 引用一致跳过为主、序列化同值不写为辅。`verify-cloud-sync` 18 → 43 断言 + 10 条变异 + CDP 12 项。
 - **练习界面零提示**（2026-09-30 深夜，用户两次要求）：三个背单词练习模式里 `toast` 只剩白名单五处（失败/空队列 + 唯一撤销入口），档位播报、连对里程碑、整轮完成、进场续学、开关、收藏、堆积提示全部撤掉，反馈交给卡面序号 / 已评 / Flame 连对 / 今天新学 x/y / ★ 实心 / 进度条。守卫 `verify-vocab-cards` ⑧c+⑧d 13 条（298 → 303）+ 10 条变异全红。详见 `docs/modules/vocabulary.md` 注意事项 13。
-- **新增 `npm run verify:all`**（同日）：自动发现全部 `scripts/verify-*.mjs` + typecheck，一条红就非零退出。理由是一条真实翻车：改复习词汇文章当天 `verify-rv-articles` 全绿，而 `verify-books-meta` 里盯同一处源码的断言**早已失效** —— 只有全量跑法能发现这种跨守卫漂移（已写进 `AGENTS.md` 提交前清单与 `docs/modules/verification.md` §5）。当时基线：**18 条契约守卫 / 断言合计 7,220 条**（**2026-09-30 收盘复跑：19 条 / 7,269 条全绿**，`npm run build:web` 通过、首屏必需 JS 199.5KB gzip）。
+- **新增 `npm run verify:all`**（同日）：自动发现全部 `scripts/verify-*.mjs` + typecheck，一条红就非零退出。理由是一条真实翻车：改复习词汇文章当天 `verify-rv-articles` 全绿，而 `verify-books-meta` 里盯同一处源码的断言**早已失效** —— 只有全量跑法能发现这种跨守卫漂移（已写进 `AGENTS.md` 提交前清单与 `docs/modules/verification.md` §5）。当时基线：**18 条契约守卫 / 断言合计 7,220 条**（**2026-09-30 收盘复跑：19 条 / 7,269 条全绿**，`npm run build:web` 通过、首屏必需 JS 199.5KB gzip；**2026-10-05 反馈下架后：19 条 / 7,252 条全绿、首屏 195.9KB**）。
 - **阅读器全屏层自带 safe-area**（`be64f2f`，真机反馈"AI 生成文章顶部被手机顶部栏遮住"）：`PageReader` 是 `fixed inset-0` 的全屏层，**跳出了外壳 `SidebarProvider` 那层 safe-area 内缩**，Android 15+ edge-to-edge 下顶栏整条被状态栏压住。修法：根节点补 `safe-area-top safe-area-bottom`（`PageReader.tsx:1210`），并在 `verify-overlay-fit` ④ 加"阅读器全屏层都带 top/bottom + 扫不到第二处贴顶内容层"；本机验收用 CDP `Emulation.setSafeAreaInsetsOverride`（**insets 传对象**）强制 47/24 量顶栏 `top`（0 → 47）。
 - **快速闪卡训练页不再提供每轮词数**（2026-09-30 用户点名）：`10/20/50/100/全部` 从训练页顶栏撤掉，只留起跑页那份（改档位 = 重建随机队列 = 本轮已作答全部清空）。训练页顶栏改只读 `SPAN` 报 `本轮 {uniqueTotal} 词 · 换数量请返回`。`verify-vocab-cards` ⑤b 7 条断言（284 → 290，含"起跑页档位仍可点"正对照）+ 5 条变异全红 + CDP 真点 18 项（向导进训练页 / 答 3 张 / 刷新续学 / 返回改 50 / 重开一轮 / 393px 顶栏不换行不溢出）。见 `docs/modules/vocabulary.md` 注意事项第 12 条。
 - **2026-09-30 晚：真机补验两条 + 顺手修掉复习词高亮的字段断层**（`50ea54e`，APK 83/2.0.38 → 84/2.0.39）：
@@ -426,10 +421,10 @@ node scripts/device-eval.mjs back
 3. **学习提醒**（Capacitor 本地通知）刻意推迟未做 —— `android/app/src/main/assets/capacitor.plugins.json` 里目前只有 `@capacitor-community/text-to-speech`（`SherpaTts` 是仓库内原生插件，在 `MainActivity` 里 `registerPlugin`，不进这张表）。
 4. **词库真人发音包**：单词集合有限，可预录（ROADMAP 第 3 项）。
 5. 句子语料/语法/导入书离线翻译仍有待回填项（见 ROADMAP）。
-6. `.githooks/post-commit` 仍会在插入日期标题时带固定空行（`CHANGELOG.md` 头部已堆 4 行空行，无害）；日期标题 `###`/`##` 那条**已修**。
-7. **反馈通道尚未开通**：代码链路已通，但线上 Pages 项目只有 `JWT_SECRET` 一个 secret —— 要让反馈真的送达开发者，需加 `FEISHU_WEBHOOK_URL`（飞书群机器人）和/或确认 KV 绑定生效；否则用户看到的一直是"暂未送出，可重试"。
-8. ~~**文档债**：应用内帮助中心比代码旧~~（2026-09-29 已修）：`HelpGuide.tsx` 的 FAQ 原来写"必须自备 API Key（推荐 DeepSeek）"（其实出厂内置免费额度可直接用）、"覆盖…五个等级词库"（其实九档）、"聚合所有五个等级"、"数据不会上传到任何服务器"（其实可登录云同步，且反馈会带诊断信息上报）。现已全部按实况改写，并加进 `verify:books-meta` 第 ⑥ 节钉住（九档名单逐个点名、词数只准用去重 21,736 不许出现词条总数 75,113、过期口径出现即红）。`使用攻略.md` 已于 2026-09-28 重写。
-9. 仓库根有 2 个真机截图残留未跟踪（`.screen1.png` / `.screen2.png`），别 commit，要清就删。
+6. ~~`.githooks/post-commit` 仍会在插入日期标题时带固定空行~~（**2026-10-05 已修**）：改为一次 awk 全文件重写（连续空行压一行 + 新日期标题两侧各留一行），存量 9 行空行已清；详见 §2「钩子缺陷史」行。
+7. ~~**反馈通道尚未开通**~~ —— **已闭项（2026-10-05）**：反馈功能整体下架，不再需要 `FEISHU_WEBHOOK_URL`。
+8. ~~**文档债**：应用内帮助中心比代码旧~~（2026-09-29 已修）：`HelpGuide.tsx` 的 FAQ 原来写"必须自备 API Key（推荐 DeepSeek）"（其实出厂内置免费额度可直接用）、"覆盖…五个等级词库"（其实九档）、"聚合所有五个等级"、"数据不会上传到任何服务器"（其实可登录云同步）。现已全部按实况改写，并加进 `verify:books-meta` 第 ⑥ 节钉住（九档名单逐个点名、词数只准用去重 21,736 不许出现词条总数 75,113、过期口径出现即红）。`使用攻略.md` 已于 2026-09-28 重写。
+9. ~~仓库根有 2 个真机截图残留未跟踪~~（2026-10-05 核实文件已不在，无需再清）。
 10. ~~**`/api/tts-voices` 是死调用**~~（2026-09-29 已修）：`TTSSettings.tsx` 原来无条件 fetch `/api/tts-voices`
     —— 网页版每条路由吃一次 404，APK 里 `index.html` 把 `/api/*` 重写到线上站点，等于手机每个页面多一次真实网络往返。
     现在用 `platformTag() === 'desktop'` 圈住：桌面照旧，web/APK 一个请求都不发。
@@ -489,7 +484,7 @@ node scripts/device-eval.mjs back
 1. 学习提醒（本地通知）—— 目前唯一还缺的系统级能力。
 2. 词库真人发音包（预录 + 打包体积方案要先定，`public/` 不能塞大文件）。
 3. ROADMAP 里的语料回填项（语法条数、导入书离线翻译、待回填空段）。
-4. 顺手项：把 `使用攻略.md` 更到当前功能面；`post-commit` 的空行治理。
+4. 顺手项：把 `使用攻略.md` 更到当前功能面（`post-commit` 空行治理已于 2026-10-05 完成）。
 
 ---
 

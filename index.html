@@ -10,6 +10,9 @@
     -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>NativeThink</title>
+    <!-- 构建期由 vite.config.ts 的 fixHtmlPlaceholders 把 {{appVersion}} 换成版本号（读 android/version.properties）；
+         scripts/ensure-web-build.mjs 靠这处标记拦「打进上次产物」，占位符形态不许手改。 -->
+    <meta name="app-version" content="{{appVersion}}" />
     <!-- Preconnect to Google Fonts origins -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

@@ -104,7 +104,6 @@ const ROUTES = {
   '/api/auth/register': 'api/auth/register.js',
   '/api/auth/me': 'api/auth/me.js',
   '/api/data/sync': 'api/data/sync.js',
-  '/api/feedback/submit': 'api/feedback/submit.js',
   '/api/tts': 'api/tts.js',
   '/api/wikipedia': 'api/wikipedia.js',
   '/api/word-image': 'api/word-image.js',

@@ -70,6 +70,7 @@ function fixHtmlPlaceholders(): Plugin {
         .replace(/{{appName}}/g, 'NativeThink')
         .replace(/{{appDescription}}/g, '英语母语思维训练')
         .replace(/{{appAvatar}}/g, '/favicon.svg')
+        .replace(/{{appVersion}}/g, appVersion)
 
       // Strip platform-only analytics/tracking scripts (they're only useful on miaoda,
       // add no value on Cloudflare/GitHub Pages, and significantly slow mobile loading):
@@ -92,7 +93,8 @@ function fixHtmlPlaceholders(): Plugin {
 
 // ── 应用版本号 ──
 // 与 APK 身份同源：读 android/version.properties 的 versionName（npm run version:apk-bump 写的），
-// 读不到再退回 package.json。反馈上报、诊断信息用它，保证和 aapt dump badging 一个口径。
+// 读不到再退回 package.json。构建期盖进 index.html 的 <meta name="app-version">，
+// 供 scripts/ensure-web-build.mjs 核对"产物是不是上一次构建的"（反馈下架后它是唯一载体）。
 let appVersion = ''
 try {
   const props = fs.readFileSync(path.resolve(process.cwd(), 'android', 'version.properties'), 'utf8')
@@ -111,8 +113,6 @@ export default defineConfig({
     'process.env.CLIENT_BASE_PATH': JSON.stringify(process.env.CLIENT_BASE_PATH || '/'),
     // 出厂内置 API Key（可为空 — scripts/.apikey 不存在时）
     '__FACTORY_API_KEY__': JSON.stringify(factoryApiKey),
-    // 应用版本（2.0.25 这种；读不到时是 package.json 的版本）
-    '__APP_VERSION__': JSON.stringify(appVersion),
   },
   plugins: [tailwindcss(), mockVirtualCapabilities(), fixHtmlPlaceholders(), serveBundledModels()],
   resolve: {
@@ -154,10 +154,6 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/api/ai': {
-        target: 'https://nativethink.pages.dev',
-        changeOrigin: true,
-      },
-      '/api/feedback': {
         target: 'https://nativethink.pages.dev',
         changeOrigin: true,
       },

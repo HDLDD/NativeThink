@@ -17,7 +17,7 @@
 
 APK 依赖 `dist/client`（`capacitor.config.json:4`），所以顺序不能省。
 
-**`scripts/ensure-web-build.mjs`（2026-09-30 加）堵的就是这条顺序**：`package:apk` **自己不构建 web**，`capacitor copy` 拷的是 `dist/client` 里现成的东西。当天改完语块接龙判定直接 `package:apk`，打出来的 78/2.0.33 里装的还是 16:05 那次 `build:web` 的产物 —— 修复根本没进包，而 `BUILD SUCCESSFUL`、versionCode、体积构成全都正常，**从打包日志上完全看不出来**。现在它是 `package:apk` / `package:desktop` 的前置，两个触发条件任一成立就自动补跑 `build:web`：① 有被跟踪的源码（`src`/`functions`/`electron`/`server`）比 `dist/client/index.html` 新；② `dist/client` 入口 chunk 里内嵌的 `__APP_VERSION__` 与 `version.properties` 的 `versionName` 不一致 —— ②顺带治了**重复 bump 的连带后果**（`package:all`/`package:apk` 都 bump，包里的 Android 版本可以是 2.0.36 而 App 内展示与反馈上报的还是上一次构建的 2.0.34）。判据②扫的是产物里**所有** `x.y.z` 字面量看当前版本在不在里面：define 替换后 `typeof __APP_VERSION__` 的三元式会被整个折掉，压缩产物里只剩 `` appVersion:`2.0.36` ``，第一版抠固定形态的写法因此静默失效（永远报"一致"）。扫不到版本号时**不触发**，宁可漏报也不误伤发布流程。
+**`scripts/ensure-web-build.mjs`（2026-09-30 加）堵的就是这条顺序**：`package:apk` **自己不构建 web**，`capacitor copy` 拷的是 `dist/client` 里现成的东西。当天改完语块接龙判定直接 `package:apk`，打出来的 78/2.0.33 里装的还是 16:05 那次 `build:web` 的产物 —— 修复根本没进包，而 `BUILD SUCCESSFUL`、versionCode、体积构成全都正常，**从打包日志上完全看不出来**。现在它是 `package:apk` / `package:desktop` 的前置，两个触发条件任一成立就自动补跑 `build:web`：① 有被跟踪的源码（`src`/`functions`/`electron`/`server`）比 `dist/client/index.html` 新；② `dist/client/index.html` 里 `<meta name="app-version">` 盖的版本与 `version.properties` 的 `versionName` 不一致 —— ②顺带治了**重复 bump 的连带后果**（`package:all`/`package:apk` 都 bump，包里的 Android 版本可以是 2.0.39 而 HTML 里盖的还是上一次构建的）。②的载体（2026-10-05 迁移）：原先扫入口 chunk 里的 `x.y.z` 裸字面量 —— 那些字面量是反馈上报的 appVersion 字段顺带带进包的，反馈下架后改为**构建期把版本盖进 HTML meta**（`vite.config.ts` 的 fixHtmlPlaceholders 替换 `{{appVersion}}`）；判据从"猜包里有没有字面量"变成"读一处我们自己的标记"，meta 缺失或占位符没替换都算需要重建，重建后仍缺会拦下打包。链路由 `node scripts/verify-app-version.mjs`（11 断言）钉住。
 
 **打完包要自己复核**（本轮实际用的三条）：`aapt dump badging release/NativeThink-mobile-debug.apk | head -1` 看内嵌版本；拿 `dist/client/index.html` 引用的入口 chunk 名去 `unzip -p` 包里比对 —— **chunk 名是内容哈希，对得上才证明包里就是这份产物**；再在页面 chunk 里 grep 本次改动的标志性字符串（新串要在、旧串该是 0）。
 
@@ -25,7 +25,7 @@ APK 依赖 `dist/client`（`capacitor.config.json:4`），所以顺序不能省�
 
 ## 2. 版本号与产物命名
 
-`android/version.properties` 当前 `versionCode=82` / `versionName=2.0.37`（2026-09-30 打，含当天全部 8 项改动；设备上还是 76/2.0.31，待装）。`scripts/bump-android-version.cjs:19,24,26`：**两个字段都改** —— code +1，name 只递增 patch（沿用文件里写的 `major.minor`；文件缺省时 code 1→2、name 2.0.0→2.0.1）。
+`android/version.properties` 当前 `versionCode=89` / `versionName=2.0.44`（2026-10-05 文件实况；每次打包自动递增）。`scripts/bump-android-version.cjs:19,24,26`：**两个字段都改** —— code +1，name 只递增 patch（沿用文件里写的 `major.minor`；文件缺省时 code 1→2、name 2.0.0→2.0.1）。
 
 `versionCode` 必须每次递增：Android 拒绝非递增的升级安装，会要求先卸载 → **丢本地数据**。
 
@@ -42,13 +42,13 @@ APK 依赖 `dist/client`（`capacitor.config.json:4`），所以顺序不能省�
 
 `vite.config.ts:199-236` 现存 `manualChunks` 规则：react / router / radix / icons / date-fns / zod；`:238-246` 九个 `wordbank-*` 数据 chunk。**recharts、react-markdown、framer-motion 的强制规则被有意删除**（`:214-227` 附实测数字）—— 给只有懒加载页面用的库写强制分块，会让它变成**入口 chunk 的静态依赖**，方向正好相反。
 
-`verify-bundle-budget.mjs`：从 `dist/client/index.html` 的 modulepreload + 入口 chunk 的**静态** import 递归 BFS 出「首屏必需集合」（`:52-63`），断言集合里没有 recharts/markdown/词库数据 chunk，且 gzip 总量 ≤ `BUDGET = 600`（`:79`）。当前实测 **199.5KB / 10 项全绿**（2026-09-30）。没有 `dist` 直接 `exit 1`（`:31-34`）；含正对照（`:83-87`）和「禁止静态 import 平台 SDK」的 `git grep`（`:96-107`）。
+`verify-bundle-budget.mjs`：从 `dist/client/index.html` 的 modulepreload + 入口 chunk 的**静态** import 递归 BFS 出「首屏必需集合」（`:52-63`），断言集合里没有 recharts/markdown/词库数据 chunk，且 gzip 总量 ≤ `BUDGET = 600`（`:79`）。当前实测 **195.9KB / 10 项全绿**（2026-10-05，反馈功能下架后）。没有 `dist` 直接 `exit 1`（`:31-34`）；含正对照（`:83-87`）和「禁止静态 import 平台 SDK」的 `git grep`（`:96-107`）。
 
 ## 4. Cloudflare Pages 侧
 
 | 文件 | 作用 |
 |------|------|
-| `functions/api/**` | 文件式路由：`ai/{chat,passage,transcribe}`、`auth/{login,me,register}`、`data/sync`、`feedback/submit`、`tts`、`word-image`、`gutenberg`、`wikipedia`、`bilibili-*`（`api/debug/` 是空目录） |
+| `functions/api/**` | 文件式路由：`ai/{chat,passage,transcribe}`、`auth/{login,me,register}`、`data/sync`、`tts`、`word-image`、`gutenberg`、`wikipedia`、`bilibili-*`（`api/debug/` 是空目录） |
 | `functions/_lib/{auth,cors,crypto,jwt,kv,types}` | 共享代码 |
 | `public/_redirects` | `/api/* /api/* 200` → `/models/* /models/* 404` → `/* /index.html 200`（顺序有意义） |
 | `public/_headers` | COOP `same-origin` + COEP `credentialless`（多线程 WASM 必需） |

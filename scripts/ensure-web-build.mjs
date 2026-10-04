@@ -9,9 +9,9 @@
  *
  * 两个触发条件（任一成立就重建）：
  *   ① 有被跟踪的源码文件比 `dist/client/index.html` 新；
- *   ② `dist/client` 里内嵌的 `__APP_VERSION__` 与 `android/version.properties` 的
- *      `versionName` 不一致 —— ②是"重复 bump"的连带后果：`package:apk` 自己会再 bump 一次，
- *      于是包里的 Android 版本是 2.0.34、App 内展示与反馈上报的版本还是上一次构建的 2.0.33。
+ *   ② `dist/client/index.html` 里 <meta name="app-version"> 盖的版本与 `android/version.properties`
+ *      的 `versionName` 不一致 —— ②是"重复 bump"的连带后果：`package:apk` 自己会再 bump 一次，
+ *      于是包里的 Android 版本是 2.0.34、HTML 里盖的还是上一次构建的 2.0.33（装上看不出来）。
  *
  * 用法：node scripts/ensure-web-build.mjs   （package:apk / package:desktop 前置）
  */
@@ -34,20 +34,19 @@ function versionFromProps() {
 }
 
 /**
- * dist 里内嵌的版本号集合。
- * 压缩后 `__APP_VERSION__` 变成裸字面量（实测形态是 `` appVersion:`2.0.34` ``，
- * 没有 `typeof __APP_VERSION__` 那段 —— define 已经把整个三元式折掉了），
- * 所以只能"扫出所有 x.y.z 字面量，看当前版本在不在里面"。
- * 扫不到（返回空数组）时判据退回不触发 —— 宁可漏报也不误伤发布流程。
+ * dist/client/index.html 里盖的版本号（构建期 fixHtmlPlaceholders 注入的 meta）。
+ *
+ * 早先的写法是扫入口 chunk 里的 x.y.z 裸字面量 —— 版本恰被反馈上报的 appVersion 字段
+ * 带进包里，才顺藤摸到。反馈功能 2026-10-05 整体下架后那条来源没了，改为构建期
+ * 把版本盖进 HTML meta：判据从"猜包里有没有字面量"变成"读一处我们自己的标记"。
+ * 读不到（旧管线产物 / 注入缺失 / 占位符没替换）返回空串 —— 视为需要重建；
+ * 重建后仍读不到会拦下打包，宁可拦住也不装出一只版本无法核对的包。
  */
-function versionsInDist() {
+function versionInDist() {
   try {
     const html = readFileSync(DIST_INDEX, 'utf8');
-    const entry = /assets\/(index-[\w-]+\.js)/.exec(html)?.[1];
-    if (!entry) return [];
-    const js = readFileSync(join(ROOT, 'dist/client/assets', entry), 'utf8');
-    return [...new Set([...js.matchAll(/[`'"](\d+\.\d+\.\d+)[`'"]/g)].map((m) => m[1]))];
-  } catch { return []; }
+    return (/<meta[^>]*name="app-version"[^>]*content="([^"]+)"/.exec(html)?.[1] || '').trim();
+  } catch { return ''; }
 }
 
 function staleReasons() {
@@ -70,9 +69,11 @@ function staleReasons() {
     reasons.push(`源码比产物新（最新：${newest}）`);
   }
   const want = versionFromProps();
-  const found = versionsInDist();
-  if (want && found.length && !found.includes(want)) {
-    reasons.push(`产物内版本是 ${found.join('/')}，version.properties 已是 ${want}`);
+  const found = versionInDist();
+  if (want && !found) {
+    reasons.push('产物里没有 app-version 标记（旧管线产物或构建期注入缺失）');
+  } else if (want && found !== want) {
+    reasons.push(`产物内版本是 ${found}，version.properties 已是 ${want}`);
   }
   return reasons;
 }

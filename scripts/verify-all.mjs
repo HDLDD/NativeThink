@@ -62,8 +62,6 @@ for (const f of scripts) {
   run(f, ['node', join('scripts', f)]);
 }
 
-// 注：feedback-loop 也在 scripts/ 里，由上面的 glob 覆盖，不再重复跑一遍。
-
 const width = Math.max(...results.map((r) => r.label.length));
 console.log('');
 for (const r of results) {
