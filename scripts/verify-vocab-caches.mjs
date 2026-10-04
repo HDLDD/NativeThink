@@ -10,6 +10,9 @@
  *     safe-storage / capped-cache —— 配额满时 `setItem`/`persistJson` 返回 false、
  *     `warnStorageFull` 全站 60s 只提示一次；`appendCapped` 对**不可重算**的清单
  *     只拒绝新增、绝不裁剪已有条目。再断言七个用户清单的接线。
+ *  ⑥（2026-10-05 加）**滚动窗口类清单的条数 + 字节双封顶**：`trimOldest` 纯函数真跑
+ *     （超条数/超字节都从最旧丢、最新一条永远保留、上限 0 不越界），
+ *     写作历史与跟读完成标记的接线/常量钉死，旧的"裸 setItem + slice(-50)"不许回来。
  *
  * 用法：node scripts/verify-vocab-caches.mjs
  */
@@ -242,6 +245,41 @@ function transpile(relPath, extraExports) {
   check(/const CHUNK_AI_SENTENCES_PER_KEY = 30;/.test(chunks), '语块：单语块例句上限钉死 30');
   check(/const CHUNK_EXAMPLE_TRANS_KEYS = 400;/.test(chunks), '语块：例句翻译上限钉死 400');
   check(/const CHUNK_PHRASE_EXAMPLE_KEYS = 300;/.test(chunks), '短语：例句上限钉死 300');
+}
+
+// ── ⑥ 滚动窗口类清单：条数 + 字节双封顶（2026-10-05 加）──
+{
+  const mod = await import(pathToFileURL(transpile('src/lib/capped-cache.ts', 'trimOldest')).href);
+  const { trimOldest } = mod;
+
+  const five = [1, 2, 3, 4, 5];
+  check(trimOldest(five, 50, 1e9).join('') === '12345', '⑥ trimOldest：未超限原样保留');
+  check(trimOldest(five, 3, 1e9).join('') === '345', '⑥ trimOldest：超条数保留最新，从最旧丢');
+  // JSON.stringify('aaaa') = '"aaaa"'（6 字符）
+  const byBytes = trimOldest(['aaaa', 'bbbb', 'cccc'], 50, 13);
+  check(byBytes.join(',') === 'bbbb,cccc', '⑥ trimOldest：超字节时丢最旧（最新两条 12 ≤ 13）', JSON.stringify(byBytes));
+  const huge = trimOldest(['aaaa', 'x'.repeat(100)], 50, 10);
+  check(huge.length === 1 && huge[0].startsWith('x'), '⑥ trimOldest：单条就超预算时至少保留最新那条（丢更旧的）');
+  check(trimOldest(five, 0, 1e9).length === 0, '⑥ trimOldest：条数上限 0 → 空（不许 slice(-0) 把整份放过去）');
+  check(trimOldest([], 10, 10).length === 0, '⑥ trimOldest：空清单不炸');
+
+  const wr = readFileSync(join(ROOT, 'src/pages/WritingPage/WritingPage.tsx'), 'utf8');
+  check(/const WRITING_HISTORY_KEY = '__nativethink_writing_history';/.test(wr), '⑥ 写作历史键名单点定义');
+  check(/const WRITING_HISTORY_LIMIT = 50;/.test(wr), '⑥ 写作历史条数上限钉死 50');
+  check(/const WRITING_HISTORY_MAX_BYTES = 256 \* 1024;/.test(wr), '⑥ 写作历史字节上限钉死 256KB');
+  check(/if \(!persistJson\(WRITING_HISTORY_KEY, trimOldest\(history, WRITING_HISTORY_LIMIT, WRITING_HISTORY_MAX_BYTES\)\)\)/.test(wr),
+    '⑥ 写作历史：落盘走 trimOldest 双封顶');
+  check(/warnStorageFull\(\)/.test(wr) && /persistJson\(WRITING_HISTORY_KEY/.test(wr), '⑥ 写作历史：写失败走 warnStorageFull 分支');
+  check(!/safeStorage\.setItem\('__nativethink_writing_history'/.test(wr), '⑥ 写作历史不再用裸 setItem（吞异常）落盘');
+  check(!/history\.slice\(-50\)/.test(wr), '⑥ 旧写法（slice(-50) 直接落盘）已消失');
+
+  const sh = readFileSync(join(ROOT, 'src/pages/ShadowingPage/ShadowingPage.tsx'), 'utf8');
+  check(/const SHADOWING_COMPLETED_LIMIT = 2000;/.test(sh), '⑥ 跟读完成标记条数上限钉死 2000');
+  check(/const SHADOWING_COMPLETED_MAX_BYTES = 64 \* 1024;/.test(sh), '⑥ 跟读完成标记字节上限钉死 64KB');
+  check(/if \(!persistJson\(COMPLETED_KEY, trimOldest\(\[\.\.\.completedSentences\], SHADOWING_COMPLETED_LIMIT, SHADOWING_COMPLETED_MAX_BYTES\)\)\)/.test(sh),
+    '⑥ 跟读完成标记：落盘走 trimOldest 双封顶');
+  check(/warnStorageFull\(\)/.test(sh) && /persistJson\(COMPLETED_KEY/.test(sh), '⑥ 跟读完成标记：写失败走 warnStorageFull 分支');
+  check(!/safeStorage\.setItem\(COMPLETED_KEY/.test(sh), '⑥ 跟读完成标记不再用裸 setItem（吞异常）落盘');
 }
 
 console.log('');

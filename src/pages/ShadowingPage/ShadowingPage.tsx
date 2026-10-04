@@ -41,7 +41,7 @@ import { useLearningStats } from '@/lib/use-learning-stats';
 import { useFavorites } from '@/lib/use-favorites';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
-import { persistJson, warnStorageFull } from '@/lib/capped-cache';
+import { persistJson, warnStorageFull, trimOldest } from '@/lib/capped-cache';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { cn, extractJson } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
@@ -84,6 +84,9 @@ export default function ShadowingPage() {
   const [playbackRate, setPlaybackRate] = usePageMemory('shadowing-rate', 1);
   /** 已完成句子（键 = 语料id-句序）—— 持久化（此前切 tab/刷新即丢） */
   const COMPLETED_KEY = '__nativethink_shadowing_completed';
+  /** 条数 + 字节双封顶：语料越多标记越多，而整份 JSON 每次变更都要重写，封顶才让写入成本有界 */
+  const SHADOWING_COMPLETED_LIMIT = 2000;
+  const SHADOWING_COMPLETED_MAX_BYTES = 64 * 1024;
   const [completedSentences, setCompletedSentences] = useState<Set<string>>(() => {
     try {
       const s = safeStorage.getItem(COMPLETED_KEY);
@@ -91,7 +94,10 @@ export default function ShadowingPage() {
     } catch { return new Set(); }
   });
   useEffect(() => {
-    try { safeStorage.setItem(COMPLETED_KEY, JSON.stringify([...completedSentences])); } catch { /* ignore */ }
+    // 保留最新，从最旧的标记丢（丢的只是老材料的"已完成"进度）；写失败要可见
+    if (!persistJson(COMPLETED_KEY, trimOldest([...completedSentences], SHADOWING_COMPLETED_LIMIT, SHADOWING_COMPLETED_MAX_BYTES))) {
+      warnStorageFull();
+    }
   }, [completedSentences]);
 
   // AI generation state

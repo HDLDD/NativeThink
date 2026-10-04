@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-10-05
+- chore(hooks): post-commit 改用一次全文件重写，不再堆空行；.wrangler/ 入 gitignore (`4556434`)
 - refactor(feedback): 整体下架反馈功能（入口/服务/云函数/守卫/文档全清） (`ac6ebf2`)
 
 ## 2026-10-01

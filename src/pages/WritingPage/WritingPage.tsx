@@ -44,7 +44,7 @@ import { useAI } from '@/hooks/use-ai';
 import { useTTS } from '@/lib/use-tts';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { safeStorage } from '@/lib/safe-storage';
-import { persistJson, warnStorageFull } from '@/lib/capped-cache';
+import { persistJson, warnStorageFull, trimOldest } from '@/lib/capped-cache';
 import { cn, extractJson } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -354,6 +354,10 @@ const WRITING_PROMPTS: IWritingPrompt[] = [
   { id:'100', title:'十年后的世界会是什么样子？', description:'预测十年后世界在科技、环境、社会等方面可能发生的变化。', category:'议论文', wordLimit:{min:120,max:300}, difficulty:'advanced', tips:['从科技、环境、工作方式等多角度预测','基于当前趋势做合理推断','既要大胆想象也要逻辑自洽'] },
 ];
 
+const WRITING_HISTORY_KEY = '__nativethink_writing_history';
+const WRITING_HISTORY_LIMIT = 50;
+const WRITING_HISTORY_MAX_BYTES = 256 * 1024;
+
 export default function WritingPage() {
   const { addStudyMinutes } = useLearningStats();
   const { creditOnce } = useStudyCredit();
@@ -370,7 +374,7 @@ export default function WritingPage() {
   const [draftRestored, setDraftRestored] = useState(false);
   const [history, setHistory] = useState<{ prompt: string; essay: string; feedback: string; date: number }[]>(() => {
     try {
-      const saved = safeStorage.getItem('__nativethink_writing_history');
+      const saved = safeStorage.getItem(WRITING_HISTORY_KEY);
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
@@ -415,11 +419,12 @@ export default function WritingPage() {
     setSelectedPrompt(null);
   };
 
-  // Persist practice history (cap at 50 entries to stay within localStorage quota)
+  // Persist practice history：条数 + 字节双封顶（只有条数上限的话，长作文 + 长批改仍能把总量撑爆）。
+  // 保留最新、淘汰最旧；写失败必须可见（与自建题目同口径）。
   useEffect(() => {
-    try {
-      safeStorage.setItem('__nativethink_writing_history', JSON.stringify(history.slice(-50)));
-    } catch { /* quota */ }
+    if (!persistJson(WRITING_HISTORY_KEY, trimOldest(history, WRITING_HISTORY_LIMIT, WRITING_HISTORY_MAX_BYTES))) {
+      warnStorageFull();
+    }
   }, [history]);
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);

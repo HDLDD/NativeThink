@@ -79,6 +79,29 @@ export function cappedPut<T>(obj: Record<string, T>, key: string, value: T, max:
   return next;
 }
 
+/**
+ * 纯函数：给**滚动窗口**类清单做条数 + 字节双封顶 —— 保留最新，从最旧的开始丢。
+ * 与 `appendCapped` 的区别：那种清单是用户作品，一条都不替用户删；
+ * 这里用于本来就按"最后 N 条"使用的历史/进度标记（写作历史、跟读已完成句），
+ * 保最新是既有产品口径，双封顶只是让它真的带上限（只数条数封不住长文本总量）。
+ * 字节按 JSON 序列化长度估算；单条就超预算时也至少保留最新那条（丢更旧的，
+ * 写不下由 persistJson 如实报失败）。
+ */
+export function trimOldest<T>(items: T[], maxItems: number, maxBytes: number): T[] {
+  const n = Math.max(0, Math.floor(maxItems));
+  const tail = n === 0 ? [] : items.slice(-n);
+  const sizeOf = (item: T) => JSON.stringify(item)?.length ?? 0;
+  let start = tail.length;
+  let total = 0;
+  while (start > 0) {
+    const size = sizeOf(tail[start - 1]);
+    if (start < tail.length && total + size > maxBytes) break;
+    total += size;
+    start--;
+  }
+  return tail.slice(start);
+}
+
 /** 一次性把旧存储键搬到新键（新键已有数据时不动；搬完删除旧键） */
 export function migrateStorageKey(oldKey: string, newKey: string): void {
   try {
