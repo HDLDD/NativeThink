@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
 
 const TTS_SETTINGS_KEY = '__nativethink_tts_settings';
@@ -118,6 +119,10 @@ export function useTTSSettings() {
     setSettings(loadSettings());
     setLoaded(true);
   }, []);
+
+  // 云同步下行后重读：另一台设备改过的音色/语速/偏好这台要生效。
+  // saveSettings 只在 updateSettings 里调用，没有"回写 effect"，重读不会回声。
+  useSyncDown(() => setSettings(loadSettings()));
 
   const updateSettings = useCallback((partial: Partial<TTSSettings>) => {
     setSettings((prev) => {

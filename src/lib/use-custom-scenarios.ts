@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
 
 const CUSTOM_SCENARIOS_KEY = '__nativethink_custom_scenarios';
@@ -50,18 +51,25 @@ export function useCustomScenarios() {
   const [scenarios, setScenarios] = useState<ICustomScenario[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
+  const reloadFromStorage = useCallback(() => {
     try {
       const saved = safeStorage.getItem(CUSTOM_SCENARIOS_KEY);
       if (saved) {
         setScenarios(JSON.parse(saved));
       }
     } catch {
-      // storage unavailable — use defaults
-    } finally {
-      setLoaded(true);
+      // storage unavailable — keep current state
     }
   }, []);
+
+  useEffect(() => {
+    reloadFromStorage();
+    setLoaded(true);
+  }, [reloadFromStorage]);
+
+  // 云同步下行后重读：另一台设备建的自定义场景这台要立即看到。
+  // 增删场景都是 persist 直接写 storage，重读不会产生回声写入。
+  useSyncDown(reloadFromStorage);
 
   const persist = useCallback((items: ICustomScenario[]) => {
     setScenarios(items);

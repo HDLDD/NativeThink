@@ -3,7 +3,8 @@
  * SM-2 间隔重复 + 错词跟踪
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
 import { formatDate } from './utils';
 import type { ISpellingSentence, ISpellingProgress, ISpellingLearningState, SpellingMode } from '@/types/spelling';
@@ -53,7 +54,10 @@ function loadCompletedIds(): string[] {
 }
 
 function saveCompletedIds(ids: string[]) {
-  safeStorage.setItem(COMPLETED_KEY, JSON.stringify(ids));
+  const json = JSON.stringify(ids);
+  // 与存储一致时不写：掐掉挂载时的同值回写（它会被双写 POST 回云端）
+  if (safeStorage.getItem(COMPLETED_KEY) === json) return;
+  safeStorage.setItem(COMPLETED_KEY, json);
 }
 
 function todayKey(): string {
@@ -70,7 +74,10 @@ function loadState(): ISpellingLearningState {
 }
 
 function saveState(state: ISpellingLearningState) {
-  safeStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const json = JSON.stringify(state);
+  // 与存储一字不差时不写：下行回声的第二道判据（第一道是回写 effect 的引用比对）
+  if (safeStorage.getItem(STORAGE_KEY) === json) return;
+  safeStorage.setItem(STORAGE_KEY, json);
 }
 
 /**
@@ -116,8 +123,30 @@ export function useSpellingLearning() {
   const [state, setState] = useState<ISpellingLearningState>(loadState);
   const [completedSentenceIds, setCompletedSentenceIds] = useState<string[]>(loadCompletedIds);
 
+  /**
+   * 下行重读的回声守卫 —— 本 hook 有两个**无条件回写 effect**（挂载即写），
+   * 不加守卫时：syncDown 重读 → effect 把刚读进来的原样写回 → 双写 POST 回云端。
+   * 引用一致 = "这份就是刚从 storage 读出来的"，直接跳过（一次性）。与 use-word-learning 同一套。
+   */
+  const loadedStateRef = useRef<ISpellingLearningState | null>(null);
+  const loadedCompletedRef = useRef<string[] | null>(null);
+
+  // 云同步下行后重读：别的设备练过的句子，这台要立即看到进度与完成标记变化
+  useSyncDown(() => {
+    const nextState = loadState();
+    const nextCompleted = loadCompletedIds();
+    loadedStateRef.current = nextState;
+    loadedCompletedRef.current = nextCompleted;
+    setState(nextState);
+    setCompletedSentenceIds(nextCompleted);
+  });
+
   // Persist completed IDs
   useEffect(() => {
+    if (loadedCompletedRef.current === completedSentenceIds) {
+      loadedCompletedRef.current = null; // 一次性：刚从 storage 读进来的，原样写回没有意义
+      return;
+    }
     saveCompletedIds(completedSentenceIds);
   }, [completedSentenceIds]);
 
@@ -131,6 +160,10 @@ export function useSpellingLearning() {
 
   // Persist
   useEffect(() => {
+    if (loadedStateRef.current === state) {
+      loadedStateRef.current = null; // 一次性：刚从 storage 读进来的，原样写回没有意义
+      return;
+    }
     saveState(state);
   }, [state]);
 

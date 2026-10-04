@@ -14,7 +14,7 @@
 | `verify-sentence-lab.mjs` | 16 | 拆句训练主干判定**索引同源**：真转译 `sentence-parse.ts` 跑出 `stdParts` 与 `segments` 的分歧（缩约形式跨意群那个真实例子）、坏数据不再产生假成功；守 ChunkDrill 候选来自 resolved、reveal 在 grade 之前拦 | 改 `sentence-parse.ts` / `ChunkDrill.tsx` |
 | `verify-spelling-resume.mjs` | 24 | 拼写断点**按词书分键**：注入替身真跑 persist/读/迁移/清理，含「旧全局单键只剩最后一本」的正对照；守页面与重置流程都走同一模块 | 改 `spelling-resume.ts` / `SpellingPage` 断点 / 拼写重置 |
 | `verify-ai-parse.mjs` | 10 | AI 解析约定全仓扫：每个 `extractJson` 调用点前必须有 `.trim()` 判空、不许残留贪婪 `match(/…[\s\S]*…/)`；**注释行不参与判定**，并用三段固件自证检查器本身有效 | 新增/改动任何 AI 调用点 |
-| `verify-cloud-sync-hygiene.mjs` | 43 | 云同步四条不变量：转译**真实** `use-cloud-sync` + `safe-storage` 在 Node 里驱动 —— 下行后 0 次 POST（回声）、同键本地再写必须 1 次 POST（正对照）、空 catch 数为 0、周期补推按需且 `needsResync` 引用稳定；④ 新增**用假 target 真跑 `sync-down`**（通知/退订/异常隔离/事件名一致）+ 7 个订阅者逐个点名 + "没有任何 hook 再自己拼事件名" + SM-2/语块两道回声判据都在 | 改 `use-cloud-sync.ts` / `sync-down.ts` / `CloudSyncProvider.tsx` / `safe-storage.ts` 双写钩子 / 任何 `useSyncDown` 调用点 |
+| `verify-cloud-sync-hygiene.mjs` | 70 | 云同步契约：转译**真实** `use-cloud-sync` + `safe-storage` 在 Node 里驱动 —— 下行后 0 次 POST（回声）、同键本地再写必须 1 次 POST（正对照）、空 catch 数为 0、周期补推按需且 `needsResync` 引用稳定；④ 用假 target 真跑 `sync-down`（通知/退订/异常隔离/事件名一致）+ **13 个订阅者逐个点名** + "没有任何 hook 再自己拼事件名" + SM-2/语块/拼写三道回声判据；④b 三处模块级缓存"重读前必须先 invalidate"的静态形态；⑤ **编译三个缓存库真跑**"不作废拿旧值（正对照）→ 作废拿新值"，防"订阅了但被缓存挡住"的假绿 | 改 `use-cloud-sync.ts` / `sync-down.ts` / `CloudSyncProvider.tsx` / `safe-storage.ts` 双写钩子 / 任何 `useSyncDown` 调用点 |
 | `verify-wordbank-loading.mjs` | 45 | 加载层集成：显示数 = 出卡池子、九本不互抢、IDB 失败才兜底 localStorage | 改词库或加载层 |
 | `verify-wordbank-split.mjs` | 数据全量比对 | 拆分校验：`--baseline` 采基线（**拆分前后都能采**）、`--check` 逐项断言 | 改词库拆分 |
 | `verify-books-meta.mjs` | 227 | ①–④ 生成器与数据不漂移；⑤ books/book-clean/books-meta 拆分（**实际加载两个模块交叉核对**）；⑥ HelpGuide 文案 vs `meta.ts`/`ai-config.ts` | 改书单、scp、reader-highlight |
@@ -108,6 +108,8 @@ npm run verify:all        # scripts/verify-all.mjs：typecheck + 全部 verify-*
 2026-10-05 第 3 测（HelpGuide 审计 + 跟读语音标注修复批次）：typecheck + 19 条守卫全绿（verify-wordbank-split 跳过），**断言合计 7,274 条**（= 7,270 + 4。tts-progress 6,175；其余 18 条：45+227+310+85+15+16+11+28+10+18+27+43+16+24+10+104+74+36 = 1,099 —— shadowing-completion 23 → 27，新增语音标注 `<u>` 渲染 4 条，变异退回旧写法红 2 条）。
 
 2026-10-05 第 4 测（品牌字体自托管落地，ROADMAP #7）：新增 verify-brand-fonts 22（三段契约：源侧零外链 / woff2 真文件与 OFL 随附 / 生效栈正对照；4 组变异全红 —— 复加外链、删字体文件、塞回 'Noto Sans SC'、截断 woff2；修掉守卫自身 `.map(basename)` 收不到下标的崩溃后，删文件红点从异常改为两条明确断言）。行为验收：无头 Chrome + CDP 对 `dist/client` 实跑 **9/9**（零 fonts.googleapis/gstatic 请求、三 woff2 全 200 且 MIME font/woff2、`document.fonts.check` 400/600/700 全 true、FontFace 全 loaded、body 计算栈含 Plus Jakarta Sans、控制台零错误）。typecheck + 20 条守卫全绿（verify-wordbank-split 跳过），**断言合计 7,296 条**（= 7,274 + 22。tts-progress 6,175；其余 19 条：45+227+310+85+15+16+11+28+10+18+27+43+16+24+10+104+74+36+22 = 1,121）。
+
+2026-10-05 第 5 测（云同步下行订阅收尾，ROADMAP #10 末项）：verify-cloud-sync-hygiene 43 → **70**（订阅者 7 → 13 逐个点名；④b 三个模块级缓存库"先作废再重读"静态 + SM-2/语块/拼写回声判据；⑤ 把 `custom-words` / `word-notes` / `quickcard-history` 转译编译后在 Node 真跑：本地写 → 走 `safeStorage`（下行落地同一条通道）模拟云端改存储 → **正对照**不作废缓存时读到旧内存 → 作废后读到新值）。4 组变异、10 条红点全部命中：回退裸 `read()` 红 1、三处 invalidate 置空红 6（3 静态 + 3 行为）、删掉一个订阅红 1、拆拼写两处回声守卫红 2（首轮因变异脚本给 CRLF 文件用 `\n` 搜索未生效，复做并先自证替换落地后才认数）。typecheck + 21 条守卫全绿（verify-wordbank-split 跳过），**断言合计 7,323 条**（= 7,296 + 27。tts-progress 6,175；其余 19 条：45+227+310+85+15+16+11+28+10+18+27+70+16+24+10+104+74+36+22 = 1,148）。
 
 ## 6. 静态检查的已知弱度
 

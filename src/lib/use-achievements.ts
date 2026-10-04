@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
 import { toast } from 'sonner';
 
@@ -116,18 +117,25 @@ export function useAchievements() {
   const [unlocked, setUnlocked] = useState<IUnlockedAchievement[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
+  const reloadFromStorage = useCallback(() => {
     try {
       const saved = safeStorage.getItem(ACHIEVEMENTS_KEY);
       if (saved) {
         setUnlocked(JSON.parse(saved));
       }
     } catch {
-      // scopedStorage unavailable — use defaults
-    } finally {
-      setLoaded(true);
+      // scopedStorage unavailable — keep current state
     }
   }, []);
+
+  useEffect(() => {
+    reloadFromStorage();
+    setLoaded(true);
+  }, [reloadFromStorage]);
+
+  // 云同步下行后重读：另一台设备解锁的成就这台要立即看到。
+  // 解锁只往列表里加（persist 直接写 storage），重读不会产生回声写入。
+  useSyncDown(reloadFromStorage);
 
   const persist = useCallback((items: IUnlockedAchievement[]) => {
     setUnlocked(items);

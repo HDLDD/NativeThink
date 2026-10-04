@@ -9,6 +9,14 @@
  *   ② **失败全静默**：三个空 `catch`，且 `syncing`/`lastSync` 没有任何组件消费。
  *   ③ **周期任务无条件全量 syncUp**：`syncDown().then(() => syncUp())` 每 5 分钟整份重推。
  *
+ * 后续扩容（2026-10-05，task #36）又盖上两件"订阅了等于没订阅"的事：
+ *   ④ **模块级缓存的库**：`custom-words` / `word-notes` / `quickcard-history` 有 `let _cache`，
+ *      `useSyncDown(() => setWords(read()))` 里 read() 命中陈旧缓存 —— 下行重读变摆设，
+ *      且本机旧内存会在下次写入时把云端新值盖回去。现在要求重读前先作废缓存：④b 静态断言形态，
+ *   ⑤ **编译三个库真跑**"不作废拿旧值（正对照）→ 作废拿新值"，把缓存本体的失效语义也钉住。
+ *   另：④ 的订阅者清单扩到 13 个（新增句子复习/成就/自定义场景/TTS 设置/拼写句子库/闪卡留档），
+ *   其中 `use-spelling-learning` 有两个无条件回写 effect，必须配完整回声守卫（引用比对 + 序列化比对）。
+ *
  * 做法：把真实的 `use-cloud-sync.ts` + `safe-storage.ts` 转译后在 Node 里驱动，
  * 只替换外部边界（react hooks / apiFetch / auth / sonner / localStorage），
  * 因此测的是产品里那份逻辑本身，不是抄一份。
@@ -136,8 +144,21 @@ compile('src/lib/use-cloud-sync.ts', 'use-cloud-sync.mjs', [
   ["from './sync-down'", "from './sync-down.mjs'"],
 ]);
 
+// 三个"模块级缓存 + 下行重读"的库：⑤ 段真跑"不先作废缓存就读不到新数据"
+for (const [rel, out] of [
+  ['src/lib/custom-words.ts', 'custom-words.mjs'],
+  ['src/lib/word-notes.ts', 'word-notes.mjs'],
+  ['src/lib/quickcard-history.ts', 'quickcard-history.mjs'],
+]) {
+  compile(rel, out, [
+    ["from 'react'", "from './react-shim.mjs'"],
+    ["from './sync-down'", "from './sync-down.mjs'"],
+    ["from './safe-storage'", "from './safe-storage.mjs'"],
+  ]);
+}
+
 // 脚手架自检：不允许有未替换成相对路径的 import（否则加载会失败，或拿到 node_modules 里的真 react）
-for (const f of ['safe-storage.mjs', 'use-cloud-sync.mjs', 'sync-down.mjs']) {
+for (const f of ['safe-storage.mjs', 'use-cloud-sync.mjs', 'sync-down.mjs', 'custom-words.mjs', 'word-notes.mjs', 'quickcard-history.mjs']) {
   const bare = [...fs.readFileSync(path.join(TMP, f), 'utf8')
     .matchAll(/^\s*import\s[^;]*?from\s+'([^']*)'/gm)]
     .map((m) => m[1])
@@ -300,6 +321,8 @@ ok(/emitSyncDown\(\);/.test(SYNC_SRC) && !/new Event\('nativethink-sync-down'\)/
 const SUBSCRIBERS = [
   'use-favorites.ts', 'use-learning-stats.ts', 'use-spelling-sentences.ts',
   'use-word-learning.ts', 'use-phrase-learning.ts', 'custom-words.ts', 'word-notes.ts',
+  'quickcard-history.ts', 'use-sentence-review.ts', 'use-achievements.ts',
+  'use-custom-scenarios.ts', 'tts-settings.ts', 'use-spelling-learning.ts',
 ];
 for (const f of SUBSCRIBERS) {
   const t = fs.readFileSync(path.join(ROOT, 'src/lib', f), 'utf8');
@@ -313,6 +336,23 @@ for (const f of subs) {
 }
 ok(legacy === 0,
   '④ 没有任何 hook 再自己拼事件名（订阅单点归属，正对照：拼回来立刻红）', `legacy=${legacy}`);
+
+/* ④b 模块级缓存的库：重读前必须先作废 _cache —— 否则 useSyncDown 是个摆设（2026-10-05 实修的坑）。
+ * 静态只验"接线形态"，缓存本体的失效语义由 ⑤ 段真跑。 */
+const CACHE_READERS = [
+  { file: 'custom-words.ts', invalidate: 'invalidateCustomWordsCache', reread: 'setWords(getCustomWords())' },
+  { file: 'word-notes.ts', invalidate: 'invalidateWordNotesCache', reread: 'setNote(getWordNote(word))' },
+  { file: 'quickcard-history.ts', invalidate: 'invalidateQuickCardRunsCache', reread: 'setRuns(listQuickCardRuns(level))' },
+];
+for (const { file, invalidate, reread } of CACHE_READERS) {
+  const t = fs.readFileSync(path.join(ROOT, 'src/lib', file), 'utf8');
+  ok(new RegExp(`export function ${invalidate}\\(\\): void \\{\\s*_cache = null;\\s*\\}`).test(t),
+    `④b ${file} 导出 ${invalidate}()（把模块级 _cache 置空）`);
+  const cb = t.match(/useSyncDown\(\(\) => \{[\s\S]{0,280}?\}\);/);
+  ok(!!cb && cb[0].includes(`${invalidate}();`) && cb[0].includes(reread),
+    `④b ${file} 的下行重读先 ${invalidate}() 再重读（直接 read() 命中陈旧缓存，重读变摆设）`,
+    cb ? `cb=${cb[0].replace(/\s+/g, ' ').slice(0, 140)}` : '没有 useSyncDown(() => { ... }) 形态的回调');
+}
 
 // SM-2 / 语块进度有"回写"effect：重读后原样再写一遍会变成一次真实的上行 POST。
 // 两道判据都要在：① 对象引用一致（刚从 storage 读进来的那份）就不写；② 序列化后与存储一字不差也不写。
@@ -330,9 +370,79 @@ for (const [f, label] of [['use-word-learning.ts', 'SM-2 词学习'], ['use-phra
     `④ ${label} 的下行重读走 useSyncDown 且真的 setState`);
 }
 
+// 拼写句子库（use-spelling-learning）有**两个无条件回写 effect**（挂载即写），
+// 新增下行订阅必须配完整回声守卫：引用比对是主力（loadState 走 JSON.parse，
+// 重串字节可能与存储不完全一致），saveX 里的序列化比对防"挂载时的同值写"。
+{
+  const t = fs.readFileSync(path.join(ROOT, 'src/lib/use-spelling-learning.ts'), 'utf8');
+  ok(/if \(safeStorage\.getItem\(COMPLETED_KEY\) === json\) return;/.test(t),
+    '④ 拼写：saveCompletedIds 与存储一致时不写（挂载同值回写也不会上云）');
+  ok(/if \(safeStorage\.getItem\(STORAGE_KEY\) === json\) return;/.test(t),
+    '④ 拼写：saveState 与存储一致时不写（下行回声的第二道判据）');
+  ok(/useSyncDown\(\(\) => \{[\s\S]{0,320}loadedStateRef\.current = nextState;/.test(t),
+    '④ 拼写的下行回调里记下"这份来自 storage"（state）');
+  ok(/useSyncDown\(\(\) => \{[\s\S]{0,320}loadedCompletedRef\.current = nextCompleted;/.test(t),
+    '④ 拼写的下行回调里记下"这份来自 storage"（完成标记）');
+  ok(/if \(loadedStateRef\.current === state\) \{[\s\S]{0,160}return;/.test(t),
+    '④ 拼写的回写 effect 对"刚读进来的那份"直接跳过（state 回声的真正来源）');
+  ok(/if \(loadedCompletedRef\.current === completedSentenceIds\) \{[\s\S]{0,160}return;/.test(t),
+    '④ 拼写的回写 effect 对"刚读进来的那份"直接跳过（完成标记回声）');
+}
+
+/* ───────── ⑤ 模块级缓存：下行重读真能拿到新数据（行为，不只是接线） ─────────
+ * 为什么必须真跑：④b 只证明"回调里调用了 invalidate"，证明不了缓存本体被正确作废。
+ * 这里把三个库编译后驱动：本地写 → 走 safeStorage（syncDown 落地用的同一条通道）
+ * 模拟云端改存储 → **正对照**不作废时读到旧内存（说明 _cache 真在挡）→ 作废后读到新值。
+ * 正对照是灵敏度：没有它，缓存压根没生效时最后一条会假绿。
+ * 本段先摘掉双写处理器：这里测缓存语义，不制造会被 POST 的测试数据（也省掉收尾的 3s 防抖等待）。
+ */
+ss.setCloudSyncHandler(null);
+{
+  const cw = await import(pathToFileURL(path.join(TMP, 'custom-words.mjs')).href);
+  cw.addCustomWord({ word: 'serendipity', phonetic: '', partOfSpeech: 'n.', meaning: '意外之喜' });
+  ok(cw.getCustomWords().some((w) => w.word === 'serendipity'), '⑤ 生词本：模块自身写入可见');
+  ss.safeStorage.setItem('__nativethink_custom_words', JSON.stringify([
+    { word: 'cloudword', phonetic: '', partOfSpeech: 'n.', meaning: '云端词', addedAt: 1 },
+  ]));
+  const stale = cw.getCustomWords();
+  ok(stale.length === 1 && stale[0].word === 'serendipity',
+    '⑤ 正对照：不作废缓存时重读拿到的是本机旧内存（证明 _cache 真的在挡）',
+    `got=${stale.map((w) => w.word).join(',')}`);
+  cw.invalidateCustomWordsCache();
+  ok(cw.getCustomWords().some((w) => w.word === 'cloudword'),
+    '⑤ 生词本：作废缓存后重读拿到云端新值（下行重读不是摆设）');
+}
+{
+  const wn = await import(pathToFileURL(path.join(TMP, 'word-notes.mjs')).href);
+  wn.setWordNote('ephemeral', '本机旧助记');
+  ok(wn.getWordNote('ephemeral') === '本机旧助记', '⑤ 词助记：模块自身写入可见');
+  ss.safeStorage.setItem('__nativethink_word_notes', JSON.stringify({ ephemeral: '云端新助记' }));
+  const staleNote = wn.getWordNote('ephemeral');
+  ok(staleNote === '本机旧助记',
+    '⑤ 正对照：不作废缓存时助记重读仍是旧值', `got=${staleNote}`);
+  wn.invalidateWordNotesCache();
+  ok(wn.getWordNote('ephemeral') === '云端新助记',
+    '⑤ 词助记：作废缓存后重读拿到云端新值');
+}
+{
+  const qc = await import(pathToFileURL(path.join(TMP, 'quickcard-history.mjs')).href);
+  qc.saveQuickCardRun({ level: 'cet4', known: 1, unknown: 0, words: [{ word: 'local', known: true }] });
+  ok(qc.listQuickCardRuns('cet4').length === 1, '⑤ 闪卡留档：模块自身写入可见');
+  ss.safeStorage.setItem('__nativethink_quickcard_runs', JSON.stringify([
+    { id: 'cloud_run', level: 'cet4', at: 2, known: 0, unknown: 1, words: [{ word: 'cloud', known: false }] },
+  ]));
+  const staleRuns = qc.listQuickCardRuns('cet4');
+  ok(staleRuns.length === 1 && staleRuns[0].id !== 'cloud_run',
+    '⑤ 正对照：不作废缓存时留档重读仍是本机旧内存', `ids=${staleRuns.map((r) => r.id).join(',')}`);
+  qc.invalidateQuickCardRunsCache();
+  const freshRuns = qc.listQuickCardRuns('cet4');
+  ok(freshRuns.length === 1 && freshRuns[0].id === 'cloud_run',
+    '⑤ 闪卡留档：作废缓存后重读拿到云端新值');
+}
+
 /* ───────────────────────── 汇总 ───────────────────────── */
 const failed = results.filter((r) => !r.pass);
 for (const r of failed) console.log(`  ✗ ${r.name}${r.detail ? '  [' + r.detail + ']' : ''}`);
 console.log(`\n断言 ${results.length - failed.length}/${results.length} 通过`);
 if (failed.length) { console.log('✗ 有失败'); process.exit(1); }
-console.log('✓ 云同步：回声已抑制、失败有提示、周期补推按需');
+console.log('✓ 云同步：回声已抑制、失败有提示、周期补推按需、13 个订阅者重读、三处缓存作废真跑');

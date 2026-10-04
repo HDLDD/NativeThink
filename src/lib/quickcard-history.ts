@@ -13,6 +13,7 @@
  *    多组件同时展示时保持一致。
  */
 import { useEffect, useState, useCallback } from 'react';
+import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
 
 const KEY = '__nativethink_quickcard_runs';
@@ -61,6 +62,14 @@ function write(list: IQuickCardRun[]) {
   _cache = list;
   try { safeStorage.setItem(KEY, JSON.stringify(list)); } catch { /* quota / private mode */ }
   try { window.dispatchEvent(new CustomEvent(EVENT)); } catch { /* ignore */ }
+}
+
+/**
+ * 云同步下行后作废 runs 缓存 —— 直接 listQuickCardRuns() 会命中 `_cache`，重读变摆设。
+ * （「当前累积」不走缓存，每次现读，不需要这一下。）
+ */
+export function invalidateQuickCardRunsCache(): void {
+  _cache = null;
 }
 
 /** 全部记录（最新在前）；传 level 只看该词书 */
@@ -220,6 +229,13 @@ export function useQuickCardRuns(level?: string): {
     window.addEventListener(EVENT, onChange);
     return () => window.removeEventListener(EVENT, onChange);
   }, [level]);
+  // 云同步下行后重读留档与当前累积（另一台设备的记录这台要看得见）。
+  // **必须先作废 runs 缓存** —— 直接 listQuickCardRuns() 拿到的是本机旧内存。
+  useSyncDown(() => {
+    invalidateQuickCardRunsCache();
+    setRuns(listQuickCardRuns(level));
+    setPending(getQuickCardPending(level));
+  });
   const remove = useCallback((id: string) => removeQuickCardRun(id), []);
   const clear = useCallback(() => clearQuickCardRuns(level), [level]);
   return { runs, pending, remove, clear };

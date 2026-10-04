@@ -6,6 +6,7 @@
  * 队列按到期时间取用，所以复习量自动收敛，不会越积越多。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
 import { formatDate } from './utils';
 
@@ -91,6 +92,10 @@ export function useSentenceReview() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => { setState(load()); setLoaded(true); }, []);
+
+  // 云同步下行后重读：别的设备练过的句子，这台要立即看到到期队列变化。
+  // 本 hook 没有"回写 effect"（grade 里直接写 storage），重读不会产生回声写入。
+  useSyncDown(() => setState(load()));
 
   const persist = useCallback((next: IState) => { save(next); setState(next); }, []);
 

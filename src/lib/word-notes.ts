@@ -32,6 +32,13 @@ function write(next: Record<string, string>) {
   try { window.dispatchEvent(new CustomEvent(EVENT)); } catch { /* ignore */ }
 }
 
+/**
+ * 云同步下行后作废模块缓存 —— 直接 getWordNote() 会命中 `_cache`，"重读"就成了摆设。
+ */
+export function invalidateWordNotesCache(): void {
+  _cache = null;
+}
+
 export function getWordNote(word: string): string {
   return read()[word.trim().toLowerCase()] ?? '';
 }
@@ -59,8 +66,12 @@ export function useWordNote(word: string): [string, (note: string) => void] {
     window.addEventListener(EVENT, onChange);
     return () => window.removeEventListener(EVENT, onChange);
   }, [word]);
-  // 云同步下行后重读这个词的助记（另一台设备改过就要看得见，否则本机的旧文本会在下次编辑时盖回去）
-  useSyncDown(() => setNote(getWordNote(word)));
+  // 云同步下行后重读这个词的助记（另一台设备改过就要看得见，否则本机的旧文本会在下次编辑时盖回去）。
+  // **必须先作废模块缓存** —— 直接 getWordNote() 会命中 _cache，重读变摆设。
+  useSyncDown(() => {
+    invalidateWordNotesCache();
+    setNote(getWordNote(word));
+  });
   const update = useCallback((next: string) => setWordNote(word, next), [word]);
   return [note, update];
 }

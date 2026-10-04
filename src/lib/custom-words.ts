@@ -47,6 +47,14 @@ function write(list: ICustomWord[]) {
   try { window.dispatchEvent(new CustomEvent(EVENT)); } catch { /* ignore */ }
 }
 
+/**
+ * 云同步下行后作废模块缓存 —— 直接 read() 会命中 `_cache`，"重读"就成了摆设：
+ * 显示层继续拿本机旧内存，下一次写入还会把云端刚拉下来的值盖回去。
+ */
+export function invalidateCustomWordsCache(): void {
+  _cache = null;
+}
+
 /** 加入生词本（同一个词只保留一条，重复加入时更新释义） */
 export function addCustomWord(w: Omit<ICustomWord, 'addedAt'>): boolean {
   const key = w.word.trim().toLowerCase();
@@ -90,8 +98,12 @@ export function useCustomWords(): { words: ICustomWord[]; remove: (w: string) =>
     window.addEventListener(EVENT, onChange);
     return () => window.removeEventListener(EVENT, onChange);
   }, []);
-  // 云同步下行后也重读：生词本在另一台设备上增删过，这台不该继续显示旧的整份列表
-  useSyncDown(() => setWords(read()));
+  // 云同步下行后也重读：生词本在另一台设备上增删过，这台不该继续显示旧的整份列表。
+  // **必须先作废模块缓存** —— 直接 read() 会命中 _cache，重读变摆设。
+  useSyncDown(() => {
+    invalidateCustomWordsCache();
+    setWords(getCustomWords());
+  });
   const remove = useCallback((w: string) => removeCustomWord(w), []);
   return { words, remove };
 }
