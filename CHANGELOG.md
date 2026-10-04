@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-10-05
+- fix(cloud-sync): 下行订阅者收全（7→13）+ 修三处被模块缓存挡住的无效重读 (`693d000`)
 - feat(brand): 品牌字体自托管 —— 去掉 fonts.googleapis 外链，latin 子集进 public/fonts（ROADMAP #7） (`eea2333`)
 - fix(shadowing): 「语音标注」面板把 <u> 重读标记渲染出来（此前整段剥掉）+ 守卫补 4 条断言 (`777f4ff`)
 - docs(help): HelpGuide 各模块介绍逐条核过 —— 修正 8 处过期描述（词汇六模式 / 语块五板块 / 思维四方式 / 跟读无级调速等） (`68730c3`)
