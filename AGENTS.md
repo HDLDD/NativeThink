@@ -107,7 +107,7 @@ node scripts/verify-vocab-caches.mjs              # 85   缓存封顶 + 存储�
 node scripts/verify-overlay-fit.mjs               # 28   窄视口浮层契约 + 全屏层自带 safe-area + 全站唯一 Toaster 出口
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
 node scripts/verify-list-scaling.mjs              # 18   长列表必须折叠/分页（写作题库 + 词库浏览 + 短语库字母段）
-node scripts/verify-shadowing-completion.mjs      # 23   跟读完成标记的索引契约（纯函数真跑 + 接线）
+node scripts/verify-shadowing-completion.mjs      # 27   跟读完成标记的索引契约（纯函数真跑 + 接线）+ 语音标注 <u> 渲染接线
 node scripts/verify-backup-idb.mjs                # 16   导出学习数据真的含整书译文
 node scripts/verify-cloud-sync-hygiene.mjs        # 43   云同步：下行回声/失败可见/按需补推 + sync-down 真跑与订阅者清单
 node scripts/verify-sentence-lab.mjs              # 16   拆句训练主干判定索引同源（真转译跑出分歧）
@@ -293,7 +293,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 310 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · overlay-fit 28 · bundle-budget 10 · list-scaling 18 · shadowing 23 · backup-idb 16 · cloud-sync 43 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · rv-articles 104 · study-credit 74 · chain-verdict 36；合计 7,270，2026-10-05 复测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 310 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · overlay-fit 28 · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 43 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · rv-articles 104 · study-credit 74 · chain-verdict 36；合计 7,274，2026-10-05 复测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`

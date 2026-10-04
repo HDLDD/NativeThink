@@ -1,6 +1,7 @@
 # 影子跟读（`/shadowing`）
 
-> 模块 key `shadowing`，`src/pages/ShadowingPage/ShadowingPage.tsx`（1328 行）。左栏选语料、右栏播放器，无 tab。
+> 模块 key `shadowing`，`src/pages/ShadowingPage/ShadowingPage.tsx`（1345 行）。左栏选语料、右栏播放器，无 tab。
+> 注：新增的 `renderAnnotated` 刻意放文件尾（`:1337-1345`），保持组件段行号与本文档 `文件:行号` 引用一致 —— 别挪到组件前面（函数声明有提升，位置不影响运行）。
 
 ## 1. 功能
 
@@ -75,7 +76,7 @@
 - 索引换算单点归属在 **`src/lib/shadowing-progress.ts`**（纯函数、零依赖）：`shadowingCompletionKey` / `parseCompletionIndex` / `countCompletedForCorpus` / `isSentenceCompleted` / `shiftCompletionAfterDelete` / `clearCompletionForCorpus` / `extrasLocalIndex`。
 - `handleDeleteSentence(corpusId, mergedIdx)` **只收合并索引**，内部用 `extrasLocalIndex` 换算本地索引；`localIdx < 0` 直接 return（内置原句不可删）；当前指针跟着左移/夹紧。
 - 键构造、计数、清空、位移在页面里都不再手写 —— `currentDoneKey`（`:266-268`）、`markCompleted`（`:400-418`）、句行绿勾（`:1253`、`:1278-1282`）同源。
-- **守卫：`node scripts/verify-shadowing-completion.mjs`（23 断言）** —— A 段真转译真跑纯函数，含"退回旧调用方式"的正对照（同一场景下完成数掉 1 且横幅不成立、`id-7` 丢失），变异实测：把调用点改回 `idx - sentences.length` 会红两条。
+- **守卫：`node scripts/verify-shadowing-completion.mjs`（27 断言）** —— A 段真转译真跑纯函数，含"退回旧调用方式"的正对照（同一场景下完成数掉 1 且横幅不成立、`id-7` 丢失），变异实测：把调用点改回 `idx - sentences.length` 会红两条；B 段还守语音标注渲染（§3.2 第 8 条）。
 
 ### 3.2 其它
 
@@ -85,4 +86,6 @@
 4. **两栏都是全量渲染 —— 但量过之后判定不动**：左栏 117 篇直接 map（`:891`），右栏句列表同样全量（`:1251-1252`，只有 `max-h-[400px]` 滚动，无虚拟列表）。headless Chrome 393×851 / DPR 3 实测 `/shadowing` 挂载后 **2,219 个 DOM 元素、页高 2,256px**，与写作页折叠后的 2,634px 同量级，不是短语库（4,805）那种规模 —— 所以这轮**没有为它改代码**：没有测量证据就加折叠，等于白白削弱「一眼看完全部语料」的入口。真要动之前先重跑测量，并参照 `verify-list-scaling.mjs` 补断言。（同一份 harness 里 longtask 观察器装在 navigate 之前会因文档切换而丢失，所以这里的结论只建立在 DOM 节点数与页高上。）
 5. **`cancelPendingAdvance` 的覆盖点**：`:379`（prev）/ `:388`（next）/ `:422`（selectCorpus）/ `:291`（卸载）都取消了 400ms 自动前进 ✅；`markCompleted` 自己重排前也先撤（`:410`）。**句行直达（`:1260-1264`）不撤** —— 400ms 窗口内点其它句子，在途定时器仍会 +1（小窗口、未修）。新增"离开当前句"的路径时请保持这个约定。
 6. **【已修，2026-10-05】`__nativethink_shadowing_completed` 条数 + 字节双封顶**：原来无上限、整份 JSON 每次变更重写（每篇 579 句全记下来还行，语料越多写越贵）。现在落盘前先 `trimOldest([...completedSentences], 2000, 64KB)`（常量 `:87-89`，落盘 `:96-101`），保留最新、从最旧的标记丢；写失败不再静默（`warnStorageFull()`）。守卫：`verify-vocab-caches` ⑥。
-7. **守卫覆盖面**：`node scripts/verify-shadowing-completion.mjs`（23 断言）守 §3.1 的索引契约（纯函数真跑 + 接线），仅此一块；其余交互仍靠无头 Chrome 真点 —— §3.1 那个缺陷正是**静态检查完全看不出来**的那类（三处都用了一个叫 `idx`/`sentenceIdx` 的名字，含义却不同）。
+7. **守卫覆盖面**：`node scripts/verify-shadowing-completion.mjs`（27 断言）守 §3.1 的索引契约（纯函数真跑 + 接线）与第 8 条的语音标注渲染；其余交互仍靠无头 Chrome 真点 —— §3.1 那个缺陷正是**静态检查完全看不出来**的那类（三处都用了一个叫 `idx`/`sentenceIdx` 的名字，含义却不同）。
+
+8. **【已修，2026-10-05】「语音标注」面板曾把 `<u>` 重读标签整个剥掉 —— 标注形同不存在**（HelpGuide 审计时发现：帮助里写着「每句附语音标注（重读提示）」，界面上却与原句一字不差）。数据层一直是对的：`src/data/shadowing.ts` 用 `<u>…</u>` 圈重读处；两处 AI prompt（`:197`、`:490`）要求产出这个标签，`validateMaterial`（`:428`）还校验开闭配对（`:437-439`）。坏的是渲染站点 `:1035`：对 `annotatedText` 直接 `.replace(/<u>/g, '').replace(/<\/u>/g, '')`。现在改走文件尾的 `renderAnnotated`（`:1337-1345`，函数声明提升；**刻意放文件尾** —— 本页文档的 `文件:行号` 引用全部落在组件段内，插在中间会让它们整体漂移）：只认 `<u>`，重读处渲染为青色加粗下划线，其余按纯文本渲染并剥掉残标签（**不走**危险 HTML 注入 —— annotatedText 可能来自 AI）。守卫：`verify-shadowing-completion` 新增 4 条（渲染接线 / 旧剥标签写法正对照 / 识别逻辑存在 / 剥注释后全页无危险注入），变异实测退回旧写法红两条；行为侧 2026-10-05 无头 Chrome CDP 实测 9/9（句 1 `day`；切到句 2 双标记 `dium`/`tte`；青色 rgb(0,184,148) + 600 字重 + 无标签字面量漏出）。

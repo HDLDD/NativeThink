@@ -14,7 +14,8 @@
  *   A. 把 `src/lib/shadowing-progress.ts` **真转译真跑**，覆盖删除/位移/隔离/边界，
  *      并带"旧调用方式"的正对照 —— 证明一旦索引语义再次被混用，这里会红。
  *   B. 静态守接线：删除路径必须传合并索引、键构造必须单一来源、
- *      两处 AI 分析必须先判空串。
+ *      两处 AI 分析必须先判空串、语音标注必须经 renderAnnotated 渲染
+ *      （且全页无危险 HTML 注入）。
  *
  * 用法：node scripts/verify-shadowing-completion.mjs
  * 退出码：0 = 全绿；1 = 有失败；2 = 脚手架自身有问题
@@ -157,6 +158,20 @@ const trimGuards = [...page.matchAll(/if\s*\(!result\.trim\(\)\)/g)].length;
 ok2(setCalls === 2 && trimGuards >= 2,
   '两处 AI 分析都有 !result.trim() 前置（空串=服务不可用，不是"结果为空"）',
   `setAiAnalysis=${setCalls} trim 守卫=${trimGuards}`);
+
+// 语音标注渲染（2026-10-05 修）：annotatedText 的 <u> 必须经 renderAnnotated 渲染成
+// 真实下划线元素。此前渲染站点把标签整个 replace 掉，面板文字与原句一字不差、标注不可见。
+// "禁危险 HTML 注入"那条**剥注释再扫** —— renderAnnotated 的注释里写了
+// "不能走 dangerouslySetInnerHTML"，不剥会把自己判红（verify-chain-verdict 的同款教训）。
+const pageNoComments = page.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+ok2(/renderAnnotated\(currentSentence\.annotatedText\)/.test(page),
+  '语音标注面板经 renderAnnotated 渲染（<u> 不被剥成纯文本）');
+ok2(!/\.replace\(\s*\/<u>\/g/.test(page),
+  '正对照：不再存在对 <u> 直接 replace 剥标签的旧写法');
+ok2(page.includes("startsWith('<u>')"),
+  'renderAnnotated 真的识别 <u> 标签（不是原样透传的哑函数）');
+ok2(!/dangerouslySetInnerHTML/.test(pageNoComments),
+  '剥注释后全页无 dangerouslySetInnerHTML（AI 生成的标注文本不许当 HTML 注入）');
 
 /* ───────────────────────── 汇总 ───────────────────────── */
 const failed = results.filter((r) => !r.pass);

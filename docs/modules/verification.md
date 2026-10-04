@@ -9,7 +9,7 @@
 
 | 脚本 | 断言 | 守什么 | 什么时候必须跑 |
 |------|------|--------|----------------|
-| `verify-shadowing-completion.mjs` | 23 | 跟读完成标记的**索引契约**：`shadowing-progress.ts` 纯函数真跑（删除位移/跨语料隔离/原句不可删）+ 页面接线（删句传合并索引、键构造单一来源、AI 分析判空）；带"退回旧调用方式"的正对照 | 改 `ShadowingPage` 完成标记 / `shadowing-progress.ts` |
+| `verify-shadowing-completion.mjs` | 27 | 跟读完成标记的**索引契约**：`shadowing-progress.ts` 纯函数真跑（删除位移/跨语料隔离/原句不可删）+ 页面接线（删句传合并索引、键构造单一来源、AI 分析判空）；带"退回旧调用方式"的正对照。2026-10-05 起还守语音标注 `<u>` 渲染（renderAnnotated 接线 / 旧剥标签写法正对照 / 剥注释后无危险注入） | 改 `ShadowingPage` 完成标记 / 语音标注渲染 / `shadowing-progress.ts` |
 | `verify-backup-idb.mjs` | 16 | 「导出学习数据」真的含整书译文：IDB 替身真跑 `dumpBookTranslationCache`（有/无缓存、超上限、跨书隔离）+ 旧枚举方式的正对照 + backup.ts 接线 | 改 `backup.ts` / `book-translation.ts` 缓存层 |
 | `verify-sentence-lab.mjs` | 16 | 拆句训练主干判定**索引同源**：真转译 `sentence-parse.ts` 跑出 `stdParts` 与 `segments` 的分歧（缩约形式跨意群那个真实例子）、坏数据不再产生假成功；守 ChunkDrill 候选来自 resolved、reveal 在 grade 之前拦 | 改 `sentence-parse.ts` / `ChunkDrill.tsx` |
 | `verify-spelling-resume.mjs` | 24 | 拼写断点**按词书分键**：注入替身真跑 persist/读/迁移/清理，含「旧全局单键只剩最后一本」的正对照；守页面与重置流程都走同一模块 | 改 `spelling-resume.ts` / `SpellingPage` 断点 / 拼写重置 |
@@ -103,6 +103,8 @@ npm run verify:all        # scripts/verify-all.mjs：typecheck + 全部 verify-*
 2026-10-05 反馈下架后复测：typecheck + 19 条守卫全绿，**断言合计 7,252 条**（= 7,294 − 58 + 5 + 11：删除 verify-feedback-loop 58；overlay-fit 23 → 28，新增的 5 条是迁入的挂载类断言；新增 verify-app-version 11。tts-progress 6,175；其余 18 条相加：45+227+310+67+15+16+10+18+28+23+16+43+16+24+10+104+74+36+11 = 1,077）。
 
 2026-10-05 同日再测（技术债 #10 双封顶落地）：verify-vocab-caches 67 → 85（⑥ `trimOldest` 双封顶契约与两处接线 18 条，4 条变异全红），typecheck + 19 条守卫全绿，**断言合计 7,270 条**（= 7,252 + 18。tts-progress 6,175；其余 18 条相加：45+227+310+85+15+16+10+18+28+23+16+43+16+24+10+104+74+36+11 = 1,095）。
+
+2026-10-05 第 3 测（HelpGuide 审计 + 跟读语音标注修复批次）：typecheck + 19 条守卫全绿（verify-wordbank-split 跳过），**断言合计 7,274 条**（= 7,270 + 4。tts-progress 6,175；其余 18 条：45+227+310+85+15+16+11+28+10+18+27+43+16+24+10+104+74+36 = 1,099 —— shadowing-completion 23 → 27，新增语音标注 `<u>` 渲染 4 条，变异退回旧写法红 2 条）。
 
 ## 6. 静态检查的已知弱度
 

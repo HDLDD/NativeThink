@@ -1032,7 +1032,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                         <span className="text-xs font-black uppercase tracking-wider text-ink-teal">语音标注</span>
                       </div>
                       <p className="text-sm text-foreground/80 italic">
-                        {currentSentence.annotatedText.replace(/<u>/g, '').replace(/<\/u>/g, '')}
+                        {renderAnnotated(currentSentence.annotatedText)}
                       </p>
                     </div>
                   )}
@@ -1324,5 +1324,22 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
       </div>
 
     </div>
+  );
+}
+
+/**
+ * annotatedText 用 <u>…</u> 标出重读处。此前渲染时把标签整个删掉 ——
+ * 「语音标注」面板显示的文字与原句一字不差，标注形同不存在。
+ * 只识别 <u> 这一种标签，其余内容一律按纯文本渲染（annotatedText 可能来自 AI 生成，
+ * 不能走 dangerouslySetInnerHTML）；不配对的残标签剥掉，不让尖括号漏进界面。
+ * 放文件尾：函数声明有提升，且模块文档的 文件:行号 引用全部落在组件段内，避免整体位移。
+ */
+function renderAnnotated(text: string) {
+  return text.split(/(<u>[\s\S]*?<\/u>)/g).filter(Boolean).map((seg, i) =>
+    seg.startsWith('<u>') && seg.endsWith('</u>') ? (
+      <u key={i} className="underline decoration-[#00B894] decoration-2 underline-offset-4 not-italic font-semibold">{seg.slice(3, -4)}</u>
+    ) : (
+      <span key={i}>{seg.replace(/<\/?u>/g, '')}</span>
+    ),
   );
 }
