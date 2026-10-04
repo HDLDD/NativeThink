@@ -53,6 +53,7 @@ APK 依赖 `dist/client`（`capacitor.config.json:4`），所以顺序不能省�
 | `public/_redirects` | `/api/* /api/* 200` → `/models/* /models/* 404` → `/* /index.html 200`（顺序有意义） |
 | `public/_headers` | COOP `same-origin` + COEP `credentialless`（多线程 WASM 必需） |
 | `public/fonts/*.woff2` | 品牌字体自托管（Plus Jakarta Sans latin 子集 400/600/700 + OFL LICENSE.txt；**零外链**，`verify-brand-fonts` 守） |
+| `public/favicon.svg` | Web 图标（`gen-app-brand.ps1` 生成；本地引用、**零外链** —— 2026-10-05 清掉模板遗留的字节 CDN shortcut icon，同守卫） |
 | `dist/client/404.html` | `build:web` 复制出来的 SPA 兜底副本 |
 | `wrangler.toml` | `pages_build_output_dir = "dist/client"`、KV binding `KV` + 真实 namespace id |
 

@@ -11,11 +11,15 @@
  * 本脚本钉住三段契约：
  *   A. 源侧：index.html 零外链字体域名；@font-face 恰三条（400/600/700）指向本地
  *      /fonts/*.woff2；woff2 是真文件（magic + header 声明长度与文件长度自洽，
- *      防占位/截断）；OFL 许可证随附（重分发合规）
+ *      防占位/截断）；OFL 许可证随附（重分发合规）；**icon 链接零 http 外链**
+ *      （2026-10-05 清理：原挂着模板遗留的 lf3-static.bytednsdoc.com shortcut icon。
+ *      本机 Chromium 判别实验（A/B/C/D 四组并列 icon）：带 type 的 SVG 无论前后都被选中、
+ *      同型取先声明者 —— 原形态下该外链 URL 从未被请求，属惰性残留；但取舍是浏览器
+ *      实现细节（不支持 SVG favicon 的老浏览器可能选中它），属真实外部依赖，删之）
  *   B. 字体栈：tailwind-theme.css 两处 --font-sans 都不含 'Noto Sans SC'，
  *      且都以 'Plus Jakarta Sans' 开头（正对照：不是删外链了事，品牌字仍是首选）
- *   C. 产物侧（先 npm run build:web）：dist/client 的 index/404 无外链、@font-face
- *      在位、fonts/ 资产结构自洽、构建出的 CSS 里生效栈已换
+ *   C. 产物侧（先 npm run build:web）：dist/client 的 index/404 无外链字体域名、
+ *      无外链 icon、@font-face 在位、fonts/ 资产结构自洽、构建出的 CSS 里生效栈已换
  *
  * 注意本文件所有"不许出现 X"的扫描都先剥注释 —— index.html 与 tailwind-theme.css
  * 的溯源注释里写着旧域名和 'Noto Sans SC' 字样，不剥会把自己判红（chain-verdict 教训）。
@@ -80,6 +84,18 @@ const license = existsSync(join(ROOT, 'public/fonts/LICENSE.txt')) ? read('publi
 check(/SIL Open Font License/i.test(license),
   'public/fonts/LICENSE.txt 随附 OFL 许可证（字体重分发合规）');
 
+/* icon 链接（favicon / apple-touch-icon / mask-icon）：与字体同口径，零 http 外链。
+   取所有 <link> 标签后按 rel 含 "icon" 过滤（兼容引号风格与属性顺序），
+   正对照防止"把图标删干净"这种假达标。 */
+const tagList = (s) => [...s.matchAll(/<link\b[^>]*>/gi)].map((m) => m[0])
+  .filter((tag) => /rel\s*=\s*["']?[^"'>]*icon/i.test(tag));
+const iconTags = tagList(htmlCode);
+const extIcons = iconTags.filter((tag) => /href\s*=\s*["']?https?:\/\//i.test(tag));
+check(extIcons.length === 0, 'index.html 的 icon 链接零 http 外链（favicon 自托管）', extIcons.join(' '));
+check(iconTags.some((tag) => /href\s*=\s*["']?\/favicon\.svg["']?/i.test(tag))
+  && existsSync(join(ROOT, 'public', 'favicon.svg')),
+  '正对照：本地 /favicon.svg 链接在位且文件存在（不是把图标删了了事）');
+
 /* ── B. 字体栈：tailwind-theme.css ── */
 const css = stripCssComments(read('src/tailwind-theme.css'));
 check(!/Noto Sans SC/.test(css),
@@ -103,6 +119,8 @@ if (!existsSync(join(DIST, 'index.html'))) {
     if (!existsSync(abs)) { skip(`C 产物缺 ${f}，跳过`); continue; }
     const d = stripHtmlComments(readFileSync(abs, 'utf8'));
     check(!EXTERNAL_FONT.test(d), `C 产物 ${f} 无外链字体域名`);
+    const dExtIcons = tagList(d).filter((tag) => /href\s*=\s*["']?https?:\/\//i.test(tag));
+    check(dExtIcons.length === 0, `C 产物 ${f} 的 icon 链接零 http 外链`, dExtIcons.join(' '));
     const dfs = [...d.matchAll(/@font-face\s*\{[^}]*\}/g)].length;
     check(dfs === 3, `C 产物 ${f} 有 3 条 @font-face`, `faces=${dfs}`);
   }

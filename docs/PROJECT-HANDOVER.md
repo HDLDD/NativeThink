@@ -462,9 +462,13 @@ node scripts/device-eval.mjs back
     **每条路由都在控制台报一次资源错误**，而字体永远拿不到（非阻塞加载 + 系统字兜底，所以只是"长得不是设计稿那套字"）。
     修法：自托管 `@fontsource/plus-jakarta-sans` 的 latin 子集（400/600/700，约 36KB 进 `public/fonts/`，
     与 Google 同一份 woff2，OFL `LICENSE.txt` 随附）；Noto Sans SC 网页字直接删（中文走系统字更稳）；
-    preconnect / 外链 / noscript 整块移除，改内联三组 `@font-face`。守 `verify-brand-fonts`（22 断言，
-    4 组变异全红）；无头 Chrome CDP 对产物实测 9/9（零外链请求、三字重全 200 且 loaded、控制台零错误）。
-    另（未动，超出本轮范围）：`index.html` 的 favicon 仍指向 `lf3-static.bytednsdoc.com`（字节 CDN）。
+    preconnect / 外链 / noscript 整块移除，改内联三组 `@font-face`。守 `verify-brand-fonts`（26 断言；
+    两轮变异全中：字体 4 组全红 + icon 4 组 5 红点）；无头 Chrome CDP 对产物实测 9/9（零外链请求、三字重全 200 且 loaded、控制台零错误）。
+    favicon 同批清理（2026-10-05）：原 `index.html` 挂着模板遗留的 `lf3-static.bytednsdoc.com` shortcut icon
+    （声明在本地 `/favicon.svg` 之后）。本机 Chromium 做了 A/B/C/D 四组判别实验：带 `type` 的 SVG 无论前后都被选中、
+    同型取先声明者 —— 原形态下该外链 URL 从未被请求（惰性残留；此前"取后声明者、图标被遮"的说法已按实测更正），
+    但取舍是浏览器实现细节（不支持 SVG favicon 的老浏览器可能选中它），属真实外部依赖。
+    删外链，守卫同文件扩到 icon 零外链 + 本地 `/favicon.svg` 在位（正对照）—— 源侧 `index.html` 至此零 http 外链资源。
 15. **`scripts/generate-books.ts` 与 `src/data/books.ts` 已经不同步**（2026-09-29 发现，未修）：
     生成器写出的 `bookContent` 只做 `enParas.map(en => ({ en, zh: '' }))`，**不调用 `cleanBookParagraphs`、也不写 `gutenbergId`**
     —— 而现文件里两样都有（章节切分靠它，全文升级靠 gutenbergId）。也就是说"照头部注释重跑一次生成器"
