@@ -8,6 +8,9 @@
 
 
 
+
+## 2026-10-05
+
 ## 2026-10-01
 - docs(verification): 修正 INJECT_EVENTS 拒权的通道口径 + 补 USB 复测结果 (`302b183`)
 - docs(verification): 真机走查补记 —— 字体缩放 ×1.1 / 无线通道两条限制 / 本轮实测结果 (`48b84f5`)
