@@ -59,13 +59,13 @@
 | | |
 |---|---|
 | 默认音色 | `piper:lessac`（`tts-voice-catalog.ts:140`，兜底 `FALLBACK_VOICE` 同一对象 `:124-127`） |
-| Kokoro 可选 | 11 个英语音色，`speakerId` = 2,3,6,9,10,11,16,18,19,21,26（`:109-121`） |
+| Kokoro 可选 | 11 个英语音色，`speakerId` = 2,3,6,9,10,11,16,18,19,21,26（`:109-121`；2026-10-05 与模型内嵌 `speaker2id` 元数据逐条核对吻合） |
 | 在线 Edge | 另有一套 12 个 `srv:edge:*`（`:40-62`） |
 | **speakerId 表在前端** | 原生插件只认 `modelId`（`SherpaTtsPlugin.java:43-45`），越界拒绝（`:457-461`） |
 
 **RTF 决定 Kokoro 不适合长文**：同一段 122 字符稳态实测，lessac 音频 5789ms / 合成 428ms → **RTF 0.076**；Kokoro 6819ms / 6867ms → **RTF 1.008**（`tts-voice-catalog.ts:132-138`）。RTF > 1 时合成追不上播放，**加大预取深度也解决不了**。
 
-改音色必须同步四处：① Java `MODEL_*` 常量与 `REGISTRY`（`java:61-62,288-296`）；② `scripts/check-tts-voices.cjs:28-44` 的 `MODELS`；③ `tts-voice-catalog.ts:94` 声明的 `modelId`；④ 资产白名单 `scripts/fetch-android-tts.cjs:37`。然后跑 `npm run check:tts-voices`（已嵌在 `package:apk` 前置，失败 `exit 1` 阻断打包）。
+改音色必须同步四处：① Java `MODEL_*` 常量与 `REGISTRY`（`java:61-62,288-296`）；② `scripts/check-tts-voices.cjs:29-45` 的 `MODELS`；③ `tts-voice-catalog.ts:95` 声明的 `modelId`；④ 资产白名单 `scripts/fetch-android-tts.cjs:37`。然后跑 `npm run check:tts-voices`（已嵌在 `package:apk` 前置，失败 `exit 1` 阻断打包）：它除越界检查外，还直读模型内嵌 `speaker2id` 元数据逐条核对名字↔下标，并对 `n_speakers` 与注册表的 `numSpeakers` 做交叉核对。
 
 ### 2.7 缓存与在途去重
 
@@ -92,7 +92,7 @@
 3. **自动朗读开关 `__nativethink_vocab_autospeak` 现在真的四处共用**（2026-09-30 补齐）：复习检测 `FlashcardMode.tsx:64-67`、每日学习 `DailyLearningMode.tsx:219-221`、语块复习 `ChunkTrainingPage.tsx:373-379`、**快速闪卡 `QuickCardMode.tsx`**（本轮新增：读键门控朗读 effect + 进度行上给开关，默认开与其余三处同口径）。此前快速闪卡完全不读它，而别处的提示语写着「与复习检测/快速闪卡共用此设置」—— 用户关掉后快速闪卡照样出声。守卫：`verify:vocab-cards` 断言四处都读同一键、快速闪卡门控位于 `tts.speak` 之前、且开关入口与写键都在。
 4. **刻意不自动朗读**：配对 `matching`（视觉任务，`DailyLearningMode.tsx:291`）、拼写/填空（`:303`「那等于把答案念出来」）、句子拼写的 fill 模式（`SpellingPage.tsx:556` 只在 dictation 自动读）。新增子模式时先想清楚朗读会不会泄答案。
 5. **预合成与实播的键可能不同**，两种情况都会让预热白做：① 语速不一致 —— 预热写死 `rate: 0.85`（`SpellingPage.tsx:549,553`）而 `speak()` 用 `settings.rate`（默认 0.9）；② 长句 —— `prewarm` 不切句、`speak` 走 `chunkText(…, 180)`（`use-tts.ts:807-824` vs `:844`），超 180 字符的句子预热键与分块键本就不同。缓存键含语速这件事在 `use-tts.ts:818-819` 有明文注释。
-6. **Kokoro 音色总数三个口径不一致**（实测以磁盘为准）：Java 注释与 `fetch-android-tts.cjs:31` 写 103，`check-tts-voices.cjs:35` 写 54；`voices.bin` 实测 28,200,960 B ÷ 522,240 B/音色 = **54.0**。前端只用了其中 11 个，所以不影响功能，但 `numSpeakers` 的注释得改。
+6. **Kokoro 音色总数口径已统一为 54（2026-10-05）**：Java 两处与 `fetch-android-tts.cjs:31` 的「103」是 v1.1-zh 的遗留口径，已改。权威值 = 模型内嵌元数据（`n_speakers=54`、`speaker2id` 54 条，`comment` 写明 "This is Kokoro v1.0"），`voices.bin` 28,200,960 B ÷ 522,240 B/音色 = 54.0 交叉吻合。守卫：`check-tts-voices.cjs` §2.5 直读元数据核对名字↔下标与 `n_speakers`，不符即 `exit 1` 阻断打包。
 7. **`TTSSettings.tsx:457-461` 的诊断文案「正常应为约 60MB」指的是 lessac（63MB）**，而该处 `modelBytes` 取自 Kokoro（114MB）；`sherpa-tts.ts:110` 的「模型 60MB」同样偏指 lessac。别按这条文案判断资产是否完整。
 8. **`assetManager` 必须传 null**（`java:341-347`）：否则 filesDir 的绝对路径会被当成 assets 名解析，原生直接崩。
 9. **模型常驻不释放、失败过的模型不再重试**（`java:298-311`）—— 想重试要重启 App，不是再点一次。

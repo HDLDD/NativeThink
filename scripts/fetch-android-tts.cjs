@@ -28,7 +28,7 @@ const VOICE = 'vits-piper-en_US-lessac-medium';
 const VOICE_REPO = `csukuangfj/${VOICE}`;
 
 // ── Kokoro 多音色模型（int8 量化）──
-// 主模型 109MB，单模型含 103 个音色，输出 24000Hz —— 一个模型顶 11 个 Piper 音色。
+// 主模型 109MB，v1.0 含 54 个音色（以模型内嵌 n_speakers 为准；103 是 v1.1-zh 的口径），输出 24000Hz —— 一个模型顶 11 个 Piper 音色。
 // espeak-ng-data 不在此拉取：与 Piper 音色自带的那份实测逐文件 SHA-1 相同（355 个文件），
 // 只保留一份，Kokoro 在原生侧通过 dataDir 指向 Piper 音色目录复用。
 const KOKORO_REPO = 'csukuangfj/kokoro-int8-multi-lang-v1_0';

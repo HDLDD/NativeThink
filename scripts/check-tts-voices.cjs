@@ -5,8 +5,8 @@
  * 退出码 0 = 通过；1 = 有问题（阻断打包）
  *
  * 为什么需要：speakerId 是 voices.bin 里的数组下标 —— 写错不会报错，只会读成别人的
- * 声音，且只有真机才能听出来；模型路径写错则要装到手机上才发现。这些都能在打包前
- * 静态查出来，不必等真机。
+ * 声音；模型路径写错则要装到手机上才发现。这些都能在打包前静态查出来，不必等真机：
+ * 越界与注册表一致性在 §1/§2 查，名字↔下标对应直读模型内嵌元数据在 §2.5 查。
  */
 const fs = require('fs');
 const path = require('path');
@@ -20,7 +20,8 @@ const CATALOG = path.join(ROOT, 'src', 'lib', 'tts-voice-catalog.ts');
  * 改这里时同步改 Java，反过来也一样。
  *
  * numSpeakers 不是估的：它来自模型内嵌元数据的 n_speakers，且与 voices.bin
- * 字节数精确对应（每音色 522240 字节 = style_dim 510×1×256×4B）。
+ * 字节数精确对应（每音色 522240 字节 = style_dim 510×1×256×4B）。§2.5 会在打包前
+ * 直读元数据复核这个数，不再只靠这行手抄。
  * 曾因忽略这个对应关系，把一个「103 音色但只有 3 个英语」的中文模型当成英语
  * 多音色模型用，结果是用中文音色读英文 —— 这类错误只有真机能听出来，
  * 所以边界值必须取自模型本身，而不是文档或仓库描述。
@@ -50,6 +51,43 @@ const errors = [];
 const notes = [];
 const mb = (n) => (n / 1024 / 1024).toFixed(1) + 'MB';
 
+/**
+ * 读 ONNX 末尾的内嵌元数据（ModelProto.metadata_props，sherpa-onnx 转换脚本写入）。
+ * 只取文件尾部 64KB（v1.0 实测 key 在最后 ~2.5KB），不把 114MB 整读进内存。
+ * 返回 (key) => value 字符串 | null。序列化格式为 protobuf：key 字符串（field 1）
+ * 之后紧跟 0x12（field 2, LEN）→ varint 长度 → value 字节。
+ */
+function readOnnxMetadata(file, tailBytes = 64 * 1024) {
+  const fd = fs.openSync(file, 'r');
+  try {
+    const size = fs.fstatSync(fd).size;
+    const len = Math.min(size, tailBytes);
+    const buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, size - len);
+    return (key) => {
+      const kb = Buffer.from(key, 'ascii');
+      let i = buf.indexOf(kb);
+      while (i !== -1) {
+        if (buf[i + kb.length] === 0x12) {
+          let j = i + kb.length + 1;
+          let vlen = 0, shift = 0;
+          while (j < buf.length) {
+            const b = buf[j++];
+            vlen |= (b & 0x7f) << shift;
+            if (!(b & 0x80)) break;
+            shift += 7;
+          }
+          if (j + vlen <= buf.length) return buf.subarray(j, j + vlen).toString('utf8');
+        }
+        i = buf.indexOf(kb, i + 1);
+      }
+      return null;
+    };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 // ── 1) 模型资产是否齐全 ──
 for (const [id, m] of Object.entries(MODELS)) {
   if (!fs.existsSync(m.dir)) {
@@ -74,19 +112,21 @@ for (const [id, m] of Object.entries(MODELS)) {
 const src = fs.readFileSync(CATALOG, 'utf8');
 const block = src.match(/export const KOKORO_VOICES[^=]*=\s*\[([\s\S]*?)\n\];/);
 let kokoroVoiceCount = 0;
+/** 解析出的目录条目，§2.5 的内嵌元数据核对要用 */
+let catalogVoices = [];
 
 if (!block) {
   notes.push('KOKORO_VOICES 尚未定义');
 } else {
-  const voices = [...block[1].matchAll(
+  catalogVoices = [...block[1].matchAll(
     /id:\s*'([^']+)'[\s\S]*?modelId:\s*'([^']+)'[\s\S]*?speakerId:\s*(\d+)/g,
   )].map((m) => ({ id: m[1], modelId: m[2], speakerId: Number(m[3]) }));
 
-  if (voices.length === 0) {
+  if (catalogVoices.length === 0) {
     notes.push('KOKORO_VOICES 为空');
   } else {
     const seen = new Set();
-    for (const v of voices) {
+    for (const v of catalogVoices) {
       if (seen.has(v.id)) errors.push(`音色 id 重复: ${v.id}`);
       seen.add(v.id);
 
@@ -99,11 +139,50 @@ if (!block) {
         errors.push(`音色 ${v.id}: speakerId ${v.speakerId} 越界（模型 ${v.modelId} 只有 ${m.numSpeakers} 个音色）`);
       }
     }
-    kokoroVoiceCount = voices.filter((v) => v.modelId === 'kokoro').length;
+    kokoroVoiceCount = catalogVoices.filter((v) => v.modelId === 'kokoro').length;
     if (kokoroVoiceCount !== EXPECTED_KOKORO_VOICES) {
       notes.push(`Kokoro 音色数 ${kokoroVoiceCount}，设计为 ${EXPECTED_KOKORO_VOICES} 个`);
     }
-    console.log(`  音色 ${voices.length} 个（Kokoro ${kokoroVoiceCount} 个），全部通过边界检查`);
+    console.log(`  音色 ${catalogVoices.length} 个（Kokoro ${kokoroVoiceCount} 个），全部通过边界检查`);
+  }
+}
+
+// ── 2.5) 音色表 vs 模型内嵌元数据（名字↔下标逐条核对）──
+// 「名字 ↔ 下标」的权威表就写在模型文件自己的尾部元数据里（v1.0 实测含
+// comment="This is Kokoro v1.0..."、n_speakers=54、speaker2id 全表 54 条）。
+// 打包前直接读出来核对即可，不必等真机试听；对不上就阻断（曾用错模型版本，
+// speakerId 全部落到中文音色上，真机听感「声音很奇怪」才被发现）。
+const kokoroModel = path.join(MODELS.kokoro.dir, 'model.int8.onnx');
+if (catalogVoices.length && fs.existsSync(kokoroModel)) {
+  const kokoroEntries = catalogVoices.filter((v) => v.modelId === 'kokoro');
+  const meta = readOnnxMetadata(kokoroModel);
+  const nSpeakers = meta('n_speakers');
+  const speaker2id = meta('speaker2id');
+  if (nSpeakers === null || speaker2id === null) {
+    errors.push('Kokoro 模型内嵌元数据读不到 n_speakers/speaker2id —— 资产可能不是预期的 v1.0 构建，重跑 node scripts/fetch-android-tts.cjs --force');
+  } else {
+    if (Number(nSpeakers) !== MODELS.kokoro.numSpeakers) {
+      errors.push(`Kokoro 元数据 n_speakers=${nSpeakers} ≠ 注册表 numSpeakers=${MODELS.kokoro.numSpeakers}（以元数据为准更新注册表）`);
+    }
+    const table = new Map(
+      speaker2id.split(',').map((s) => s.trim().split('->')).filter((p) => p.length === 2)
+        .map((p) => [p[0], Number(p[1])]),
+    );
+    let ok = 0;
+    for (const v of kokoroEntries) {
+      const name = v.id.replace(/^kokoro:/, '');
+      const real = table.get(name);
+      if (real === undefined) {
+        errors.push(`音色 ${v.id}: 模型内嵌元数据里没有 ${name}（v1.0 共 ${table.size} 个音色）`);
+      } else if (real !== v.speakerId) {
+        errors.push(`音色 ${v.id}: speakerId ${v.speakerId} 与元数据不符（${name}->${real}）—— 会读成别人的声音`);
+      } else {
+        ok++;
+      }
+    }
+    if (ok) {
+      console.log(`  内嵌元数据核对: ${ok}/${kokoroEntries.length} 个 Kokoro 音色名字↔下标逐条吻合（n_speakers=${nSpeakers}）`);
+    }
   }
 }
 

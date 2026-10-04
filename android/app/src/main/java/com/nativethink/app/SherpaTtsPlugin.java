@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 本插件把合成完全放在设备内完成（同方案实测 RTF≈0.08，3 秒语音约 250ms 合成完），
  * 与网速彻底无关。
  *
- * 支持多音色：一个 Kokoro 模型内含 103 个音色，由 JS 侧传 speakerId 选择。
+ * 支持多音色：随包 Kokoro v1.0 模型内含 54 个音色，由 JS 侧传 speakerId 选择。
  * 音色元数据（名字/口音/speakerId 映射）归前端 src/lib/tts-voice-catalog.ts，
  * 本插件只认 modelId → 配置，不维护音色表。
  *
@@ -61,7 +61,7 @@ public class SherpaTtsPlugin extends Plugin {
     private static final String MODEL_KOKORO = "kokoro";
     private static final String MODEL_LESSAC = "piper-lessac";
 
-    /** Kokoro：assets/tts/ 下的多音色模型（int8 量化，103 个音色，24000Hz） */
+    /** Kokoro：assets/tts/ 下的多音色模型（int8 量化，54 个音色，24000Hz） */
     private static final String KOKORO_ASSET_DIR = "tts/kokoro-int8-multi-lang-v1_0";
     /** Piper 兜底音色：assets/piper/ 下（22050Hz，单音色，真机已验证可跑） */
     private static final String LESSAC_ASSET_DIR = "piper/vits-piper-en_US-lessac-medium";

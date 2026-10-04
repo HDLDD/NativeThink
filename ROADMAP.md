@@ -22,7 +22,7 @@
 
 1. **学习提醒**（Capacitor 本地通知）—— 系统级能力里唯一的缺口。npm 侧目前只注册了 `@capacitor-community/text-to-speech`（仓库内的 `SherpaTts` 是原生插件，不走 npm），没有任何通知插件。
 2. **词库真人发音包**：单词集合有限，可预录；先定体积方案（大文件绝不能进 `public/`，会同时拖累 web/APK/桌面三份产物）。
-3. **11 个 Kokoro 音色逐个真机试听**，核对 `src/lib/tts-voice-catalog.ts` 的 `speakerId`（名不符实只改前端表，不必动原生）。
+3. ~~**11 个 Kokoro 音色逐个真机试听**~~ → **代码侧已定论（2026-10-05）**：11 个 `speakerId` 与包内 `model.int8.onnx` 内嵌 `speaker2id` 元数据逐条吻合（v1.0 / `n_speakers`=54，`comment` 字段自证 "This is Kokoro v1.0"）；`scripts/check-tts-voices.cjs` 已加同款静态核对（名字↔下标 + `n_speakers` 交叉核对，不符 `exit 1`，2 条变异全红）。真机试听降级为可选——只用于标定 `note` 听感描述，要动设备先报备。
 4. **语料回填**：语法条目继续扩、导入书离线翻译、书籍译文仍有待回填空段（口径沿用上一版 ROADMAP）。
 5. ~~**开通反馈通道**~~ —— **已决定不做（2026-10-05）**：反馈功能整体下架（入口 / 服务 / 云函数 / 守卫 / 帮助文案全清），不再需要 `FEISHU_WEBHOOK_URL`；同日的连带迁移：产物版本核对改走构建期 `<meta name="app-version">`（`verify-app-version` 守）。
 6. **文档债（帮助中心）**：`HelpGuide.tsx` 的过期口径已于 2026-09-29 修正并钉进 `verify:books-meta` 第 ⑥ 节；仍待做的是把里面偏长的"各模块介绍"逐条对着现在的功能面再过一遍。

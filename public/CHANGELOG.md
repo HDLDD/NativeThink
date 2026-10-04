@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-10-05
+- fix(storage): 写作历史与跟读完成标记条数+字节双封顶（trimOldest），写失败可见 (`56f971f`)
 - chore(hooks): post-commit 改用一次全文件重写，不再堆空行；.wrangler/ 入 gitignore (`4556434`)
 - refactor(feedback): 整体下架反馈功能（入口/服务/云函数/守卫/文档全清） (`ac6ebf2`)
 

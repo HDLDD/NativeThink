@@ -64,7 +64,7 @@ APK 依赖 `dist/client`（`capacitor.config.json:4`），所以顺序不能省�
    - `models-bundled/` 不存在 → `android-copy-models.cjs:14-17` 打印「跳过（APK 将不含离线模型）」并 **`exit 0`**；`pack-app.mjs:94-97` 同样跳过。
    - `scripts/.apikey` 不存在 → `vite.config.ts:33-35` `catch` 后**空串**，出厂 AI Key 消失。
    - TTS 资产单文件下载失败 → 只 `console.error`（`fetch-android-tts.cjs:247`），末尾校验只打印 ✓/✗（`:261-264`）**不 `exit 1`** → `package:web` 不会拦。
-   - **只有 `package:apk` 里的 `check:tts-voices` 会真的阻断**（`check-tts-voices.cjs:170-172`）。
+   - **只有 `package:apk` 里的 `check:tts-voices` 会真的阻断**（`check-tts-voices.cjs:248-252`）。
    打完包要自己核验产物：APK 里 `/models/` 与 `assets/tts/` 是否真在、网页版出厂 Key 是否生效。
 3. **`fetch-android-tts.cjs` 幂等靠 size 比对**（`:164/:198/:234`），`--force` 才重取。**Kokoro 必须在 Piper 完整早退之前拉取**（`:212-213` 注释），否则 Piper 齐了就直接 return，Kokoro 永远不下。
 4. **必须存在但被 gitignore 的目录**：`release/`、`models-bundled/`（tracked 文件数 **0**）、`scripts/.apikey`、`android/app/libs/*.aar`、`assets/piper|tts/`、`android/keystore.properties`、`dist/`、`.local-data/`。**新机器 clone 下来是打不出完整包的** —— 先跑 `fetch-android-tts`、准备 `models-bundled/`、放好 `.apikey`。

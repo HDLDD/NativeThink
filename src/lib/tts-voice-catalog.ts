@@ -81,9 +81,9 @@ export function edgeVoiceNameOf(uri: string | null | undefined): string | null {
 // ── 本地离线音色（sherpa-onnx + Kokoro int8）──
 //
 // 与上面 Edge 在线目录的区别：这些音色在设备内合成，不联网。
-// speakerId 是 voices.bin 里的数组下标，**写错不会报错、只会读成别人的声音**，
-// 故改动后须真机试听确认（见 docs/superpowers/specs/2026-09-18-offline-tts-multivoice-design.md §6.2）。
-// 越界由 scripts/check-tts-voices.cjs 在打包前静态拦截。
+// speakerId 是 voices.bin 里的数组下标，**写错不会报错、只会读成别人的声音**。
+// 名字↔下标已静态锁定：11 个条目与包内 model.int8.onnx 内嵌 speaker2id 元数据逐条吻合
+// （v1.0 / 54 音色），check-tts-voices.cjs 打包前做同款核对，越界也拦。
 
 export interface ILocalVoice {
   /** 传给 sherpaSpeak 的 voiceId，形如 kokoro:af_sarah */
@@ -102,9 +102,9 @@ export interface ILocalVoice {
 /**
  * Kokoro int8 多语模型的 11 个英文音色。
  *
- * speakerId 初始值取自 sherpa 官方文档的 v1_0 speaker 表 —— v1.1 无公开表，
- * 且两版音色嵌入经字节比对确认并非同一套，故此表须真机试听校准。
- * 若名不符实，改这里的数字即可，不必改原生代码。
+ * speakerId 已与包内 model.int8.onnx 内嵌的 speaker2id 元数据逐条核对吻合
+ * （v1.0 / 54 音色；2026-10-05 直读核实，同款核对固化在 check-tts-voices.cjs）。
+ * 真机试听只用于标定 note 听感描述；改数字前先跑 npm run check:tts-voices。
  */
 export const KOKORO_VOICES: ILocalVoice[] = [
   { id: 'kokoro:af_bella', name: 'Bella', gender: 'female', accent: '美音', modelId: 'kokoro', speakerId: 2, note: '温暖亲切' },
