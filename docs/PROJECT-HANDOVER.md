@@ -457,14 +457,14 @@ node scripts/device-eval.mjs back
     唯一一次尝试因我用 `pushState` 跳转没落到预期界面而读数全空，等于没验。
     待确认两件事：词书卡是否显示 六级 7,404 / 考研 5,047 且考研能开出卡；朗读设置能否手指滑到底
     点到语速与自检。现有一切结论都只有本机证据（`verify-wordbank-loading` 42 项 + 无头 Chrome 读 DOM）。
-16. **品牌字体对大陆用户实际上从未生效**（2026-09-29 线上实测，未改 —— 涉及视觉标识，要用户拍板）：
-    `index.html:17` 从 `fonts.googleapis.com` 拉 Plus Jakarta Sans + Noto Sans SC。
-    直连（无代理）时该域名不可达 → **每条路由都在控制台报一次资源错误**，而字体永远拿不到。
-    好消息是不卡渲染：那条 link 用了 `media="print" onload="this.media='all'"`（非阻塞），
-    且 `--font-sans` 尾部有 `-apple-system / Segoe UI / Roboto` 兜底，所以只是"长得不是设计稿那套字"。
-    三个候选：① 自托管 Plus Jakarta Sans 的 latin 子集（约 15-30KB woff2，Noto Sans SC 直接删 —— 中文用系统字更稳）；
-    ② 换国内可达镜像（等于引入第三方依赖，需评估）；③ 认了，把字体栈改成纯系统字，去掉这条外链与控制台噪声。
-    另：`index.html:22` 的 favicon 指向 `lf3-static.bytednsdoc.com`（字节 CDN），同样是外部依赖。
+16. ~~**品牌字体对大陆用户实际上从未生效**~~（2026-09-29 实测发现；**2026-10-05 已修，走选项①**）：
+    原状：`index.html:17` 从 `fonts.googleapis.com` 拉 Plus Jakarta Sans + Noto Sans SC。直连（无代理）时该域名不可达 →
+    **每条路由都在控制台报一次资源错误**，而字体永远拿不到（非阻塞加载 + 系统字兜底，所以只是"长得不是设计稿那套字"）。
+    修法：自托管 `@fontsource/plus-jakarta-sans` 的 latin 子集（400/600/700，约 36KB 进 `public/fonts/`，
+    与 Google 同一份 woff2，OFL `LICENSE.txt` 随附）；Noto Sans SC 网页字直接删（中文走系统字更稳）；
+    preconnect / 外链 / noscript 整块移除，改内联三组 `@font-face`。守 `verify-brand-fonts`（22 断言，
+    4 组变异全红）；无头 Chrome CDP 对产物实测 9/9（零外链请求、三字重全 200 且 loaded、控制台零错误）。
+    另（未动，超出本轮范围）：`index.html` 的 favicon 仍指向 `lf3-static.bytednsdoc.com`（字节 CDN）。
 15. **`scripts/generate-books.ts` 与 `src/data/books.ts` 已经不同步**（2026-09-29 发现，未修）：
     生成器写出的 `bookContent` 只做 `enParas.map(en => ({ en, zh: '' }))`，**不调用 `cleanBookParagraphs`、也不写 `gutenbergId`**
     —— 而现文件里两样都有（章节切分靠它，全文升级靠 gutenbergId）。也就是说"照头部注释重跑一次生成器"

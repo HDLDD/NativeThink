@@ -13,14 +13,16 @@
     <!-- 构建期由 vite.config.ts 的 fixHtmlPlaceholders 把 {{appVersion}} 换成版本号（读 android/version.properties）；
          scripts/ensure-web-build.mjs 靠这处标记拦「打进上次产物」，占位符形态不许手改。 -->
     <meta name="app-version" content="{{appVersion}}" />
-    <!-- Preconnect to Google Fonts origins -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Non-render-blocking font loading: reduced weights (400/600/700) -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Noto+Sans+SC:wght@400;600;700&display=swap" media="print" onload="this.media='all'" />
-    <noscript>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Noto+Sans+SC:wght@400;600;700&display=swap" />
-    </noscript>
+    <!-- 品牌字体自托管（大陆可达）：Plus Jakarta Sans latin 子集 400/600/700，共约 36KB。
+         文件来自 @fontsource/plus-jakarta-sans@5.3.0（与 fonts.googleapis.com 同一份 woff2），
+         放 public/fonts/，OFL 许可证随附见 public/fonts/LICENSE.txt。原外链 fonts.googleapis.com
+         对大陆不可达 —— 每条路由报一次资源错误且字体从未生效（ROADMAP #7，2026-10-05 落地）。
+         中文不再加载 Noto Sans SC 网页字，走 --font-sans 兜底栈里的系统字。 -->
+    <style>
+      @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-display: swap; font-weight: 400; src: url(/fonts/plus-jakarta-sans-latin-400-normal.woff2) format('woff2'); }
+      @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-display: swap; font-weight: 600; src: url(/fonts/plus-jakarta-sans-latin-600-normal.woff2) format('woff2'); }
+      @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-display: swap; font-weight: 700; src: url(/fonts/plus-jakarta-sans-latin-700-normal.woff2) format('woff2'); }
+    </style>
     <link href="https://lf3-static.bytednsdoc.com/obj/eden-cn/ylcylz_fsph_ryhs/ljhwZthlaukjlkulzlp/feisuda/feisuda.svg" rel="shortcut icon"/>
   </head>
   <body>

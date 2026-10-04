@@ -1,6 +1,6 @@
 # 验证体系
 
-> 本项目**没有测试框架**。防线是：`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 19 条可跑的 `scripts/verify-*.mjs` 契约守卫（另有需要基线参数的 verify-wordbank-split 与作为全量跑法的 verify-all，共 21 个文件） + 无头 Chrome/CDP 行为验收 + 真机 CDP 通道。
+> 本项目**没有测试框架**。防线是：`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 20 条可跑的 `scripts/verify-*.mjs` 契约守卫（另有需要基线参数的 verify-wordbank-split 与作为全量跑法的 verify-all，共 22 个文件） + 无头 Chrome/CDP 行为验收 + 真机 CDP 通道。
 > 一句话原则：**证据来自产物和真运行，不来自读代码**。
 
 ## 1. 契约守卫（`scripts/verify-*.mjs`）
@@ -23,6 +23,7 @@
 | `verify-tts-progress.mjs` | 6175 | 「读到哪」反查表恒等式：各段词数之和 === 各切片词数之和（书目 22 / 页 419 / 切片 3785 + 5 项脚手架自检） | 改 TTS 切片上限或阅读器朗读逻辑 |
 | `verify-tts-hardening.mjs` | 15 | A 原生静态（无 `new Thread().start()`、有界线程池 + 队列上限）4 项；B 真实模块在途去重 6 项；C 桌面限定 5 项 | 改降级链路或预合成 |
 | `verify-app-version.mjs` | 11 | 版本号**单一载体**链路：version.properties（源）→ vite 构建期替换 `{{appVersion}}`（注入）→ index.html 占位符 meta（载体）→ ensure-web-build 按 meta 核对且不再引用 `__APP_VERSION__`（消费）→ 产物存在时 index/404 两页 meta 与源一致且非占位符（端到端）；全仓剥注释扫旧 define 不许复活。缺 dist 时产物段声明跳过 | 改版本号管线（`version.properties` / `vite.config` 的 fixHtmlPlaceholders / `ensure-web-build.mjs` / index.html 的 meta） |
+| `verify-brand-fonts.mjs` | 22 | 品牌字体自托管（大陆可达，替代 fonts.googleapis.com）：源侧零外链域名 + @font-face 恰三条（400/600/700）指向 `/fonts/*.woff2` + woff2 真文件（`wOF2` magic + header 声明长度与文件长度自洽，防占位/截断）+ OFL 许可证随附；两处 `--font-sans` 都不含 `'Noto Sans SC'` 且以 `'Plus Jakarta Sans'` 开头（正对照：不是删外链了事）；产物段核对 dist 的 index/404、fonts/ 与构建出的 CSS（缺 dist 声明跳过）。**剥注释后扫描** —— 溯源自述里写着旧域名与 Noto 字样 | 改 index.html 字体引用 / `public/fonts/` / `tailwind-theme.css` 字体栈 |
 | `verify-overlay-fit.mjs` | 28 | 窄视口浮层契约：Dialog/Popover 基座 + 朗读设置/AI 设置面板结构 + ④ 贴顶全屏层自带 safe-area + ⑤ 全站唯一 `<Toaster />` 出口（剥注释全仓扫描，Layout 必须渲染 Header；迁移并强化自已删的 verify-feedback-loop） | 改 `ui/dialog` 基座、那两个面板或 `src/index.tsx`/`Layout.tsx` 挂载点 |
 | `verify-bundle-budget.mjs` | 10 | 从**产物**反查入口静态依赖图：首屏必需集合里不许出现 recharts/markdown/词库数据 chunk；gzip 总量 ≤ 预算 | 改 `vite.config` 的 manualChunks、壳里新增静态 import/require |
 | `verify-list-scaling.mjs` | 18 | 一屏渲染不完的列表必须折叠/分页：写作题库默认 12 张、词库浏览分页、**语块短语库每字母段默认 6 条且 A-Z 跳转仍可达每一段**（各配「不许退回全量 `.map`」的正对照） | 新增长列表页 |
@@ -105,6 +106,8 @@ npm run verify:all        # scripts/verify-all.mjs：typecheck + 全部 verify-*
 2026-10-05 同日再测（技术债 #10 双封顶落地）：verify-vocab-caches 67 → 85（⑥ `trimOldest` 双封顶契约与两处接线 18 条，4 条变异全红），typecheck + 19 条守卫全绿，**断言合计 7,270 条**（= 7,252 + 18。tts-progress 6,175；其余 18 条相加：45+227+310+85+15+16+10+18+28+23+16+43+16+24+10+104+74+36+11 = 1,095）。
 
 2026-10-05 第 3 测（HelpGuide 审计 + 跟读语音标注修复批次）：typecheck + 19 条守卫全绿（verify-wordbank-split 跳过），**断言合计 7,274 条**（= 7,270 + 4。tts-progress 6,175；其余 18 条：45+227+310+85+15+16+11+28+10+18+27+43+16+24+10+104+74+36 = 1,099 —— shadowing-completion 23 → 27，新增语音标注 `<u>` 渲染 4 条，变异退回旧写法红 2 条）。
+
+2026-10-05 第 4 测（品牌字体自托管落地，ROADMAP #7）：新增 verify-brand-fonts 22（三段契约：源侧零外链 / woff2 真文件与 OFL 随附 / 生效栈正对照；4 组变异全红 —— 复加外链、删字体文件、塞回 'Noto Sans SC'、截断 woff2；修掉守卫自身 `.map(basename)` 收不到下标的崩溃后，删文件红点从异常改为两条明确断言）。行为验收：无头 Chrome + CDP 对 `dist/client` 实跑 **9/9**（零 fonts.googleapis/gstatic 请求、三 woff2 全 200 且 MIME font/woff2、`document.fonts.check` 400/600/700 全 true、FontFace 全 loaded、body 计算栈含 Plus Jakarta Sans、控制台零错误）。typecheck + 20 条守卫全绿（verify-wordbank-split 跳过），**断言合计 7,296 条**（= 7,274 + 22。tts-progress 6,175；其余 19 条：45+227+310+85+15+16+11+28+10+18+27+43+16+24+10+104+74+36+22 = 1,121）。
 
 ## 6. 静态检查的已知弱度
 

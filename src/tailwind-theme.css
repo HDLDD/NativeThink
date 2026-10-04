@@ -58,7 +58,7 @@
   --accent-border: hsl(from hsl(220 14% 96%) h s calc(l + var(--opaque-button-border-intensity)));
   --muted-border: hsl(from hsl(220 14% 96%) h s calc(l + var(--opaque-button-border-intensity)));
   --font-sans:
-    'Plus Jakarta Sans', 'Noto Sans SC', 'LarkHackSafariFont', 'LarkEmojiFont',
+    'Plus Jakarta Sans', 'LarkHackSafariFont', 'LarkEmojiFont',
     'LarkChineseQuote', '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue',
     'Tahoma', 'PingFang SC', 'Microsoft Yahei', 'Arial', 'Hiragino Sans GB',
     'sans-serif', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
@@ -203,7 +203,9 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --font-sans: 'Plus Jakarta Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;;
+  /* 中文走系统字（PingFang SC / Microsoft YaHei），不再加载 Noto Sans SC 网页字：
+     大陆直连拿不到 fonts.googleapis.com，旧外链只会报错并从生效（ROADMAP #7，2026-10-05）。 */
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
 

@@ -26,7 +26,7 @@
 4. **语料回填**：语法条目继续扩、导入书离线翻译、书籍译文仍有待回填空段（口径沿用上一版 ROADMAP）。
 5. ~~**开通反馈通道**~~ —— **已决定不做（2026-10-05）**：反馈功能整体下架（入口 / 服务 / 云函数 / 守卫 / 帮助文案全清），不再需要 `FEISHU_WEBHOOK_URL`；同日的连带迁移：产物版本核对改走构建期 `<meta name="app-version">`（`verify-app-version` 守）。
 6. **文档债（帮助中心）**：`HelpGuide.tsx` 的过期口径已于 2026-09-29 修正并钉进 `verify:books-meta` 第 ⑥ 节；仍待做的是把里面偏长的"各模块介绍"逐条对着现在的功能面再过一遍。
-7. **品牌字体要不要自托管**：`fonts.googleapis.com` 对大陆用户不可达 —— 线上每条路由一次资源错误、Plus Jakarta Sans / Noto Sans SC 从未生效（非阻塞 + 系统字兜底，所以只是不好看）。选项见交接手册 §9 第 16 条。
+7. ~~**品牌字体要不要自托管**~~ → **已自托管（2026-10-05，交接手册 §9 第 16 条的选项①）**：Plus Jakarta Sans latin 子集 400/600/700 进 `public/fonts/`（约 36KB，`@fontsource/plus-jakarta-sans` 官方重打包 = 与 fonts.googleapis.com 同一份 woff2，OFL 许可证随附）；Noto Sans SC 网页字直接删（中文走 `--font-sans` 里的 PingFang SC / Microsoft YaHei 系统字）；旧 preconnect + `media="print"` 外链 + noscript 整块移除，改内联三组 `@font-face`。守卫 `verify-brand-fonts`（22 断言，4 组变异全红）；无头 Chrome CDP 对产物实测 9/9（零外链请求、三字重 200 且 loaded、控制台零错误）。遗留：favicon 仍指向 `lf3-static.bytednsdoc.com`（字节 CDN，非字体范畴，未动）。
 8. ~~顺手项：`.githooks/post-commit` 插入日期标题时带固定空行~~（**2026-10-05 已修**）：旧 `sed i\` 写法每来一个新日期就在标题上方多堆一行空行（已堆到 10 行）；改写为一次全文件 awk 重写 —— 连续空行压成一行、新日期标题插在首个日期标题之前且两侧各留一空行，存量空行已一并清理。
 9. ~~**真机补验 2.0.28**~~ → **真机走查已做完（APK 2.0.31 / versionCode 76）**：装机其实早已完成（`lastUpdateTime` 09-29 21:12，此前记的"未装机"是错的）。本轮经 WebView CDP 在真机核对：九本词书词数与文档口径逐一对上（六级 7,404 / 考研 5,047 / 全部 21,736）、考研能开卡（`1/10 新学 craft`）、换书一步生效、朗读设置浮层 764px 落在 851 视口内且「测试声音 / 朗读自检」全可达、AI 设置不再上下各裁 43px、`/api/tts-voices` 请求数 0。收尾 `force-stop` 已归位。
 10. **文档写作期间新核实、尚未修的缺陷**（按"用户能感觉到"排序，每条都在 `docs/modules/` 里有 `文件:行号` 与复现路径）：
