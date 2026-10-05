@@ -63,6 +63,21 @@ scripts/.apikey（gitignore，.gitignore:4）
 
 `src/lib/capability-client.ts`：模块级单飞 `pending`，`import('@lark-apaas/client-toolkit-lite')` 后取 `capabilityClient`，失败把 `pending` 置 null 以便重试，**永远返回 `null` 而不是抛**。8 个调用点（思维/语块/对话/写作）。该 chunk 实测 507KB raw / 160KB gzip —— 静态引入它等于给四个 AI 路由各压 160KB 首屏（这正是 `perf(bundle)` 那轮修掉的）。
 
+### 2.6 `/api/ai/*` 的防滥用守卫（2026-10-05）
+
+中继端点挂在任何人都能 POST 的公网域名上，所以 `functions/_lib/guard.js` 把四件事钉在一起，`functions/api/ai/chat.js` 在**业务逻辑之前**按序跑完：
+
+| 手段 | 判据 | 位置 | 为什么是这样 |
+|---|---|---|---|
+| Origin 白名单 | 精确四源 + `^https?://(localhost\|127\.0\.0\.1)(:\d+)?$` 放行本地/打包形态；不匹配 → **403** | `guard.js:17-34`、`chat.js:68-71` | 浏览器跨源 POST 必带 Origin，第三方网页拿不到白名单里的源；能伪造 Origin 的只有非浏览器脚本，那类交给下面的限流兜底 |
+| IP 分钟窗限流 | `CF-Connecting-IP` 每 60s 至多 **30** 次，超 → **429** | `guard.js:37-54`、`chat.js:72-75` | 计数放 **isolate 内存**而非 KV：免费档 KV 每日写上限 1000，逐请求写会把配额打爆。代价：跨 isolate 各算各的、冷启动即清零 —— 它是"削突发"不是硬额度 |
+| messages 形状校验 | 非空数组、**≤80 条**、每条 `role`/`content` 均为字符串、总长 **≤64k 字符**，不过 → **400** | `guard.js:78-89`、`chat.js:86-88` | 防超大 payload 白烧 Key；80 条是给 AI 对话"全量上下文"留的量（`:80` 注释写明），别当宽松项改小 |
+| 出厂 Key 用量监控 | 请求**没带** `apiKey` 时才计（按天重置、按 provider 分桶）+ 结构化日志 | `guard.js:57-71`、`chat.js:97-99` | 查看入口：`GET /api/ai/chat` 返回 `{usage:{day,factoryTotal,byProvider}}`（`chat.js:58-61`）。明细在 CF 控制台 Real-time Logs / `wrangler pages deployment tail` 里按 `type:"ai_factory_usage"` 检索（含 ip，`guard.js:70`） |
+
+两条容易踩的边角：**GET 短路在 405 判断之前**（`chat.js:58` 早于 `:64`），所以这个端点用 GET 探活拿到的永远是用量快照；**Electron 不走这条路** —— 桌面版把 `/api/*` 在本地 Node 里执行（见 [build-release.md](./build-release.md) §5 第 8-9 条），因此白名单只需覆盖 Web / Capacitor / 本地开发三种形态。
+
+⚠️ **`verify:all` 现有 21 项里没有任何一条覆盖 `functions/_lib/guard.js`**：改 `MAX_PER_WINDOW`、往 `ALLOWED_ORIGINS` 加源、动 `validateMessages` 的两个上限，全都是静默生效。要改它就先手工验四种响应（403 / 429 / 400 / 200 流式）。另一件仓库做不到的事：**出厂 Key 自 `750a7c3` 起在 git 历史里可读**，守卫只是止损，不在平台侧作废轮换等于没修（同 build-release.md §5 第 9 条）。
+
 ## 3. 注意事项
 
 1. **`extractJson()` 是硬规定，且现在由守卫全仓扫**。历史上违反过两件事，2026-09-30 已全部清零：

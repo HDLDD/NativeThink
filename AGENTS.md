@@ -32,8 +32,8 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 背单词 `/vocabulary` | [modules/vocabulary.md](./docs/modules/vocabulary.md) | 6 种模式、三个正交开关（`setupDone`/`showWizard`/`immersed`）、SM-2、三套并行重排实现 |
 | 词库数据 | [modules/wordbank-data.md](./docs/modules/wordbank-data.md) | 两层去重、核心/detail 拆分、IDB 主 + localStorage 兜底、改完必跑的两个脚本 |
 | 阅读 `/articles` | [modules/reading.md](./docs/modules/reading.md) | 五种来源一套阅读器、运行时全文升级、**两套切章必须对齐**、复习词文章词表是派生的（删文章即回词表） |
-| 朗读 TTS | [modules/tts.md](./docs/modules/tts.md) | 引擎降级链、切片 180 由上游 200 硬上限钉死、闪退自愈、音色四处同步 |
-| AI 服务与端侧模型 | [modules/ai-services.md](./docs/modules/ai-services.md) | Key 优先级、服务端免费档回退、端侧回落条件、`extractJson` 规定由 `verify:ai-parse` 全仓扫 |
+| 朗读 TTS | [modules/tts.md](./docs/modules/tts.md) | 引擎降级链、切片 180 由上游 200 硬上限钉死、闪退自愈、音色四处同步、云端缓存 FIFO 400 条 + Blob URL 用完即 revoke |
+| AI 服务与端侧模型 | [modules/ai-services.md](./docs/modules/ai-services.md) | Key 优先级、服务端免费档回退、端侧回落条件、`extractJson` 规定由 `verify:ai-parse` 全仓扫、**中继防滥用守卫（Origin/限流/形状校验/出厂 Key 用量，无守卫覆盖）** |
 | 母语思维 `/think` | [modules/think-in-english.md](./docs/modules/think-in-english.md) | 4 tab；换题不 abort 导致流式内容串题 |
 | 语块 `/chunks` | [modules/chunks.md](./docs/modules/chunks.md) | 最大单文件；练习池走 `useStableShuffle`、短语库按字母段折叠（4,805→1,148 元素）、接龙判定三档（未判定不送分） |
 | 对话 `/conversation` | [modules/conversation.md](./docs/modules/conversation.md) | 场景选择↔聊天；`mountedRef` 每轮挂载需复位（dev 下曾恒 false 让对话永远空白） |

@@ -73,9 +73,13 @@
 |----|-----|------|------|
 | JS Map | `voiceId\|speed.toFixed(2)\|text` | 120，FIFO | `sherpa-tts.ts:150-152,168-171,260-264` |
 | 原生文件 | `sha1(modelId\|speakerId\|speed\|text)+'.wav'` | `cacheDir/sherpa-tts`，命中判 `length>1024`，先写 `.part` 再 rename | `java:463-478` |
-| 云端 Cache API | `nativethink-tts-v1` | 10s 超时 + `priority:'low'` | `use-tts.ts:240-264` |
+| 云端 Cache API | `nativethink-tts-v1` | 10s 超时 + `priority:'low'`；**FIFO 裁到 400 条** | `use-tts.ts:244-259` |
 
 键里**必须含音色与语速**：只按文本+语速会「换音色播出上一个音色的音频」（`sherpa-tts.ts:168-171` 注释）。
+
+云端结果缓存的条数上限 `MAX_TTS_CACHE_ENTRIES = 400`（`use-tts.ts:255-258`，2026-10-05 加）：**Cache Storage 与 IndexedDB 共享同源配额**，只增不减会把配额吃满，连带**整书译文写入静默失败**（那是 IDB 的另一大户 —— 2026-09 体检结论）。`cache.keys()` 近似插入序，所以从头部删就是 FIFO，不需要额外时间戳。
+
+同一批把**播放用的 Blob URL 用完即 revoke**：每段音频一个 objectURL，`stopAudio()` 里释放（`:352`），分派引擎时记下当前 URL（`:512`，只认 `blob:` 前缀，非 blob 的引擎不记）。不 revoke 的话 objectURL 会驻留到页面卸载 —— 连着朗读整本书这种长会话里内存单调上涨。
 
 在途去重 `inflight: Map<key, Promise>`（`sherpa-tts.ts:195-230`）：原生是 `synthLock` 串行的，同文本并发请求会各占一条线程阻塞在锁上。真机闪退链写在这里：每次 `new Thread` + `generate()` → `OutOfMemoryError: pthread_create failed` → App 崩（`java:95-105`，栈原文抄在 `verify-tts-hardening.mjs:5-9`）。修法是单线程 `ttsWorker` + 独立 `loadWorker`（`java:106-117`）+ 队列上限 `MAX_PENDING_TTS = 8`，满了 `call.reject("busy: too many pending tts requests")`（`java:119-140,490-493`）。
 
