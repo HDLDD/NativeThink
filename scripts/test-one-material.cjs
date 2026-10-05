@@ -4,7 +4,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const API_KEY = 'sk-3c3af2b45baf4638a3eebe7c25d07b4d';
+// 出厂 Key 只放 gitignored scripts/.apikey（此前硬编码的 Key 已进 git 历史，需在平台作废）
+const API_KEY = fs.existsSync(require('path').join(__dirname, '.apikey'))
+  ? fs.readFileSync(require('path').join(__dirname, '.apikey'), 'utf8').trim()
+  : '';
 const SRC = path.join(__dirname, '..', 'src', 'data', 'shadowing.ts');
 const raw = fs.readFileSync(SRC, 'utf-8');
 

@@ -107,6 +107,10 @@ const ROUTES = {
   '/api/tts': 'api/tts.js',
   '/api/wikipedia': 'api/wikipedia.js',
   '/api/word-image': 'api/word-image.js',
+  '/api/gutenberg': 'api/gutenberg.js',
+  '/api/bilibili-info': 'api/bilibili-info.js',
+  '/api/bilibili-subtitle': 'api/bilibili-subtitle.js',
+  '/api/bilibili-transcribe': 'api/bilibili-transcribe.js',
 };
 
 function ensureJwtSecret(dataDir) {
@@ -540,7 +544,7 @@ export async function startServer(opts) {
             await synthesizeWav(text, rate, wavPath, null);
             const stream2 = fs.createReadStream(wavPath);
             stream2.on('open', () => {
-              res.writeHead(200, { 'Content-Type': 'audio/wav', 'Access-Control-Allow-Origin': '*' });
+              res.writeHead(200, { 'Content-Type': 'audio/wav' });
               stream2.pipe(res);
             });
             stream2.on('error', () => { if (!res.headersSent) res.writeHead(500).end(); });
@@ -572,10 +576,9 @@ export async function startServer(opts) {
     if (req.method === 'GET') {
       const cfg = loadLocalConfig();
       const body = JSON.stringify({
-        sessdata: cfg.bilibiliSessdata || '',
         hasSessdata: !!cfg.bilibiliSessdata,
       });
-      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }).end(body);
+      res.writeHead(200, { 'Content-Type': 'application/json' }).end(body);
       return;
     }
     if (req.method === 'POST') {
@@ -589,7 +592,7 @@ export async function startServer(opts) {
           fs.writeFileSync(path.join(dataDir, 'server-config.json'), JSON.stringify(cfg, null, 2));
           // Live-update the env used by Pages Functions
           env.BILIBILI_COOKIE = cfg.bilibiliSessdata ? `SESSDATA=${cfg.bilibiliSessdata}` : undefined;
-          res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+          res.writeHead(200, { 'Content-Type': 'application/json' })
             .end(JSON.stringify({ ok: true, restartNeeded: true }));
         } catch (err) {
           res.writeHead(400, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'Invalid JSON' }));

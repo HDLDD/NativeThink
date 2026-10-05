@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST_INDEX = join(ROOT, 'dist/client/index.html');
-const SRC_DIRS = ['src', 'functions', 'electron', 'server'];
+const SRC_DIRS = ['src', 'functions', 'electron', 'server', 'index.html', 'vite.config.ts', 'public'];
 const CODE_EXT = new Set(['.ts', '.tsx', '.js', '.mjs', '.cjs', '.css', '.html', '.json']);
 
 function versionFromProps() {

@@ -178,10 +178,15 @@ export default function CollocationsTab({
   }, [selectedColloc, currentPage]);
 
   // Save scroll position on scroll
+  const collocScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleCollocListScroll = useCallback(() => {
-    if (collocListRef.current) {
-      try { localStorage.setItem(SCROLL_MEMORY_KEY, String(collocListRef.current.scrollTop)); } catch { /* ignore */ }
-    }
+    // 400ms debounce —— 此前每个 scroll 事件都同步写 localStorage（主线程磁盘 I/O），长列表滚动掉帧
+    if (collocScrollTimer.current) clearTimeout(collocScrollTimer.current);
+    collocScrollTimer.current = setTimeout(() => {
+      if (collocListRef.current) {
+        try { localStorage.setItem(SCROLL_MEMORY_KEY, String(collocListRef.current.scrollTop)); } catch { /* ignore */ }
+      }
+    }, 400);
   }, []);
 
   // ===== 记忆功能：标记已记住的搭配 =====

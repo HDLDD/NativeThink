@@ -101,9 +101,8 @@ try {
   appVersion = (props.match(/versionName=([\w.]+)/) || [])[1] || ''
 } catch { /* 非安卓工程 —— 走 package.json */ }
 if (!appVersion) {
-  try {
-    appVersion = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8')).version || ''
-  } catch { /* 版本留空，不谎报 */ }
+  // 版本链断裂宁可拦下构建 —— 兜底 package.json 会盖出 1.0.0，ensure-web-build 与 aapt 均无法识别这是异常（2026-09 体检结论）
+  throw new Error('[version] 读不到 android/version.properties 的 versionName —— 版本链断裂，拒绝构建')
 }
 
 export default defineConfig({

@@ -249,6 +249,13 @@ async function warmTtsCache(url: string): Promise<void> {
     // 必须带超时：网络被黑洞时 fetch 不会 reject，会永久挂起（真机上表现为"点朗读毫无反应"）
     const resp = await fetch(url, { priority: 'low', signal: AbortSignal.timeout(10_000) } as RequestInit);
     if (resp.ok) await cache.put(url, resp.clone());
+    // FIFO 上限：Cache Storage 与 IndexedDB 共享源配额，无限缓存会把配额撑满
+    // （挤占整书译文写入导致其静默失败 —— 2026-09 体检结论）。keys() 近似插入序，淘汰最旧。
+    const keys = await cache.keys();
+    const MAX_TTS_CACHE_ENTRIES = 400;
+    for (let i = 0; i < keys.length - MAX_TTS_CACHE_ENTRIES; i++) {
+      await cache.delete(keys[i]).catch(() => {});
+    }
   } catch { /* ignore */ }
 }
 
@@ -316,6 +323,8 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
   // ── Refs ──
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  /** 当前播放的 Blob URL —— 每片音频一个 objectURL，不 revoke 会驻留内存到页面卸载 */
+  const currentBlobUrlRef = useRef<string | null>(null);
   const ssUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const genRef = useRef(0);
   const abortedRef = useRef(false);
@@ -338,6 +347,11 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   };
   const stopAudio = () => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
+    // 释放上一段音频的 Blob URL（不 revoke 会驻留内存到页面卸载 —— 长会话内存单调增长）
+    if (currentBlobUrlRef.current) {
+      try { URL.revokeObjectURL(currentBlobUrlRef.current); } catch { /* ignore */ }
+      currentBlobUrlRef.current = null;
+    }
     // 原生引擎正在播 → 同步原生停止（仅原生激活时，避免与刚启动的 speak 竞态）
     if (nativeActiveRef.current) {
       nativeActiveRef.current = false;
@@ -495,6 +509,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       ) => {
         if (abortedRef.current) { opts.skipChunk(); return; }
         stopAudio();
+        currentBlobUrlRef.current = url.startsWith('blob:') ? url : null;
         // 关键：撤掉上一个引擎留下的看门狗。否则它会在新引擎朗读途中触发，
         // 把引擎索引用陈旧闭包再推进一次 —— 同一句被两个引擎各读一遍。
         if (safetyRef.current) { clearTimeout(safetyRef.current); safetyRef.current = null; }
@@ -513,7 +528,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
             reportPlayback({ engine: opts.engine, firstAudioMs: Date.now() - opts.t0, fellBack: engineIdx > 0 });
           }
         };
-        a.onended = () => { if (audioRef.current === a) audioRef.current = null; opts.skipChunk(); };
+        a.onended = () => { if (audioRef.current === a) audioRef.current = null; if (currentBlobUrlRef.current === url) { try { URL.revokeObjectURL(url); } catch { /* */ } currentBlobUrlRef.current = null; } opts.skipChunk(); };
         a.onerror = () => {
           if (audioRef.current === a) audioRef.current = null;
           madeSound ? opts.skipChunk() : opts.retryNextEngine();

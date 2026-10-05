@@ -60,6 +60,18 @@ export function SpeakBack({ item }: { item: ISentenceLabItem }) {
 
   useEffect(() => () => { if (userUrl) URL.revokeObjectURL(userUrl); }, [userUrl]);
 
+  // 卸载兜底：录音中途导航离开（Layout key=pathname 每次导航都重挂载）时
+  // 停掉录制器并释放 MediaStream —— 否则麦克风指示灯常亮、采集管线持续占用
+  useEffect(() => () => {
+    const rec = recorderRef.current;
+    if (rec && rec.state === 'recording') {
+      rec.onstop = null;          // 摘掉 onstop，避免卸载后再 setState
+      try { rec.stop(); } catch { /* ignore */ }
+      rec.stream?.getTracks().forEach((t) => t.stop());
+    }
+    recorderRef.current = null;
+  }, []);
+
   const start = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -209,6 +221,7 @@ async function analyze(
   const buf = await blob.arrayBuffer();
   const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const ctx = new Ctx();
+  try {
   const audio = await ctx.decodeAudioData(buf.slice(0));
   const data = audio.getChannelData(0);
   const rate = audio.sampleRate;
@@ -258,8 +271,7 @@ async function analyze(
   }
   const total = expectedBoundaries.filter((b) => b >= 0.08 && b <= 0.95).length;
 
-  await ctx.close();
-  return {
+  const result: IAnalysis = {
     durationMs,
     expectedMs,
     paceDelta: (durationMs - expectedMs) / expectedMs,
@@ -268,4 +280,6 @@ async function analyze(
     hit,
     total,
   };
+  return result;
+  } finally { try { void ctx.close(); } catch { /* ignore */ } }
 }
