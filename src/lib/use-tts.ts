@@ -14,7 +14,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
-import { getNativeTts as getNativeTtsPlugin, pickPreferredEnglishVoice } from './native-tts';
+import { getNativeTts as getNativeTtsPlugin, pickPreferredEnglishVoice, type INativeTtsHandle } from './native-tts';
 import { isBundledEngineDisabled, isSherpaAvailable, sherpaInFlightCount, sherpaPrewarm, sherpaSpeak, warmSherpa } from './sherpa-tts';
 import { DEFAULT_LOCAL_VOICE_ID, findLocalVoice, isLocalVoiceId } from './tts-voice-catalog';
 import { edgeVoiceNameOf, googleLangOf, isEdgeCatalogVoice } from './tts-voice-catalog';
@@ -355,7 +355,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     // 原生引擎正在播 → 同步原生停止（仅原生激活时，避免与刚启动的 speak 竞态）
     if (nativeActiveRef.current) {
       nativeActiveRef.current = false;
-      void getNativeTts().then((t) => t?.stop().catch(() => {}));
+      void getNativeTts().then(({ plugin: t }) => t?.stop().catch(() => {}));
     }
   };
 
@@ -553,7 +553,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
       if (engine === 'native') {
         getNativeTts()
-          .then(async (plugin) => {
+          .then(async ({ plugin }) => {
             if (!plugin) { onFail(); return; }
             // 语音选择：用户选过就用用户的；没选过则自动挑一个「本地」音色 ——
             // 网络音色每次朗读都要把文本发到服务器合成（500~2000ms），
@@ -912,7 +912,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   const pause = useCallback(() => {
     if (nativeActiveRef.current) {
       // 原生引擎不支持暂停 — 停止并在恢复时重播当前段
-      void getNativeTts().then((t) => t?.stop().catch(() => {}));
+      void getNativeTts().then(({ plugin: t }) => t?.stop().catch(() => {}));
       nativeActiveRef.current = false;
       nativePausedRef.current = true;
       setIsPaused(true);
@@ -1006,7 +1006,12 @@ export async function probeTtsEngines(rate = 0.9): Promise<ITtsEngineProbe[]> {
 
   // 1) 原生系统引擎
   const t0 = Date.now();
-  const plugin = await getNativeTts();
+  // 必须带超时：原生桥不响应时 `await getNativeTts()` 会**永久挂住**（不是抛错，兜不住），
+  // 整个自检就停在第一步不出结果 —— 与下面云端那步 8s 超时同一条口径。
+  const { plugin } = await Promise.race([
+    getNativeTts(),
+    new Promise<INativeTtsHandle>((res) => setTimeout(() => res({ plugin: null }), 3000)),
+  ]);
   if (plugin) {
     const ok = await new Promise<boolean>((resolve) => {
       let done = false;
@@ -1021,7 +1026,7 @@ export async function probeTtsEngines(rate = 0.9): Promise<ITtsEngineProbe[]> {
     });
     out.push({ engine: 'native', ok, ms: Date.now() - t0, note: ok ? undefined : '系统无英语语音包或无引擎' });
   } else {
-    out.push({ engine: 'native', ok: false, ms: 0, note: '非手机端 / 插件不可用' });
+    out.push({ engine: 'native', ok: false, ms: 0, note: '非手机端 / 插件不可用 / 3s 内未响应' });
   }
 
   // 2) 云端通道（Cloudflare → Google）

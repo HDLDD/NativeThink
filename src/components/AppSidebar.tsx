@@ -24,6 +24,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { preloadCoreOnly } from '@/data/wordbank';
@@ -63,6 +64,7 @@ const NAV_ITEMS = [
 
 export default function AppSidebar() {
   const { pathname } = useLocation();
+  const { setOpenMobile } = useSidebar();
   // 待复习角标（扫全部等级；学习状态变更会广播刷新）
   const dueCount = useGlobalDueCount();
 
@@ -101,6 +103,9 @@ export default function AppSidebar() {
                     <NavLink
                       to={item.path}
                       end={item.path === '/'}
+                      // 手机抽屉是整屏 modal 层：不主动关，路由已经切了但抽屉还盖着吞点击，
+                      // 用户必须再点一次遮罩才能操作新页面（桌面侧栏常驻，这行是空转）
+                      onClick={() => setOpenMobile(false)}
                       className={cn(
                         'flex items-center gap-3 transition-all duration-200 rounded-2xl',
                         isActive

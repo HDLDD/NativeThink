@@ -35,14 +35,16 @@
 
 | 位置 | 内容 |
 |------|------|
-| `AppSidebar.tsx:32-46` | `ROUTE_PREFETCH`，13 条 |
-| `AppSidebar.tsx:48-62` | `NAV_ITEMS`，13 条 |
-| `AppSidebar.tsx:97-98` | 触发时机 = **`onMouseEnter` + `onTouchStart`**，不是 mount |
-| `AppSidebar.tsx:97-98` | `/vocabulary` 额外 `preloadCoreOnly(['cet4'])` |
+| `AppSidebar.tsx:33-47` | `ROUTE_PREFETCH`，13 条 |
+| `AppSidebar.tsx:49-63` | `NAV_ITEMS`，13 条 |
+| `AppSidebar.tsx:99-100` | 触发时机 = **`onMouseEnter` + `onTouchStart`**，不是 mount |
+| `AppSidebar.tsx:99-100` | `/vocabulary` 额外 `preloadCoreOnly(['cet4'])` |
 | `MobileBottomNav.tsx:14-22` | **自己复制的第二份 `ROUTE_PREFETCH`，只有 7 条**（AppSidebar 那份没 export） |
 | `MobileBottomNav.tsx:25-30` | 移动端底栏只 6 项，`:49` 仅 `onTouchStart` |
 
-桌面抽屉是 shadcn `Sidebar collapsible="icon"`（`AppSidebar:70`）；edge-to-edge 避让在最外层 `SidebarProvider className="safe-area-top safe-area-left safe-area-right"`（`Layout.tsx:113`，`targetSdk 36` 时 WebView 铺到系统栏下面，外壳必须自己补 safe-area；`env()` 在桌面浏览器恒为 0）。`focus` 模式隐藏侧栏 + 头 + 底栏（`:114/116/129`）。
+桌面抽屉是 shadcn `Sidebar collapsible="icon"`（`AppSidebar:72`）；edge-to-edge 避让在最外层 `SidebarProvider className="safe-area-top safe-area-left safe-area-right"`（`Layout.tsx:113`，`targetSdk 36` 时 WebView 铺到系统栏下面，外壳必须自己补 safe-area；`env()` 在桌面浏览器恒为 0）。`focus` 模式隐藏侧栏 + 头 + 底栏（`:114/116/129`）。
+
+**手机上的"侧栏"是整屏 modal 抽屉，导航后必须自己关**（`AppSidebar.tsx:67` 取 `setOpenMobile`、`:108` 挂在每个 `NavLink` 的 `onClick` 上）。2026-10-05 真机 CDP 实测：从抽屉点「句子拼写」，路由确实变成 `/spelling`，但 `[role="dialog"]` 仍是 `data-state=open`、宽 288/视口 393，屏幕中心 `elementFromPoint` 命中的是抽屉里的 `<a>`、右侧 368px 命中的是抽屉那层整屏 portal 容器 —— **新页面整个被吞掉点击**，用户必须再点一次遮罩。根因：`openMobile` 只在 `ui/sidebar.tsx:185` 的 `<Sheet onOpenChange>` 里被改过，导航本身没人关。桌面侧栏常驻所以完全无感 —— **静态检查看不见、只有真机看得见**的那类。为什么值得守：底栏只 6 项，13 个页面里另外 7 个只能从抽屉进，这条是手机主路径。守卫：`verify-overlay-fit` ⑥（逐个 `NavLink` 检查关闭接线，新增导航项漏挂即红）。
 
 **但外壳那层内缩救不了 `fixed inset-0` 的全屏浮层** —— 它们脱离文档流、直接铺满视口，等于绕过了 `SidebarProvider` 的 padding。2026-09-30 真机反馈"AI 生成文章顶部被状态栏压住"就是这条：`PageReader.tsx:1210` 的阅读器根节点只有 `fixed inset-0 … flex flex-col`，在小米 onyx 上实测 `env(safe-area-inset-top)=47px`，顶栏（含「退出阅读」）整个藏进状态栏。修法是根节点自己补 `safe-area-top safe-area-bottom`（底部翻页条同理躲手势条）。**以后新增任何贴顶的全屏层都要自带内缩**，`verify-overlay-fit` ④ 会扫 `PageReader.tsx` 里所有 `fixed inset-0`（单/双引号都吃、先剥注释）并要求非居中的那些带 `safe-area-top`。验收用 CDP `Emulation.setSafeAreaInsetsOverride`（参数是 `insets: {top,bottom,left,right}` **对象**，写成数组会 Invalid parameters）把 inset 强制成 47/24，量顶栏 `top` 从 0 变 47。
 

@@ -140,6 +140,41 @@ function classNameOf(src, tagRe, label) {
   check(/!focused && <Header\s*\/>/.test(layout), '⑤ Layout 在非沉浸模式下渲染 Header');
 }
 
+/* ───────────── 6. 移动端抽屉：导航之后必须自己让开（2026-10-05 真机 CDP 实测） ─────────────
+ * 史实：在手机上从抽屉点「句子拼写」，路由确实变成 /spelling，但 `[role="dialog"]` 仍是
+ * data-state=open、宽 288/视口 393，屏幕中心 elementFromPoint 命中的是抽屉里的 <a>，
+ * 右侧 368px 命中的是抽屉那层整屏 portal 容器 —— **新页面整个被吞掉点击**，用户必须再点一次
+ * 遮罩才能操作。6 个条目逐个测，每次都残留。
+ * 根因：openMobile 只在 ui/sidebar.tsx 的 Sheet onOpenChange 里被改过，AppSidebar 的 NavLink
+ * 没有任何"导航后关闭"的接线。桌面侧栏常驻所以完全无感 —— 静态检查看不见，只有真机看得见。
+ * 为什么值得守：底部导航只放 6 项，13 个页面里另外 7 个**只能**从抽屉进，这条是手机主路径。
+ */
+{
+  const sidebar = read('src/components/AppSidebar.tsx');
+  const base = read('src/components/ui/sidebar.tsx');
+
+  check(/const \{ setOpenMobile \} = useSidebar\(\)/.test(sidebar),
+    '⑥ AppSidebar 取到 setOpenMobile（不接这根线，抽屉就永远不关）');
+  check(/import \{[^}]*useSidebar[^}]*\} from '@\/components\/ui\/sidebar'/.test(sidebar),
+    '⑥ useSidebar 从 ui/sidebar 导入');
+
+  // 每个 NavLink 都必须挂关闭 —— 新增导航项时漏挂是静默失效（正是本次缺陷的形状）
+  const chunks = sidebar.split('<NavLink').slice(1);
+  check(chunks.length >= 1, '⑥ 抽屉导航项可定位（正对照的前提）', `扫到 ${chunks.length} 个 NavLink`);
+  const noClose = chunks.filter((c) => !/onClick=\{\(\) => setOpenMobile\(false\)\}/.test(c.slice(0, 600)));
+  check(noClose.length === 0,
+    '⑥ 每个 NavLink 都挂了「导航后关抽屉」（漏一个就是那个页面点进去被抽屉盖住）',
+    `漏挂 ${noClose.length} 处`);
+
+  // 正对照：移动端确实是 Sheet 浮层（所以它会盖住页面），桌面是常驻侧栏（所以看不见这个缺陷）
+  check(/if \(isMobile\) \{[\s\S]{0,260}<Sheet open=\{openMobile\} onOpenChange=\{setOpenMobile\}/.test(base),
+    '⑥ 正对照：移动端走 Sheet(openMobile)，桌面走常驻侧栏 —— 同一段 JSX 两种形态');
+  check(/export \{[\s\S]*useSidebar,?\s*\}/.test(base), '⑥ 正对照：ui/sidebar 确实导出 useSidebar');
+  const navItems = (sidebar.match(/\{ path: '\/[a-z0-9-]*', label:/g) || []).length;
+  check(navItems >= 13,
+    '⑥ 抽屉仍承载全部 13 个页面入口（底部导航只有 6 项，其余只能靠它）', `NAV_ITEMS=${navItems}`);
+}
+
 console.log('');
 console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
 if (fail) {

@@ -89,6 +89,19 @@
 
 诊断回显：`reportPlayback` 只在**首次起播**写 `lastPlaybackReport`（`use-tts.ts:210-223`），降级标记 `fellBack: engineIdx > 0`，设置页每秒轮询读取（`TTSSettings.tsx:92-93`）；主动自检按钮 `probeTtsEngines()`（`use-tts.ts:988-1045`）依次探 native(2.5s 看门狗)/cloud(8s)/edge/google 直连/浏览器语音。
 
+### 2.9 系统语音（Android 原生插件）的插件边界
+
+| 契约 | 位置 | 破坏后果 |
+|---|---|---|
+| **Capacitor 插件对象不许穿过 Promise 边界** | `native-tts.ts:51,53,67-77`（具名持有者 `INativeTtsHandle`） | 插件是 Proxy，`typeof plugin.then === 'function'`；`async` 函数直接 `return 插件` 会让 Promise 同化去调 `plugin.then(res, rej)` —— 这一句被当成一次真实原生调用发给 Android，而原生没有 `then` 方法，于是 **res/rej 永不调用 → 永久 pending**。它**不是抛错**：外层 `try/catch` 兜不住（同化发生在 try 块之外），还缓存在模块级 `pluginPromise`（`:53`）里拖死整个会话 |
+| 取语音列表必须有界 | `native-tts.ts:81-92`（`VOICE_LIST_TIMEOUT_MS = 4000` + `withTimeout`） | 原生不响应时设置页永远停在「读取中…」 |
+| 自检第一步必须带超时 | `use-tts.ts:1009-1013` | 「自检中…」永不返回。云端那步早就有 8s 超时（`:1037-1038` 注释写着「必须带超时」），native 这步漏了同一条口径 |
+| 6 个调用点全部解构持有者 | `native-tts.ts:89,156,163` + `use-tts.ts:358,556,915` | 漏一处就是那条链静默失效（speak / stop / 试听 / 去安装 / 音色列表各一处） |
+
+真机 2.0.45 实测（2026-10-05，USB/CDP）：朗读设置里「系统语音引擎」永远「读取中…」、点「朗读自检」永远「自检中…」、每调用一次多一条未捕获的 `"TextToSpeech.then()" is not implemented on android`。**原生侧本身是好的** —— 直连 `getSupportedVoices()` 返回 4 条语音、其中 1 条本地英语（`voiceURI:"en"`），所以修完就能出声。**只有 APK 会中**：网页/桌面没有原生 Proxy，`isPluginAvailable` 那条分支也走不到。
+
+守卫：`node scripts/verify-native-tts.mjs`（21 条，替身真跑）。替身逐条复刻 Capacitor 代理的三个行为：任意字符串属性取到函数（所以 `then` 也是函数）、已实现方法正常 resolve、未知方法**另开一个会 reject 的 Promise 且绝不调用传进来的回调**（正是第三条让同化永远等不到结果）。A 段先自证"旧写法确实永久挂死 + 留下一条未捕获拒绝"，C 段让替身装死证明超时是真的而不是恰好快；守卫自带 45s 看门狗，实现被改坏时**快速变红而不是卡住** `verify:all`。
+
 ## 3. 注意事项
 
 1. **切片上限 180 不能改大**。改成 200 以上，整条云端链路会失败并**静默**降级到更差的引擎，看起来"能读"但音质/延迟都变了。守卫会红：`node scripts/verify-tts-progress.mjs`。
@@ -101,5 +114,6 @@
 8. **`assetManager` 必须传 null**（`java:341-347`）：否则 filesDir 的绝对路径会被当成 assets 名解析，原生直接崩。
 9. **模型常驻不释放、失败过的模型不再重试**（`java:298-311`）—— 想重试要重启 App，不是再点一次。
 10. **`/api/tts-voices` 只有桌面版有**（`server/local-server.mjs:671`，Cloudflare 侧无此函数）。前端因此用 `platformTag() === 'desktop'` 限定（`TTSSettings.tsx:143-157`）。去掉这个判断的后果：网页每次路由切换一个 404，APK 里因为 `index.html` 的 `/api/` 重写会真的发一次网络请求。守卫：`verify-tts-hardening.mjs:132-145`。
+11. **降级链里任何一环"永不 settle"都会吃掉整条链**，而且比"失败"更糟 —— 失败会降级，挂住不会。具体形状：内置引擎被闪退护栏停用时候选是 `['native','cf','edge','google']`（`use-tts.ts:446`），native 那环一旦挂住，后面的云端永远轮不到；而 2.5s 看门狗写在 `.then` 回调**内部**（`:588-596`），`.then` 不执行时它根本没起 —— 于是"闪退自愈"反而把朗读彻底弄死。所以：native 分支 `.then` 之前的每个 await（含 `getNativeTts()`、`pickPreferredEnglishVoice()`）都必须自带超时，这条就是 §2.9 那两处超时的由来。改这里跑 `verify-native-tts`。
 11. **APK 的 `/api/*` 重写只覆盖 `fetch`**（`index.html:25-35`）。音频/图片类 URL 得自己读 `window.__API_BASE__` 拼接（`use-tts.ts:232-238` 的 `cfTtsUrl` 就是这么做的）—— 新增任何非 fetch 的资源加载都要照做，否则 APK 里 404。
 12. **改完必跑**：`npm run check:tts-voices`（音色/模型）、`node scripts/verify-tts-progress.mjs`（切片+阅读器反查表，实测 6175 断言）、`node scripts/verify-tts-hardening.mjs`（降级/在途去重/桌面限定，实测 15 项；**注意它没有 npm script，只能裸跑**）。

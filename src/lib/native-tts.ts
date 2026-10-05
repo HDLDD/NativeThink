@@ -47,28 +47,49 @@ export function isAndroidNative(): boolean {
   try { return isNativePlatform() && Capacitor.getPlatform?.() === 'android'; } catch { return false; }
 }
 
-let pluginPromise: Promise<any | null> | null = null;
+/** 插件句柄的载体（见 getNativeTts 的注释：插件对象不许直接穿过 Promise 边界） */
+export interface INativeTtsHandle { plugin: any | null }
 
-/** 取原生 TTS 插件实例（不可用返回 null；结果缓存） */
-export function getNativeTts(): Promise<any | null> {
+let pluginPromise: Promise<INativeTtsHandle> | null = null;
+
+/**
+ * 取原生 TTS 插件实例（不可用返回 { plugin: null }；结果缓存）。
+ *
+ * **返回值必须装在持有者对象里，不许直接 return 插件本身。**
+ * Capacitor 的插件是 Proxy，`typeof plugin.then === 'function'`；一旦它作为 async
+ * 函数的返回值穿过 Promise 边界，同化流程会调用 `plugin.then(resolve, reject)` ——
+ * 这一句被当成一次真实的原生方法调用发给 Android，而原生没有 `then` 方法，
+ * 于是 resolve/reject 永远不会被调用：这个 Promise **永久挂死**（不是抛错，
+ * 外层 try/catch 也兜不住，因为同化发生在 try 块之外），并且被缓存在
+ * `pluginPromise` 里拖垮整个会话 —— 真机 2.0.45 实测就是朗读自检永远停在「自检中…」、
+ * 系统语音列表永远「读取中…」。
+ */
+export function getNativeTts(): Promise<INativeTtsHandle> {
   if (!pluginPromise) {
     pluginPromise = (async () => {
       try {
-        if (!Capacitor.isPluginAvailable?.('TextToSpeech')) return null;
+        if (!Capacitor.isPluginAvailable?.('TextToSpeech')) return { plugin: null };
         const mod = await import('@capacitor-community/text-to-speech');
-        return (mod as any).TextToSpeech ?? null;
-      } catch { return null; }
+        return { plugin: (mod as any).TextToSpeech ?? null };
+      } catch { return { plugin: null }; }
     })();
   }
   return pluginPromise;
 }
 
+/** 原生调用超时上限：语音列表挂住时界面不能跟着永久挂住 */
+const VOICE_LIST_TIMEOUT_MS = 4000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fallback), ms))]);
+}
+
 /** 列出系统语音引擎的语音（Android 上这是唯一可用的语音来源） */
 export async function listNativeVoices(): Promise<INativeVoice[]> {
-  const plugin = await getNativeTts();
+  const { plugin } = await getNativeTts();
   if (!plugin?.getSupportedVoices) return [];
   try {
-    const res = await plugin.getSupportedVoices();
+    const res = await withTimeout(plugin.getSupportedVoices(), VOICE_LIST_TIMEOUT_MS, null);
     const raw: any[] = Array.isArray(res?.voices) ? res.voices : [];
     return raw.map((v, i) => ({
       index: i,
@@ -132,14 +153,14 @@ export function pickPreferredEnglishVoice(): Promise<INativeVoice | null> {
 
 /** 打开系统 TTS 安装/设置页（缺语音包时引导用户安装） */
 export async function openNativeTtsInstall(): Promise<boolean> {
-  const plugin = await getNativeTts();
+  const { plugin } = await getNativeTts();
   if (!plugin?.openInstall) return false;
   try { await plugin.openInstall(); return true; } catch { return false; }
 }
 
 /** 用原生引擎试听某个语音 */
 export async function previewNativeVoice(index: number | null, rate: number, volume: number): Promise<void> {
-  const plugin = await getNativeTts();
+  const { plugin } = await getNativeTts();
   if (!plugin?.speak) return;
   try {
     await plugin.stop?.();
