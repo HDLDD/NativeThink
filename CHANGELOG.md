@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-10-05
+- feat(security): /api/ai/chat 防滥用守卫（guard.js）—— Origin 白名单(nativethink.pages.dev/localhost/Capacitor/Electron 本地，第三方网页无法再白嫖中继)、CF-Connecting-IP 分钟窗限流(30/min)、messages 形状+条数+总长校验；出厂 Key 用量监控：服务端 Key 调用记内存计数+结构化日志(CF Real-time Logs 可查)，GET /api/ai/chat 返回当日快照 (`079c6cc`)
 - fix(hardening): 三方向体检修复 —— ①脚本硬编码 AI Key 改读 gitignored .apikey(旧 Key 已进 git 历史需平台作废轮换)；②桌面本地 server 撤全量 CORS*(同源无需)且不再明文回吐 B 站 SESSDATA(改 hasSessdata 布尔)；③local-server ROUTES 补齐 gutenberg/bilibili×3(桌面端导入书全文兜底 404 静默降级)；④ensure-web-build 源码新鲜度白名单补 index.html/vite.config/public(改这些后不再打出旧产物包)；⑤vite 版本兜底改抛错(版本链断裂宁可拦构建)；⑥TTS Blob URL 用完即 revoke+Cache API FIFO 400 上限(长会话内存/配额泄漏)；⑦搭配页滚动写盘 400ms debounce；⑧SpeakBack 录音卸载兜底+AudioContext finally 释放 (`e78b7cf`)
 - fix(vocabulary): 只有生词本时复习检测不再空队列（角标谎报"能复习"） (`f772dad`)
 - fix(brand): index.html 清掉模板遗留的字节 CDN favicon 外链 + 守卫扩 icon 零外链契约（22→26 断言） (`b4b9712`)
