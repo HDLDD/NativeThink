@@ -1,4 +1,5 @@
 import { withCors, preflight, isPreflight } from '../../_lib/cors.js';
+import { checkOrigin, checkRate, trackFactoryUsage, usageSnapshot, validateMessages } from '../../_lib/guard.js';
 /**
  * POST /api/ai/chat — AI chat proxy (streaming)
  *
@@ -54,8 +55,23 @@ const GLM_FREE_CHAIN = [
 async function handler(context) {
   const { request, env } = context;
 
+  if (request.method === 'GET') {
+    // 用量快照（仅计数，无敏感数据）—— 出厂 Key 用量监控的查看入口
+    return Response.json({ usage: usageSnapshot() });
+  }
+
   if (request.method !== 'POST') {
     return Response.json({ error: 'Method not allowed' }, { status: 405 });
+  }
+
+  // Origin 白名单：拦截第三方网页把我们当免费 AI 中继（伪造 Origin 只能来自非浏览器，由 IP 限流兜底）
+  const originCheck = checkOrigin(request);
+  if (!originCheck.ok) {
+    return Response.json({ error: 'Origin not allowed' }, { status: 403 });
+  }
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  if (!checkRate(ip).ok) {
+    return Response.json({ error: 'Too many requests, slow down' }, { status: 429 });
   }
 
   let body;
@@ -67,8 +83,8 @@ async function handler(context) {
 
   const { provider = 'deepseek', model, messages, max_tokens = 4096, temperature = 0.7, stream = true, apiKey: clientApiKey, thinking, task } = body;
 
-  if (!messages || !Array.isArray(messages) || messages.length === 0) {
-    return Response.json({ error: 'Messages array is required' }, { status: 400 });
+  if (!validateMessages(messages)) {
+    return Response.json({ error: 'Messages array is required (max 80 entries, string role/content, <=64k chars total)' }, { status: 400 });
   }
 
   // Get API key: prefer client-sent key, fallback to server env (AI_KEY_<PROVIDER> or SERVER_AI_KEY)
@@ -76,7 +92,11 @@ async function handler(context) {
   const apiKey = clientApiKey || env[envKey] || env.SERVER_AI_KEY;
 
   if (!apiKey) {
-    return Response.json({ error: `Server AI key not configured for ${provider}` }, { status: 503 });
+    return Response.json({ error: 'Server AI key not configured for ' + provider }, { status: 503 });
+  }
+  if (!clientApiKey) {
+    // 用的是服务端出厂 Key —— 记用量（监控入口：GET /api/ai/chat）
+    trackFactoryUsage(request, provider, model || "default");
   }
 
   const endpoint = PROVIDER_ENDPOINTS[provider];

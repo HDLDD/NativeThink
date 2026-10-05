@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-10-05
+- fix(hardening): 三方向体检修复 —— ①脚本硬编码 AI Key 改读 gitignored .apikey(旧 Key 已进 git 历史需平台作废轮换)；②桌面本地 server 撤全量 CORS*(同源无需)且不再明文回吐 B 站 SESSDATA(改 hasSessdata 布尔)；③local-server ROUTES 补齐 gutenberg/bilibili×3(桌面端导入书全文兜底 404 静默降级)；④ensure-web-build 源码新鲜度白名单补 index.html/vite.config/public(改这些后不再打出旧产物包)；⑤vite 版本兜底改抛错(版本链断裂宁可拦构建)；⑥TTS Blob URL 用完即 revoke+Cache API FIFO 400 上限(长会话内存/配额泄漏)；⑦搭配页滚动写盘 400ms debounce；⑧SpeakBack 录音卸载兜底+AudioContext finally 释放 (`e78b7cf`)
 - fix(vocabulary): 只有生词本时复习检测不再空队列（角标谎报"能复习"） (`f772dad`)
 - fix(brand): index.html 清掉模板遗留的字节 CDN favicon 外链 + 守卫扩 icon 零外链契约（22→26 断言） (`b4b9712`)
 - fix(cloud-sync): 下行订阅者收全（7→13）+ 修三处被模块缓存挡住的无效重读 (`693d000`)
