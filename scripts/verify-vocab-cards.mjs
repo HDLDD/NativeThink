@@ -237,6 +237,24 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(!/词库未收录 "\$\{word\}"，无法加入学习/.test(reader), '不再出现"词库未收录 → 无法加入"的断头路文案');
   check(/customList\.map\(toWordEntry\)/.test(fc), '复习队列纳入生词本词条');
   check(/setShowCustom\(true\)/.test(fc) && /removeCustom\(w\.word\)/.test(fc), '生词本有管理入口与移除操作');
+  /**
+   * 【2026-10-05 修复钉住】只有生词本的账号（新装 / 换设备还没同步 / 把 AI 词表灌进生词本）
+   * 曾被空队列判据挡掉：dueWords 与 otherWords 都用只查词库的 findWord() 解析，词库未收录的
+   * 生词本词两支都进不去 → 队列空，而入口角标按进度算，照样显示「N 个到期」。
+   * 用户视角就是"点了没反应"。下面四条钉住修好的顺序、判据、补量与屏蔽承诺。
+   */
+  const ixCustom = fc.indexOf('const customEntries = customList.map(toWordEntry)');
+  const ixEmpty = fc.indexOf('dueWords.length === 0 && otherWords.length === 0');
+  check(ixCustom > -1 && ixEmpty > -1 && ixCustom < ixEmpty,
+    '生词本词条在「空队列判据」之前算出（顺序反了纯生词本账号就永远出不了卡）', `ixCustom=${ixCustom} ixEmpty=${ixEmpty}`);
+  check(/dueWords\.length === 0 && otherWords\.length === 0 && customEntries\.length === 0/.test(fc),
+    '空队列判据含第三个条件 customEntries');
+  check(!/if \(dueWords\.length === 0 && otherWords\.length === 0\) \{/.test(fc),
+    '旧判据（只看两支词库解析结果）必须消失 —— 反向正对照，防退回旧逻辑');
+  check(/20 - cappedDue\.length - otherWords\.length - customEntries\.length/.test(fc),
+    '补量扣掉生词本词数（会话仍是"补到 20 张"，不会在 20 之外再加一层）');
+  check(/const customEntries = customList\.map\(toWordEntry\)\.filter\(\(w\) => \{[\s\S]{0,240}!prog\.suspended/.test(fc),
+    '被「不再出现」屏蔽的生词本词也不进队列（与上面 otherWords 的屏蔽承诺一致）');
 }
 
 // ── ⑨ 助记 / 连击 / 断点续学 / 周报 / 入口角标 ──

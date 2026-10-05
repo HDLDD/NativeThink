@@ -138,16 +138,25 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
         if (w) { seen.add(key); otherWords.push(w); }
       }
     }
+    // 生词本的词优先排进来（它们来自用户真实阅读，意愿最强）。
+    // **必须算在下面那个空队列判据之前**：上面两支都用只查词库的 `findWord()` 解析，
+    // 生词本的词（词库未收录）解析不到，若留在后面，"只有生词本"的账号 —— 新装、换设备
+    // 还没同步、或把 AI 词表灌进生词本 —— 会被判成"没词可复习"，而入口角标仍显示
+    // 「N 个到期」，用户看到的就是"点了没反应"（2026-10-05 本机复现）。
+    // 屏蔽（不再出现）的词这里也必须跳过，与上面 otherWords 的承诺保持一致。
+    const customEntries = customList.map(toWordEntry).filter((w) => {
+      const key = w.word.toLowerCase();
+      const prog = state.progress[key];
+      return !seen.has(key) && prog && !prog.suspended;
+    });
     // Only add new words if there are no due or learning words
     // This prevents random word switching when user hasn't learned anything yet
-    if (dueWords.length === 0 && otherWords.length === 0) {
+    if (dueWords.length === 0 && otherWords.length === 0 && customEntries.length === 0) {
       return []; // Return empty queue - show "no words to review" message
     }
-    // Otherwise, fill with new words to reach 20 cards
-    const fillCount = Math.max(0, 20 - cappedDue.length - otherWords.length);
-    // 生词本的词优先排进来（它们来自用户真实阅读，意愿最强）
-    const customEntries = customList.map(toWordEntry).filter((w) => !seen.has(w.word.toLowerCase()) && state.progress[w.word.toLowerCase()]);
+    // Otherwise, fill with new words to reach 20 cards（生词本的词也算在这 20 张里）
     customEntries.forEach((w) => seen.add(w.word.toLowerCase()));
+    const fillCount = Math.max(0, 20 - cappedDue.length - otherWords.length - customEntries.length);
     const newWords = fillCount > 0 ? getNewWords(fillCount).filter((w) => !seen.has(w.word.toLowerCase())) : [];
     return [...customEntries, ...cappedDue, ...otherWords, ...newWords];
   }, [wrongDrill, wrongEntries, dueForReview, state.progress, getNewWords, customList]);

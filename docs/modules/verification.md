@@ -18,7 +18,7 @@
 | `verify-wordbank-loading.mjs` | 45 | 加载层集成：显示数 = 出卡池子、九本不互抢、IDB 失败才兜底 localStorage | 改词库或加载层 |
 | `verify-wordbank-split.mjs` | 数据全量比对 | 拆分校验：`--baseline` 采基线（**拆分前后都能采**）、`--check` 逐项断言 | 改词库拆分 |
 | `verify-books-meta.mjs` | 227 | ①–④ 生成器与数据不漂移；⑤ books/book-clean/books-meta 拆分（**实际加载两个模块交叉核对**）；⑥ HelpGuide 文案 vs `meta.ts`/`ai-config.ts` | 改书单、scp、reader-highlight |
-| `verify-vocab-cards.mjs` | 310 | 背单词卡片交互契约 + 手势决策表 + 换卡节奏（数值锁）+ 答错重排延后 + 静默契约 + 换书路径 + 预载门 + HelpGuide 内容 + 单词字号三档（FitWord 不许复活） | 改 FlashcardMode/QuickCardMode/vocab-* |
+| `verify-vocab-cards.mjs` | 315 | 背单词卡片交互契约 + 手势决策表 + 换卡节奏（数值锁）+ 答错重排延后 + 静默契约 + 换书路径 + 预载门 + HelpGuide 内容 + 单词字号三档（FitWord 不许复活）+ **生词本入队：声明顺序 / 空队列判据三条件 / 旧判据不许回来 / 补量扣减 / 屏蔽跳过** | 改 FlashcardMode/QuickCardMode/vocab-* |
 | `verify-vocab-caches.mjs` | 85 | 缓存与存储写入基建：`cappedPut`/`mergeCollocAiCache`/`appendCapped`/`trimOldest` 纯函数**真跑** + **注入 localStorage 替身真跑 safe-storage/capped-cache**（配额满时 `setItem`/`persistJson` 返回 false、`warnStorageFull` 60s 只提示一次）+ 九个不可重算清单的接线与派生缓存的上限数值；⑥ `trimOldest` 滚动窗口双封顶（写作历史 50 条/256KB、跟读完成标记 2000 条/64KB）契约 + 两个调用点接线 | 改缓存基建接线 / 改任何 `persistJson`·`cappedPut`·`trimOldest` 调用点 |
 | `verify-tts-progress.mjs` | 6175 | 「读到哪」反查表恒等式：各段词数之和 === 各切片词数之和（书目 22 / 页 419 / 切片 3785 + 5 项脚手架自检） | 改 TTS 切片上限或阅读器朗读逻辑 |
 | `verify-tts-hardening.mjs` | 15 | A 原生静态（无 `new Thread().start()`、有界线程池 + 队列上限）4 项；B 真实模块在途去重 6 项；C 桌面限定 5 项 | 改降级链路或预合成 |
@@ -112,6 +112,8 @@ npm run verify:all        # scripts/verify-all.mjs：typecheck + 全部 verify-*
 2026-10-05 第 5 测（云同步下行订阅收尾，ROADMAP #10 末项）：verify-cloud-sync-hygiene 43 → **70**（订阅者 7 → 13 逐个点名；④b 三个模块级缓存库"先作废再重读"静态 + SM-2/语块/拼写回声判据；⑤ 把 `custom-words` / `word-notes` / `quickcard-history` 转译编译后在 Node 真跑：本地写 → 走 `safeStorage`（下行落地同一条通道）模拟云端改存储 → **正对照**不作废缓存时读到旧内存 → 作废后读到新值）。4 组变异、10 条红点全部命中：回退裸 `read()` 红 1、三处 invalidate 置空红 6（3 静态 + 3 行为）、删掉一个订阅红 1、拆拼写两处回声守卫红 2（首轮因变异脚本给 CRLF 文件用 `\n` 搜索未生效，复做并先自证替换落地后才认数）。typecheck + 21 条守卫全绿（verify-wordbank-split 跳过），**断言合计 7,323 条**（= 7,296 + 27。tts-progress 6,175；其余 19 条：45+227+310+85+15+16+11+28+10+18+27+70+16+24+10+104+74+36+22 = 1,148）。
 
 2026-10-05 第 6 测（favicon 外链清理）：`index.html` 原挂着模板遗留的 `lf3-static.bytednsdoc.com` shortcut icon（`rel="shortcut icon"`，声明在本地 `/favicon.svg` 之后）。**先判别实验再下结论**（本机 Chromium，A/B/C/D 四组并列 icon 测试页，逐组独立 URL + `no-store` 防 favicon 缓存）：A 组（= 原 index.html 形态：typed 本地在前、untyped 外链在后）抓的是本地——外链 URL 从未被请求；B 组换序后仍抓带 `type` 的那个；C/D 组同为无 type / 同为 typed 时取**先**声明者。即：带 `type` 的 SVG 优先、同型取先声明者，原形态下该外链是**惰性残留**（此前"取后声明者、图标被遮"的写法未经验证，已按实测更正）；但取舍规则是实现细节（老浏览器可能选中它），属真实外部依赖。删除外链；verify-brand-fonts 22 → **26**（A 段 +2：icon 链接零 http 外链 + 本地 `/favicon.svg` 链接在位且文件存在；C 段 +2：产物 index/404 同扫）。4 组变异 5 条红点全部命中：复加外链红 1、删本地链接红 1、挪走 `favicon.svg` 红 1、往 dist 注入外链红 2；还原后终验绿。typecheck + 21 条守卫全绿（verify-wordbank-split 跳过），**断言合计 7,327 条**（= 7,323 + 4。tts-progress 6,175；其余 19 条：45+227+310+85+15+16+11+28+10+18+27+70+16+24+10+104+74+36+26 = 1,152）。
+
+2026-10-05 第 7 测（生词本空队列修复）：`verify-vocab-cards` 310 → **315**（⑧ 加 5 条：`customEntries` 声明必须早于空队列判据、判据含第三条件、**旧判据必须消失**（反向正对照）、`fillCount` 扣掉生词本词数、被「不再出现」屏蔽的生词本词不进队列）。4 组变异 5 条红点全部命中（顺序退回红 1、判据退回两项红 2、补量不扣红 1、不跳屏蔽红 1）；FlashcardMode.tsx 是 **CRLF**，变异用不含换行的字符串替换并先自证落地。行为对照（本机独立 profile、`serve.cjs` 跑产物）：零词库进度灌 3 个生词本词 → 修复前点复习检测是空态而角标显示「3 个到期」，修复后**首张卡就是 `goblemuch`**。typecheck + 21 条守卫全绿（verify-wordbank-split 跳过），**断言合计 7,332 条**（= 7,327 + 5。tts-progress 6,175；其余 19 条：45+227+315+85+15+16+11+28+10+18+27+70+16+24+10+104+74+36+26 = 1,157）。
 
 ## 6. 静态检查的已知弱度
 
