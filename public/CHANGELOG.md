@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-10-05
+- fix(vocabulary): 只有生词本时复习检测不再空队列（角标谎报"能复习"） (`f772dad`)
 - fix(brand): index.html 清掉模板遗留的字节 CDN favicon 外链 + 守卫扩 icon 零外链契约（22→26 断言） (`b4b9712`)
 - fix(cloud-sync): 下行订阅者收全（7→13）+ 修三处被模块缓存挡住的无效重读 (`693d000`)
 - feat(brand): 品牌字体自托管 —— 去掉 fonts.googleapis 外链，latin 子集进 public/fonts（ROADMAP #7） (`eea2333`)
