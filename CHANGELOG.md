@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-10-05
+- fix(tts+nav): 真机 USB/CDP 走查出的两个 APK 缺陷 (`2921472`)
 - chore(release): bump android 版本号到 90 / 2.0.45（含生词本修复的包已 USB 装机 + CDP 真机验证） (`6938711`)
 - docs(modules): 补记 e78b7cf / 079c6cc 的行为到模块文档（六处，逐条回源带行号） (`4ec2d02`)
 - feat(security): /api/ai/chat 防滥用守卫（guard.js）—— Origin 白名单(nativethink.pages.dev/localhost/Capacitor/Electron 本地，第三方网页无法再白嫖中继)、CF-Connecting-IP 分钟窗限流(30/min)、messages 形状+条数+总长校验；出厂 Key 用量监控：服务端 Key 调用记内存计数+结构化日志(CF Real-time Logs 可查)，GET /api/ai/chat 返回当日快照 (`079c6cc`)
