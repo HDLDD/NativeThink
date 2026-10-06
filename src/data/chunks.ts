@@ -1,4 +1,6 @@
 // EXPORTS: IChunk, MOCK_CHUNKS
+import { CHUNKS_EXTRA } from './chunks-extra';
+
 export interface IChunk {
   id: string; content: string; meaning: string;
   category: "daily" | "workplace" | "social" | "emotion" | "travel" | "study" | "tech" | "food" | "health" | "shopping" | "sports";
@@ -10,7 +12,8 @@ export interface IChunk {
   difficulty: "beginner" | "intermediate" | "advanced";
 }
 
-export const MOCK_CHUNKS: IChunk[] = [
+/** 主库（c1-c748）+ 扩容（chunks-extra.ts，cx*，补齐 7 个空分类）—— 合并后统一导出 */
+const MOCK_CHUNKS_BASE: IChunk[] = [
   { id:`c1`,content:`hit the hay`,meaning:`上床睡觉`,category:`daily`,usage:`非正式表示去睡觉`,example:`I'm exhausted, I'm gonna hit the hay.`,difficulty:`intermediate` },
   { id:`c2`,content:`piece of cake`,meaning:`小菜一碟`,category:`daily`,usage:`非常容易`,example:`The exam was a piece of cake.`,difficulty:`beginner` },
   { id:`c3`,content:`out of the blue`,meaning:`突然地`,category:`daily`,usage:`毫无征兆`,example:`He called me out of the blue after ten years.`,difficulty:`intermediate` },
@@ -760,3 +763,6 @@ export const MOCK_CHUNKS: IChunk[] = [
   { id:`c747`,content:`speak of the devil`,meaning:`说曹操曹操到`,category:`daily`,usage:`谈到某人就出现`,example:`Speak of the devil — we were just talking about you!`,difficulty:`intermediate` },
   { id:`c748`,content:`spitting image`,meaning:`长得一模一样`,category:`daily`,usage:`完全相像`,example:`She's the spitting image of her mother.`,difficulty:`intermediate` },
 ];
+
+// 合并扩容库（cx*，travel/study/tech/food/health/shopping/sports 等分类）
+export const MOCK_CHUNKS: IChunk[] = [...MOCK_CHUNKS_BASE, ...CHUNKS_EXTRA];

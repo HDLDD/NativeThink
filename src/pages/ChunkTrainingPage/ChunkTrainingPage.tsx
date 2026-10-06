@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Brain,
+  Layers,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -53,6 +54,7 @@ import { useStudyCredit, creditKey } from '@/lib/study-credit';
 import { usePhraseLearning } from '@/lib/use-phrase-learning';
 import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
 import { useStableShuffle } from '@/lib/use-stable-shuffle';
+import ChunkFlashcards from './components/ChunkFlashcards';
 import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { cn, cleanText, extractJson } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
@@ -1123,6 +1125,13 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
           >
             <BookOpen className="size-4 mr-2" />
             短语库
+          </TabsTrigger>
+          <TabsTrigger
+            value="flashcards"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-amber-600 data-[state=active]:shadow-sm"
+          >
+            <Layers className="size-4 mr-2" />
+            闪卡
           </TabsTrigger>
           <TabsTrigger
             value="review"
@@ -2496,6 +2505,11 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* 闪卡学习 */}
+        <TabsContent value="flashcards" className="mt-6">
+          <ChunkFlashcards allChunks={allChunks} />
         </TabsContent>
 
         {/* 短语复习 */}
