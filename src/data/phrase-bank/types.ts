@@ -8,6 +8,10 @@ export interface IPhraseEntry {
   sourceWord: string;
   /** 来源单词的中文释义主干 */
   meaning: string;
+  /** 预翻译例句（英文）—— 从词书例句中匹配，覆盖约 80% 条目 */
+  exampleEn?: string;
+  /** 预翻译例句（中文） */
+  exampleZh?: string;
 }
 
 export type PhraseLevel = 'zhongkao' | 'gaokao' | 'cet4' | 'cet6' | 'ielts' | 'toefl' | 'postgraduate' | 'professional' | 'advanced';
