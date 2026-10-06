@@ -296,7 +296,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 315 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 37** · overlay-fit **35** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · rv-articles 104 · study-credit 74 · chain-verdict 36；合计 **7,376**，2026-10-06 第 10 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 315 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 37** · overlay-fit **38** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · rv-articles 104 · study-credit 74 · chain-verdict 36；合计 **7,379**，2026-10-06 第 10 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`

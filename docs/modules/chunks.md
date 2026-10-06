@@ -16,9 +16,22 @@
 
 ## 2. 数据
 
-`MOCK_CHUNKS` 实测 **748 条**（`^  { id:` 计数）。由 `scripts/gen-chunks.mjs:124` 与 `scripts/gen-data.mjs:807` **整体 `writeFileSync` 重写**（仓库里还留着 `chunks.ts.bak`）→ **重跑生成脚本会覆盖手改**。
+**基库 `MOCK_CHUNKS_BASE` 748 条**（`chunks.ts` 的 `^  { id:\`c` 计数）+ **扩容库 `CHUNKS_EXTRA` 215 条**（`chunks-extra.ts`，id 前缀 `cx`）= **导出 `MOCK_CHUNKS` 963 条**（`chunks.ts:768` 合并）。
+
+⚠️ **手改要写进 `chunks-extra.ts`**：`chunks.ts` 的主库由 `scripts/gen-chunks.mjs:124` 与 `scripts/gen-data.mjs:807` **整体 `writeFileSync` 重写** → 重跑生成脚本会覆盖手改。扩容库是独立文件、生成脚本不碰，所以**新增语块一律加到 `chunks-extra.ts`**（旧的 `chunks.ts.bak` 已删，2026-10-06）。
+
+扩容起因（2026-10-06）：11 个分类里 **travel / study / tech / food / health / shopping / sports 七个分类一条都没有** —— 筛选器摆着却筛出空列表。此次按分类补齐真实条目（非占位假数据），并程序化与主库去重。当前分布：
+`daily 471 · workplace 173 · social 79 · emotion 64 · travel 37 · tech 26 · food 25 · health 25 · study 24 · shopping 20 · sports 19`。
+
+写 `chunks-extra.ts` 的硬约束：**字符串一律用反引号** —— 条目文本含撇号（`let's` / `I'm`），单引号会直接破坏语法（本轮踩过两次，`tsc` 报一堆 TS1005）。
 
 合并池 `allChunks`（`:257`）= 内置 + `__nativethink_custom_chunks`。SRS 走 `src/lib/use-phrase-learning.ts`（键 `__nativethink_phrase_learning`、`__nativethink_phrase_daily_quota`，`:6-7`）。
+
+### 2.1 闪卡 tab（2026-10-06 新增）
+
+`components/ChunkFlashcards.tsx`，与词汇模块 `QuickCardMode` 同构：正面只显示语块/短语 → 点卡片翻面看释义+例句 → `认识 / 模糊 / 不认识` 三档（SM-2 quality 5/3/1，写进 `use-phrase-learning`，与「短语复习」tab 共享进度）。含：分类筛选、每轮数量、答错隔 4 张重排（上限 2 次，同 `vocab-session` 参数）、自动发音（共用键 `__nativethink_vocab_autospeak`）、断点续学（`__nativethink_chunk_card_session`）、键盘（空格/1/2/→/Backspace/Esc）。
+
+⚠️ **挂载点必须包 `<LazyFramerProvider>`**（`:2510`）——组件调 `useFramerMotion()`，缺 Provider 会直接 `throw`，ErrorBoundary 把**整个语块页**换成「页面出错」，而 library tab 正常 → 表现成"切到某 tab 就白屏"。typecheck / lint 都看不见，守卫在 `verify-overlay-fit.mjs` ⑦（3 条断言，含正对照）。
 
 ## 3. AI 调用点：9 处（8 `aiChat` + 1 `aiStream`），判空前置已全部补齐
 

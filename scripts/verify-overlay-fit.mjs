@@ -175,6 +175,54 @@ function classNameOf(src, tagRe, label) {
     '⑥ 抽屉仍承载全部 13 个页面入口（底部导航只有 6 项，其余只能靠它）', `NAV_ITEMS=${navItems}`);
 }
 
+// ── ⑦ useFramerMotion 必须有 LazyFramerProvider 祖先（缺了会抛错让整页崩） ──
+{
+  /**
+   * 2026-10 真实事故：新增的 ChunkFlashcards 调 useFramerMotion()，
+   * 但挂载它的 ChunkTrainingPage 没有 Provider —— hook 直接 throw，
+   * ErrorBoundary 把整个语块页换成「页面出错」，而 library tab 却正常，
+   * 表现成"切到某个 tab 就白屏"。typecheck 与 lint 都看不见这种缺线。
+   */
+  const walk = (dir, out = []) => {
+    for (const ent of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${ent.name}`;
+      if (ent.isDirectory()) walk(rel, out);
+      else if (/\.tsx$/.test(ent.name)) out.push(rel);
+    }
+    return out;
+  };
+  const allTsx = walk('src');
+  const users = allTsx.filter((f) => /useFramerMotion\(\)/.test(readFileSync(join(ROOT, f), 'utf8')));
+  check(users.length >= 3, '⑦ 扫到使用 useFramerMotion 的组件（正对照的前提）', `扫到 ${users.length} 个`);
+
+  const orphans = [];
+  for (const f of users) {
+    const src = readFileSync(join(ROOT, f), 'utf8');
+    // 自身渲染了 Provider → 放行（只认 JSX 用法，光 import 不算）
+    if (/<LazyFramerProvider/.test(src)) continue;
+    const name = f.split('/').pop().replace(/\.tsx$/, '');
+    let wrapped = false;
+    for (const host of allTsx) {
+      if (host === f) continue;
+      const hostSrc = readFileSync(join(ROOT, host), 'utf8');
+      // 宿主必须渲染这个组件
+      if (!new RegExp(`<${name}[\\s/>]`).test(hostSrc)) continue;
+      // 宿主必须**真的用 JSX 渲染** Provider —— 只 import 不算（那是假绿：
+      // 2026-10 复核时正是 import 语句让这条断言空转）
+      if (/<LazyFramerProvider/.test(hostSrc)) { wrapped = true; break; }
+    }
+    if (!wrapped) orphans.push(f);
+  }
+  check(orphans.length === 0,
+    '⑦ 每个 useFramerMotion 组件都被 <LazyFramerProvider> 包住（漏了 → 那个页面/tab 直接崩）',
+    orphans.join(', '));
+
+  // 正对照：hook 确实在缺 Provider 时抛错（证明这条断言不是空转）
+  const framer = readFileSync(join(ROOT, 'src/lib/lazy-framer-motion.tsx'), 'utf8');
+  check(/if \(!ctx\) throw new Error\('useFramerMotion must be used within <LazyFramerProvider>'\)/.test(framer),
+    '⑦ 正对照：useFramerMotion 缺 Provider 时确实抛错（不是警告，是崩）');
+}
+
 console.log('');
 console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
 if (fail) {

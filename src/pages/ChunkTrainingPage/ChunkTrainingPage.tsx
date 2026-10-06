@@ -55,6 +55,7 @@ import { usePhraseLearning } from '@/lib/use-phrase-learning';
 import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
 import { useStableShuffle } from '@/lib/use-stable-shuffle';
 import ChunkFlashcards from './components/ChunkFlashcards';
+import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
 import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { cn, cleanText, extractJson } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
@@ -2509,7 +2510,10 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
 
         {/* 闪卡学习 */}
         <TabsContent value="flashcards" className="mt-6">
-          <ChunkFlashcards allChunks={allChunks} />
+          {/* useFramerMotion 必须在 Provider 内 —— 缺它会直接抛错让整页崩（2026-10 踩过） */}
+          <LazyFramerProvider>
+            <ChunkFlashcards allChunks={allChunks} />
+          </LazyFramerProvider>
         </TabsContent>
 
         {/* 短语复习 */}
