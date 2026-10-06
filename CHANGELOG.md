@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-10-07
+- fix(ai): 修智谱 1213「未正常接收到 prompt 参数」—— factory 和 glm 走同一智谱端点但 thinking 只对 glm 发送；空 content 消息透传给智谱触发 1213（过滤空消息 + 无有效消息时返回 400） (`2dc3c1b`)
 - build(apk): versionCode 97 / 2.0.52（含短语预翻译修复） (`73c4fa3`)
 - fix(phrases): 预翻译修复 —— 短语词书条目从词书例句中预匹配英文例句+中文翻译（覆盖约 93%），detail 面板/搜索/闪卡不再空翻译；生成脚本改用 JSON.stringify 避免反引号嵌套转义 bug；index.ts/types.ts 改为手写不被脚本覆盖 (`1153040`)
 - build(apk): versionCode 96 / 2.0.51（含短语词库 50k 搭配提取 + 语块库扩容 963 + 闪卡 tab） (`7e33651`)
