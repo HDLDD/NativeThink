@@ -1,5 +1,8 @@
 # NativeThink 开发日志
 
+## 2026-10-06
+- chore(release): bump android 版本号到 91 / 2.0.46（含系统语音挂死与抽屉不自动关两个修复，已 USB 装机 + CDP 真机复验） (`9f185b6`)
+
 ## 2026-10-05
 - fix(tts+nav): 真机 USB/CDP 走查出的两个 APK 缺陷 (`2921472`)
 - chore(release): bump android 版本号到 90 / 2.0.45（含生词本修复的包已 USB 装机 + CDP 真机验证） (`6938711`)
