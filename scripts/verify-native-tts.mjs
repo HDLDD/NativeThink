@@ -19,6 +19,10 @@
  *   C. 原生调用不响应时，listNativeVoices 由超时兜住（超时是真的，不是装饰）
  *   D. 静态契约：不许退回"直接 return 插件对象"，调用点必须解构持有者，自检那步必须带超时，
  *      且原生"出声证据"阈值必须单点常量（真机实测 speak 要 3160ms，旧的 2.5s 会误判好引擎）
+ *   E. hasEnglishVoice 真跑：引擎装死时必须有界返回 false，且**空列表不许钉死缓存**
+ *   F. B 方案契约（2026-10-06 实测后定的）：播放路径先问"引擎有没有英语音色"再决定要不要
+ *      猜沉默；看门狗预算随句长放大；每词耗时常数按实测 ≥380ms；起播证据两档都要报，
+ *      设置页不许把"整句念完"写成"起播"
  *
  * 用法: node scripts/verify-native-tts.mjs
  */
@@ -86,11 +90,11 @@ globalThis.__clearHang = (n) => { __hang[n] = false; };
 globalThis.__fakeTtsModule = async () => ({ TextToSpeech: fakePlugin });
 `;
 
-function buildModule() {
+function buildModule(name = 'native-tts-under-test') {
   let src = fs.readFileSync(path.join(ROOT, 'src/lib/native-tts.ts'), 'utf8');
   src = src.replace(/^import \{ Capacitor \} from '@capacitor\/core';$/m, '');
   src = src.replace(/await import\('@capacitor-community\/text-to-speech'\)/g, 'await globalThis.__fakeTtsModule()');
-  src += '\nexport { getNativeTts, listNativeVoices, listNativeEnglishVoices, pickPreferredEnglishVoice, nativeVoiceLabel };\n';
+  src += '\nexport { getNativeTts, listNativeVoices, listNativeEnglishVoices, pickPreferredEnglishVoice, hasEnglishVoice, nativeVoiceLabel };\n';
   // 脚手架自检：残留 import 会让"模块加载失败"被误判成产品缺陷
   const leftover = [...src.matchAll(/^import .*$/gm)].map((m) => m[0]);
   if (leftover.length) { console.error('脚手架错误：仍有未替换的 import ->\n' + leftover.join('\n')); process.exit(2); }
@@ -169,6 +173,26 @@ function buildModule() {
     backR.settled ? `len=${backR.value.length}` : '仍然挂死');
 }
 
+/* ───────────── E. hasEnglishVoice：播放路径"该不该快速降级"的依据 ─────────────
+ * 用**全新的模块实例**（带 cache-bust 的 URL）—— 上一个实例已经缓存过结果，测不出缓存语义。
+ */
+{
+  const fresh = pathToFileURL(buildModule('native-tts-fresh')).href;
+  const mod2 = await import(fresh);
+  globalThis.__setHang('getSupportedVoices');           // 先让引擎装死
+  const first = await withDeadline(mod2.hasEnglishVoice(), 9000);
+  ok(first.settled && first.value === false,
+    'E1 引擎装死时 hasEnglishVoice 由超时兜成 false（它若挂住，播放路径就永远等不到降级判断）',
+    first.settled ? String(first.value) : '仍然挂死');
+  globalThis.__clearHang('getSupportedVoices');
+  const second = await withDeadline(mod2.hasEnglishVoice(), 2000);
+  ok(second.settled && second.value === true,
+    'E2 空列表不缓存：引擎恢复后同一会话内就能改判 true（钉死一次会把长句重新推回被掐断的老路）',
+    second.settled ? String(second.value) : '仍然挂死');
+  const third = await mod2.hasEnglishVoice();
+  ok(third === true, 'E3 非空结果会被缓存复用（每次朗读都去问原生就是白等）', String(third));
+}
+
 /* ───────────────────────── D. 静态契约（防改回去） ───────────────────────── */
 {
   const src = fs.readFileSync(path.join(ROOT, 'src/lib/native-tts.ts'), 'utf8');
@@ -203,9 +227,36 @@ function buildModule() {
     'D11 阈值 ≥ 5000ms（真机 Redmi Turbo 3 实测 speak resolve 3160ms 且从不派发 onRangeStart）',
     m ? `${m[1]}ms` : '常量缺失');
   const watchdogs = (useTts.match(/NATIVE_AUDIO_EVIDENCE_MS\)/g) || []).length;
-  ok(watchdogs === 2, 'D12 播放看门狗与朗读自检两处都吃这个常量（漏一处就是自检与实播口径不一致）', `count=${watchdogs}`);
+  ok(watchdogs === 1,
+    'D12 裸常量只剩朗读自检那一处（播放看门狗必须改吃随句长放大的预算，见 D14）', `count=${watchdogs}`);
   ok(!/,\s*2500\)/.test(useTts),
     'D13 反向断言：native 那两处 2500 字面量不许回来（URL 引擎的 25000 是另一回事，不在此列）');
+
+  /* ── B 方案契约：先问引擎有没有英语音色，再决定要不要"猜沉默" ── */
+  ok(/const engineAlive = await hasEnglishVoice\(\);/.test(useTts),
+    'D14 播放路径真的去问了引擎有没有英语音色（有音色＝它是活的，不该再猜沉默）');
+  ok(/nativeSilenceBudgetMs\(expectedMs, engineAlive\)/.test(useTts),
+    'D15 看门狗预算改吃 nativeSilenceBudgetMs(句长, 引擎活否)，不再是固定秒数');
+  const speakAt = useTts.indexOf('plugin.speak({');
+  const aliveAt = useTts.indexOf('await hasEnglishVoice()');
+  ok(aliveAt > 0 && speakAt > 0 && aliveAt < speakAt,
+    'D16 顺序锁：能力探测必须在 speak 之前 —— 放后面就等于这一句已经被掐了才知道引擎是活的');
+  ok(/function nativeSilenceBudgetMs[\s\S]{0,220}Math\.max\(NATIVE_ALIVE_MIN_MS, expectedMs \* 2\)[\s\S]{0,80}NATIVE_AUDIO_EVIDENCE_MS/.test(useTts),
+    'D17 两档口径都在：活引擎按句长放大、没英语音色才用快速降级档');
+  const perWord = useTts.match(/wordCount \* (\d+)\)\s*\/\s*Math\.max/);
+  ok(perWord && Number(perWord[1]) >= 380,
+    'D18 每词耗时常数按实测 ≥380ms（真机四类文本实测 356~469ms/词，旧的 260 会把预算算小）',
+    perWord ? `${perWord[1]}ms/词` : '没抓到 expectedMs 公式');
+  ok(!/wordCount \* 260\)\s*\//.test(useTts),
+    'D19 反向断言：260ms/词 那个低估口径不许回来');
+  const nativeReports = (useTts.match(/reportPlayback\(\{ engine: 'native'/g) || []).length;
+  ok(nativeReports === 2 && /startEvidence: false/.test(useTts),
+    'D20 起播证据两档都在：onRangeStart 一处、整句念完补报一处（只有前者时，不派发该事件的引擎实测区永远空白）', `count=${nativeReports}`);
+  ok(/export function hasEnglishVoice/.test(src) && /englishVoicesPromise = null/.test(src),
+    'D21 hasEnglishVoice 导出且空列表会作废缓存（钉死一次＝长句又被掐）');
+  const ui = fs.readFileSync(path.join(ROOT, 'src/components/TTSSettings.tsx'), 'utf8');
+  ok(/startEvidence === false/.test(ui) && /整句念完/.test(ui),
+    'D22 设置页区分两种数字：没有起播证据时写「整句念完」，不许谎称「起播 Xms」');
 }
 
 /* ───────────────────────── 汇总 ───────────────────────── */

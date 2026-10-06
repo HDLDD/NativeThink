@@ -577,10 +577,17 @@ export default function TTSSettings() {
                     {lastReport.firstAudioMs > 400 && ' — 首次朗读含模型加载，之后会更快'}
                   </>
                 ) : lastReport.engine === 'native' ? (
-                  <>
-                    系统引擎（<span className="text-[#00B894]">离线，与网速无关</span>）· 起播 {lastReport.firstAudioMs}ms
-                    {lastReport.firstAudioMs > 600 && ' — 偏慢，多半是所选音色为网络音色'}
-                  </>
+                  lastReport.startEvidence === false ? (
+                    <>
+                      系统引擎（<span className="text-[#00B894]">离线，与网速无关</span>）· 整句念完 {lastReport.firstAudioMs}ms
+                      {' — 这台设备的引擎不回报「开始发声」时刻，上面是整句耗时，不是起播延迟'}
+                    </>
+                  ) : (
+                    <>
+                      系统引擎（<span className="text-[#00B894]">离线，与网速无关</span>）· 起播 {lastReport.firstAudioMs}ms
+                      {lastReport.firstAudioMs > 600 && ' — 偏慢，多半是所选音色为网络音色'}
+                    </>
+                  )
                 ) : (
                   <>
                     <span className="text-amber-600 dark:text-amber-400">

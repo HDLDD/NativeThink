@@ -134,6 +134,29 @@ export async function listNativeEnglishVoices(): Promise<INativeVoice[]> {
 
 let preferredVoicePromise: Promise<INativeVoice | null> | null = null;
 
+let englishVoicesPromise: Promise<boolean> | null = null;
+
+/**
+ * 引擎里到底有没有英语音色 —— 播放路径用它决定"该不该快速放弃原生"。
+ *
+ * 为什么需要它：真机实测系统引擎的 `speak()` 是**整句念完才 resolve**（约 380ms/词），
+ * 且不少引擎**从不派发 `onRangeStart`**。所以"几秒没出声证据就判死"这种固定秒数
+ * 必然掐断比它长的真实朗读；而缺英语语音包（原本要防的那种无声挂住）是可以直接问出来的。
+ *
+ * 空列表**不缓存** —— 它可能只是 4s 超时或引擎瞬时没答，钉死一整个会话会让长句又被掐。
+ */
+export function hasEnglishVoice(): Promise<boolean> {
+  if (englishVoicesPromise) return englishVoicesPromise;
+  englishVoicesPromise = listNativeEnglishVoices().then(
+    (list) => {
+      if (list.length === 0) englishVoicesPromise = null;
+      return list.length > 0;
+    },
+    () => { englishVoicesPromise = null; return false; },
+  );
+  return englishVoicesPromise;
+}
+
 /**
  * 挑一个「本地」英语音色 —— 结果缓存。
  *

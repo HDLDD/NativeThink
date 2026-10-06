@@ -14,7 +14,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
-import { getNativeTts as getNativeTtsPlugin, pickPreferredEnglishVoice, type INativeTtsHandle } from './native-tts';
+import { getNativeTts as getNativeTtsPlugin, pickPreferredEnglishVoice, hasEnglishVoice, type INativeTtsHandle } from './native-tts';
 import { isBundledEngineDisabled, isSherpaAvailable, sherpaInFlightCount, sherpaPrewarm, sherpaSpeak, warmSherpa } from './sherpa-tts';
 import { DEFAULT_LOCAL_VOICE_ID, findLocalVoice, isLocalVoiceId } from './tts-voice-catalog';
 import { edgeVoiceNameOf, googleLangOf, isEdgeCatalogVoice } from './tts-voice-catalog';
@@ -203,16 +203,24 @@ const IS_ANDROID_NATIVE = Capacitor.isNativePlatform?.() && Capacitor.getPlatfor
 const getNativeTts = getNativeTtsPlugin;
 
 /**
- * 给原生引擎「证明自己会出声」的时间上限 —— 播放降级看门狗与朗读自检**共用这一个数**。
+ * 原生引擎"沉默多久算死"的两档口径（2026-10-06 真机 Redmi Turbo 3 实测后重定）。
  *
- * 为什么是 5s（2026-10-06 真机 Redmi Turbo 3 实测）：这台机器的系统引擎 `speak()` 要
- * **3160ms 才 resolve**，而且**从不派发 `onRangeStart`** —— 2.5s 阈值正好卡在它身上：
- * 连着两轮朗读自检一次 1408ms ✓、一次 2516ms ✗，同一个引擎两种结论。更要命的是
- * 「只用系统引擎」时候选只有 `['native']`（`:443`），到点降级就没有下一个引擎了 →
- * **静默无声**，而引擎再过 0.6 秒就把那句念出来了。抬到 5s 的代价只是"真没装语音包"
- * 那种情况多等 2.5 秒；默认链里内置引擎排第一，正常用户碰不到这段。
+ * 实测：这台机器的系统引擎 `speak()` 是**整句念完才 resolve**，约 **380ms/词**
+ * （1 词 1361ms / 8 词 3752ms / 14 词 4986ms / 27 词 10317ms），
+ * 而且**从不派发 `onRangeStart`**。于是任何固定秒数的沉默看门狗都会掐断比它长的真实语音：
+ * 旧的 2.5s 约等于"只允许 6 个词"，抬到 5s 也只是推到 13 个词 —— 所以秒数不是重点，
+ * **先问引擎有没有英语音色**才是重点（有音色＝它是活的，不该再猜沉默）。
+ *
+ * - 拿不到英语音色 → 保持快速降级（`NATIVE_AUDIO_EVIDENCE_MS`），因为这时"无声挂住"才是主症状；
+ * - 有英语音色 → 只留一个**随句长放大**的兜底上限，防的是原生桥真挂死，不是防慢。
  */
 const NATIVE_AUDIO_EVIDENCE_MS = 5000;
+const NATIVE_ALIVE_MIN_MS = 12000;
+
+/** 看门狗预算：引擎自证活着时按预期朗读时长放大，否则用快速降级档 */
+function nativeSilenceBudgetMs(expectedMs: number, engineHasEnglishVoice: boolean): number {
+  return engineHasEnglishVoice ? Math.max(NATIVE_ALIVE_MIN_MS, expectedMs * 2) : NATIVE_AUDIO_EVIDENCE_MS;
+}
 
 /**
  * 上一次朗读的实测报告 —— 设置页直接回显，用来判断「慢」到底慢在哪一段：
@@ -225,6 +233,12 @@ export interface ITtsPlaybackReport {
   firstAudioMs: number;
   /** 是否降级来的（前一个引擎失败） */
   fellBack: boolean;
+  /**
+   * 这个数字是不是"起播时刻"。原生引擎里 `onRangeStart` 从未触发的那些只能给出
+   * **整句耗时**（speak 念完才 resolve），此时为 false —— 界面必须说清楚，
+   * 否则用户会把它读成"起播要 10 秒"。缺省 true（URL 类引擎的 onplay 就是起播）。
+   */
+  startEvidence?: boolean;
   at: number;
 }
 
@@ -578,12 +592,21 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
               voiceIdx = preferred ? preferred.index : null;
             }
             if (abortedRef.current) return;
+            // 引擎活不活问它自己有没有英语音色 —— 比"猜它沉默了几秒"可靠得多：
+            // 缺语音包时 speak() 会无声挂住（该快速降级），而引擎是好的时候 speak()
+            // 要等整句念完才 resolve（约 380ms/词），固定秒数一定会掐断真实朗读。
+            const engineAlive = await hasEnglishVoice();
+            if (abortedRef.current) return;
             stopAudio();
             nativeActiveRef.current = true;
             nativeReplayRef.current = () => playChunkWithFallback(chunks, idx, rate, 0);
             setIsSpeaking(true); setIsPaused(false);
 
             const text = chunks[idx];
+            // 预期朗读时长（按实测 ~380ms/词；旧的 260ms/词低估约 1.5 倍）——
+            // 既用于识别"瞬间返回但没出声"的假成功，也用于给看门狗算随句长放大的预算
+            const wordCount = countWords(text);
+            const expectedMs = Math.max(500, (wordCount * 400) / Math.max(0.5, rate));
             let settled = false;
             let spokeAtLeastOnce = false;
             let listenerHandle: any = null;
@@ -594,9 +617,8 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
               try { listenerHandle?.remove?.(); } catch { /* ignore */ }
               listenerHandle = null;
             };
-            // 关键看门狗：系统引擎缺英语语音包时 speak() 既不成功也不失败，
-            // 会无声地挂住整个降级链（用户感知＝"点了不朗读"）。
-            // 因此只要在 NATIVE_AUDIO_EVIDENCE_MS 内没有任何"开始发声"的证据，就放弃原生、降级到网络引擎。
+            // 看门狗：只有"拿不到英语音色"时才用 5s 快速降级；引擎自证活着时
+            // 预算随句长放大（防的是原生桥真挂死，不是防念得慢）。
             let nativeWatchdog: ReturnType<typeof setTimeout> | null = setTimeout(() => {
               if (settled || spokeAtLeastOnce) return;
               settled = true;
@@ -605,7 +627,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
               nativeActiveRef.current = false;
               console.info('[tts] native engine silent → falling back to network engines');
               if (!abortedRef.current) onFail();
-            }, NATIVE_AUDIO_EVIDENCE_MS);
+            }, nativeSilenceBudgetMs(expectedMs, engineAlive));
 
             const startedAt = Date.now();
 
@@ -621,10 +643,6 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
                 clearWatchdog();
               })).then((h: any) => { listenerHandle = h; }).catch(() => {});
             } catch { /* ignore */ }
-
-            // 预期朗读时长（粗略）：按词数估算，用于识别"瞬间返回但没出声"的假成功
-            const wordCount = countWords(text);
-            const expectedMs = Math.max(500, (wordCount * 260) / Math.max(0.5, rate));
 
             plugin.speak({
               text,
@@ -648,6 +666,12 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
                   console.info('[tts] native resolved silently (' + elapsed + 'ms) → fallback');
                   if (!abortedRef.current) onFail();
                   return;
+                }
+                // 很多系统引擎根本不派发 onRangeStart（真机实测四类文本全不派发），
+                // 但整句确实念完了 —— 不报就等于「上次朗读实测」永远空白，
+                // 所以这里补一条并**明说没有起播证据**（数字是整句耗时，不是起播延迟）。
+                if (!spokeAtLeastOnce) {
+                  reportPlayback({ engine: 'native', firstAudioMs: elapsed, fellBack: engineIdx > 0, startEvidence: false });
                 }
                 if (!abortedRef.current) onDone();
               })
