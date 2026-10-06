@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-10-06
+- build(apk): versionCode 95 / 2.0.50（含语块闪卡 Provider 修复 + overlay-fit ⑦ 守卫） (`8038d30`)
 - fix(chunks): 修语块闪卡 tab 白屏 —— ChunkFlashcards 调 useFramerMotion 但缺 LazyFramerProvider 会直接 throw，ErrorBoundary 把整个语块页换成「页面出错」(library tab 却正常，表现成切 tab 就崩)；补 verify-overlay-fit ⑦ 守卫 3 条(全仓扫 useFramerMotion 组件→宿主必须真渲染 Provider，含正对照：去掉 Provider 必红)；顺带删掉过时的 chunks.ts.bak、模块文档补数据分布与闪卡章节 (`21d2a8e`)
 - build(apk): versionCode 94 / 2.0.49（含语块库扩容+215、闪卡 tab、并行工作流 TTS/生词本修复）+ 日志 (`cabfc1a`)
 - feat(chunks): 语块库扩容 +215 条(748→963，补齐 travel/study/tech/food/health/shopping/sports 七个空分类，真实条目与主库去重)；新增语块/短语闪卡 tab(QuickCardMode 风格：分类筛选/每轮数量/答错重排/SM-2 进度同步/自动发音共用键/断点续学/键盘快捷键) (`1927337`)

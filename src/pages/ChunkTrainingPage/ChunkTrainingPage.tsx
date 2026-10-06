@@ -55,6 +55,7 @@ import { usePhraseLearning } from '@/lib/use-phrase-learning';
 import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
 import { useStableShuffle } from '@/lib/use-stable-shuffle';
 import ChunkFlashcards from './components/ChunkFlashcards';
+import { PHRASE_LEVELS, PHRASE_LEVEL_LABELS, type PhraseLevel } from '@/data/phrase-bank/types';
 import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
 import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { cn, cleanText, extractJson } from '@/lib/utils';
@@ -321,6 +322,44 @@ export default function ChunkTrainingPage() {
       return [...allChunks].sort((a, b) => (a?.content || '').toLowerCase().localeCompare((b?.content || '').toLowerCase()));
     } catch { return [...allChunks]; }
   }, [allChunks]);
+
+  // ── 短语词书（从词书搭配提取，按级别划分）──
+  const [phraseBankLevel, setPhraseBankLevel] = usePageMemory<string>('phrase-bank-level', '');
+  const [phraseBankData, setPhraseBankData] = useState<IChunk[]>([]);
+  const [phraseBankLoading, setPhraseBankLoading] = useState(false);
+  useEffect(() => {
+    if (!phraseBankLevel) { setPhraseBankData([]); return; }
+    let cancelled = false;
+    setPhraseBankLoading(true);
+    import('@/data/phrase-bank').then(m => m.loadPhrases(phraseBankLevel as never)).then((entries) => {
+      if (cancelled) return;
+      // 映射成 IChunk 兼容对象，让现有渲染代码（选中/收藏/TTS/例句计数）零改动
+      const mapped: IChunk[] = entries.map((e, i) => ({
+        id: `pb_${phraseBankLevel}_${i}`,
+        content: e.content,
+        meaning: e.meaning || e.sourceWord,
+        category: 'daily' as const,
+        usage: `来源词：${e.sourceWord}`,
+        example: '',
+        difficulty: 'intermediate' as const,
+        level: phraseBankLevel as never,
+      }));
+      setPhraseBankData(mapped);
+    }).catch(() => {}).finally(() => { if (!cancelled) setPhraseBankLoading(false); });
+    return () => { cancelled = true; };
+  }, [phraseBankLevel]);
+  /** 短语库实际展示的数据：选了词书 → 用词书搭配；没选 → 用原有语块 */
+  const phraseBankSorted = useMemo(() => {
+    if (!phraseBankLevel || phraseBankData.length === 0) return sortedChunks;
+    return [...phraseBankData].sort((a, b) => a.content.toLowerCase().localeCompare(b.content.toLowerCase()));
+  }, [phraseBankLevel, phraseBankData, sortedChunks]);
+  const [phraseBankSearch, setPhraseBankSearch] = useState('');
+  const filteredPhraseBank = useMemo(() => {
+    if (!phraseBankSearch.trim()) return phraseBankSorted;
+    const q = phraseBankSearch.toLowerCase();
+    return phraseBankSorted.filter((p) => p.content.toLowerCase().includes(q) || (p.meaning && p.meaning.includes(phraseBankSearch)));
+  }, [phraseBankSorted, phraseBankSearch]);
+
   const [phraseGenLoading, setPhraseGenLoading] = useState(false);
   const [selectedPhrase, setSelectedPhrase] = useState<IChunk | null>(null);
   /** 短语库里被展开的字母段（默认折叠到 PHRASE_LETTER_PREVIEW 条，A-Z 跳转仍可达每一段） */
@@ -2265,7 +2304,9 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   <div>
                     <CardTitle className="text-xl font-[900] italic text-foreground">短语库</CardTitle>
                     <CardDescription className="text-sm font-medium mt-1">
-                      共 {allChunks.length} 个短语 · 按字母排列
+                      {phraseBankLevel
+                        ? `${PHRASE_LEVEL_LABELS[phraseBankLevel as never] || phraseBankLevel} · ${filteredPhraseBank.length} 条`
+                        : `语块短语 ${allChunks.length} 条 · 选词书可切换搭配库`}
                     </CardDescription>
                   </div>
                 </div>
@@ -2288,9 +2329,37 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
               <div className="grid grid-cols-12 gap-4" style={{ height: '520px' }}>
                 {/* Left: Phrase list with meanings */}
                 <div className="col-span-12 lg:col-span-5 flex flex-col min-h-0">
+                  {/* 词书选择器 */}
+                  <div className="flex items-center gap-1 flex-wrap mb-2 shrink-0">
+                    <button
+                      onClick={() => setPhraseBankLevel('')}
+                      className={cn('px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all',
+                        !phraseBankLevel ? 'bg-sky-500 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80')}
+                    >语块短语</button>
+                    {PHRASE_LEVELS.map((lvl) => (
+                      <button
+                        key={lvl}
+                        onClick={() => setPhraseBankLevel(lvl)}
+                        className={cn('px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all',
+                          phraseBankLevel === lvl ? 'bg-sky-500 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80')}
+                      >
+                        {PHRASE_LEVEL_LABELS[lvl]}
+                      </button>
+                    ))}
+                  </div>
+                  {/* 搜索框 */}
+                  <div className="relative mb-2 shrink-0">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={phraseBankSearch}
+                      onChange={(e) => setPhraseBankSearch(e.target.value)}
+                      placeholder="搜索短语或释义…"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-muted/50 border border-transparent focus:border-sky-300 focus:bg-white text-sm outline-none transition-all"
+                    />
+                  </div>
                   <div className="flex flex-wrap gap-0.5 mb-2 shrink-0">
                     {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => {
-                      const has = sortedChunks.some((c) => c.content[0]?.toUpperCase() === letter);
+                      const has = filteredPhraseBank.some((c) => c.content[0]?.toUpperCase() === letter);
                       return (
                         <button
                           key={letter}
@@ -2311,7 +2380,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   </div>
                   <div className="flex-1 overflow-y-auto space-y-4 pr-1">
                     {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => {
-                      const chunks = sortedChunks.filter((c) => c.content[0]?.toUpperCase() === letter);
+                      const chunks = filteredPhraseBank.filter((c) => c.content[0]?.toUpperCase() === letter);
                       if (chunks.length === 0) return null;
                       const expanded = expandedLetters.has(letter);
                       const visible = expanded ? chunks : chunks.slice(0, PHRASE_LETTER_PREVIEW);
