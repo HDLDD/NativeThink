@@ -1,5 +1,8 @@
 # NativeThink 开发日志
 
+## 2026-10-07
+- feat(phrases): 短语库丰富 —— 从 9 级词书 detail 提取 50,652 条真实搭配，按级别划分为 9 个短语词书（中考 20k/高考 11k/四级 4.7k/六级 3.9k/考研 3.6k/托福 2.5k/高阶 1.7k/雅思 1.9k/专业 1.2k），按级别懒加载；短语库 tab 加词书选择器（语块短语+9 级词书）+ 搜索框，选中词书后列表/字母导航/详情面板全切换到搭配数据 (`8c4ced3`)
+
 ## 2026-10-06
 - build(apk): versionCode 95 / 2.0.50（含语块闪卡 Provider 修复 + overlay-fit ⑦ 守卫） (`8038d30`)
 - fix(chunks): 修语块闪卡 tab 白屏 —— ChunkFlashcards 调 useFramerMotion 但缺 LazyFramerProvider 会直接 throw，ErrorBoundary 把整个语块页换成「页面出错」(library tab 却正常，表现成切 tab 就崩)；补 verify-overlay-fit ⑦ 守卫 3 条(全仓扫 useFramerMotion 组件→宿主必须真渲染 Provider，含正对照：去掉 Provider 必红)；顺带删掉过时的 chunks.ts.bak、模块文档补数据分布与闪卡章节 (`21d2a8e`)
