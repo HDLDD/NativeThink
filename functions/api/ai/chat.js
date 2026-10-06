@@ -106,16 +106,24 @@ async function handler(context) {
 
   const modelId = model || PROVIDER_DEFAULT_MODELS[provider] || 'deepseek-chat';
 
+  // 过滤空 content 消息 —— 智谱 1213 = "未正常接收到 prompt 参数"，空消息透传会触发
+  const cleanMessages = messages.filter(m => m.content && typeof m.content === 'string' && m.content.trim());
+  if (cleanMessages.length === 0) {
+    return Response.json({ error: 'All messages have empty content' }, { status: 400 });
+  }
+
   // GLM 4.5+ 系列支持关闭思考模式 — 出厂免费模型要求响应快，默认关
+  // factory 和 glm 走同一个智谱端点，参数要求一致
+  const isZhipu = provider === 'glm' || provider === 'factory';
   const buildUpstreamBody = (mid) => {
     const b = {
       model: mid,
-      messages,
+      messages: cleanMessages,
       max_tokens,
       temperature,
       stream,
     };
-    if (provider === 'glm') {
+    if (isZhipu) {
       b.thinking = thinking || { type: 'disabled' };
     }
     return b;
