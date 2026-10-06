@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-10-06
+- feat(chunks): 语块库扩容 +215 条(748→963，补齐 travel/study/tech/food/health/shopping/sports 七个空分类，真实条目与主库去重)；新增语块/短语闪卡 tab(QuickCardMode 风格：分类筛选/每轮数量/答错重排/SM-2 进度同步/自动发音共用键/断点续学/键盘快捷键) (`1927337`)
 - fix(tts): 系统语音不再按句长抽签 —— 先问能力再猜沉默 (`25e8ef7`)
 - chore(release): bump android 版本号到 92 / 2.0.47（阈值修复包已装机，朗读自检连跑三轮 native 全 ✓） (`892e80b`)
 - fix(tts): 原生引擎"出声证据"阈值 2.5s → 5s，收成单点常量 (`c2b913c`)
