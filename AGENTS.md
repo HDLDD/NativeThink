@@ -101,7 +101,7 @@ node scripts/verify-wordbank-loading.mjs          # 45  加载层集成（无需
 node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆分（基线任意时刻可重采）
 node scripts/verify-tts-progress.mjs              # 6175 朗读切片与进度反查表
 node scripts/verify-tts-hardening.mjs             # 15   TTS 降级/在途去重/桌面限定（注意：没有 npm script）
-node scripts/verify-native-tts.mjs                # 21   原生插件边界：替身复刻 Capacitor Proxy 真跑「async return 插件对象＝永久挂死」+ 取语音列表 4s 超时 + 六处调用点接线
+node scripts/verify-native-tts.mjs                # 25   原生插件边界：替身复刻 Capacitor Proxy 真跑「async return 插件对象＝永久挂死」+ 取语音列表 4s 超时 + 六处调用点接线 + 出声证据阈值单点常量 ≥5s
 node scripts/verify-books-meta.mjs                # 227  书目元数据 + 复习词高亮
 node scripts/verify-vocab-cards.mjs               # 315  背单词卡片契约 + 手势决策表 + 换卡节奏 + 答错重排延后 + 单词字号三档 + 生词本入队（顺序/判据/补量/屏蔽）
 node scripts/verify-vocab-caches.mjs              # 85   缓存封顶 + 存储写失败可见（替身真跑）+ trimOldest 滚动窗口双封顶
@@ -296,7 +296,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 315 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 21** · overlay-fit **35** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · rv-articles 104 · study-credit 74 · chain-verdict 36；合计 **7,360**，2026-10-05 第 8 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 315 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 25** · overlay-fit **35** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · rv-articles 104 · study-credit 74 · chain-verdict 36；合计 **7,364**，2026-10-06 第 9 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`

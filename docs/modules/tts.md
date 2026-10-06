@@ -48,11 +48,11 @@
 
 ### 2.5 看门狗与双触发防护
 
-- URL 引擎 25s 安全定时器触发时先过 `madeSound` 分流（`:521-526`）；
-- **新引擎接棒前必须清掉上一个引擎的看门狗**（`:496-500`，注释直指「同一句被两个引擎各读一遍」）；
-- 原生分支用 `settled` + `clearWatchdog/teardown`（`:560-569`），2.5s 无声即降级；
-- 「立即 resolve 但从未 `onRangeStart`」判为**假成功**并降级，阈值 `min(expectedMs*0.4, 1500)`（`:598-624`）；
-- 用户暂停时撤看门狗，免得把正在读的那句杀掉（`:521-523`、`pause()` `:906-909`）。
+- URL 引擎 25s 安全定时器触发时先过 `madeSound` 分流（`:541-553`）；
+- **新引擎接棒前必须清掉上一个引擎的看门狗**（`:525-529`，注释直指「同一句被两个引擎各读一遍」）；
+- 原生分支用 `settled` + `clearWatchdog/teardown`（`:587-596`），**5s** 内没有"开始发声"的证据才降级；阈值单点在 `NATIVE_AUDIO_EVIDENCE_MS`（`:215`），播放看门狗（`:600-608`）与朗读自检（`:1031`）共用它。**为什么不是 2.5s**：真机 Redmi Turbo 3 的系统引擎 `speak()` 要 3160ms 才 resolve 且**从不派发 `onRangeStart`**，2.5s 正好卡在它身上 —— 连着两轮自检一次 1408ms ✓、一次 2516ms ✗，同一引擎两种结论；而「只用系统引擎」时候选只有 `['native']`（`:455`），到点降级就没有下一个引擎，等于静默无声（详见 §2.9 末与注意事项 11）；
+- 「立即 resolve 但从未 `onRangeStart`」判为**假成功**并降级，阈值 `min(expectedMs*0.4, 1500)`（`:645-647`）；
+- 用户暂停时撤看门狗，免得把正在读的那句杀掉（`:541-553`、`pause()` `:924-932`）。
 
 ### 2.6 音色体系
 
@@ -73,13 +73,13 @@
 |----|-----|------|------|
 | JS Map | `voiceId\|speed.toFixed(2)\|text` | 120，FIFO | `sherpa-tts.ts:150-152,168-171,260-264` |
 | 原生文件 | `sha1(modelId\|speakerId\|speed\|text)+'.wav'` | `cacheDir/sherpa-tts`，命中判 `length>1024`，先写 `.part` 再 rename | `java:463-478` |
-| 云端 Cache API | `nativethink-tts-v1` | 10s 超时 + `priority:'low'`；**FIFO 裁到 400 条** | `use-tts.ts:244-259` |
+| 云端 Cache API | `nativethink-tts-v1` | 10s 超时 + `priority:'low'`；**FIFO 裁到 400 条** | `use-tts.ts:253-271` |
 
 键里**必须含音色与语速**：只按文本+语速会「换音色播出上一个音色的音频」（`sherpa-tts.ts:168-171` 注释）。
 
-云端结果缓存的条数上限 `MAX_TTS_CACHE_ENTRIES = 400`（`use-tts.ts:255-258`，2026-10-05 加）：**Cache Storage 与 IndexedDB 共享同源配额**，只增不减会把配额吃满，连带**整书译文写入静默失败**（那是 IDB 的另一大户 —— 2026-09 体检结论）。`cache.keys()` 近似插入序，所以从头部删就是 FIFO，不需要额外时间戳。
+云端结果缓存的条数上限 `MAX_TTS_CACHE_ENTRIES = 400`（`use-tts.ts:267-270`，2026-10-05 加）：**Cache Storage 与 IndexedDB 共享同源配额**，只增不减会把配额吃满，连带**整书译文写入静默失败**（那是 IDB 的另一大户 —— 2026-09 体检结论）。`cache.keys()` 近似插入序，所以从头部删就是 FIFO，不需要额外时间戳。
 
-同一批把**播放用的 Blob URL 用完即 revoke**：每段音频一个 objectURL，`stopAudio()` 里释放（`:352`），分派引擎时记下当前 URL（`:512`，只认 `blob:` 前缀，非 blob 的引擎不记）。不 revoke 的话 objectURL 会驻留到页面卸载 —— 连着朗读整本书这种长会话里内存单调上涨。
+同一批把**播放用的 Blob URL 用完即 revoke**：每段音频一个 objectURL，`stopAudio()` 里释放（`:364`），分派引擎时记下当前 URL（`:524`，只认 `blob:` 前缀，非 blob 的引擎不记）。不 revoke 的话 objectURL 会驻留到页面卸载 —— 连着朗读整本书这种长会话里内存单调上涨。
 
 在途去重 `inflight: Map<key, Promise>`（`sherpa-tts.ts:195-230`）：原生是 `synthLock` 串行的，同文本并发请求会各占一条线程阻塞在锁上。真机闪退链写在这里：每次 `new Thread` + `generate()` → `OutOfMemoryError: pthread_create failed` → App 崩（`java:95-105`，栈原文抄在 `verify-tts-hardening.mjs:5-9`）。修法是单线程 `ttsWorker` + 独立 `loadWorker`（`java:106-117`）+ 队列上限 `MAX_PENDING_TTS = 8`，满了 `call.reject("busy: too many pending tts requests")`（`java:119-140,490-493`）。
 
@@ -87,7 +87,7 @@
 
 `checkBundledEngineHealth()` 在 app 启动最早处调用（`src/index.tsx:11,15`）。实现思路（`sherpa-tts.ts:43-52,111-132`）：**加载前打 `__nativethink_sherpa_try`、到 ready 才清除**；启动时发现 try 键还在，说明上次加载过程中崩了，就写 `__nativethink_sherpa_off` 停用内置引擎。注释明确写了**不能用时间新旧判定**（`:38-42`）。用户手动恢复走 `reenableBundledEngine()`（`:27-32`），按钮在 `TTSSettings.tsx:468-476`。
 
-诊断回显：`reportPlayback` 只在**首次起播**写 `lastPlaybackReport`（`use-tts.ts:210-223`），降级标记 `fellBack: engineIdx > 0`，设置页每秒轮询读取（`TTSSettings.tsx:92-93`）；主动自检按钮 `probeTtsEngines()`（`use-tts.ts:988-1045`）依次探 native(2.5s 看门狗)/cloud(8s)/edge/google 直连/浏览器语音。
+诊断回显：`reportPlayback` 只在**首次起播**写 `lastPlaybackReport`（`use-tts.ts:222-235`），降级标记 `fellBack: engineIdx > 0`，设置页每秒轮询读取（`TTSSettings.tsx:92-93`）；主动自检按钮 `probeTtsEngines()`（`use-tts.ts:1015-1077`）依次探 native(5s 看门狗)/cloud(8s)/edge/google 直连/浏览器语音。
 
 ### 2.9 系统语音（Android 原生插件）的插件边界
 
@@ -95,8 +95,8 @@
 |---|---|---|
 | **Capacitor 插件对象不许穿过 Promise 边界** | `native-tts.ts:51,53,67-77`（具名持有者 `INativeTtsHandle`） | 插件是 Proxy，`typeof plugin.then === 'function'`；`async` 函数直接 `return 插件` 会让 Promise 同化去调 `plugin.then(res, rej)` —— 这一句被当成一次真实原生调用发给 Android，而原生没有 `then` 方法，于是 **res/rej 永不调用 → 永久 pending**。它**不是抛错**：外层 `try/catch` 兜不住（同化发生在 try 块之外），还缓存在模块级 `pluginPromise`（`:53`）里拖死整个会话 |
 | 取语音列表必须有界 | `native-tts.ts:81-92`（`VOICE_LIST_TIMEOUT_MS = 4000` + `withTimeout`） | 原生不响应时设置页永远停在「读取中…」 |
-| 自检第一步必须带超时 | `use-tts.ts:1009-1013` | 「自检中…」永不返回。云端那步早就有 8s 超时（`:1037-1038` 注释写着「必须带超时」），native 这步漏了同一条口径 |
-| 6 个调用点全部解构持有者 | `native-tts.ts:89,156,163` + `use-tts.ts:358,556,915` | 漏一处就是那条链静默失效（speak / stop / 试听 / 去安装 / 音色列表各一处） |
+| 自检第一步必须带超时 | `use-tts.ts:1021-1025` | 「自检中…」永不返回。云端那步早就有 8s 超时（`:1049-1050` 注释写着「必须带超时」），native 这步漏了同一条口径 |
+| 6 个调用点全部解构持有者 | `native-tts.ts:89,156,163` + `use-tts.ts:370,568,927` | 漏一处就是那条链静默失效（speak / stop / 试听 / 去安装 / 音色列表各一处） |
 
 真机 2.0.45 实测（2026-10-05，USB/CDP）：朗读设置里「系统语音引擎」永远「读取中…」、点「朗读自检」永远「自检中…」、每调用一次多一条未捕获的 `"TextToSpeech.then()" is not implemented on android`。**原生侧本身是好的** —— 直连 `getSupportedVoices()` 返回 4 条语音、其中 1 条本地英语（`voiceURI:"en"`），所以修完就能出声。**只有 APK 会中**：网页/桌面没有原生 Proxy，`isPluginAvailable` 那条分支也走不到。
 
@@ -114,6 +114,7 @@
 8. **`assetManager` 必须传 null**（`java:341-347`）：否则 filesDir 的绝对路径会被当成 assets 名解析，原生直接崩。
 9. **模型常驻不释放、失败过的模型不再重试**（`java:298-311`）—— 想重试要重启 App，不是再点一次。
 10. **`/api/tts-voices` 只有桌面版有**（`server/local-server.mjs:671`，Cloudflare 侧无此函数）。前端因此用 `platformTag() === 'desktop'` 限定（`TTSSettings.tsx:143-157`）。去掉这个判断的后果：网页每次路由切换一个 404，APK 里因为 `index.html` 的 `/api/` 重写会真的发一次网络请求。守卫：`verify-tts-hardening.mjs:132-145`。
-11. **降级链里任何一环"永不 settle"都会吃掉整条链**，而且比"失败"更糟 —— 失败会降级，挂住不会。具体形状：内置引擎被闪退护栏停用时候选是 `['native','cf','edge','google']`（`use-tts.ts:446`），native 那环一旦挂住，后面的云端永远轮不到；而 2.5s 看门狗写在 `.then` 回调**内部**（`:588-596`），`.then` 不执行时它根本没起 —— 于是"闪退自愈"反而把朗读彻底弄死。所以：native 分支 `.then` 之前的每个 await（含 `getNativeTts()`、`pickPreferredEnglishVoice()`）都必须自带超时，这条就是 §2.9 那两处超时的由来。改这里跑 `verify-native-tts`。
+11. **降级链里任何一环"永不 settle"都会吃掉整条链**，而且比"失败"更糟 —— 失败会降级，挂住不会。具体形状：内置引擎被闪退护栏停用时候选是 `['native','cf','edge','google']`（`use-tts.ts:458`），native 那环一旦挂住，后面的云端永远轮不到；而看门狗写在 `.then` 回调**内部**（`:600-608`），`.then` 不执行时它根本没起 —— 于是"闪退自愈"反而把朗读彻底弄死。所以：native 分支 `.then` 之前的每个 await（含 `getNativeTts()`、`pickPreferredEnglishVoice()`）都必须自带超时，这条就是 §2.9 那两处超时的由来。改这里跑 `verify-native-tts`。
+12. **"没在 X 毫秒内出声"不等于"不会出声"**：真机 Redmi Turbo 3（2026-10-06 实测）系统语音引擎 `speak()` **3160ms 才 resolve**，且该引擎**从不派发 `onRangeStart`** —— 于是旧的 2.5s 阈值把一个好引擎判成"系统无英语语音包或无引擎"，两轮自检一次 1408ms ✓ 一次 2516ms ✗（结论会抖），而「只用系统引擎」时候选只有 `['native']`（`:455`），到点降级就没有下一个引擎 → 用户感知仍是"点了没声"。阈值现在单点在 `NATIVE_AUDIO_EVIDENCE_MS = 5000`（`:215`），播放与自检共用。**通用口径**：给原生/外部引擎设"沉默即判死"的阈值之前，先在这台设备上直接量一次真实耗时，别拿手感当阈值；能拿到"确实出声"的事件最好，拿不到（本例就是拿不到）就要把窗口放宽到实测值之上。
 11. **APK 的 `/api/*` 重写只覆盖 `fetch`**（`index.html:25-35`）。音频/图片类 URL 得自己读 `window.__API_BASE__` 拼接（`use-tts.ts:232-238` 的 `cfTtsUrl` 就是这么做的）—— 新增任何非 fetch 的资源加载都要照做，否则 APK 里 404。
 12. **改完必跑**：`npm run check:tts-voices`（音色/模型）、`node scripts/verify-tts-progress.mjs`（切片+阅读器反查表，实测 6175 断言）、`node scripts/verify-tts-hardening.mjs`（降级/在途去重/桌面限定，实测 15 项；**注意它没有 npm script，只能裸跑**）。

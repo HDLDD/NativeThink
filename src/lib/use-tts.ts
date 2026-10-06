@@ -203,6 +203,18 @@ const IS_ANDROID_NATIVE = Capacitor.isNativePlatform?.() && Capacitor.getPlatfor
 const getNativeTts = getNativeTtsPlugin;
 
 /**
+ * 给原生引擎「证明自己会出声」的时间上限 —— 播放降级看门狗与朗读自检**共用这一个数**。
+ *
+ * 为什么是 5s（2026-10-06 真机 Redmi Turbo 3 实测）：这台机器的系统引擎 `speak()` 要
+ * **3160ms 才 resolve**，而且**从不派发 `onRangeStart`** —— 2.5s 阈值正好卡在它身上：
+ * 连着两轮朗读自检一次 1408ms ✓、一次 2516ms ✗，同一个引擎两种结论。更要命的是
+ * 「只用系统引擎」时候选只有 `['native']`（`:443`），到点降级就没有下一个引擎了 →
+ * **静默无声**，而引擎再过 0.6 秒就把那句念出来了。抬到 5s 的代价只是"真没装语音包"
+ * 那种情况多等 2.5 秒；默认链里内置引擎排第一，正常用户碰不到这段。
+ */
+const NATIVE_AUDIO_EVIDENCE_MS = 5000;
+
+/**
  * 上一次朗读的实测报告 —— 设置页直接回显，用来判断「慢」到底慢在哪一段：
  * 系统引擎（离线，与网速无关）还是云端（每次都要联网合成）。
  * 手机上没法开控制台，这个回显就是唯一的现场证据。
@@ -584,7 +596,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
             };
             // 关键看门狗：系统引擎缺英语语音包时 speak() 既不成功也不失败，
             // 会无声地挂住整个降级链（用户感知＝"点了不朗读"）。
-            // 因此只要 2.5s 内没有任何"开始发声"的证据，就放弃原生、降级到网络引擎。
+            // 因此只要在 NATIVE_AUDIO_EVIDENCE_MS 内没有任何"开始发声"的证据，就放弃原生、降级到网络引擎。
             let nativeWatchdog: ReturnType<typeof setTimeout> | null = setTimeout(() => {
               if (settled || spokeAtLeastOnce) return;
               settled = true;
@@ -593,7 +605,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
               nativeActiveRef.current = false;
               console.info('[tts] native engine silent → falling back to network engines');
               if (!abortedRef.current) onFail();
-            }, 2500);
+            }, NATIVE_AUDIO_EVIDENCE_MS);
 
             const startedAt = Date.now();
 
@@ -1016,7 +1028,7 @@ export async function probeTtsEngines(rate = 0.9): Promise<ITtsEngineProbe[]> {
     const ok = await new Promise<boolean>((resolve) => {
       let done = false;
       let alive = false;
-      const timer = setTimeout(() => { if (!done) { done = true; try { plugin.stop?.(); } catch { /* */ } resolve(alive); } }, 2500);
+      const timer = setTimeout(() => { if (!done) { done = true; try { plugin.stop?.(); } catch { /* */ } resolve(alive); } }, NATIVE_AUDIO_EVIDENCE_MS);
       try {
         Promise.resolve(plugin.addListener?.('onRangeStart', () => { alive = true; })).catch(() => {});
       } catch { /* ignore */ }

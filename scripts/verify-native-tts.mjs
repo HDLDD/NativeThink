@@ -17,7 +17,8 @@
  *   A. 替身必须能复现"永久挂死"（脚手架自证 + 正对照，否则后面的绿是假的）
  *   B. 修复后的 getNativeTts() 在 1s 内 settle，且音色列表/默认音色真跑得出结果
  *   C. 原生调用不响应时，listNativeVoices 由超时兜住（超时是真的，不是装饰）
- *   D. 静态契约：不许退回"直接 return 插件对象"，调用点必须解构持有者，自检那步必须带超时
+ *   D. 静态契约：不许退回"直接 return 插件对象"，调用点必须解构持有者，自检那步必须带超时，
+ *      且原生"出声证据"阈值必须单点常量（真机实测 speak 要 3160ms，旧的 2.5s 会误判好引擎）
  *
  * 用法: node scripts/verify-native-tts.mjs
  */
@@ -193,6 +194,18 @@ function buildModule() {
     'D8 朗读自检第一步带超时（与云端那步 8s 同口径；缺它就是"自检中…"永不返回）');
   ok(/type INativeTtsHandle/.test(useTts),
     'D9 超时兜底分支复用同一个句柄类型（不靠 any 蒙过 typecheck）');
+
+  /* 阈值单点 + 数值锁：真机实测系统引擎 speak 要 3160ms 才 resolve，
+     旧的 2.5s 把可用引擎判成"无语音包"，且「只用系统引擎」时降级没有下一环 → 静默无声 */
+  const m = useTts.match(/const NATIVE_AUDIO_EVIDENCE_MS = (\d+);/);
+  ok(!!m, 'D10 原生"出声证据"阈值有单点常量（不许两处各写一个字面量）');
+  ok(m && Number(m[1]) >= 5000,
+    'D11 阈值 ≥ 5000ms（真机 Redmi Turbo 3 实测 speak resolve 3160ms 且从不派发 onRangeStart）',
+    m ? `${m[1]}ms` : '常量缺失');
+  const watchdogs = (useTts.match(/NATIVE_AUDIO_EVIDENCE_MS\)/g) || []).length;
+  ok(watchdogs === 2, 'D12 播放看门狗与朗读自检两处都吃这个常量（漏一处就是自检与实播口径不一致）', `count=${watchdogs}`);
+  ok(!/,\s*2500\)/.test(useTts),
+    'D13 反向断言：native 那两处 2500 字面量不许回来（URL 引擎的 25000 是另一回事，不在此列）');
 }
 
 /* ───────────────────────── 汇总 ───────────────────────── */
