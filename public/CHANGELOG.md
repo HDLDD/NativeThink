@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-10-06
+- chore(release): bump android 版本号到 92 / 2.0.47（阈值修复包已装机，朗读自检连跑三轮 native 全 ✓） (`892e80b`)
 - fix(tts): 原生引擎"出声证据"阈值 2.5s → 5s，收成单点常量 (`c2b913c`)
 - chore(release): bump android 版本号到 91 / 2.0.46（含系统语音挂死与抽屉不自动关两个修复，已 USB 装机 + CDP 真机复验） (`9f185b6`)
 
