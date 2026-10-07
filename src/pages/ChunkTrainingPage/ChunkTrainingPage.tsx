@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import {
   Puzzle,
   Heart,
@@ -397,22 +397,55 @@ export default function ChunkTrainingPage() {
     return out;
   }, [filteredPhraseBank]);
   const phraseNavIdx = selectedPhrase ? phraseNavList.findIndex((c) => c.id === selectedPhrase.id) : -1;
+
+  /**
+   * 列表内的「移动」只能由列表容器自己执行：scrollIntoView 会沿途把**每个**祖先滚动容器都滚一遍，
+   * 包括文档 —— 真机实测按一次「下一个」文档 scrollY 上下振荡上百 px（2026-10-08 用户反馈"窗口会乱动"）。
+   * 这里用 rect 差值只改容器 scrollTop，语义等价于 block:'nearest' / 'start'，但止步于容器。
+   */
+  const phraseListRef = useRef<HTMLDivElement>(null);
+  const scrollPhraseList = (el: HTMLElement | null, opts: { align: 'top' | 'nearest'; smooth?: boolean }) => {
+    const list = phraseListRef.current;
+    if (!list || !el) return;
+    const lb = list.getBoundingClientRect();
+    const eb = el.getBoundingClientRect();
+    let delta = 0;
+    if (opts.align === 'top') delta = eb.top - lb.top;
+    else if (eb.top < lb.top) delta = eb.top - lb.top;
+    else if (eb.bottom > lb.bottom) delta = eb.bottom - lb.bottom;
+    if (!delta) return;
+    if (opts.smooth) list.scrollTo({ top: list.scrollTop + delta, behavior: 'smooth' });
+    else list.scrollTop += delta;
+  };
+  /** 最近一次选中的来源：'上一个/下一个' → 把目标收进列表容器；列表点选 → 把详情滚进视野 */
+  const phraseNavTargetRef = useRef<string | null>(null);
+  const selectPhraseFromList = (chunk: IChunk) => {
+    phraseNavTargetRef.current = null;
+    setSelectedPhrase(chunk);
+  };
   const gotoPhrase = (delta: number) => {
     const next = phraseNavList[phraseNavIdx + delta];
     if (!next) return;
+    phraseNavTargetRef.current = next.id;
     setSelectedPhrase(next);
     // 目标可能落在默认折叠的字母段里 —— 先把那段展开，列表才跟得上详情
     const letter = (next.content[0] || '').toUpperCase();
     if (letter && !expandedLetters.has(letter)) { const s = new Set(expandedLetters); s.add(letter); setExpandedLetters(s); }
-    requestAnimationFrame(() => document.getElementById(`phrase-item-${next.id}`)?.scrollIntoView({ block: 'nearest' }));
   };
   /**
    * 窄屏下详情排在列表下方（两栏都是 col-span-12），点了条目却看不见详情等于没响应 ——
    * 只把详情滚进视野。桌面两栏并排，滚它会把列表推出屏幕，所以 lg 以上不动。
+   * 上下切换不走这条：详情就在眼前原地更新，任何页面滚动都是"乱动"。
+   * 用 layout effect：展开字母段后的布局在同一个 commit 里就绪，量到的 rect 是新值，且不给中间态留一帧。
    */
   const phraseDetailRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!selectedPhrase) return;
+  useLayoutEffect(() => {
+    const id = selectedPhrase?.id;
+    if (!id) return;
+    if (phraseNavTargetRef.current === id) {
+      scrollPhraseList(document.getElementById(`phrase-item-${id}`), { align: 'nearest' });
+      return;
+    }
     if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) return;
     phraseDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [selectedPhrase?.id]);
@@ -2421,7 +2454,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           key={letter}
                           onClick={() => {
                             const el = document.getElementById(`phrase-l-${letter}`);
-                            el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            scrollPhraseList(el, { align: 'top', smooth: true });
                           }}
                           disabled={!has}
                           className={cn(
@@ -2436,7 +2469,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   </div>
                   {/* 手机上给列表自己一个有界的滚动区（否则整页无限长，详情永远在屏幕外）；
                       桌面靠父级 520px + flex-1 撑满，不需要 max-h */}
-                  <div className="flex-1 overflow-y-auto space-y-4 pr-1 max-h-[52vh] lg:max-h-none">
+                  <div ref={phraseListRef} className="flex-1 overflow-y-auto space-y-4 pr-1 max-h-[52vh] lg:max-h-none">
                     {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => {
                       const chunks = filteredPhraseBank.filter((c) => c.content[0]?.toUpperCase() === letter);
                       if (chunks.length === 0) return null;
@@ -2451,7 +2484,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                               <button
                                 key={chunk.id}
                                 id={`phrase-item-${chunk.id}`}
-                                onClick={() => setSelectedPhrase(chunk)}
+                                onClick={() => selectPhraseFromList(chunk)}
                                 className={cn(
                                   'w-full text-left p-3 rounded-2xl transition-all duration-200 border-2 mb-1',
                                   selectedPhrase?.id === chunk.id

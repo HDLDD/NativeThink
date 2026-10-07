@@ -254,6 +254,54 @@ ok(phDetail.includes(FAV_BTN) && phDetail.includes('AI 生成更多')
   'D20 收藏按语块库口径放在详情**底部动作条**（挂在标题行会把标题挤成三行）',
   `len=${phDetail.length} fav=${phDetail.indexOf(FAV_BTN)} ex=${phDetail.indexOf('AI 生成更多')}`);
 
+/* ── 短语库「列表内移动」的单一滚动权威（2026-10-08 用户反馈"切换单词窗口会乱动"） ──
+   病因是三个滚动互相打架：按一次「下一个」，列表项 scrollIntoView({nearest}) 会沿途把**每个**
+   祖先滚动容器都滚一遍（文档在内），详情 effect 又平滑滚回来 —— 真机实测文档 scrollY 上下振荡
+   上百 px，连按 5 次位移合计 858px；字母跳转同理（一次拽了 273px）。
+   契约：列表内的移动只许改容器自己的 scrollTop；文档滚动只剩"点选条目 → 详情进视野"一条路径。 */
+/** 取函数体：从 `const NAME` 到其后第一个行首两空格的 `};`（不写死字符窗，版式改动不误伤） */
+const fnRegion = (src, head) => {
+  const i = src.indexOf(head);
+  if (i < 0) return '';
+  const j = src.indexOf('\n  };', i);
+  return j > i ? src.slice(i, j) : '';
+};
+const gotoBody = fnRegion(pageCode, 'const gotoPhrase = (delta: number) => {');
+ok(gotoBody.length > 0 && !gotoBody.includes('scrollIntoView'),
+  'D21 上下切换体里没有 scrollIntoView（它会沿途滚所有祖先滚动容器，文档在内 —— 这就是"乱动"的元凶）',
+  `len=${gotoBody.length}`);
+ok(gotoBody.includes('phraseNavTargetRef.current = next.id'),
+  'D22 上下切换登记落点（phraseNavTargetRef）—— 详情 effect 靠它区分"导航"与"点选"');
+const helperBody = fnRegion(pageCode, 'const scrollPhraseList = (el: HTMLElement | null');
+ok(helperBody.includes('getBoundingClientRect') && helperBody.includes('list.scrollTop')
+    && !helperBody.includes('window.scroll') && !helperBody.includes('scrollIntoView'),
+  'D23 容器内滚动助手只改 list.scrollTop/list.scrollTo（两 rect 差值定位），不碰 window',
+  `len=${helperBody.length}`);
+const effStart = pageCode.indexOf('useLayoutEffect(() => {');
+const effEnd = pageCode.indexOf('}, [selectedPhrase?.id])', effStart);
+const detailEff = effStart > 0 && effEnd > effStart ? pageCode.slice(effStart, effEnd) : '';
+const navGate = detailEff.indexOf('phraseNavTargetRef.current === id');
+const afterGate = navGate >= 0 ? detailEff.slice(navGate) : '';
+const retAt = afterGate.indexOf('return;');
+const listAt = afterGate.indexOf('scrollPhraseList(');
+const detailAt = afterGate.indexOf('scrollIntoView');
+ok(navGate >= 0 && retAt > -1 && listAt > -1 && listAt < retAt && detailAt > retAt,
+  'D24 详情 effect 先判"是不是导航"：是导航 → 收进容器并 return（return 必须在详情滚动之前）；能走到详情滚动的只剩点选这条',
+  `gate=${navGate} list=${listAt} ret=${retAt} scrollIntoView=${detailAt}`);
+ok(count(pageCode, 'scrollIntoView') === 1
+    && pageCode.includes(`phraseDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })`),
+  'D25 全页唯一的 scrollIntoView = 详情进视野（点选路径）—— 多出来的都会重新引入"乱动"',
+  `count=${count(pageCode, 'scrollIntoView')}`);
+ok(/<div ref=\{phraseListRef\} className="flex-1 overflow-y-auto space-y-4 pr-1 max-h-\[52vh\] lg:max-h-none">/.test(pageCode),
+  'D26 列表滚动容器挂了 phraseListRef（助手没有容器可写就是空转）');
+ok(/document\.getElementById\(`phrase-l-\$\{letter\}`\)[\s\S]{0,120}scrollPhraseList\(el, \{ align: 'top', smooth: true \}\)/.test(pageCode)
+    && count(pageCode, 'scrollPhraseList(') === 2,
+  'D27 字母跳转也走容器内滚动（旧实现同样在拽文档，一次 273px；两处调用点 = 导航落点 + 字母跳转）',
+  `calls=${count(pageCode, 'scrollPhraseList(')}`);
+ok(/onClick=\{\(\) => selectPhraseFromList\(chunk\)\}/.test(pageCode)
+    && /const selectPhraseFromList = \(chunk: IChunk\) => \{[\s\S]{0,120}phraseNavTargetRef\.current = null/.test(pageCode),
+  'D28 列表点选走 selectPhraseFromList 且先清落点闸门（否则点选会被当成导航，详情不再进视野）');
+
 /* ───────── 汇总 ───────── */
 let failed = 0;
 for (const r of results) { if (!r.pass) failed++; console.log((r.pass ? 'PASS  ' : 'FAIL  ') + r.name + (r.detail ? '  [' + r.detail + ']' : '')); }

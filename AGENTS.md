@@ -101,7 +101,7 @@ node scripts/verify-wordbank-loading.mjs          # 45  加载层集成（无需
 node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆分（基线任意时刻可重采）
 node scripts/verify-tts-progress.mjs              # 6175 朗读切片与进度反查表
 node scripts/verify-tts-hardening.mjs             # 15   TTS 降级/在途去重/桌面限定（注意：没有 npm script）
-node scripts/verify-chunks-data.mjs               # 47   语块库 963 条数据卫生 + 读取层去重（12 组重复冻结成基线、去重顺序判别、已记组行为）+ 短语库/语块库显示语言同源
+node scripts/verify-chunks-data.mjs               # 55   语块库 963 条数据卫生 + 读取层去重（12 组重复冻结成基线、去重顺序判别、已记组行为）+ 短语库/语块库显示语言同源 + 列表内移动的单一滚动权威
 node scripts/verify-native-tts.mjs                # 37   原生插件边界：替身真跑「async return 插件对象＝永久挂死」+ 取语音列表 4s 超时 + 六处调用点 + 先问能力再猜沉默（看门狗吃句长、每词 ≥380ms、起播证据两档）
 node scripts/verify-books-meta.mjs                # 227  书目元数据 + 复习词高亮
 node scripts/verify-vocab-cards.mjs               # 315  背单词卡片契约 + 手势决策表 + 换卡节奏 + 答错重排延后 + 单词字号三档 + 生词本入队（顺序/判据/补量/屏蔽）
@@ -297,7 +297,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 315 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 37** · chunks-data **47** · overlay-fit **38** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · rv-articles 104 · study-credit 74 · chain-verdict 36；合计 **7,426**，2026-10-07 第 13 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 315 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 37** · chunks-data **55** · overlay-fit **38** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · rv-articles 104 · study-credit 74 · chain-verdict 36；合计 **7,434**，2026-10-08 第 14 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**
