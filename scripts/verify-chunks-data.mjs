@@ -94,6 +94,10 @@ ok(brokenLines.length === 0, 'A11 每条都在自己那一行闭合且花括号�
   brokenLines.slice(0, 3).map((c) => c.id).join(','));
 const parsedVsRaw = (base.raw.match(/^\s*\{\s*id:/gm) || []).length + (extra.raw.match(/^\s*\{\s*id:/gm) || []).length;
 ok(parsedVsRaw === all.length, 'A12 正对照：解析条数等于文件里的条目行数（没有静默漏解析）', `${parsedVsRaw}/${all.length}`);
+// 短语库列表按 A-Z 分段渲染，首字符不是字母的条目**一条都渲染不出来**（曾经就有 ` RSVP`）
+const badStart = all.filter((c) => c.content !== (c.content || '').trim() || !/^[A-Za-z]/.test(c.content || ''));
+ok(badStart.length === 0, 'A13 content 无前后空白且首字符是字母（否则该条目在短语库列表里永远不可达）',
+  badStart.slice(0, 4).map((c) => `${c.id}:${JSON.stringify(c.content)}`).join(', '));
 
 /* ───────────── B. 已知重复冻结成基线 ───────────── */
 const KNOWN_DUP_GROUPS = [
@@ -194,6 +198,21 @@ ok(/expandMemorized\(JSON\.parse\(raw\), MOCK_CHUNKS\)/.test(pageCode),
   'D7 已记读入时补齐兄弟 id');
 ok(/setMemorizedChunks\(toggleMemorizedGroup\(memorizedChunks, chunk, allChunks\)\)/.test(pageCode),
   'D8 已记切换走组（updater 保持纯，落盘仍交给 persist effect）');
+
+/* ── 短语库详情的布局与导航（2026-10-07 用户反馈：详情盖住列表 + 不能切上下） ── */
+ok(!/style=\{\{ height: '520px' \}\}/.test(pageCode) && /lg:h-\[520px\]/.test(pageCode),
+  'D9 定高只给桌面两栏 —— 手机上左右都是 col-span-12，写死 520px 会让详情溢出盖住列表（只能看一条）');
+ok(/max-h-\[52vh\] lg:max-h-none/.test(pageCode),
+  'D10 手机侧列表自带滚动上界（否则整页无限长，详情永远在屏幕外）');
+ok(/aria-label="上一个短语"[\s\S]{0,900}aria-label="下一个短语"/.test(pageCode) && /gotoPhrase\(-1\)[\s\S]{0,900}gotoPhrase\(1\)/.test(pageCode),
+  'D11 详情头部有上下切换（列表在屏幕外时，这是唯一能继续浏览的手段）');
+const navPredicateOk = /for \(const letter of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'\)[\s\S]{0,160}c\.content\[0\]\?\.toUpperCase\(\) === letter/.test(pageCode);
+const listPredicateOk = /filteredPhraseBank\.filter\(\(c\) => c\.content\[0\]\?\.toUpperCase\(\) === letter\)/.test(pageCode);
+ok(navPredicateOk && listPredicateOk,
+  'D12 导航表与列表用**同一个**首字母分段判据（不一致的话按上下键看到的邻居和列表里的邻居不同）',
+  `nav=${navPredicateOk} list=${listPredicateOk}`);
+ok(/window\.matchMedia\('\(min-width: 1024px\)'\)/.test(pageCode),
+  'D13 只有窄屏才把详情滚进视野（桌面两栏并排，滚它会把列表推出屏幕）');
 
 /* ───────── 汇总 ───────── */
 let failed = 0;

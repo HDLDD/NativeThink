@@ -210,7 +210,7 @@ export const CHUNKS_EXTRA: IChunk[] = [
   { id:`cx181`,content:`catch up`,meaning:`叙旧；近况互通`,category:`social`,usage:`Let's catch up soon 高频`,example:`It's been ages — let's catch up over coffee.`,difficulty:`beginner` },
   { id:`cx182`,content:`get together`,meaning:`聚会；相聚`,category:`social`,usage:`名词 get-together`,example:`We're getting together this Saturday for a BBQ.`,difficulty:`beginner` },
   { id:`cx183`,content:`a social butterfly`,meaning:`社交达人；交际花`,category:`social`,usage:`形容活跃于各社交圈`,example:`My sister is a social butterfly — she knows everyone.`,difficulty:`intermediate` },
-  { id:`cx184`,content:` RSVP`,meaning:`回复是否出席（请柬用语）`,category:`social`,usage:`源自法语，请柬高频`,example:`Please RSVP by Friday so we can plan the seating.`,difficulty:`advanced` },
+  { id:`cx184`,content:`RSVP`,meaning:`回复是否出席（请柬用语）`,category:`social`,usage:`源自法语，请柬高频`,example:`Please RSVP by Friday so we can plan the seating.`,difficulty:`advanced` },
   { id:`cx185`,content:`give someone a hand`,meaning:`帮某人一把；鼓掌`,category:`social`,usage:`双义：帮忙/鼓掌`,example:`Can you give me a hand with these boxes?`,difficulty:`beginner` },
   { id:`cx186`,content:`my place`,meaning:`我家`,category:`social`,usage:`邀请到家的口语说法`,example:`Come over to my place for dinner tonight.`,difficulty:`beginner` },
   { id:`cx187`,content:`meet up`,meaning:`碰头；约见`,category:`social`,usage:`meet up with someone`,example:`Let's meet up after class.`,difficulty:`beginner` },

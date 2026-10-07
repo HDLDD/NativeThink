@@ -22,6 +22,8 @@ import {
   Shuffle,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Brain,
   Layers,
 } from 'lucide-react';
@@ -379,6 +381,38 @@ export default function ChunkTrainingPage() {
     if (next.has(letter)) next.delete(letter); else next.add(letter);
     setExpandedLetters(next);
   };
+
+  /**
+   * 详情面板「上一项 / 下一项」走的顺序 = 列表**实际渲染**的顺序（按 A-Z 分段展平），
+   * 不是排序数组的原序 —— 两边不一致的话，按下去看到的邻居和列表里的邻居就不是同一个。
+   */
+  const phraseNavList = useMemo(() => {
+    const out: IChunk[] = [];
+    for (const letter of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
+      for (const c of filteredPhraseBank) { if (c.content[0]?.toUpperCase() === letter) out.push(c); }
+    }
+    return out;
+  }, [filteredPhraseBank]);
+  const phraseNavIdx = selectedPhrase ? phraseNavList.findIndex((c) => c.id === selectedPhrase.id) : -1;
+  const gotoPhrase = (delta: number) => {
+    const next = phraseNavList[phraseNavIdx + delta];
+    if (!next) return;
+    setSelectedPhrase(next);
+    // 目标可能落在默认折叠的字母段里 —— 先把那段展开，列表才跟得上详情
+    const letter = (next.content[0] || '').toUpperCase();
+    if (letter && !expandedLetters.has(letter)) { const s = new Set(expandedLetters); s.add(letter); setExpandedLetters(s); }
+    requestAnimationFrame(() => document.getElementById(`phrase-item-${next.id}`)?.scrollIntoView({ block: 'nearest' }));
+  };
+  /**
+   * 窄屏下详情排在列表下方（两栏都是 col-span-12），点了条目却看不见详情等于没响应 ——
+   * 只把详情滚进视野。桌面两栏并排，滚它会把列表推出屏幕，所以 lg 以上不动。
+   */
+  const phraseDetailRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!selectedPhrase) return;
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) return;
+    phraseDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [selectedPhrase?.id]);
   const [phraseExamples, setPhraseExamples] = useState<Record<string, { en: string; zh: string }[]>>(() => {
     try { const s = safeStorage.getItem('__nativethink_phrase_examples'); return s ? JSON.parse(s) : {}; } catch { return {}; }
   });
@@ -2344,7 +2378,9 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-12 gap-4" style={{ height: '520px' }}>
+              {/* 定高只给桌面两栏用：手机上左右都是 col-span-12，两行内容挤进 520px 的盒子里
+                  会溢出，详情栏就盖在列表上面 —— 表现成"一次只能看一个短语、列表点不动" */}
+              <div className="grid grid-cols-12 gap-4 lg:h-[520px]">
                 {/* Left: Phrase list with meanings */}
                 <div className="col-span-12 lg:col-span-5 flex flex-col min-h-0">
                   {/* 词书选择器 */}
@@ -2396,7 +2432,9 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                       );
                     })}
                   </div>
-                  <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                  {/* 手机上给列表自己一个有界的滚动区（否则整页无限长，详情永远在屏幕外）；
+                      桌面靠父级 520px + flex-1 撑满，不需要 max-h */}
+                  <div className="flex-1 overflow-y-auto space-y-4 pr-1 max-h-[52vh] lg:max-h-none">
                     {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => {
                       const chunks = filteredPhraseBank.filter((c) => c.content[0]?.toUpperCase() === letter);
                       if (chunks.length === 0) return null;
@@ -2410,6 +2448,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                             return (
                               <button
                                 key={chunk.id}
+                                id={`phrase-item-${chunk.id}`}
                                 onClick={() => setSelectedPhrase(chunk)}
                                 className={cn(
                                   'w-full text-left px-3 py-2.5 rounded-xl transition-all mb-1',
@@ -2444,7 +2483,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                 </div>
 
                 {/* Right: Phrase detail */}
-                <div className="col-span-12 lg:col-span-7 lg:border-l lg:border-border lg:pl-4 flex flex-col min-h-0">
+                <div ref={phraseDetailRef} className="col-span-12 lg:col-span-7 lg:border-l lg:border-border lg:pl-4 flex flex-col min-h-0">
                   {selectedPhrase ? (
                     <div className="flex-1 flex flex-col min-h-0">
                       {/* Phrase header */}
@@ -2461,6 +2500,19 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
+                          {/* 上下切换：手机上列表在屏幕外，没有这两个按钮就只能"一次看一个" */}
+                          <Button variant="ghost" size="icon" onClick={() => gotoPhrase(-1)} disabled={phraseNavIdx <= 0}
+                            aria-label="上一个短语" className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal">
+                            <ChevronUp className="size-4" />
+                          </Button>
+                          <span className="text-[9px] font-black text-muted-foreground tabular-nums min-w-11 text-center">
+                            {phraseNavIdx >= 0 ? `${phraseNavIdx + 1}/${phraseNavList.length}` : `共 ${phraseNavList.length}`}
+                          </span>
+                          <Button variant="ghost" size="icon" onClick={() => gotoPhrase(1)}
+                            disabled={phraseNavIdx < 0 || phraseNavIdx >= phraseNavList.length - 1}
+                            aria-label="下一个短语" className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal">
+                            <ChevronDown className="size-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => tts.speak(selectedPhrase.content)} className="rounded-xl size-9 text-muted-foreground hover:text-ink-teal">
                             <Volume2 className="size-5" />
                           </Button>
