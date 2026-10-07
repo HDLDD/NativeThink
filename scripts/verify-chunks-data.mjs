@@ -180,6 +180,8 @@ ok(poolFind.length === 1, 'C9 断点续学按 content find 不再歧义（去重
 const stripComments = (x) => x.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
 const pageCode = stripComments(srcPage);
 const cardsCode = stripComments(srcCards);
+/** 出现次数一律用 split 数（拼 RegExp 要转义 [] / # 这些，转义写漏就是静默少算 —— D19 第一版就这么假红过一次） */
+const count = (hay, needle) => hay.split(needle).length - 1;
 
 /* ───────────── D. 接线静态锁 ───────────── */
 ok(/return dedupeChunks\(MOCK_CHUNKS\.filter\(/.test(pageCode),
@@ -204,8 +206,13 @@ ok(!/style=\{\{ height: '520px' \}\}/.test(pageCode) && /lg:h-\[520px\]/.test(pa
   'D9 定高只给桌面两栏 —— 手机上左右都是 col-span-12，写死 520px 会让详情溢出盖住列表（只能看一条）');
 ok(/max-h-\[52vh\] lg:max-h-none/.test(pageCode),
   'D10 手机侧列表自带滚动上界（否则整页无限长，详情永远在屏幕外）');
-ok(/aria-label="上一个短语"[\s\S]{0,900}aria-label="下一个短语"/.test(pageCode) && /gotoPhrase\(-1\)[\s\S]{0,900}gotoPhrase\(1\)/.test(pageCode),
-  'D11 详情头部有上下切换（列表在屏幕外时，这是唯一能继续浏览的手段）');
+/* 上下切换：只量"按钮自己"（handler 与 aria-label 在同一元素上），不量两个按钮之间的间距
+   —— 间距版被版式改动误伤过两次（600→900→932），而它真正要守的是"方向没接反、按钮没被删" */
+ok(/onClick=\{\(\) => gotoPhrase\(-1\)\}[\s\S]{0,200}aria-label="上一个短语"/.test(pageCode)
+    && /onClick=\{\(\) => gotoPhrase\(1\)\}[\s\S]{0,200}aria-label="下一个短语"/.test(pageCode)
+    && count(pageCode, 'aria-label="上一个短语"') === 1 && count(pageCode, 'aria-label="下一个短语"') === 1,
+  'D11 详情头部有上下切换，且各自绑到正确方向（列表在屏幕外时这是唯一能继续浏览的手段）',
+  `prev=${count(pageCode, 'aria-label="上一个短语"')} next=${count(pageCode, 'aria-label="下一个短语"')}`);
 const navPredicateOk = /for \(const letter of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'\)[\s\S]{0,160}c\.content\[0\]\?\.toUpperCase\(\) === letter/.test(pageCode);
 const listPredicateOk = /filteredPhraseBank\.filter\(\(c\) => c\.content\[0\]\?\.toUpperCase\(\) === letter\)/.test(pageCode);
 ok(navPredicateOk && listPredicateOk,
@@ -213,6 +220,39 @@ ok(navPredicateOk && listPredicateOk,
   `nav=${navPredicateOk} list=${listPredicateOk}`);
 ok(/window\.matchMedia\('\(min-width: 1024px\)'\)/.test(pageCode),
   'D13 只有窄屏才把详情滚进视野（桌面两栏并排，滚它会把列表推出屏幕）');
+ok(/return dedupeChunks\(sortedChunks\);/.test(pageCode) && /return dedupeChunks\(\[\.\.\.phraseBankData\]\.sort/.test(pageCode),
+  'D14 短语库**两条数据源**都去重（真机 2.0.54 实测漏了这条：在「语块短语」里搜 call the shots 出 2 条）');
+
+/* ── 显示语言对齐（2026-10-07 用户反馈：「显示模块模仿语块库的，不然太难看了」）
+   两个列表各写一份卡片类，漂移是必然的；这里把"同一套"钉成字符串比对。 ── */
+const ROW_CARD = "'w-full text-left p-3 rounded-2xl transition-all duration-200 border-2";
+const ROW_SELECTED = 'border-[#00B894] bg-[#00B894]/5 shadow-sm';
+const DETAIL_FRAME = 'rounded-[32px] border-2 border-[#00B894]/20 shadow-sm overflow-hidden';
+const FAV_BTN = 'rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal';
+const SPEAK_BTN = 'e.stopPropagation(); tts.speak(chunk.content)';
+const libRow = pageCode.slice(pageCode.indexOf('onClick={() => setDetailChunk(chunk)}'), pageCode.indexOf('onClick={() => setDetailChunk(chunk)}') + 700);
+const phRow = pageCode.slice(pageCode.indexOf('id={`phrase-item-'), pageCode.indexOf('id={`phrase-item-') + 900);
+ok(pageCode.includes('onClick={() => setDetailChunk(chunk)}') && pageCode.includes('id={`phrase-item-'),
+  'D15 两个列表的行锚点都还在（下面几条的比对不是空转）');
+ok(libRow.includes(ROW_CARD) && libRow.includes(ROW_SELECTED),
+  'D16 正对照：语块库行仍是这套卡片类（改了它就要同步改短语库，不许只改一边）');
+ok(phRow.includes(ROW_CARD) && phRow.includes(ROW_SELECTED),
+  'D17 短语库行与语块库行**同一套**卡片类（p-3 rounded-2xl border-2 + 选中 teal 环 + 同一 hover 语言）');
+ok(count(pageCode, SPEAK_BTN) === 2,
+  'D18 两个列表的行内都有独立朗读按钮（点行只选中，朗读走喇叭）', `count=${count(pageCode, SPEAK_BTN)}`);
+ok(count(pageCode, DETAIL_FRAME) === 2,
+  'D19 两个详情面板共用同一个 Card 外框（短语详情原先是裸内容贴在页面底上，没有面板感）',
+  `frames=${count(pageCode, DETAIL_FRAME)}`);
+/* FAV_BTN 这套按钮类全站有 4 处，所以只能圈定"短语详情那一段"来判位置。
+   区间用 Card 自己的 </Card> 收尾，不写死长度 —— 详情里有例句列表，长度会随内容漂。 */
+const phDetailStart = pageCode.indexOf('<Card className="flex-1 flex flex-col min-h-0 rounded-[32px]');
+const phDetailEnd = pageCode.indexOf('</Card>', phDetailStart);
+const phDetail = phDetailStart > 0 && phDetailEnd > phDetailStart ? pageCode.slice(phDetailStart, phDetailEnd) : '';
+ok(phDetail.includes(FAV_BTN) && phDetail.includes('AI 生成更多')
+    && phDetail.indexOf('AI 生成更多') < phDetail.indexOf(FAV_BTN)
+    && !phDetail.includes('aria-label="收藏这个短语"'),
+  'D20 收藏按语块库口径放在详情**底部动作条**（挂在标题行会把标题挤成三行）',
+  `len=${phDetail.length} fav=${phDetail.indexOf(FAV_BTN)} ex=${phDetail.indexOf('AI 生成更多')}`);
 
 /* ───────── 汇总 ───────── */
 let failed = 0;

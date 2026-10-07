@@ -361,8 +361,11 @@ export default function ChunkTrainingPage() {
   }, [phraseBankLevel]);
   /** 短语库实际展示的数据：选了词书 → 用词书搭配；没选 → 用原有语块 */
   const phraseBankSorted = useMemo(() => {
-    if (!phraseBankLevel || phraseBankData.length === 0) return sortedChunks;
-    return [...phraseBankData].sort((a, b) => a.content.toLowerCase().localeCompare(b.content.toLowerCase()));
+    // 两条来源都要去重：call the shots 这种在 daily/workplace 各登记过一次的短语，
+    // 在短语库里会连着出现两遍（真机 2.0.54 实测搜一次出 2 条），用户看到的就是"重复条目"。
+    // 放在排序之后 → 保留的是字母序里第一条，顺序稳定、导航表与列表同一份。
+    if (!phraseBankLevel || phraseBankData.length === 0) return dedupeChunks(sortedChunks);
+    return dedupeChunks([...phraseBankData].sort((a, b) => a.content.toLowerCase().localeCompare(b.content.toLowerCase())));
   }, [phraseBankLevel, phraseBankData, sortedChunks]);
   const [phraseBankSearch, setPhraseBankSearch] = useState('');
   const filteredPhraseBank = useMemo(() => {
@@ -2353,17 +2356,16 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   <div className="size-12 rounded-2xl bg-sky-50 dark:bg-sky-500/15 text-sky-500 flex items-center justify-center">
                     <BookOpen className="size-5.5" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <CardTitle className="text-xl font-[900] italic text-foreground">短语库</CardTitle>
                     <CardDescription className="text-sm font-medium mt-1">
                       {phraseBankLevel
                         ? `${PHRASE_LEVEL_LABELS[phraseBankLevel as never] || phraseBankLevel} · ${filteredPhraseBank.length} 条`
-                        : `语块短语 ${allChunks.length} 条 · 选词书可切换搭配库`}
+                        : `语块短语 ${phraseBankSorted.length} 条 · 选词书可切换搭配库`}
                     </CardDescription>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-muted-foreground/50">点击短语即可朗读</span>
+                <div className="flex items-center gap-2 shrink-0">
                   <Button
                     variant="outline"
                     size="sm"
@@ -2451,18 +2453,34 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                 id={`phrase-item-${chunk.id}`}
                                 onClick={() => setSelectedPhrase(chunk)}
                                 className={cn(
-                                  'w-full text-left px-3 py-2.5 rounded-xl transition-all mb-1',
+                                  'w-full text-left p-3 rounded-2xl transition-all duration-200 border-2 mb-1',
                                   selectedPhrase?.id === chunk.id
-                                    ? 'bg-[#00B894]/10 border border-[#00B894]/30'
-                                    : 'bg-muted/20 hover:bg-muted/50 border border-transparent',
+                                    ? 'border-[#00B894] bg-[#00B894]/5 shadow-sm'
+                                    : 'border-transparent bg-muted/30 hover:bg-muted hover:border-border',
                                 )}
                               >
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-sm font-black text-foreground truncate flex-1">{chunk.content}</span>
-                                  <span className="text-[9px] font-bold text-muted-foreground shrink-0">{exCount}例</span>
-                                  <Badge variant="secondary" className="shrink-0 text-[8px] font-black rounded-full px-1 py-0 bg-muted">{getDifficultyAbbr(chunk.difficulty)}</Badge>
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); tts.speak(chunk.content); }}
+                                        className="shrink-0 text-muted-foreground/40 hover:text-ink-teal transition-colors"
+                                        title={`朗读 "${chunk.content}"`}
+                                      >
+                                        <Volume2 className="size-3.5" />
+                                      </button>
+                                      <span className="text-sm font-black text-foreground">{chunk.content}</span>
+                                      {chunk.id.startsWith('ai_') && (
+                                        <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
+                                      )}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{chunk.meaning}</p>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0 pt-0.5">
+                                    <span className="text-[9px] font-bold text-muted-foreground">{exCount}例</span>
+                                    <Badge variant="secondary" className="text-[8px] font-black rounded-full px-1.5 py-0 bg-background/60">{getDifficultyAbbr(chunk.difficulty)}</Badge>
+                                  </div>
                                 </div>
-                                <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{chunk.meaning}</p>
                               </button>
                             );
                           })}
@@ -2483,155 +2501,169 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                 </div>
 
                 {/* Right: Phrase detail */}
-                <div ref={phraseDetailRef} className="col-span-12 lg:col-span-7 lg:border-l lg:border-border lg:pl-4 flex flex-col min-h-0">
+                <div ref={phraseDetailRef} className="col-span-12 lg:col-span-7 flex flex-col min-h-0">
                   {selectedPhrase ? (
-                    <div className="flex-1 flex flex-col min-h-0">
-                      {/* Phrase header */}
-                      <div className="flex items-center justify-between mb-4 shrink-0">
-                        <div>
-                          <h3 className="text-2xl font-black italic text-foreground">{selectedPhrase.content}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge className="text-[9px] font-black uppercase rounded-full px-2 py-0.5 bg-sky-100 dark:bg-sky-500/15 text-sky-600 border-none">
+                    <Card className="flex-1 flex flex-col min-h-0 rounded-[32px] border-2 border-[#00B894]/20 shadow-sm overflow-hidden">
+                      <CardContent className="p-4 lg:p-6 flex-1 flex flex-col min-h-0">
+                        {/* Phrase header —— 与语块库详情同一套版式：徽章在上、标题独占一行、控件 shrink-0 */}
+                        <div className="shrink-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-3">
+                            {selectedPhrase.id.startsWith('ai_') && (
+                              <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
+                            )}
+                            <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-sky-100 dark:bg-sky-500/15 text-sky-600 border-none">
                               {CATEGORY_LABELS[selectedPhrase.category] || selectedPhrase.category}
                             </Badge>
-                            <Badge variant="secondary" className="text-[9px] font-black uppercase rounded-full px-2 py-0.5 bg-muted">
+                            <Badge variant="secondary" className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-muted">
                               {getDifficultyLabel(selectedPhrase.difficulty)}
                             </Badge>
+                            <span className="ml-auto text-[9px] font-black text-muted-foreground tabular-nums">
+                              {phraseNavIdx >= 0 ? `${phraseNavIdx + 1}/${phraseNavList.length}` : `共 ${phraseNavList.length}`}
+                            </span>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {/* 上下切换：手机上列表在屏幕外，没有这两个按钮就只能"一次看一个" */}
-                          <Button variant="ghost" size="icon" onClick={() => gotoPhrase(-1)} disabled={phraseNavIdx <= 0}
-                            aria-label="上一个短语" className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal">
-                            <ChevronUp className="size-4" />
-                          </Button>
-                          <span className="text-[9px] font-black text-muted-foreground tabular-nums min-w-11 text-center">
-                            {phraseNavIdx >= 0 ? `${phraseNavIdx + 1}/${phraseNavList.length}` : `共 ${phraseNavList.length}`}
-                          </span>
-                          <Button variant="ghost" size="icon" onClick={() => gotoPhrase(1)}
-                            disabled={phraseNavIdx < 0 || phraseNavIdx >= phraseNavList.length - 1}
-                            aria-label="下一个短语" className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal">
-                            <ChevronDown className="size-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => tts.speak(selectedPhrase.content)} className="rounded-xl size-9 text-muted-foreground hover:text-ink-teal">
-                            <Volume2 className="size-5" />
-                          </Button>
-                          <Button
-                            variant="ghost" size="icon"
-                            onClick={() => toggleFavorite(selectedPhrase)}
-                            className={cn('rounded-xl size-9', isFavorited(selectedPhrase.content, 'chunk') ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')}
-                          >
-                            <Heart className={cn('size-5', isFavorited(selectedPhrase.content, 'chunk') && 'fill-current')} />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Meaning & Usage */}
-                      <div className="space-y-3 mb-4 shrink-0">
-                        <div className="p-4 rounded-2xl bg-muted/30">
-                          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">释义</p>
-                          <p className="text-base font-bold text-foreground">{selectedPhrase.meaning}</p>
-                        </div>
-                        {selectedPhrase.introduction && (
-                          <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/8 dark:to-teal-500/8 border border-[#00B894]/10">
-                            <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal mb-1">English Introduction</p>
-                            <p className="text-sm text-foreground/80 leading-relaxed italic">{selectedPhrase.introduction}</p>
-                          </div>
-                        )}
-                        <div className="p-3 rounded-2xl bg-muted/20">
-                          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">使用说明</p>
-                          <p className="text-sm text-foreground/80">{selectedPhrase.usage}</p>
-                        </div>
-                      </div>
-
-                      {/* Examples with translations */}
-                      <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
-                        <div className="flex items-center justify-between sticky top-0 bg-background/90 py-1 z-10">
-                          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                            例句 · {(phraseExamples[selectedPhrase.id]?.length || 0) + 1} 条
-                          </p>
-                          <Button
-                            variant="ghost" size="sm"
-                            onClick={() => handleGeneratePhraseExamples(selectedPhrase)}
-                            className="rounded-xl text-[10px] font-bold text-violet-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-500/15 gap-1 h-7"
-                          >
-                            <Wand2 className="size-3" />
-                            AI 生成更多
-                          </Button>
-                        </div>
-                        {/* Built-in example */}
-                        <div className="p-4 rounded-2xl bg-[#00B894]/5 dark:bg-[#00B894]/10 border border-[#00B894]/10">
-                          <p className="text-xs font-black uppercase tracking-wider text-ink-teal mb-1.5">内置例句</p>
-                          <p className="text-sm text-foreground italic leading-relaxed">「{cleanText(selectedPhrase.example)}」</p>
-                          {(selectedPhrase.exampleZh || exampleTranslations[selectedPhrase.id]) ? (
-                            <p className="text-xs text-muted-foreground mt-1.5 font-medium">
-                              {selectedPhrase.exampleZh || exampleTranslations[selectedPhrase.id]}
-                            </p>
-                          ) : (
-                            <button
-                              onClick={() => handleTranslateExample(selectedPhrase)}
-                              disabled={exampleTransLoading === selectedPhrase.id}
-                              className="text-xs text-violet-500 hover:text-violet-600 font-medium mt-1.5 transition-colors"
-                            >
-                              {exampleTransLoading === selectedPhrase.id ? '翻译中...' : '翻译例句'}
-                            </button>
-                          )}
-                          <div className="flex items-center gap-2 mt-2">
-                            <Button variant="ghost" size="icon" onClick={() => tts.speak(selectedPhrase.example, { rate: 0.9 })} className="rounded-lg size-6 text-muted-foreground hover:text-ink-teal">
-                              <Volume2 className="size-3" />
+                          <div className="flex items-center gap-2 mb-4">
+                            {/* 上下切换：手机上列表在屏幕外，没有这两个按钮就只能"一次看一个" */}
+                            <Button variant="ghost" size="icon" onClick={() => gotoPhrase(-1)} disabled={phraseNavIdx <= 0}
+                              aria-label="上一个短语" className="rounded-xl size-7 shrink-0 text-muted-foreground hover:text-ink-teal">
+                              <ChevronUp className="size-4" />
                             </Button>
-                            <Button
-                              variant="ghost" size="icon"
-                              onClick={() => {
-                                if (isFavorited(selectedPhrase.example, 'expression')) {
-                                  const fav = favorites.find((f) => f.content === selectedPhrase.example && f.type === 'expression');
-                                  if (fav) removeFavorite(fav.id);
-                                } else {
-                                  addFavorite({ type: 'expression', content: selectedPhrase.example, meaning: selectedPhrase.meaning, category: selectedPhrase.category });
-                                }
-                              }}
-                              className={cn('rounded-lg size-6', isFavorited(selectedPhrase.example, 'expression') ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')}
-                            >
-                              <Heart className={cn('size-3', isFavorited(selectedPhrase.example, 'expression') && 'fill-current')} />
+                            <h3 className="text-2xl font-black italic text-foreground tracking-tight flex-1 min-w-0">
+                              {selectedPhrase.content}
+                            </h3>
+                            <Button variant="ghost" size="icon" onClick={() => tts.speak(selectedPhrase.content)} className="rounded-xl size-8 shrink-0 text-muted-foreground hover:text-ink-teal">
+                              <Volume2 className="size-4.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => gotoPhrase(1)}
+                              disabled={phraseNavIdx < 0 || phraseNavIdx >= phraseNavList.length - 1}
+                              aria-label="下一个短语" className="rounded-xl size-7 shrink-0 text-muted-foreground hover:text-ink-teal">
+                              <ChevronDown className="size-4" />
                             </Button>
                           </div>
                         </div>
-                        {/* AI-generated examples */}
-                        {(phraseExamples[selectedPhrase.id] || []).map((ex, i) => (
-                          <div key={i} className="p-4 rounded-2xl bg-violet-50/30 dark:bg-violet-500/5 border border-violet-100 dark:border-violet-500/10 group/ex">
-                            <div className="flex items-center justify-between mb-1">
-                              <p className="text-[9px] font-black uppercase tracking-wider text-violet-500">AI 例句 {i + 1}</p>
-                              <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" onClick={() => tts.speak(ex.en, { rate: 0.9 })} className="rounded-lg size-5 text-muted-foreground hover:text-violet-500 opacity-0 group-hover/ex:opacity-100 transition-opacity">
-                                  <Volume2 className="size-2.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost" size="icon"
-                                  onClick={() => {
-                                    if (isFavorited(ex.en, 'expression')) {
-                                      const fav = favorites.find((f) => f.content === ex.en && f.type === 'expression');
-                                      if (fav) removeFavorite(fav.id);
-                                    } else {
-                                      addFavorite({ type: 'expression', content: ex.en, meaning: ex.zh, category: selectedPhrase.category });
-                                    }
-                                  }}
-                                  className={cn('rounded-lg size-5', isFavorited(ex.en, 'expression') ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500 opacity-0 group-hover/ex:opacity-100 transition-opacity')}
-                                >
-                                  <Heart className={cn('size-2.5', isFavorited(ex.en, 'expression') && 'fill-current')} />
-                                </Button>
-                              </div>
+
+                        {/* Meaning & Usage */}
+                        <div className="space-y-4 mb-4 shrink-0">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">释义</p>
+                            <p className="text-lg font-bold text-foreground">{selectedPhrase.meaning}</p>
+                          </div>
+                          {selectedPhrase.introduction && (
+                            <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/8 dark:to-teal-500/8 border border-[#00B894]/10">
+                              <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal mb-1">English Introduction</p>
+                              <p className="text-sm text-foreground/80 leading-relaxed italic">{selectedPhrase.introduction}</p>
                             </div>
-                            <p className="text-sm text-foreground italic leading-relaxed">「{cleanText(ex.en)}」</p>
-                            <p className="text-xs text-muted-foreground mt-1.5 pl-2 border-l-2 border-violet-300 dark:border-violet-500/30">{ex.zh}</p>
+                          )}
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">使用场景</p>
+                            <p className="text-sm text-foreground/80 font-medium">{selectedPhrase.usage}</p>
                           </div>
-                        ))}
-                        {(phraseExamples[selectedPhrase.id] || []).length === 0 && (
-                          <div className="text-center py-6 text-muted-foreground">
-                            <p className="text-xs">点击"AI 生成更多"为这个短语创建更多例句</p>
+                        </div>
+
+                        {/* Examples with translations */}
+                        <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
+                          <div className="flex items-center justify-between sticky top-0 bg-background/90 py-1 z-10">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                              例句 · {(phraseExamples[selectedPhrase.id]?.length || 0) + 1} 条
+                            </p>
+                            <Button
+                              variant="ghost" size="sm"
+                              onClick={() => handleGeneratePhraseExamples(selectedPhrase)}
+                              className="rounded-xl text-[10px] font-bold text-violet-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-500/15 gap-1 h-7"
+                            >
+                              <Wand2 className="size-3" />
+                              AI 生成更多
+                            </Button>
                           </div>
-                        )}
-                      </div>
-                    </div>
+                          {/* Built-in example */}
+                          <div className="p-4 rounded-2xl bg-[#00B894]/5 dark:bg-[#00B894]/10 border border-[#00B894]/10">
+                            <p className="text-xs font-black uppercase tracking-wider text-ink-teal mb-1.5">内置例句</p>
+                            <p className="text-sm text-foreground italic leading-relaxed">「{cleanText(selectedPhrase.example)}」</p>
+                            {(selectedPhrase.exampleZh || exampleTranslations[selectedPhrase.id]) ? (
+                              <p className="text-xs text-muted-foreground mt-1.5 font-medium">
+                                {selectedPhrase.exampleZh || exampleTranslations[selectedPhrase.id]}
+                              </p>
+                            ) : (
+                              <button
+                                onClick={() => handleTranslateExample(selectedPhrase)}
+                                disabled={exampleTransLoading === selectedPhrase.id}
+                                className="text-xs text-violet-500 hover:text-violet-600 font-medium mt-1.5 transition-colors"
+                              >
+                                {exampleTransLoading === selectedPhrase.id ? '翻译中...' : '翻译例句'}
+                              </button>
+                            )}
+                            <div className="flex items-center gap-2 mt-2">
+                              <Button variant="ghost" size="icon" onClick={() => tts.speak(selectedPhrase.example, { rate: 0.9 })} className="rounded-lg size-6 text-muted-foreground hover:text-ink-teal">
+                                <Volume2 className="size-3" />
+                              </Button>
+                              <Button
+                                variant="ghost" size="icon"
+                                onClick={() => {
+                                  if (isFavorited(selectedPhrase.example, 'expression')) {
+                                    const fav = favorites.find((f) => f.content === selectedPhrase.example && f.type === 'expression');
+                                    if (fav) removeFavorite(fav.id);
+                                  } else {
+                                    addFavorite({ type: 'expression', content: selectedPhrase.example, meaning: selectedPhrase.meaning, category: selectedPhrase.category });
+                                  }
+                                }}
+                                className={cn('rounded-lg size-6', isFavorited(selectedPhrase.example, 'expression') ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')}
+                              >
+                                <Heart className={cn('size-3', isFavorited(selectedPhrase.example, 'expression') && 'fill-current')} />
+                              </Button>
+                            </div>
+                          </div>
+                          {/* AI-generated examples */}
+                          {(phraseExamples[selectedPhrase.id] || []).map((ex, i) => (
+                            <div key={i} className="p-4 rounded-2xl bg-violet-50/30 dark:bg-violet-500/5 border border-violet-100 dark:border-violet-500/10 group/ex">
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="text-[9px] font-black uppercase tracking-wider text-violet-500">AI 例句 {i + 1}</p>
+                                <div className="flex items-center gap-1">
+                                  <Button variant="ghost" size="icon" onClick={() => tts.speak(ex.en, { rate: 0.9 })} className="rounded-lg size-5 text-muted-foreground hover:text-violet-500 opacity-0 group-hover/ex:opacity-100 transition-opacity">
+                                    <Volume2 className="size-2.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost" size="icon"
+                                    onClick={() => {
+                                      if (isFavorited(ex.en, 'expression')) {
+                                        const fav = favorites.find((f) => f.content === ex.en && f.type === 'expression');
+                                        if (fav) removeFavorite(fav.id);
+                                      } else {
+                                        addFavorite({ type: 'expression', content: ex.en, meaning: ex.zh, category: selectedPhrase.category });
+                                      }
+                                    }}
+                                    className={cn('rounded-lg size-5', isFavorited(ex.en, 'expression') ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500 opacity-0 group-hover/ex:opacity-100 transition-opacity')}
+                                  >
+                                    <Heart className={cn('size-2.5', isFavorited(ex.en, 'expression') && 'fill-current')} />
+                                  </Button>
+                                </div>
+                              </div>
+                              <p className="text-sm text-foreground italic leading-relaxed">「{cleanText(ex.en)}」</p>
+                              <p className="text-xs text-muted-foreground mt-1.5 pl-2 border-l-2 border-violet-300 dark:border-violet-500/30">{ex.zh}</p>
+                            </div>
+                          ))}
+                          {(phraseExamples[selectedPhrase.id] || []).length === 0 && (
+                            <div className="text-center py-6 text-muted-foreground">
+                              <p className="text-xs">点击"AI 生成更多"为这个短语创建更多例句</p>
+                            </div>
+                          )}
+                        </div>
+                        {/* 动作条：与语块库详情同款位置与样式（收藏从标题行挪到这里，标题才有整行宽度） */}
+                        <div className="flex gap-2 pt-2 shrink-0">
+                          <Button
+                            variant="outline"
+                            className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+                            onClick={() => toggleFavorite(selectedPhrase)}
+                          >
+                            <Heart
+                              className={cn(
+                                'size-4 mr-2',
+                                isFavorited(selectedPhrase.content, 'chunk') && 'fill-current text-rose-500',
+                              )}
+                            />
+                            {isFavorited(selectedPhrase.content, 'chunk') ? '已收藏' : '收藏'}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ) : (
                     <div className="flex-1 flex items-center justify-center text-muted-foreground">
                       <div className="text-center">
