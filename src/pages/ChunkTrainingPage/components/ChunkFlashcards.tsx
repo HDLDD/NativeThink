@@ -10,6 +10,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
+import { dedupeChunks } from '@/lib/chunk-dedupe';
 import {
   Layers, Check, X, RefreshCw, ArrowLeft, Volume2, Shuffle,
   Target, History, ChevronLeft, Zap,
@@ -87,7 +88,8 @@ export default function ChunkFlashcards({ allChunks }: { allChunks: IChunk[] }) 
   }, [allChunks]);
 
   const pool = useMemo(
-    () => categoryFilter === 'all' ? allChunks : allChunks.filter((c) => c.category === categoryFilter),
+    // 先按分类筛、再去重：分类视图各自保留自己那条，「全部」不会一轮出两张同短语卡
+    () => dedupeChunks(categoryFilter === 'all' ? allChunks : allChunks.filter((c) => c.category === categoryFilter)),
     [allChunks, categoryFilter],
   );
 

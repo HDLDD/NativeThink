@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MOCK_CHUNKS, type IChunk } from '@/data/chunks';
+import { dedupeChunks, expandMemorized, toggleMemorizedGroup } from '@/lib/chunk-dedupe';
 import { useFavorites } from '@/lib/use-favorites';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useStudyCredit, creditKey } from '@/lib/study-credit';
@@ -147,7 +148,8 @@ const AWKWARD_MAP: Record<string, string> = {
  * 都会让整套题重排：`currentQIdx` 没变，指向的题却换了，用户正在作答的题面被悄悄替换
  * （AGENTS.md 坑表「洗牌列表 + 下标定位当前题悄悄漂移」，思维训练/语块两页都踩过）。
  *
- * 随机感来自上层 `useStableShuffle(allChunks)` 的顺序（进页面洗一次，之后只增删）；
+ * 随机感来自上层 `useStableShuffle(uniqueChunks)` 的顺序（进页面洗一次，之后只增删；
+ * uniqueChunks 是按 content 去重后的池子，见 src/lib/chunk-dedupe.ts）；
  * 干扰项与选项位置用内容哈希推导 —— 同一道题的选项顺序固定，但不同题不会都落在同一个位置上。
  */
 function hashString(s: string): number {
@@ -315,6 +317,13 @@ export default function ChunkTrainingPage() {
   const allChunks = useMemo(() => {
     try { return [...customChunks, ...MOCK_CHUNKS]; } catch { return [...MOCK_CHUNKS]; }
   }, [customChunks]);
+
+  /**
+   * 洗牌/接龙/随机练习共用的**去重后**池子（同 content 只留第一条）。
+   * 必须 memo：`useStableShuffle` 依赖数组身份，内联 `dedupeChunks(allChunks)` 会每帧新数组，
+   * 正下方注释里记的就是这个坑（AI 生成/删除语块把正在接龙的语块悄悄换掉）。
+   */
+  const uniqueChunks = useMemo(() => dedupeChunks(allChunks), [allChunks]);
 
   // Phrase library: sorted alphabetically
   const sortedChunks = useMemo(() => {
@@ -528,7 +537,7 @@ export default function ChunkTrainingPage() {
 
   // Review memorized (Brain-toggled) chunks specifically
   const startMemorizedReview = (count?: number) => {
-    const memorized = allChunks.filter((c) => memorizedChunks.has(c.id));
+    const memorized = dedupeChunks(allChunks.filter((c) => memorizedChunks.has(c.id)));
     if (memorized.length === 0) {
       toast.info('还没有标记已记的语块，先去语块库标记吧');
       return;
@@ -618,7 +627,7 @@ export default function ChunkTrainingPage() {
    * 练习池的稳定洗牌顺序 —— 进页面洗一次，之后集合变化只做增量同步（新条目追加到末尾）。
    * 替换训练与「随便看看」都以它为准，所以 AI 生成/删除语块都不会让正在作答的题目漂移。
    */
-  const exercisePool = useStableShuffle(allChunks);
+  const exercisePool = useStableShuffle(uniqueChunks);
 
   /** 「随便看看」推荐（未学过的语块取 5 个）—— 顺序取自 exercisePool，不再各自洗牌 */
   const suggestPhrases = useMemo(
@@ -631,14 +640,16 @@ export default function ChunkTrainingPage() {
 
   // Split filtered chunks by source
   const filteredBuiltInChunks = useMemo(() => {
-    return MOCK_CHUNKS.filter((chunk) => {
+    // 去重放在筛选**之后**：分类视图各自保留自己那条（call the shots 在 daily 与 workplace
+    // 各登记过一次），只有「全部」把它们并成一条。见 src/lib/chunk-dedupe.ts
+    return dedupeChunks(MOCK_CHUNKS.filter((chunk) => {
       const matchesSearch =
         chunk.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
         chunk.meaning.includes(searchQuery);
       const matchesCategory = categoryFilter === 'all' || chunk.category === categoryFilter;
       const matchesDifficulty = difficultyFilter === 'all' || chunk.difficulty === difficultyFilter;
       return matchesSearch && matchesCategory && matchesDifficulty;
-    });
+    }));
   }, [searchQuery, categoryFilter, difficultyFilter]);
 
   const filteredAiChunks = useMemo(() => {
@@ -657,7 +668,8 @@ export default function ChunkTrainingPage() {
   const [memorizedChunks, setMemorizedChunks] = useState<Set<string>>(() => {
     try {
       const raw = safeStorage.getItem(MEMORIZED_KEY);
-      return raw ? new Set(JSON.parse(raw)) : new Set<string>();
+      // 历史数据里可能只标了同义两条中的一条 —— 读入时补齐成兄弟 id，界面才不会自相矛盾
+      return raw ? expandMemorized(JSON.parse(raw), MOCK_CHUNKS) : new Set<string>();
     } catch { return new Set<string>(); }
   });
   const [memoryFilter, setMemoryFilter] = useState<'all' | 'memorized' | 'unmemorized'>('all');
@@ -672,9 +684,15 @@ export default function ChunkTrainingPage() {
   const toggleMemorized = (chunkId: string) => {
     // updater 保持纯：StrictMode 会双调用更新函数，原先在里面写 safeStorage 等于写两遍
     // （见 src/lib/capped-cache.ts:32-35 的同款约定）。落盘交给下面的 persist effect。
-    const next = new Set(memorizedChunks);
-    if (next.has(chunkId)) { next.delete(chunkId); } else { next.add(chunkId); }
-    setMemorizedChunks(next);
+    const chunk = allChunks.find((c) => c.id === chunkId);
+    if (!chunk) {
+      const fallback = new Set(memorizedChunks);
+      if (fallback.has(chunkId)) fallback.delete(chunkId); else fallback.add(chunkId);
+      setMemorizedChunks(fallback);
+      return;
+    }
+    // 同 content 的兄弟 id 一起改：否则「已记」在两条视图里会互相矛盾
+    setMemorizedChunks(toggleMemorizedGroup(memorizedChunks, chunk, allChunks));
   };
 
   // Apply memory filter to built-in chunks
@@ -730,7 +748,7 @@ export default function ChunkTrainingPage() {
   const currentQuestion = replacementExercises[currentQIdx];
   // 接龙语块用**稳定洗牌**：此前 useMemo 依赖 allChunks 身份，AI 生成/删除语块都会
   // 触发重新洗牌 —— 正在接龙的当前语块被悄悄换掉
-  const chainShuffled = useStableShuffle(allChunks);
+  const chainShuffled = useStableShuffle(uniqueChunks);
   const chainChunks = useMemo(() => chainShuffled.slice(0, 10), [chainShuffled]);
 
   // AI-generated chain challenge

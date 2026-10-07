@@ -672,7 +672,7 @@ const MOCK_CHUNKS_BASE: IChunk[] = [
   { id:`c656`,content:`off the wall`,meaning:`古怪疯癫的`,category:`daily`,usage:`特别奇怪的想法`,example:`His ideas are always a bit off the wall.`,difficulty:`intermediate` },
   { id:`c657`,content:`old habits die hard`,meaning:`旧习难改`,category:`daily`,usage:`老习惯不容易改变`,example:`I still check my work email on vacation — old habits die hard.`,difficulty:`intermediate` },
   { id:`c658`,content:`on a silver platter`,meaning:`唾手可得`,category:`daily`,usage:`没有付出努力就得到`,example:`He expects everything to be handed to him on a silver platter.`,difficulty:`intermediate` },
-  { id:`c659`,content:`on cloud nine`,meaning:`在九重天上`,category:`daily`,usage:`极度欢欣`,example:`She's been on cloud nine ever since the engagement.`,difficulty:`intermediate` },
+  { id:`c659`,content:`on cloud nine`,meaning:`欣喜若狂`,category:`daily`,usage:`极度欢欣`,example:`She's been on cloud nine ever since the engagement.`,difficulty:`intermediate` },
   { id:`c660`,content:`on its last legs`,meaning:`快不行了`,category:`daily`,usage:`濒临报废或死亡`,example:`My laptop is on its last legs — I need a new one.`,difficulty:`intermediate` },
   { id:`c661`,content:`on second thought`,meaning:`转念一想`,category:`daily`,usage:`改变了之前的想法`,example:`On second thought maybe I'll stay home tonight.`,difficulty:`beginner` },
   { id:`c662`,content:`on the bright side`,meaning:`往好的方面看`,category:`daily`,usage:`从积极角度看`,example:`On the bright side the rain is good for the garden.`,difficulty:`beginner` },
