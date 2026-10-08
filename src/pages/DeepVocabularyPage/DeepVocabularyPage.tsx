@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
-import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, ArrowRight, Notebook, NotebookPen, BookMarked, Plane, GraduationCap, Briefcase, Award, Zap, Library, Globe, type LucideIcon } from 'lucide-react';
+import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, ArrowRight, Notebook, NotebookPen, BookMarked, Plane, GraduationCap, Briefcase, Award, Zap, Library, Layers, Globe, type LucideIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,6 +23,7 @@ import { queryWords, preloadLevels, isLevelReady, WORD_COUNTS, TOTAL_UNIQUE_WORD
 import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
 import DailyLearningMode from './components/DailyLearningMode';
 import FlashcardMode from './components/FlashcardMode';
+import PhraseFlashcardMode from './components/PhraseFlashcardMode';
 import QuickCardMode from './components/QuickCardMode';
 import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
 import CollocationsTab from './components/CollocationsTab';
@@ -83,6 +84,7 @@ const MODES: { key: string; label: string; icon: LucideIcon; color: string; desc
   { key: 'daily', label: '每日学习', icon: Brain, color: '#00B894', desc: '按计划每天学新词' },
   { key: 'quickcard', label: '快速闪卡', icon: Zap, color: '#0EA5E9', desc: '只单词 · 认识/不认识' },
   { key: 'flashcard', label: '复习检测', icon: RotateCw, color: '#6C5CE7', desc: 'SM-2 间隔记忆复习' },
+  { key: 'phrasecard', label: '短语闪卡', icon: Layers, color: '#14B8A6', desc: '九个考试短语库 · SM-2 闪卡' },
   { key: 'browse', label: '词库浏览', icon: Library, color: '#64748B', desc: '自由浏览全部词汇' },
   { key: 'collocations', label: '搭配学习', icon: Link2, color: '#F59E0B', desc: '常用搭配与短语' },
   { key: 'vocabtest', label: '词汇量测试', icon: Target, color: '#EC4899', desc: '1分钟估算词汇量' },
@@ -1161,6 +1163,10 @@ export default function DeepVocabularyPage() {
 
         <TabsContent value="flashcard" className="mt-0">
           <FlashcardMode level={selectedLevel} counts={counts} />
+        </TabsContent>
+
+        <TabsContent value="phrasecard" className="mt-0">
+          <PhraseFlashcardMode level={selectedLevel} />
         </TabsContent>
 
         <TabsContent value="browse" className="mt-0">

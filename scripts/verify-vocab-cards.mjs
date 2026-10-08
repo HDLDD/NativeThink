@@ -58,7 +58,8 @@ const SHARED_KEY = '__nativethink_vocab_autospeak';
 const qc = readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/QuickCardMode.tsx'), 'utf8');
 const dl = readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/DailyLearningMode.tsx'), 'utf8');
 const ct = readFileSync(join(ROOT, 'src/pages/ChunkTrainingPage/ChunkTrainingPage.tsx'), 'utf8');
-for (const [name, src] of [['快速闪卡', qc], ['每日学习', dl], ['语块复习', ct]]) {
+const pfm = readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/PhraseFlashcardMode.tsx'), 'utf8');
+for (const [name, src] of [['快速闪卡', qc], ['每日学习', dl], ['语块复习', ct], ['短语闪卡', pfm]]) {
   check(src.includes(SHARED_KEY), `${name} 读同一个自动发音持久化键（否则「共用此设置」是假话）`);
 }
 check(/const AUTO_SPEAK_KEY = '__nativethink_vocab_autospeak';/.test(qc), '快速闪卡定义共享键');
@@ -661,7 +662,7 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   /**
    * ⑧d 练习界面零提示（2026-09-30 用户要求：「不要在练习界面有任何提示」）
    *
-   * 三个练习模式文件里**剩下每一个 toast 调用点都必须逐字命中白名单**，白名单只有两类：
+   * 四个练习模式文件里**剩下每一个 toast 调用点都必须逐字命中白名单**，白名单只有两类：
    *   ① 失败 / 空队列 —— 不解释就变成"点了没反应"（AGENTS.md 坑表里那条）；
    *   ② 「不再出现」的撤销 —— 撤销按钮只挂在这条提示上，撤了就是丢功能。
    * 其余（档位名播报、连对里程碑、整轮完成、进场续学、自动发音开关、收藏、到期堆积、每日目标、
@@ -671,23 +672,26 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   const ALLOW_TOAST = [
     /上次的进度已失效/,
     /已把「\$\{word\.word\}」移出学习队列/,
+    /已把「\$\{card\.content\}」移出学习队列/,
     /搭配翻译失败/,
     /暂时没有可学的单词/,
     /收藏的词在词库里找不到了/,
   ];
-  for (const [name, src] of [['FlashcardMode', fc], ['DailyLearningMode', dl], ['QuickCardMode', qc]]) {
+  for (const [name, src] of [['FlashcardMode', fc], ['DailyLearningMode', dl], ['QuickCardMode', qc], ['PhraseFlashcardMode', pfm]]) {
     const lines = src.split('\n').map((l) => l.trim())
       .filter((l) => /(^|[^.\w])toast(\.\w+)?\(/.test(l) && !l.startsWith('//') && !l.startsWith('*') && !/from 'sonner'/.test(l));
     const bad = lines.filter((l) => !ALLOW_TOAST.some((re) => re.test(l)));
     check(lines.length > 0 && bad.length === 0,
       `⑧d ${name}：练习界面只剩白名单提示（失败/撤销），实测 ${lines.length} 处`, bad.join(' ⧸ ').slice(0, 160));
   }
-  check(!/连对 \$\{next\} 个|连对 \$\{n\} 个|完成一整轮|接着上次继续|已开启自动发音|已收藏「|已取消收藏「|到期复习 \$\{|每日目标已设为|已从生词本移除|切换至 \$\{|重练 \$\{|开始练收藏的|今日目标已完成|已恢复 \$\{/.test(fc + '\n' + dl + '\n' + qc),
-    '⑧d 播报类文案在三个练习模式里全部消失（新增提示必须先改这条白名单）');
-  check(/action: \{ label: '撤销'/.test(fc) && /action: \{ label: '撤销'/.test(dl),
+  check(!/连对 \$\{next\} 个|连对 \$\{n\} 个|完成一整轮|接着上次继续|已开启自动发音|已收藏「|已取消收藏「|到期复习 \$\{|每日目标已设为|已从生词本移除|切换至 \$\{|重练 \$\{|开始练收藏的|今日目标已完成|已恢复 \$\{/.test(fc + '\n' + dl + '\n' + qc + '\n' + pfm),
+    '⑧d 播报类文案在四个练习模式里全部消失（新增提示必须先改这条白名单）');
+  check(/action: \{ label: '撤销'/.test(fc) && /action: \{ label: '撤销'/.test(dl) && /action: \{ label: '撤销'/.test(pfm),
     '⑧d 正对照：「不再出现」的撤销入口仍挂在提示上（不许靠删功能变静默）');
   check(/连对 \{combo\}/.test(fc) && /今天新学 \{state\.todayLearned\.length\}\/\{dailyQuota\}/.test(fc) && /已评/.test(fc),
     '⑧d 正对照：反馈改由界面承担（连对 Flame 数字 / 今天新学 x/y / 已评计数在位）');
+  check(/连对 \{combo\}/.test(pfm) && /今天新学 \{state\.todayLearned\.length\}\/\{dailyQuota\}/.test(pfm) && /已评 \{sessionRated\}/.test(pfm),
+    '⑧d 正对照：短语闪卡同样以界面反馈替代提示（连对 / 今天新学 x/y / 已评 计数在位）');
 
   // ⑨ 释义必须带词性
   check(/cw\.partOfSpeech\}/.test(qc) && /tracking-wider text-ink-violet/.test(qc), '卡片释义行内显示词性');
@@ -770,6 +774,115 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     check(/'font-black italic text-foreground tracking-tight break-words min-w-0',/.test(src),
       `⑭ ${name}：词面保留 break-words（长词可以折，不再 nowrap 硬缩）`);
   }
+
+  /**
+   * ⑮ 短语闪卡（词汇深度页第 7 个模式，2026-10-09）——「复习检测」的短语库移植。
+   *
+   * 用户需求：「在词汇深度界面，做一个对各短语库进行学习的闪卡学习功能，功能需要模仿
+   * 复习闪卡的逻辑，实现其对应有的功能以及同样的优化体验，这样就可以不用挤在短语库那小的界面里」。
+   * 本节钉四件事，缺一条就不算"逐条移植"：
+   *   ① 接线：MODES 第 7 条 + TabsContent 挂载（漏了就是"两端都写了却点不到"）；
+   *   ② 数据与进度：9 个短语库懒加载 + 读取层去重；进度写 use-phrase-learning，与语块页
+   *      「短语复习 / 闪卡」同一份 SM-2（哪个入口学都算数）；
+   *   ③ 会话机制与复习检测逐条同构（冻结顺序 / 答错延迟重排 / 120·300ms 自动跳卡 /
+   *      0.18s 定长 tween / 共用自动发音键且默认开 / 断点续学 / 「不再出现」撤销出口）；
+   *   ④ 有意差异只有三条（空进度也能开轮=学习入口 / 无生词本助记 / 学习时长记 'chunks'）。
+   */
+  const dvp = readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx'), 'utf8');
+  const phraseLib = readFileSync(join(ROOT, 'src/lib/use-phrase-learning.ts'), 'utf8');
+
+  // ⑮a 接线：首页卡片 / 向导步骤 / 沉浸标题三处都从 MODES 表派生，登记一条就都带上
+  check(/\{ key: 'phrasecard', label: '短语闪卡', icon: Layers, color: '#14B8A6'/.test(dvp),
+    '⑮a MODES 登记第 7 个模式（首页卡片与向导步骤自动出现）');
+  check(/import PhraseFlashcardMode from '\.\/components\/PhraseFlashcardMode';/.test(dvp), '⑮a 组件被导入');
+  check(/<TabsContent value="phrasecard" className="mt-0">/.test(dvp) && /<PhraseFlashcardMode level=\{selectedLevel\} \/>/.test(dvp),
+    '⑮a TabsContent 挂载 + 传当前词书作默认短语库');
+  check(/MODES\.filter\(\(m\) => m\.key !== 'daily' && m\.key !== 'flashcard'\)/.test(dvp),
+    '⑮a 首页「其余模式」只排除每日学习/复习检测（把 phrasecard 加进排除名单＝把它藏起来）');
+
+  // ⑮b 数据与进度：懒加载 + 去重 + 共享存储
+  check(/loadPhrases\(bank\)\.then\(/.test(pfm), '⑮b 短语库按需懒加载（9 库共 ~7.6MB，不许全量进内存）');
+  check(/setEntries\(dedupeChunks\(mapped\)\)/.test(pfm), '⑮b 读取层去重（与语块页短语库同一口径）');
+  check(pfm.includes('`pbc_${bank}_${i}`'), '⑮b 映射成 IChunk 兼容 id 带库前缀（存储/复习逻辑零改动）');
+  check(pfm.includes('来源词：${e.sourceWord}'), '⑮b usage 保留来源词（短语库信息不丢）');
+  check(/usePhraseLearning\(entries\)/.test(pfm), '⑮b 进度走 usePhraseLearning（与语块页两个入口同一份 SM-2）');
+  check(/const \{ state, dueForReview, recordReview, setSuspended, dailyQuota, setDailyQuota, phraseKey \} = usePhraseLearning\(entries\);/.test(pfm),
+    '⑮b 用上 store 的全部扩展项（wrongCount/suspended/history 的行为才生效）');
+
+  // ⑮c 会话机制：与复习检测逐条同构
+  check(/const AUTO_SPEAK_KEY = '__nativethink_vocab_autospeak';/.test(pfm) && /safeStorage\.getItem\(AUTO_SPEAK_KEY\) !== '0'/.test(pfm),
+    '⑮c 自动发音共用词汇侧键且默认开（与其余四处同口径）');
+  check(/transition=\{\{ duration: 0\.18, ease: 'easeOut' \}\}/.test(pfm),
+    '⑮c 退场定长 tween 0.18（mode="wait" 下 spring 实测 ~400ms，是"下一张来得慢"的来源）');
+  check(/const delay = lastQualityRef\.current >= 3 \? 120 : 300;/.test(pfm) && /setTimeout\(\(\) => advanceRef\.current\(1\), delay\)/.test(pfm),
+    '⑮c 评分后 120/300ms 自动跳下一张（advanceRef 镜像避免定时器反复重置）');
+  check(/setSession\(createSessionOrder\(list\.map\(\(c\) => phraseKey\(c\)\)\)\)/.test(pfm),
+    '⑮c 会话顺序开始时冻结（不能直接用随评分变化的 queue 配下标）');
+  check(/if \(\(session\.relearnCounts\[key\] \?\? 0\) < MAX_RELEARN\) pendingRelearnRef\.current = key;/.test(pfm)
+    && /setSession\(scheduleRelearn\(session, currentIdx, pending\)\)/.test(pfm)
+    && /setIdx\(applies \? currentIdx : next\)/.test(pfm),
+    '⑮c 答错延迟重排：评分只记下、advance 时才插回（评分那刻同步重排会让自动跳转永远排不上）');
+  check(/markWithQuality\(\[0, 2, 3, 4, 5\]\[parseInt\(e\.key, 10\) - 1\]\)/.test(pfm),
+    '⑮c 键盘 1-5 映射 SM-2 五档 [0,2,3,4,5]');
+  check(/const MAX_DUE = 30;/.test(pfm) && /if \(dueCards\.length < MAX_DUE\) dueCards\.push\(c\);/.test(pfm),
+    '⑮c 到期封顶 30 张/轮');
+  check(/\n      if \(!dueSet\.has\(k\) \|\| seen\.has\(k\)\) continue;\n      seen\.add\(k\);/.test(pfm),
+    '⑮c 超额的到期卡也要记入 seen（否则它们会从"已学"分支再进场，本轮超过 30 张）');
+  check(/const fillCount = Math\.max\(0, 20 - dueCards\.length - otherCards\.length\);/.test(pfm),
+    '⑮c 空进度也能补新到 20 张开轮（学习入口；复习检测是纯复习口径，要求先有已学）');
+  check(/lastSpokenKey\.current = '';/.test(pfm) && (pfm.match(/lastSpokenKey\.current = '';/g) ?? []).length >= 3,
+    '⑮c 每开一轮/续学/换库都清空朗读去重键（否则新一轮第一张不出声）');
+  check(pfm.includes('`${card.content}. ${example}`'),
+    '⑮c 背面自动朗读是「短语 + 例句」一次 speak（拆两次会互相打断；same 时跳过重复例句）');
+  check(/toast\.success\(`已把「\$\{card\.content\}」移出学习队列`/.test(pfm)
+    && /action: \{ label: '撤销', onClick: \(\) => setSuspended\(card, false\) \}/.test(pfm),
+    '⑮c 「不再出现」带撤销出口（撤了就是丢功能）');
+  check(/const removed = session\.order\.filter\(\(k\) => k !== key\);/.test(pfm)
+    && /setIdx\(Math\.min\(currentIdx, Math\.max\(0, removed\.length - 1\)\)\);/.test(pfm)
+    && /if \(pendingRelearnRef\.current === key\) pendingRelearnRef\.current = null;/.test(pfm),
+    '⑮c 屏蔽后从本轮移除（下标夹紧）+ 撤销它的待重排（否则下次前进又插回）');
+  check(/const saved = loadPhraseSession\(bank\);/.test(pfm)
+    && /savePhraseSession\(bank, \{ order: session\.order, index: currentIdx, savedAt: Date\.now\(\) \}\)/.test(pfm),
+    '⑮c 断点续学：按库存/读（顺序 + 位置）');
+  check(/useEffect\(\(\) => \{ setRatedNow\(null\); \}, \[currentKey\]\);/.test(pfm)
+    && /const rated = !!currentKey && ratedKeys\.has\(currentKey\);/.test(pfm),
+    '⑮c 「刚评分」与「回看已评卡」两种状态分离（回看不自动跳、不出评分按钮）');
+  check(/const action = decideSwipe\(\{ dx, isFlipped, rated \}\);/.test(pfm),
+    '⑮c 滑动手势走同一张决策表 decideSwipe（未翻面→翻 / 未评→左右滑评分 / 已评→前后翻）');
+  check(/if \(document\.querySelector\('\[role="dialog"\]'\)\) return;/.test(pfm),
+    '⑮c 弹窗打开时不抢键盘（与复习检测同一条守卫）');
+  check(/addStudyMinutes\(0\.2, 'chunks'\)/.test(pfm) && !/creditOnce/.test(pfm),
+    '⑮c 学习时长翻面直计 0.2 分（内容域=短语，与语块闪卡同口径；详见 verify-study-credit ④）');
+  check(/不再出现/.test(pfm) && /恢复全部/.test(pfm) && /suspendedInBank > 0/.test(pfm),
+    '⑮c 屏蔽有出口：卡片「不再出现」+ 概览「恢复全部」（只作用于本库，与计数同口径）');
+  check(/const \[savedSession, setSavedSession\] = useState<ISavedPhraseSession \| null>\(\(\) => loadPhraseSession\(bank\)\)/.test(pfm)
+    && /接着上次（还剩 \{Math\.max\(0, savedSession\.order\.length - savedSession\.index\)\} 张）/.test(pfm),
+    '⑮c 概览给「接着上次」续学入口（带剩余张数）');
+  check(/开始学习（\$\{queue\.length\} 张卡片）/.test(pfm) && /PHRASE_LEVELS\.map\(\(lv\) => \(/.test(pfm),
+    '⑮c 概览有选库 chips 与开始按钮（9 个库任选）');
+  check(/h-\[72px\]/.test(pfm) && /未来 7 天复习量/.test(pfm),
+    '⑮c 7 天负担图容器高度容下「数值+柱+星期」三层（勿压回 h-12）');
+
+  // ⑮d 存储扩展：老存档可读（normalize）+ 屏蔽过滤 + 错词/新学/历史口径
+  check(/function normalize\(state: Partial<IPhraseLearningState> \| null \| undefined\): IPhraseLearningState \{/.test(phraseLib)
+    && (phraseLib.match(/return normalize\(/g) ?? []).length >= 4,
+    '⑮d 所有读档出口都过 normalize 补 todayLearned/history（UI 直读 state.todayLearned.length，漏一个就崩）');
+  check(/p\.nextReview <= now && p\.status !== 'new' && !p\.suspended/.test(phraseLib),
+    '⑮d 到期队列过滤「不再出现」（屏蔽的短语不许再从到期进来）');
+  check(/wrongCount: quality <= 2 \? \(existing\?\.wrongCount \|\| 0\) \+ 1 : 0/.test(phraseLib),
+    '⑮d 错词口径与词汇侧一致（quality<=2 累计，答对清零）');
+  check(/todayLearned: existing[\s\S]{0,60}\? prev\.todayLearned/.test(phraseLib),
+    '⑮d 「今天新学」只在首次复习时计入（重复复习同一条不虚报）');
+  check(/history\[day\] = \{ reviewed: cur\.reviewed \+ 1, good: cur\.good \+ \(quality >= 3 \? 1 : 0\) \};/.test(phraseLib),
+    '⑮d 每日历史按天分桶（本周学习量/正确率跨天回溯）');
+  check(/progress: \{ \.\.\.prev\.progress, \[key\]: \{ \.\.\.\(prev\.progress\[key\] \|\| base\), suspended \} \}/.test(phraseLib),
+    '⑮d setSuspended 对没学过的短语自动补记录（"没学过也能直接屏蔽"）');
+  check(/const PHRASE_SESSION_KEY_PREFIX = '__nativethink_phrase_session_';/.test(phraseLib)
+    && /if \(typeof p\.index !== 'number' \|\| p\.index < 0 \|\| p\.index >= p\.order\.length\) return null;/.test(phraseLib),
+    '⑮d 断点键按库分开（不覆盖单词侧 __nativethink_vocab_session_）+ 越界断点判无效');
+  check(/if \(safeStorage\.getItem\(STORAGE_KEY\) === json\) return;/.test(phraseLib),
+    '⑮d 一字不差就不写（掐掉下行重读→回写的云同步回声）');
+  check(/useSyncDown\(\(\) => \{/.test(phraseLib), '⑮d 云同步下行后重读（否则本机拿着陈旧状态覆盖远端）');
 }
 
 console.log('');console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);

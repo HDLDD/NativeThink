@@ -4,6 +4,16 @@ import { useSyncDown } from '@/lib/sync-down';
 import { formatDate } from '@/lib/utils';
 import type { IChunk } from '@/data/chunks';
 
+/**
+ * 短语/语块的 SM-2 学习进度存储（**单一权威源，三个消费者共用**）：
+ *  ① 语块页「短语复习」tab（ChunkTrainingPage）
+ *  ② 语块页「闪卡」tab（ChunkFlashcards）
+ *  ③ 词汇深度页「短语闪卡」（PhraseFlashcardMode，2026-10-09 新增）
+ * 进度按 content.toLowerCase() 记键，所以同一短语在哪个入口学都算同一份进度。
+ * wrongCount / suspended / todayLearned / history 是与词汇侧 use-word-learning 对齐的加法项，
+ * 老存档由 loadState 的 normalize 补齐，无需迁移。
+ */
+
 const STORAGE_KEY = '__nativethink_phrase_learning';
 const DAILY_QUOTA_KEY = '__nativethink_phrase_daily_quota';
 
@@ -15,17 +25,39 @@ export interface IPhraseProgress {
   repetitions: number;       // successful review count
   nextReview: number;        // Date.now() at next review time
   lastReview: number;        // timestamp
+  /** 答错累计（quality<=2 +1，答对清零）—— 错词重练队列用（与 use-word-learning 同口径） */
+  wrongCount?: number;
+  /** 用户主动「不再出现」：不进复习队列、不在补新里出现，进度保留可恢复 */
+  suspended?: boolean;
 }
 
 export interface IPhraseLearningState {
   progress: Record<string, IPhraseProgress>;
   todayReviewed: string[];   // phrase keys reviewed today
+  /** 今天首次复习的短语（= 今天新学）—— 概览「今天新学 x/y」用 */
+  todayLearned: string[];
   lastActiveDate: string;    // YYYY-MM-DD
+  /** 每日历史（YYYY-MM-DD → 计数）—— 「本周学习量/正确率」跨天回溯用（老数据免迁移） */
+  history?: Record<string, { reviewed: number; good: number }>;
 }
 
 function todayKey(): string {
   // 本地日期，避免东八区 00:00–07:59 仍落在 UTC「昨天」
   return formatDate(new Date());
+}
+
+/**
+ * 补齐缺省字段：老存档没有 todayLearned / history（UI 直接读 `state.todayLearned.length`），
+ * 不补齐会在读旧数据时崩掉。所有出口（含"新格式直接返回"那条）都必须过这里。
+ */
+function normalize(state: Partial<IPhraseLearningState> | null | undefined): IPhraseLearningState {
+  return {
+    progress: state?.progress ?? {},
+    todayReviewed: state?.todayReviewed ?? [],
+    todayLearned: state?.todayLearned ?? [],
+    lastActiveDate: state?.lastActiveDate ?? todayKey(),
+    history: state?.history,
+  };
 }
 
 function loadState(): IPhraseLearningState {
@@ -38,7 +70,7 @@ function loadState(): IPhraseLearningState {
         // Check if it's already the new format (object values with easeFactor)
         const firstValue = Object.values(parsed.progress)[0];
         if (firstValue && typeof firstValue === 'object' && 'easeFactor' in (firstValue as object)) {
-          return parsed;
+          return normalize(parsed);
         }
         // Old format detected — migrate to new format
         const newProgress: Record<string, IPhraseProgress> = {};
@@ -54,12 +86,12 @@ function loadState(): IPhraseLearningState {
             lastReview: s === 'known' ? Date.now() : 0,
           };
         }
-        return { ...parsed, progress: newProgress, todayReviewed: parsed.todayReviewed || [], lastActiveDate: parsed.lastActiveDate || todayKey() };
+        return normalize({ ...parsed, progress: newProgress });
       }
-      return { progress: {}, todayReviewed: [], lastActiveDate: todayKey(), ...parsed };
+      return normalize(parsed);
     }
-    return { progress: {}, todayReviewed: [], lastActiveDate: todayKey() };
-  } catch { return { progress: {}, todayReviewed: [], lastActiveDate: todayKey() }; }
+    return normalize(null);
+  } catch { return normalize(null); }
 }
 
 function saveState(state: IPhraseLearningState) {
@@ -67,6 +99,36 @@ function saveState(state: IPhraseLearningState) {
   // 与存储一字不差就不写：掐掉"下行重读 → 回写 → 双写再把同一份推回云端"的回声
   if (safeStorage.getItem(STORAGE_KEY) === json) return;
   safeStorage.setItem(STORAGE_KEY, json);
+}
+
+// ── 短语闪卡会话断点（顺序 + 位置），每个短语库一条，中途退出后仍可续学 ──
+// 键里带 bank 前缀，与词汇侧的 __nativethink_vocab_session_<level> 分开命名，
+// 免得"四级短语闪卡"和"四级单词复习"互相覆盖断点。
+export interface ISavedPhraseSession {
+  order: string[];
+  index: number;
+  savedAt: number;
+}
+
+const PHRASE_SESSION_KEY_PREFIX = '__nativethink_phrase_session_';
+
+export function savePhraseSession(bank: string, s: ISavedPhraseSession): void {
+  try { safeStorage.setItem(`${PHRASE_SESSION_KEY_PREFIX}${bank}`, JSON.stringify(s)); } catch { /* ignore */ }
+}
+
+export function loadPhraseSession(bank: string): ISavedPhraseSession | null {
+  try {
+    const raw = safeStorage.getItem(`${PHRASE_SESSION_KEY_PREFIX}${bank}`);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as ISavedPhraseSession;
+    if (!p || !Array.isArray(p.order) || !p.order.length) return null;
+    if (typeof p.index !== 'number' || p.index < 0 || p.index >= p.order.length) return null;
+    return p;
+  } catch { return null; }
+}
+
+export function clearPhraseSession(bank: string): void {
+  try { safeStorage.removeItem(`${PHRASE_SESSION_KEY_PREFIX}${bank}`); } catch { /* ignore */ }
 }
 
 // SM-2 algorithm: returns updated progress
@@ -154,13 +216,19 @@ export function usePhraseLearning(allPhrases: IChunk[]) {
   // Persist daily quota
   useEffect(() => { safeStorage.setItem(DAILY_QUOTA_KEY, String(dailyQuota)); }, [dailyQuota]);
 
-  // Phrases that are due for review today
+  // Phrases that are due for review today（不含用户主动「不再出现」的）
   const dueForReview = useMemo(() => {
     const now = Date.now();
     return Object.values(state.progress).filter(
-      (p) => p.nextReview <= now && p.status !== 'new',
+      (p) => p.nextReview <= now && p.status !== 'new' && !p.suspended,
     );
   }, [state.progress]);
+
+  /** 被「不再出现」屏蔽的短语数（概览里给出口，否则屏蔽后无法找回） */
+  const suspendedCount = useMemo(
+    () => Object.values(state.progress).filter((p) => p.suspended).length,
+    [state.progress],
+  );
 
   // New phrases available to learn (not yet started)
   const learnedKeys = useMemo(() => new Set(Object.keys(state.progress)), [state.progress]);
@@ -209,31 +277,59 @@ export function usePhraseLearning(allPhrases: IChunk[]) {
     const key = phraseKey(phrase);
     setState((prev) => {
       const existing = prev.progress[key];
-      const updated = sm2Update(
-        existing || {
-          phraseKey: key,
-          status: 'new',
-          easeFactor: 2.5,
-          interval: 0,
-          repetitions: 0,
-          nextReview: 0,
-          lastReview: 0,
-        },
-        quality,
-      );
+      const updated: IPhraseProgress = {
+        ...sm2Update(
+          existing || {
+            phraseKey: key,
+            status: 'new',
+            easeFactor: 2.5,
+            interval: 0,
+            repetitions: 0,
+            nextReview: 0,
+            lastReview: 0,
+          },
+          quality,
+        ),
+        // 错词统计：quality<=2 记一次错，答对清零（错词重练用，与词汇侧同口径）
+        wrongCount: quality <= 2 ? (existing?.wrongCount || 0) + 1 : 0,
+      };
+      // 每日历史（供"本周学习量/正确率"跨天回溯）—— 只有当天日期桶，跨天自动分桶
+      const day = todayKey();
+      const history = { ...(prev.history || {}) };
+      const cur = history[day] || { reviewed: 0, good: 0 };
+      history[day] = { reviewed: cur.reviewed + 1, good: cur.good + (quality >= 3 ? 1 : 0) };
       return {
         ...prev,
         progress: { ...prev.progress, [key]: updated },
         todayReviewed: prev.todayReviewed.includes(key)
           ? prev.todayReviewed
           : [...prev.todayReviewed, key],
+        todayLearned: existing
+          ? prev.todayLearned
+          : prev.todayLearned.includes(key) ? prev.todayLearned : [...prev.todayLearned, key],
+        history,
       };
     });
   }, [phraseKey]);
 
+  /**
+   * 「不再出现」开关（已会 / 不感兴趣）。屏蔽后不出现在到期队列与补新里；再次打开即恢复原进度。
+   * 需要时自动补一条 status='new' 的记录，这样"没学过的短语也能直接屏蔽"。
+   */
+  const setSuspended = useCallback((phrase: IChunk, suspended: boolean) => {
+    const key = phraseKey(phrase);
+    const base: IPhraseProgress = {
+      phraseKey: key, status: 'new', easeFactor: 2.5, interval: 0, repetitions: 0, nextReview: 0, lastReview: 0,
+    };
+    setState((prev) => ({
+      ...prev,
+      progress: { ...prev.progress, [key]: { ...(prev.progress[key] || base), suspended } },
+    }));
+  }, [phraseKey]);
+
   // Reset all phrase progress
   const resetProgress = useCallback(() => {
-    setState({ progress: {}, todayReviewed: [], lastActiveDate: todayKey() });
+    setState({ progress: {}, todayReviewed: [], todayLearned: [], lastActiveDate: todayKey() });
   }, []);
 
   // Get progress summary stats
@@ -254,6 +350,8 @@ export function usePhraseLearning(allPhrases: IChunk[]) {
     setDailyQuota,
     todayRemaining,
     dueForReview,
+    suspendedCount,
+    setSuspended,
     learnedKeys,
     getNewPhrases,
     getReviewQueue,

@@ -29,13 +29,13 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 
 | 模块 / 路由 | 文档 | 一句话 |
 |-----------|------|--------|
-| 背单词 `/vocabulary` | [modules/vocabulary.md](./docs/modules/vocabulary.md) | 6 种模式、三个正交开关（`setupDone`/`showWizard`/`immersed`）、SM-2、三套并行重排实现 |
+| 背单词 `/vocabulary` | [modules/vocabulary.md](./docs/modules/vocabulary.md) | 7 种模式（含「短语闪卡」—— 九个考试短语库共用短语侧 SM-2）、三个正交开关（`setupDone`/`showWizard`/`immersed`）、SM-2、三套并行重排实现 |
 | 词库数据 | [modules/wordbank-data.md](./docs/modules/wordbank-data.md) | 两层去重、核心/detail 拆分、IDB 主 + localStorage 兜底、改完必跑的两个脚本 |
 | 阅读 `/articles` | [modules/reading.md](./docs/modules/reading.md) | 五种来源一套阅读器、运行时全文升级、**两套切章必须对齐**、复习词文章词表是派生的（删文章即回词表） |
 | 朗读 TTS | [modules/tts.md](./docs/modules/tts.md) | 引擎降级链、切片 180 由上游 200 硬上限钉死、闪退自愈、音色四处同步、云端缓存 FIFO 400 条 + Blob URL 用完即 revoke、**系统语音的插件边界（async 别 return 插件对象，否则永久挂死）** |
 | AI 服务与端侧模型 | [modules/ai-services.md](./docs/modules/ai-services.md) | Key 优先级、服务端免费档回退、端侧回落条件、`extractJson` 规定由 `verify:ai-parse` 全仓扫、**中继防滥用守卫（Origin/限流/形状校验/出厂 Key 用量，无守卫覆盖）** |
 | 母语思维 `/think` | [modules/think-in-english.md](./docs/modules/think-in-english.md) | 4 tab；换题不 abort 导致流式内容串题 |
-| 语块 `/chunks` | [modules/chunks.md](./docs/modules/chunks.md) | 最大单文件；963 条（**手改写进 `chunks-extra.ts`**）、练习池走 `useStableShuffle`、**同短语多登记 → 读取层去重（筛选后、洗牌前）**、短语库按字母段折叠（4,805→1,148 元素）、接龙判定三档（未判定不送分） |
+| 语块 `/chunks` | [modules/chunks.md](./docs/modules/chunks.md) | 最大单文件；963 条（**手改写进 `chunks-extra.ts`**）、练习池走 `useStableShuffle`、**同短语多登记 → 读取层去重（筛选后、洗牌前）**、短语库按字母段折叠（4,805→1,148 元素）、接龙判定三档（未判定不送分）；**短语 SM-2 进度 store 三处共享**（本页「短语复习」「闪卡」+ 词汇页「短语闪卡」） |
 | 对话 `/conversation` | [modules/conversation.md](./docs/modules/conversation.md) | 场景选择↔聊天；`mountedRef` 每轮挂载需复位（dev 下曾恒 false 让对话永远空白） |
 | 影子跟读 `/shadowing` | [modules/shadowing.md](./docs/modules/shadowing.md) | 连播/循环/录音评分；完成标记按**合并索引**存，索引换算单点在 `shadowing-progress.ts` |
 | 写作 `/writing` | [modules/writing.md](./docs/modules/writing.md) | 100 题 + AI 批改（Markdown 不是 JSON）；默认折叠 12 张 |
@@ -104,7 +104,7 @@ node scripts/verify-tts-hardening.mjs             # 15   TTS 降级/在途去重
 node scripts/verify-chunks-data.mjs               # 55   语块库 963 条数据卫生 + 读取层去重（12 组重复冻结成基线、去重顺序判别、已记组行为）+ 短语库/语块库显示语言同源 + 列表内移动的单一滚动权威
 node scripts/verify-native-tts.mjs                # 37   原生插件边界：替身真跑「async return 插件对象＝永久挂死」+ 取语音列表 4s 超时 + 六处调用点 + 先问能力再猜沉默（看门狗吃句长、每词 ≥380ms、起播证据两档）
 node scripts/verify-books-meta.mjs                # 227  书目元数据 + 复习词高亮
-node scripts/verify-vocab-cards.mjs               # 315  背单词卡片契约 + 手势决策表 + 换卡节奏 + 答错重排延后 + 单词字号三档 + 生词本入队（顺序/判据/补量/屏蔽）
+node scripts/verify-vocab-cards.mjs               # 359  背单词卡片契约 + 手势决策表 + 换卡节奏 + 答错重排延后 + 单词字号三档 + 生词本入队（顺序/判据/补量/屏蔽）+ ⑮ 短语闪卡（接线/懒加载去重/会话同构/共享 store 扩展）
 node scripts/verify-vocab-caches.mjs              # 85   缓存封顶 + 存储写失败可见（替身真跑）+ trimOldest 滚动窗口双封顶
 node scripts/verify-overlay-fit.mjs               # 38   窄视口浮层契约 + 全屏层自带 safe-area + 全站唯一 Toaster 出口 + ⑥ 手机抽屉导航后必须关
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
@@ -119,7 +119,7 @@ node scripts/verify-ai-parse.mjs                  # 10   AI 解析约定：25 �
 node scripts/verify-app-version.mjs                 # 11   版本号单一载体：meta 注入链路 + 产物一致性（产物段先 build:web）
 node scripts/verify-brand-fonts.mjs                 # 26   品牌资产自托管：字体与 favicon 外链零残留 + woff2 结构自洽 + 生效栈正对照（产物段先 build:web）
 npm run verify:rv-articles                        # 104  复习词汇文章：选词/分篇/覆盖出队/体裁主题/原位重写（含旧 slice(0,10) 正对照）
-npm run verify:study-credit                       # 74   学习时长记账：闸门真跑 + 七个提交点接线 + 口径双向锁（本地动作不许套闸门）
+npm run verify:study-credit                       # 77   学习时长记账：闸门真跑 + 七个提交点接线 + 口径双向锁（本地动作不许套闸门，含短语闪卡翻面直计时）
 npm run verify:all                                # —    收尾必跑：typecheck + 全部 verify-*（自动发现，新增守卫不用登记）
 ```
 
@@ -297,7 +297,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 315 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 37** · chunks-data **55** · overlay-fit **38** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · rv-articles 104 · study-credit 74 · chain-verdict 36；合计 **7,434**，2026-10-08 第 14 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 359 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 37** · chunks-data **55** · overlay-fit **38** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · rv-articles 104 · study-credit 77 · chain-verdict 36；合计 **7,481**，2026-10-09 第 15 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**

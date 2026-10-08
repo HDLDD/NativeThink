@@ -165,6 +165,16 @@ function fnBody(src, name) {
   check(/creditOnce\('writing', creditKey\('submit', selectedPrompt\.id, text\), 3\)/.test(writing),
     '写作交卷：一次计 3 分钟（名义时长不许悄悄降成默认的 1）');
 
+  // 短语闪卡（词汇深度页第 7 模式）与语块复习是同一类**本地动作**：翻一张就该涨，
+  // 没有"重复刷"的破口（每张卡只翻一次即计），所以同样不许套闸门。
+  const pfm = readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/PhraseFlashcardMode.tsx'), 'utf8');
+  const pfmFlipStart = pfm.indexOf('const flip = useCallback(');
+  const pfmFlipBody = pfmFlipStart >= 0 ? pfm.slice(pfmFlipStart, pfm.indexOf('\n\n', pfmFlipStart)) : '';
+  check(pfmFlipBody.length > 40, `短语闪卡 flip：函数体可定位（实际 ${pfmFlipBody.length} 字符）`);
+  check(/addStudyMinutes\(0\.2, 'chunks'\)/.test(pfmFlipBody),
+    '短语闪卡翻面：直计时 0.2 分（内容域=短语，与语块复习打分同口径）');
+  check(!/creditOnce/.test(pfm), '短语闪卡：全文件不走闸门（本地动作，套上就会"翻过再翻不计"）');
+
   // 句子学习的独立造句是**另一种口径**（拿到反馈才计，AI 反馈就是这次练习的产物），
   // 这里钉住"口径不同"本身 —— 谁把它顺手统一成按动作计，同样算回归。
   const build = readFileSync(join(ROOT, 'src/pages/SentenceLabPage/components/BuildPractice.tsx'), 'utf8');

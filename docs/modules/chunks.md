@@ -27,6 +27,8 @@
 
 合并池 `allChunks`（`:257`）= 内置 + `__nativethink_custom_chunks`。SRS 走 `src/lib/use-phrase-learning.ts`（键 `__nativethink_phrase_learning`、`__nativethink_phrase_daily_quota`，`:6-7`）。
 
+⚠️ **这份 store 有三个消费者**：本页「短语复习」tab、本页「闪卡」tab（`ChunkFlashcards`）、词汇深度页「短语闪卡」（`PhraseFlashcardMode.tsx`，2026-10-09 新增，见 [vocabulary.md](./vocabulary.md)「短语闪卡」）—— 三处共享同一份 SM-2 进度，哪个入口学都算数；改 store 要三处一起想。为短语闪卡加的 `wrongCount / suspended / todayLearned / history` 是**加法项**，老存档由 `normalize()` 补齐，本页两个入口零改动。
+
 ### 2.1 闪卡 tab（2026-10-06 新增）
 
 `components/ChunkFlashcards.tsx`，与词汇模块 `QuickCardMode` 同构：正面只显示语块/短语 → 点卡片翻面看释义+例句 → `认识 / 模糊 / 不认识` 三档（SM-2 quality 5/3/1，写进 `use-phrase-learning`，与「短语复习」tab 共享进度）。含：分类筛选、每轮数量、答错隔 4 张重排（上限 2 次，同 `vocab-session` 参数）、自动发音（共用键 `__nativethink_vocab_autospeak`）、断点续学（`__nativethink_chunk_card_session`）、键盘（空格/1/2/→/Backspace/Esc）。
