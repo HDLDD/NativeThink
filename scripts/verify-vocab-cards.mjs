@@ -826,10 +826,12 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '⑮c 键盘 1-5 映射 SM-2 五档 [0,2,3,4,5]');
   check(/const MAX_DUE = 30;/.test(pfm) && /if \(dueCards\.length < MAX_DUE\) dueCards\.push\(c\);/.test(pfm),
     '⑮c 到期封顶 30 张/轮');
-  check(/\n      if \(!dueSet\.has\(k\) \|\| seen\.has\(k\)\) continue;\n      seen\.add\(k\);/.test(pfm),
+  check(/\r?\n      if \(!dueSet\.has\(k\) \|\| seen\.has\(k\)\) continue;\r?\n      seen\.add\(k\);/.test(pfm),
     '⑮c 超额的到期卡也要记入 seen（否则它们会从"已学"分支再进场，本轮超过 30 张）');
-  check(/const fillCount = Math\.max\(0, 20 - dueCards\.length - otherCards\.length\);/.test(pfm),
-    '⑮c 空进度也能补新到 20 张开轮（学习入口；复习检测是纯复习口径，要求先有已学）');
+  check(/const fillCount = Math\.max\(0, dailyQuota - dueCards\.length - otherCards\.length\);/.test(pfm),
+    '⑮c 补新到「每日目标」开轮（学习入口；档位即本轮张数，复习检测是纯复习口径、要求先有已学）');
+  check(/\}, \[wrongDrill, wrongEntries, entries, dueForReview, state\.progress, phraseKey, dailyQuota\]\);/.test(pfm),
+    '⑮c 队列 memo 依赖必须含 dailyQuota（漏掉＝改档位后张数不变，得重挂载才生效）');
   check(/lastSpokenKey\.current = '';/.test(pfm) && (pfm.match(/lastSpokenKey\.current = '';/g) ?? []).length >= 3,
     '⑮c 每开一轮/续学/换库都清空朗读去重键（否则新一轮第一张不出声）');
   check(pfm.includes('`${card.content}. ${example}`'),

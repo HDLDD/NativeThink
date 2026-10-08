@@ -9,8 +9,8 @@
  * 与复习检测的**有意差异**（其余尽量逐行同构，改一边先想另一边）：
  *  ① 数据 = 9 个考试短语库（phrase-bank，懒加载 + 读取层去重），进度写 use-phrase-learning
  *     —— 与语块页「短语复习 / 闪卡」同一份存储，哪个入口学都算同一份 SM-2 进度；
- *  ② 空进度也能开一轮（补新到 20 张）—— 它就是短语的**学习入口**；复习检测要求
- *     「先有已学单词」是因为那边是纯复习模式（教新词由每日学习负责）；
+ *  ② 空进度也能开一轮 —— 它就是短语的**学习入口**（补新到「每日目标」，档位即本轮张数）；
+ *     复习检测要求「先有已学单词」是因为那边是纯复习模式（教新词由每日学习负责）；
  *  ③ 没有生词本 / 我的助记（词库侧概念，短语存储里没有对应物）；
  *     学习时长记 'chunks'（内容域是短语，与语块闪卡同口径）。
  * 零提示契约与三个练习模式同一条：只剩「失败 / 唯一撤销入口」白名单（verify-vocab-cards ⑧d）。
@@ -163,9 +163,12 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
   }, [entries, state.progress, phraseKey]);
 
   /**
-   * 本轮队列 = 到期(≤30) + 已学未到期 + 补新到 20。
+   * 本轮队列 = 到期(≤30) + 已学未到期 + 补新到「每日目标」。
    * ① 「不再出现」的短语必须跳过（到期由 store 过滤，已学/补新在这里过滤）；
-   * ② 与复习检测不同：**空进度也补新**（这是学习入口，见文件头差异 ②）。
+   * ② 与复习检测不同：**空进度也补新**（这是学习入口，见文件头差异 ②）；
+   * ③ 补新目标吃 `dailyQuota`（概览档位）而不是写死 20 ——
+   *    2026-10-09 用户要求「学习单词量要可调」：档位即本轮张数
+   *    （到期/已学两支照旧参与，所以有复习量时总数可能大于档位，这是复习义务）。
    */
   const queue = useMemo(() => {
     if (wrongDrill) return wrongEntries;
@@ -186,7 +189,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
       const p = state.progress[k];
       if (p && !p.suspended) { seen.add(k); otherCards.push(c); }
     }
-    const fillCount = Math.max(0, 20 - dueCards.length - otherCards.length);
+    const fillCount = Math.max(0, dailyQuota - dueCards.length - otherCards.length);
     const newCards: IChunk[] = [];
     if (fillCount > 0) {
       for (const c of entries) {
@@ -202,7 +205,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
       }
     }
     return [...dueCards, ...otherCards, ...newCards];
-  }, [wrongDrill, wrongEntries, entries, dueForReview, state.progress, phraseKey]);
+  }, [wrongDrill, wrongEntries, entries, dueForReview, state.progress, phraseKey, dailyQuota]);
 
   const cw = useMemo(() => {
     const k = session.order[currentIdx];
