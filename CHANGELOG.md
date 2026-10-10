@@ -1,5 +1,8 @@
 # NativeThink 开发日志
 
+## 2026-10-11
+- feat(dashboard): 首页内容扩展 —— 今日待复习横幅 + 本周学习概览柱状；修续学条缺 /sentences (`5a1c21e`)
+
 ## 2026-10-10
 - feat(dashboard): 首页内容扩展 —— 今日待复习横幅（useGlobalDueCount 同源，到期 0 整卡不渲染）+ 本周学习概览柱状（calendar 近 7 个自然日，formatDate 循环查表）；修「继续上次学习」labels 表缺 /sentences（句子学习访问后续学条静默不出现）；新增 verify-dashboard-glance 守卫 16 断言（变异 5 条全红）+ 无头 Chrome CDP 行为验收 12 项
 - docs: verification.md 第 18 测（24 项守卫 / 断言合计 7,498）+ dashboard-progress-favorites.md 补新组件与 lastVisit labels 穷举映射的坑
