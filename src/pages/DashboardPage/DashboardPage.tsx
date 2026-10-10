@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useLearningStats } from '@/lib/use-learning-stats';
+import { useGlobalDueCount } from '@/lib/use-word-learning';
 import { useFavorites } from '@/lib/use-favorites';
 import type { IChunk } from '@/data/chunks';
 import { cn, formatDate, extractJson } from '@/lib/utils';
@@ -30,6 +31,8 @@ import { DailySentenceCard } from './DailySentenceCard';
 import { QuickStartGrid } from './QuickStartGrid';
 import { ModuleProgressCard } from './ModuleProgressCard';
 import { HistoryCalendar } from './HistoryCalendar';
+import { ReviewDueCard } from './ReviewDueCard';
+import { WeekGlanceCard } from './WeekGlanceCard';
 import { LEARNING_OPTIONS } from './constants';
 
 /** 每日一句 AI 生成的返回形态（提示词要求单个 JSON 对象，见 handleAiGenerateChunk） */
@@ -44,7 +47,8 @@ interface IAiChunkFields {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { stats, loaded } = useLearningStats();
+  const { stats, calendar, loaded } = useLearningStats();
+  const dueCount = useGlobalDueCount();
   const { addFavorite, isFavorited, favorites, removeFavorite } = useFavorites();
   const tts = useTTS();
   const { isConfigured, chat: aiChat } = useAI();
@@ -278,6 +282,7 @@ export default function DashboardPage() {
         '/shadowing': '影子跟读',
         '/articles': '文章阅读',
         '/vocabulary': '词汇深度',
+        '/sentences': '句子学习',
         '/favorites': '我的收藏',
         '/writing': 'AI 写作练习',
         '/spelling': '句子拼写',
@@ -310,21 +315,26 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-10">
-      {/* 继续上次学习 */}
-      {lastVisit && (
-        <button
-          onClick={() => navigate(lastVisit.path)}
-          className="w-full flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3 text-left hover:border-[#00B894]/40 hover:shadow-md transition-all group"
-        >
-          <span className="size-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center shrink-0">
-            <HistoryIcon className="size-4" />
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="block text-[10px] font-black uppercase tracking-wider text-muted-foreground">继续上次学习</span>
-            <span className="block text-sm font-black text-foreground group-hover:text-ink-teal transition-colors truncate">{lastVisit.label}</span>
-          </span>
-          <span className="text-[10px] font-black uppercase tracking-wider text-ink-teal opacity-0 group-hover:opacity-100 transition-opacity shrink-0">进入 →</span>
-        </button>
+      {/* 继续上次学习 + 今日待复习（窄屏堆叠，宽屏并排；都没有时该行不占位） */}
+      {(lastVisit || dueCount > 0) && (
+        <div className="grid gap-3 lg:grid-cols-2 lg:items-stretch">
+          {lastVisit && (
+            <button
+              onClick={() => navigate(lastVisit.path)}
+              className="w-full flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3 text-left hover:border-[#00B894]/40 hover:shadow-md transition-all group"
+            >
+              <span className="size-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center shrink-0">
+                <HistoryIcon className="size-4" />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[10px] font-black uppercase tracking-wider text-muted-foreground">继续上次学习</span>
+                <span className="block text-sm font-black text-foreground group-hover:text-ink-teal transition-colors truncate">{lastVisit.label}</span>
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-ink-teal opacity-0 group-hover:opacity-100 transition-opacity shrink-0">进入 →</span>
+            </button>
+          )}
+          <ReviewDueCard dueCount={dueCount} onNavigate={navigate} />
+        </div>
       )}
 
       {/* Hero + KPI 区域 */}
@@ -390,6 +400,9 @@ export default function DashboardPage() {
 
         <QuickStartGrid onNavigate={navigate} />
       </div>
+
+      {/* 本周学习概览（近 7 天分钟柱状） */}
+      <WeekGlanceCard calendar={calendar} dailyGoalMinutes={stats.dailyGoalMinutes} onNavigate={navigate} />
 
       {/* 模块进度 */}
       <ModuleProgressCard

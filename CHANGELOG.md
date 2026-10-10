@@ -1,6 +1,24 @@
 # NativeThink 开发日志
 
+## 2026-10-10
+- feat(dashboard): 首页内容扩展 —— 今日待复习横幅（useGlobalDueCount 同源，到期 0 整卡不渲染）+ 本周学习概览柱状（calendar 近 7 个自然日，formatDate 循环查表）；修「继续上次学习」labels 表缺 /sentences（句子学习访问后续学条静默不出现）；新增 verify-dashboard-glance 守卫 16 断言（变异 5 条全红）+ 无头 Chrome CDP 行为验收 12 项
+- docs: verification.md 第 18 测（24 项守卫 / 断言合计 7,498）+ dashboard-progress-favorites.md 补新组件与 lastVisit labels 穷举映射的坑
+
+## 2026-10-09
+- fix(vocab+serve): 短语闪卡每日目标档位即本轮张数；本地 /api 反代修翻译报 JSON 解析错 (`7fd17c9`)
+- build(apk): versionCode 104 / 2.0.59（短语闪卡） (`2313398`)
+- feat(vocabulary): 短语闪卡 —— 词汇页第 7 个模式，九个考试短语库共用短语侧 SM-2 (`5d8ab60`)
+
+## 2026-10-08
+- build(apk): versionCode 102 / 2.0.57（含短语库切换滚动修复） (`7cee4ba`)
+- fix(chunks): 列表内移动改为单一滚动权威，修「切换单词窗口会乱动」 (`6a8a5ac`)
+
 ## 2026-10-07
+- build(apk): versionCode 101 / 2.0.56（短语库显示对齐 + 短语库去重） (`494b322`)
+- fix(chunks): 短语库显示语言对齐语块库，并把两条数据源都去重 (`cfda602`)
+- fix(chunks): 短语库详情不再盖住列表，并支持上下切换 (`cf8f8d6`)
+- fix(chunks): 同短语多登记改在读取层收敛 + 语块库数据守卫 + 一处成语错译 (`81f202a`)
+- fix(android): 高 DPI 手机（density ≥ 3.0）WebView 文本放大 20%（setTextZoom 120）—— 修「窗口太窄搞得很小」反馈，6.7" 447DPI 屏上 CSS 393px 文字偏小 (`19398b6`)
 - fix(ai): 修智谱 1213「未正常接收到 prompt 参数」—— factory 和 glm 走同一智谱端点但 thinking 只对 glm 发送；空 content 消息透传给智谱触发 1213（过滤空消息 + 无有效消息时返回 400） (`2dc3c1b`)
 - build(apk): versionCode 97 / 2.0.52（含短语预翻译修复） (`73c4fa3`)
 - fix(phrases): 预翻译修复 —— 短语词书条目从词书例句中预匹配英文例句+中文翻译（覆盖约 93%），detail 面板/搜索/闪卡不再空翻译；生成脚本改用 JSON.stringify 避免反引号嵌套转义 bug；index.ts/types.ts 改为手写不被脚本覆盖 (`1153040`)

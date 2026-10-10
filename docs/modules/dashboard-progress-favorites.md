@@ -4,7 +4,11 @@
 
 ## 1. 首页 `/`
 
-无模块 key（不参与 `moduleProgress`）。组成：`HeroCard` + `KpiCard` + `ProgressCard`/`RingProgress` + `ModuleProgressCard` + `QuickStartGrid` + `DailySentenceCard` + `HistoryCalendar`。
+无模块 key（不参与 `moduleProgress`）。组成：`HeroCard` + `KpiCard` + `ProgressCard`/`RingProgress` + `ModuleProgressCard` + `QuickStartGrid` + `DailySentenceCard` + `HistoryCalendar`，外加 2026-10-10 新增的 `ReviewDueCard` + `WeekGlanceCard`。
+
+**今日待复习（`ReviewDueCard.tsx`）**：横幅复用侧边栏角标同一数据源 `useGlobalDueCount`（`DashboardPage.tsx:18,51,336` 直扫 SM-2 存储，不挂完整学习状态实例）。**口径：`dueCount <= 0` 时整卡 `return null`（`ReviewDueCard.tsx:17`）**—— 没有复习义务就不渲染"已清零"占位卡；点击进 `/vocabulary`。外层行 gate 是 `(lastVisit || dueCount > 0)`（`DashboardPage.tsx:319`），两卡都空时整行不占位。
+
+**本周学习概览（`WeekGlanceCard.tsx`）**：`calendar`（`__nativethink_calendar`，`useLearningStats` 直接暴露）取近 7 个自然日分钟画柱状 + 周合计/打卡天数/达标天数，点击进 `/progress`（`:405` 接线）。**日期一律 `formatDate` 循环生成再按字符串查表（`:26-29`）**—— 不能 `slice(-7)` 取数组尾：calendar 只在跨出 31 天窗口后才 push 新条目，跨天当天没学习时尾部是昨天，柱状会整体错位一天。柱状容器 `h-28` 固定高度（`:69`），标题/柱/星期三层不互压。守卫 `npm run verify-dashboard-glance`（16 断言，变异 5 条）。
 
 **每日一句（daily chunk）**：
 
@@ -12,7 +16,7 @@
 |-----|------|------|
 | `__nativethink_daily_chunk` | `:66` 读 / `:76` 写 | `{date, chunk}`，按本地日期换 |
 | `__nativethink_daily_history` | `:100` 读 / `:91`、`:138` 写 | 生成过的语块，`id: ai_<ts>` |
-| `__nativethink_last_visit` | `:249` | 上次访问（回访问候/断点提示） |
+| `__nativethink_last_visit` | `:249` | 上次访问（回访问候/断点提示）。**「继续上次学习」的 labels 表（`DashboardPage.tsx:277-289`）是"路径 → 文案"的穷举映射，不在新增页面六件套里** —— 每上一个新路由要补一行，漏了该页访问后续学条静默不出现（`/sentences` 真实漏过，2026-10-10 补上，守卫 `verify-dashboard-glance` ① 钉住） |
 | `__nativethink_achievements` | `use-achievements.ts:5,121,135` | 成就解锁列表 |
 
 AI 生成：`aiChat`（`:154`），system 要求**只返回一个 JSON 对象**（`{content, meaning, example, exampleZh, category, difficulty}`）。
