@@ -936,20 +936,26 @@ export default function QuickCardMode({ level }: { level: string }) {
                 revealed ? 'border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/10' : 'border-border bg-card',
               )}
             >
-              <CardContent className="p-8 text-center space-y-3">
+              <CardContent className="p-7 text-center space-y-3">
                 {/*
                   词排 = 单词 + 朗读/收藏两个动作按钮。
-                  **按钮组必须能整体换到下一行**（flex-wrap）—— 卡片是 w-full，428 CSS 宽的
-                  手机上词排只剩 ~328px，两个按钮固定吃 ~86px；长词（>14 字母 text-3xl ≈ 250px+）
-                  被挤进 ~242px 的窄列里 break-words 折成两截（2026-10-13 真机反馈「长单词被
+                  **按钮组必须能整体换到下一行**（flex-wrap）—— 卡片是 w-full，真机 393 CSS 宽的
+                  布局视口（此前按 428 估算是错的）里词排只有 301px，两个按钮固定吃 ~86px；长词
+                  被挤进 ~215px 的窄列里 break-words 折成两截（2026-10-13 真机反馈「长单词被
                   分割为两列」）。单词与按钮组同排放得下就并排（短词版式不变），
                   放不下时按钮组**整组**落到单词下方：换行以组为单位，不许拆散两个按钮
                   （逐个换行会出现「词+🔊 一行、⭐ 单独一行」的碎排）。
+                  内边距 p-8 → p-7 与复习检测/每日学习同宽：p-8 时词排只有 293px，
+                  14 字母的 recommendation 在手机档 text-3xl（真机 36px）要 298px，正好折两截
+                  （第 21 测 393 仿真实测），同卡片宽度就无权比另两个模式窄这 8px。
                 */}
                 <div data-fit-box className="flex flex-wrap items-center justify-center gap-2 max-w-full">
                   <h2 className={cn(
                     'font-black italic text-foreground tracking-tight break-words min-w-0',
-                    cw.word.length > 14 ? 'text-3xl' : cw.word.length > 10 ? 'text-4xl' : 'text-5xl',
+                    // 手机(<sm)用复习检测同款小档：真机 MainActivity setTextZoom(120) 会把字号再
+                    // ×1.2（393 视口下 text-3xl 实渲 36px），按桌面档排的长词因此折两截。
+                    // sm: 保桌面原档位，桌面像素不变（2026-10-13 真机反馈 telecommunications/compatible）
+                    cw.word.length > 14 ? 'text-2xl sm:text-3xl' : cw.word.length > 10 ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl',
                   )}>{cw.word}</h2>
                   <div className="flex items-center gap-2 shrink-0">
                     <Button

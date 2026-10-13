@@ -19,7 +19,7 @@ import { cn, cleanText } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTTS } from '@/lib/use-tts';
 import { sfxComplete } from '@/lib/sfx';
-import { decideSwipe, SWIPE_THRESHOLD, SWIPE_QUALITY_UNKNOWN, SWIPE_QUALITY_KNOWN } from '@/lib/vocab-swipe';
+import { decideSwipe, SWIPE_THRESHOLD } from '@/lib/vocab-swipe';
 import { createSessionOrder, scheduleRelearn, nextIndex, forecastByDay, MAX_RELEARN, type ISessionOrder } from '@/lib/vocab-session';
 import { useCustomWords, toWordEntry } from '@/lib/custom-words';
 import { useWordNote, countWordNotes } from '@/lib/word-notes';
@@ -75,7 +75,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const [sessionRated, setSessionRated] = useState(0);
   const [sessionGood, setSessionGood] = useState(0);
   const [showDeep, setShowDeep] = useState(false);
-  // 滑动位移（跟随手指）；>0 右滑=认识，<0 左滑=不认识
+  // 滑动位移（跟随手指）；未翻面→翻面，已评分→前后导航
   const [dragX, setDragX] = useState(0);
   const dragStart = useRef<number | null>(null);
   const [detailTick, setDetailTick] = useState(0);
@@ -527,7 +527,9 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     return () => window.removeEventListener('keydown', handler);
   }, [cw, isFlipped, rated, started, flip, advance, markWithQuality, toggleAutoSpeak]);
 
-  // ── 滑动手势：未翻面→翻面；已翻面未评分→左滑不认识 / 右滑认识；已评分→切换下一张 ──
+  // ── 滑动手势：未翻面→翻面；已评分→前后导航。已翻面未评分的滑动不评分 ──
+  // 2026-10-13 用户口径：熟悉程度不许用左右划表达（方向≠五档），只认评分按钮 / 数字键，
+  // 由 decideSwipe 的 allowRate:false 档实现（短语闪卡保留滑动评分，见 vocab-swipe.ts）。
   // 拖动手势必须避开输入控件：卡片背面有"我的助记"文本框，如果在里面拖动/选中文字
   // 被当成滑卡，会直接把当前卡评掉（真机上很容易误触）。
   const onTouchStart = (e: React.TouchEvent) => {
@@ -543,12 +545,11 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     const dx = dragX;
     dragStart.current = null;
     setDragX(0);
-    const action = decideSwipe({ dx, isFlipped, rated });
+    const action = decideSwipe({ dx, isFlipped, rated, allowRate: false });
     if (action === 'none') return;
     if (action === 'flip') { flip(); return; }
     if (action === 'next') { advance(dx < 0 ? -1 : 1); return; }
     if (action === 'prev') { advance(-1); return; }
-    markWithQuality(action === 'rate-unknown' ? SWIPE_QUALITY_UNKNOWN : SWIPE_QUALITY_KNOWN);
   };
 
   // 只有"根本没词可复习"才走空状态；会话未开始时 cw 也是 undefined，不能混为一谈
@@ -805,7 +806,6 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   }
   const accuracy = sessionRated > 0 ? Math.round((sessionGood / sessionRated) * 100) : 0;
   const progressPct = session.order.length > 0 ? Math.round((sessionRated / session.order.length) * 100) : 0;
-  const swipeHint = Math.abs(dragX) < SWIPE_THRESHOLD ? null : (dragX < 0 ? 'left' : 'right');
   return (
     <div className="space-y-4">
         {/* 学习中头部：返回 + 本轮进度条 + 正确率 */}
@@ -844,11 +844,11 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
               )}
             </div>
           </div>
-          {/* 上一个词 —— 回看刚看过的词的具体信息（左滑也可以） */}
+          {/* 上一个词 —— 回看刚看过的词的具体信息 */}
           <Button
             variant="ghost" size="icon" onClick={() => advance(-1)} disabled={currentIdx === 0}
             className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-ink-violet disabled:opacity-30"
-            title="上一个词（查看它的具体信息）· 左滑也可以"
+            title="上一个词（查看它的具体信息）"
           >
             <ChevronLeft className="size-5" />
           </Button>
@@ -879,15 +879,6 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
               onTouchEnd={onTouchEnd}
               style={{ transform: `translateX(${dragX}px) rotate(${dragX / 40}deg)`, transition: dragStart.current == null ? 'transform 200ms ease' : 'none' }}
             >
-              {/* 滑动方向提示（模仿主流卡片：左=不认识，右=认识） */}
-              {swipeHint && (
-                <div className={cn('absolute inset-0 z-10 rounded-[32px] border-2 flex items-center justify-center pointer-events-none',
-                  swipeHint === 'left' ? 'border-rose-400 bg-rose-500/10' : 'border-emerald-400 bg-emerald-500/10')}>
-                  <span className={cn('text-lg font-black uppercase tracking-wider', swipeHint === 'left' ? 'text-rose-500' : 'text-emerald-600')}>
-                    {swipeHint === 'left' ? '不认识' : '认识'}
-                  </span>
-                </div>
-              )}
             <Card
               className={cn('rounded-[32px] border-2 shadow-xl transition-all cursor-pointer',
                 isFlipped
@@ -919,7 +910,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-4">
                       <Sparkles className="size-3.5 inline mr-1 text-ink-violet" />点击翻转查看释义
                     </p>
-                    <p className="text-[9px] text-muted-foreground/70 font-bold mt-1.5">手机：左右滑动 · 键盘：空格 / 1-5 / S</p>
+                    <p className="text-[9px] text-muted-foreground/70 font-bold mt-1.5">手机：滑动翻面 · 键盘：空格 / 1-5 / S</p>
                   </>
                 ) : (
                   <div className="space-y-3.5">
@@ -1113,7 +1104,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             </button>
           ))}
           <span className="w-full text-center text-[9px] text-muted-foreground font-bold mt-1">
-            手机：左滑不认识 / 右滑认识 · 键盘：空格 翻面 / 1-5 评分 · 评完自动跳下一个
+            手机：点下方按钮评分 · 键盘：空格 = 比较熟悉 / 1-5 评分 · 评完自动跳下一个
           </span>
         </div>
       )}

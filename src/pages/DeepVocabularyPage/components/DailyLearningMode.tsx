@@ -1217,7 +1217,10 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                             <div data-fit-box className="flex flex-wrap items-center justify-center gap-3 mb-3 max-w-full">
                               <h2 className={cn(
                                 'font-black italic text-foreground tracking-tight break-words min-w-0',
-                                currentWord.word.length > 14 ? 'text-3xl' : currentWord.word.length > 10 ? 'text-4xl' : 'text-5xl',
+                                // 手机(<sm)用复习检测同款小档：真机 MainActivity setTextZoom(120) 会把字号再
+                                // ×1.2（393 视口下 text-3xl 实渲 36px），按桌面档排的长词因此折两截。
+                                // sm: 保桌面原档位，桌面像素不变（2026-10-13 真机反馈 telecommunications/compatible）
+                                currentWord.word.length > 14 ? 'text-2xl sm:text-3xl' : currentWord.word.length > 10 ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl',
                               )}>{currentWord.word}</h2>
                               <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(currentWord.word, { rate: 0.9 }); }} className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal shrink-0">
                                 <Volume2 className="size-5" />

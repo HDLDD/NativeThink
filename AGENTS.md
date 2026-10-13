@@ -104,7 +104,7 @@ node scripts/verify-tts-hardening.mjs             # 15   TTS 降级/在途去重
 node scripts/verify-chunks-data.mjs               # 55   语块库 963 条数据卫生 + 读取层去重（12 组重复冻结成基线、去重顺序判别、已记组行为）+ 短语库/语块库显示语言同源 + 列表内移动的单一滚动权威
 node scripts/verify-native-tts.mjs                # 37   原生插件边界：替身真跑「async return 插件对象＝永久挂死」+ 取语音列表 4s 超时 + 六处调用点 + 先问能力再猜沉默（看门狗吃句长、每词 ≥380ms、起播证据两档）
 node scripts/verify-books-meta.mjs                # 227  书目元数据 + 复习词高亮
-node scripts/verify-vocab-cards.mjs               # 376  背单词卡片契约 + 手势决策表 + 换卡节奏 + 答错重排延后 + 单词字号三档 + 词面按钮组整组换行（⑭b，四个模式） + 每日学习卡片几何与答对零等待（⑯） + 生词本入队（顺序/判据/补量/屏蔽）+ ⑮ 短语闪卡（接线/懒加载去重/会话同构/档位即补新张数/共享 store 扩展）
+node scripts/verify-vocab-cards.mjs               # 390  背单词卡片契约 + 手势决策表（含复习检测禁滑动评分 allowRate:false + 短语闪卡正对照） + 换卡节奏 + 答错重排延后 + 单词档位字号（DL/QC 手机档=FM 档 + PFM 正对照） + 词面按钮组整组换行（⑭b，四个模式） + 快速闪卡卡内边距（⑭c） + 每日学习卡片几何与答对零等待（⑯） + 生词本入队（顺序/判据/补量/屏蔽）+ ⑮ 短语闪卡（接线/懒加载去重/会话同构/档位即补新张数/共享 store 扩展）
 node scripts/verify-vocab-caches.mjs              # 85   缓存封顶 + 存储写失败可见（替身真跑）+ trimOldest 滚动窗口双封顶
 node scripts/verify-overlay-fit.mjs               # 38   窄视口浮层契约 + 全屏层自带 safe-area + 全站唯一 Toaster 出口 + ⑥ 手机抽屉导航后必须关
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
@@ -271,11 +271,12 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 | 全站 toast 提示不出现 | `ui/sonner.tsx` 有 `Toaster` 但没人挂载 | 唯一出口在 `src/index.tsx`；新页面不要再挂第二个，`verify-overlay-fit` ⑤ 剥注释全仓扫描会断言 |
 | 全屏浮层顶部被手机状态栏压住 | `fixed inset-0` 的浮层脱离文档流，**绕过了外壳 `SidebarProvider` 那层 safe-area 内缩**（Android 15+ edge-to-edge 下 inset 实测 47px） | 浮层根节点自己补 `safe-area-top safe-area-bottom`（阅读器 `PageReader.tsx:1210`，2026-09-30 真机反馈已修）；新增贴顶全屏层同理，`verify-overlay-fit` ④ 会扫；本机验收用 CDP `Emulation.setSafeAreaInsetsOverride`（insets 传对象）强制 47/24 量顶栏 top |
 | 练习界面一张接一张弹提示 | 评分/翻面/收藏/开关各处都挂 toast，答 30 张就是几十条（用户两次要求静默，最后一条是「不要在练习界面有任何提示」） | 三个练习模式只剩**白名单**：失败/空队列 + 唯一撤销入口；其余反馈交给界面计数（已评 / Flame 连对 / 今天新学 x/y / ★ 实心 / 进度条）。新增提示必须先改守卫 ⑧d 白名单，见 [vocabulary.md](./docs/modules/vocabulary.md) 注意事项 13 |
-| 手机上"点了没反应／转圈不结束"，网页版一切正常 | **只在 APK 成立的原生桥逻辑**：`async` 函数 `return` 一个 Capacitor 插件对象 → 它是 Proxy、`typeof x.then === 'function'` → Promise 同化把 `then` 当原生方法发出去 → resolve/reject 永不调用 → **永久 pending**（不是抛错，`try/catch` 兜不住）。同类的还有"整屏抽屉导航后不关，新页面被吞点击"（`AppSidebar.tsx:108`） | 插件对象一律装在持有者里返回（`native-tts.ts:51,67-77`），原生桥的每个 await 自带超时；这两条由 `verify-native-tts`(21) 与 `verify-overlay-fit` ⑥ 守，**但真凭据只有真机 CDP**（typecheck 与静态守卫都看不见） |
+| 手机上"点了没反应／转圈不结束"，网页版一切正常 | **只在 APK 成立的原生桥逻辑**：`async` 函数 `return` 一个 Capacitor 插件对象 → 它是 Proxy、`typeof x.then === 'function'` → Promise 同化把 `then` 当原生方法发出去 → resolve/reject 永不调用 → **永久 pending**（不是抛错，`try/catch` 兜不住）。同类的还有"整屏抽屉导航后不关，新页面被吞点击"（`AppSidebar.tsx:108`） | 插件对象一律装在持有者里返回（`native-tts.ts:51,67-77`），原生桥的每个 await 自带超时；这两条由 `verify-native-tts`(37) 与 `verify-overlay-fit` ⑥ 守，**但真凭据只有真机 CDP**（typecheck 与静态守卫都看不见） |
 | 顶部内容被一条空条遮住 | 无内容但带 `bg-*` 的 sticky 元素仍占位 | 只在有内容时渲染 |
 | 图表数值压住标题 | 容器高度装不下「值+柱+轴」三层 | 容器高度 ≥ 三层实测高度 |
 | 打出的 APK 里是上一次的 web 产物 | `package:apk` **不重建 web**，只拷 `dist/client` 现成的东西；打包日志与 versionCode 全都正常，看不出来 | `scripts/ensure-web-build.mjs` 已是 `package:apk`/`package:desktop` 前置（源码比产物新、或产物内版本 ≠ version.properties 就自动补跑 `build:web`）；复核靠入口 chunk 的内容哈希比对，见 [build-release.md](./docs/modules/build-release.md) §1 |
 | 装 APK 后部分本地数据"消失" | 某些 ROM 上 WebView localStorage 随更新被清 | 重装前用「学习记录 → 导出」备份；重要数据登录走云同步 |
+| 真机上字更大、长词折行，本机仿真不复现 | 真机布局视口是 **393 CSS**（1283 物理px ÷ 3 ≈ 428 是估算、错），且 `MainActivity.java:22` 的 `settings.setTextZoom(120)` 让全站字号再 ×1.2（真机 telecom 实渲 36px、compatible 57.6px —— 长词折行即这两个叠加） | 几何/字号核验用 393×852 + `webkitTextSizeAdjust:'120%'` 仿真（**每次页面导航后必须重施**），别再用 428 估算；仿真值与真机逐项核对，见 [verification.md](./docs/modules/verification.md) §5 第 21 测 |
 
 ---
 
@@ -298,7 +299,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 376 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 37** · chunks-data **55** · overlay-fit **38** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · rv-articles 104 · study-credit 77 · chain-verdict 36 · dashboard-glance 16；合计 **7,514**，2026-10-13 第 20 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 390 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 37** · chunks-data **55** · overlay-fit **38** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · rv-articles 104 · study-credit 77 · chain-verdict 36 · dashboard-glance 16；合计 **7,528**，2026-10-13 第 21 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**

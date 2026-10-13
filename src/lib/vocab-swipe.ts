@@ -9,6 +9,10 @@
  *  - 未翻面 → 滑动只翻面（必须先看到释义再自评，避免盲滑刷进度）；
  *  - 已翻面未评分 → 左滑=不认识(2) / 右滑=认识(4)；
  *  - 已评分 → 左滑回上一张方向 / 右滑下一张，**不必先翻面**。
+ *
+ * `allowRate: false`（复习检测在 2026-10-13 起启用）：已翻面未评分的滑动**什么都不做** ——
+ * "熟悉还是不熟悉"不许用方向手势表达（用户口径），只认五档评分按钮 / 数字键。
+ * 翻面与已评分后的前后导航不受影响；短语闪卡不传该选项，保留滑动评分。
  */
 export type SwipeAction = 'none' | 'flip' | 'rate-unknown' | 'rate-known' | 'next' | 'prev';
 
@@ -21,6 +25,8 @@ export function decideSwipe(opts: {
   dx: number;
   isFlipped: boolean;
   rated: boolean;
+  /** false = 禁用「滑动评分」档（复习检测）：已翻面未评分时返回 'none' */
+  allowRate?: boolean;
   threshold?: number;
 }): SwipeAction {
   const threshold = opts.threshold ?? SWIPE_THRESHOLD;
@@ -35,5 +41,6 @@ export function decideSwipe(opts: {
    */
   if (opts.rated) return left ? 'prev' : 'next';
   if (!opts.isFlipped) return 'flip';
+  if (opts.allowRate === false) return 'none';
   return left ? 'rate-unknown' : 'rate-known';
 }

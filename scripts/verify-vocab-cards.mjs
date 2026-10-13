@@ -124,8 +124,26 @@ check(T({ dx: 120, isFlipped: true, rated: true }) === 'next', '手势：已评�
  */
 check(T({ dx: -120, isFlipped: false, rated: true }) === 'prev', '手势：已评分未翻面左滑 → 直接上一张（回看态不必先翻面）');
 check(T({ dx: 120, isFlipped: false, rated: true }) === 'next', '手势：已评分未翻面右滑 → 直接下一张');
-check(SWIPE_QUALITY_UNKNOWN === 2 && SWIPE_QUALITY_KNOWN === 4, '滑动映射到 SM-2 quality 2 / 4', `${SWIPE_QUALITY_UNKNOWN}/${SWIPE_QUALITY_KNOWN}`);
-check(/decideSwipe\(\{ dx, isFlipped, rated \}\)/.test(fc), '组件用纯函数判定手势（不在组件里重复分支）');
+check(SWIPE_QUALITY_UNKNOWN === 2 && SWIPE_QUALITY_KNOWN === 4, '滑动映射到 SM-2 quality 2 / 4（短语闪卡口径）', `${SWIPE_QUALITY_UNKNOWN}/${SWIPE_QUALITY_KNOWN}`);
+
+/**
+ * ⑤b 复习检测禁用「滑动评分」（2026-10-13 用户口径：不要用左右划判断熟悉与否）——
+ * 已翻面未评分的滑动必须返回 'none'（不评分、不动作），只认五档评分按钮 / 数字键；
+ * 未翻面→翻面、已评分→前后导航两条保留。纯函数新加 allowRate 档实现，
+ * 上面 112-119、125-126 那张默认表**一字不改**：它就是短语闪卡（不传 allowRate）的契约与正对照。
+ */
+check(T({ dx: -120, isFlipped: true, rated: false, allowRate: false }) === 'none', '手势（FM 禁用滑动评分）：已翻面左滑 → 不评分不动作');
+check(T({ dx: 120, isFlipped: true, rated: false, allowRate: false }) === 'none', '手势（FM）：已翻面右滑 → 不评分不动作');
+check(T({ dx: -120, isFlipped: false, rated: false, allowRate: false }) === 'flip', '手势（FM）：未翻面左滑 → 仍只翻面');
+check(T({ dx: 120, isFlipped: false, rated: false, allowRate: false }) === 'flip', '手势（FM）：未翻面右滑 → 仍只翻面');
+check(T({ dx: -120, isFlipped: false, rated: true, allowRate: false }) === 'prev', '手势（FM）：已评分左滑 → 回看导航保留');
+check(T({ dx: 120, isFlipped: true, rated: true, allowRate: false }) === 'next', '手势（FM）：已评分右滑 → 回看导航保留');
+check(T({ dx: -120, isFlipped: true, rated: false, allowRate: true }) === 'rate-unknown', '正对照：显式 allowRate:true 仍走滑动评分（默认表未被破坏）');
+check(/decideSwipe\(\{ dx, isFlipped, rated, allowRate: false \}\)/.test(fc), '复习检测调用处传 allowRate:false（组件不重复分支）');
+check(!/markWithQuality\(action === 'rate-unknown'/.test(fc), '复习检测删掉了滑动 → quality 的评分映射');
+check(!/swipeHint/.test(fc), '复习检测删掉了滑动方向提示（不认识/认识覆盖层）');
+check(/decideSwipe\(\{ dx, isFlipped, rated \}\)/.test(pfm), '正对照：短语闪卡仍走默认决策表（滑动评分）');
+check(/markWithQuality\(action === 'rate-unknown' \? SWIPE_QUALITY_UNKNOWN : SWIPE_QUALITY_KNOWN\)/.test(pfm), '正对照：短语闪卡保留滑动评分映射');
 check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值常量只有一处定义（lib），组件不重复声明');
 
 // ── ⑥ 会话排卡：答错重排 + 未来 7 天预测（纯函数，全边界单测）──
@@ -759,32 +777,51 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
    * 观感被用户否掉：同一轮里每个词一个字号、同屏对比忽大忽小，短词被容器宽拉满显得过大，
    * 长词缩到很小；且 ResizeObserver 首帧后重算，用户看到"先大后小"的跳变。
    * 回退 = 改造前原样：break-words 的 h2 + 三档字号（≤10 最大 / 11–14 中 / >14 小）。
-   * 三模式档位不同是改造前各自的既有样式，勿"顺手统一"。
    * data-fit-box 是无样式锚点（自动化找词面用，verification.md §3 有记载），保留。
+   *
+   * 2026-10-13 第 21 测重推导（真机 109 反馈「telecommunications 和 compatible 都分行」）：
+   * 真机布局视口是 393 CSS（此前按 428=1283÷3 估算，错），且 MainActivity 的
+   * settings.setTextZoom(120) 会把全部字号再 ×1.2 —— 实验室须以 393 + text-size-adjust:120%
+   * 仿真才复现（4 词 × DL/QC 两模式共 8/8 折行、几何逐项对齐真机，见 verification.md 第 21 测）。
+   * 修法：每日学习 / 快速闪卡手机(<sm)档对齐复习检测既有小档 24/30/36（FM 自 2026-10-01
+   * 回退 FitWord 起即此 sm: 分档、本次未动；真机实测其 telecom 28.8px / h2W=282 / 单行 ——
+   * 该参考档有真机实证），sm: 保各自桌面原档（30/36/48）——桌面像素不变，手机档对齐是
+   * **统一到已验证档**（≠ 取消档位差异：「勿顺手统一」在 ≥sm 仍成立）。
    */
   check(!existsSync(join(ROOT, 'src/components/FitWord.tsx')) && !/FitWord/.test(fc + dl + qc),
     '⑭ 自适应字号组件已删除且三模式无引用（防止无人重推导就复活）');
   const tieredWord = [
+    // 复习检测：已真机验证的基准档（最短档 ≤10 字母桌面就到此为止，无 sm: 变体）
     ['FlashcardMode', fc, /shown!\.word\.length > 14 \? 'text-2xl sm:text-3xl' : shown!\.word\.length > 10 \? 'text-3xl sm:text-4xl' : 'text-4xl'/],
-    ['DailyLearningMode', dl, /currentWord\.word\.length > 14 \? 'text-3xl' : currentWord\.word\.length > 10 \? 'text-4xl' : 'text-5xl'/],
-    ['QuickCardMode', qc, /cw\.word\.length > 14 \? 'text-3xl' : cw\.word\.length > 10 \? 'text-4xl' : 'text-5xl'/],
+    // 每日学习 / 快速闪卡：手机档与复习检测同组，sm: 保桌面原档
+    ['DailyLearningMode', dl, /currentWord\.word\.length > 14 \? 'text-2xl sm:text-3xl' : currentWord\.word\.length > 10 \? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl'/],
+    ['QuickCardMode', qc, /cw\.word\.length > 14 \? 'text-2xl sm:text-3xl' : cw\.word\.length > 10 \? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl'/],
+    // 正对照：短语闪卡四档本次未动（用户只报了复习/每日/快速三个模式的卡面）
+    ['PhraseFlashcardMode', pfm, /cw\.content\.length > 24 \? 'text-xl sm:text-2xl' : cw\.content\.length > 14 \? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl'/],
   ];
   for (const [name, src, re] of tieredWord) {
-    check(re.test(src), `⑭ ${name}：单词按词长三档字号（>14 小 / 11–14 中 / ≤10 大）`);
+    check(re.test(src), `⑭ ${name}：单词按词长分档字号（档位字面量锁定，短词大长词小）`);
     check(/'font-black italic text-foreground tracking-tight break-words min-w-0',/.test(src),
       `⑭ ${name}：词面保留 break-words（长词可以折，不再 nowrap 硬缩）`);
   }
+  /**
+   * ⑭c 卡片内边距 = 词排可用宽度的唯一变量（第 21 测 393 仿真）：
+   * p-8 时 QC 词排只有 293px，14 字母的 recommendation 在手机档 text-3xl（真机 36px）
+   * 要 298px → 折两截；收到 p-7 后三个模式词排同为 301px，8 词矩阵全单行。
+   */
+  check(/<CardContent className="p-7 text-center space-y-3">/.test(qc), '⑭c 快速闪卡卡内边距 p-7（词排 301px 与复习检测/每日学习同宽）');
 
   /**
    * ⑭b 词面与动作按钮同一行时，按钮组必须能**整体换行**（2026-10-13 真机反馈
    * 「快速闪卡长单词会被分割为两列」）。
    *
-   * 词排 = 单词 h2 + 朗读钮 + 收藏钮（同一 flex 行）。卡片 w-full，428 CSS 宽的手机上
-   * 词排只有 ~328px，两个按钮固定吃 ~86px；长词（>14 字母 text-3xl ≈250px+）被挤进
-   * ~242px 的窄列里，break-words 从词中间折成两截。修法 = 词排 flex-wrap + 两按钮包进
-   * 一个 shrink-0 组：短词并排（版式不变），长词时按钮组**整组**落到下一行，词面拿回整行宽；
-   * 不许逐项换行拆成「词+🔊 一行 / ⭐ 一行」的碎排。8 词矩阵（428×925，修复前 h2W=242
-   * 两行/4 词 → 修复后全单行）见 verification.md §5 第 19 测。
+   * 词排 = 单词 h2 + 朗读钮 + 收藏钮（同一 flex 行）。卡片 w-full，真机 393 CSS 宽的布局
+   * 视口（第 19 测按 428 仿真是错的，第 21 测起改 393 + textZoom 仿真）里词排只有 ~293px
+   * （报障时仍 p-8；⑭c 收到 p-7 后 301px），两个按钮固定吃 ~86px；长词被挤进 ~207px 的
+   * 窄列里，break-words 从词中间折成两截。
+   * 修法 = 词排 flex-wrap + 两按钮包进一个 shrink-0 组：短词并排（版式不变），长词时按钮组
+   * **整组**落到下一行，词面拿回整行宽；不许逐项换行拆成「词+🔊 一行 / ⭐ 一行」的碎排。
+   * 8 词矩阵（第 19 测 428×925 采的修复前后对照；第 21 测已按 393 重验）见 verification.md §5。
    */
   check(/<div data-fit-box className="flex flex-wrap items-center justify-center gap-2 max-w-full">/.test(qc),
     '⑭b 快速闪卡词排允许换行（长词时按钮组落下一行，词面拿整行宽）');
