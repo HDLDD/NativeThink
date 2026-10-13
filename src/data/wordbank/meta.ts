@@ -15,6 +15,8 @@ export const WORD_COUNTS: Record<string, number> = {
   gaokao: 3743,
   cet4: 4542,
   cet6: 7404,
+  cet46freq: 3000,
+  cet46elite: 3000,
   ielts: 6609,
   toefl: 10367,
   postgraduate: 5047,
@@ -28,6 +30,8 @@ export const WORD_ENTRIES: Record<string, number> = {
   gaokao: 6008,
   cet4: 4542,
   cet6: 7404,
+  cet46freq: 3000,
+  cet46elite: 3000,
   ielts: 6609,
   toefl: 10367,
   postgraduate: 9602,
@@ -36,7 +40,7 @@ export const WORD_ENTRIES: Record<string, number> = {
 };
 
 /** 词条总数 = 各书词条相加（同一词在多本书里各有一条） */
-export const TOTAL_ENTRIES = 75113;
+export const TOTAL_ENTRIES = 81113;
 
 /** 跨书唯一单词数 —— 「全部」模式（不选具体词书）真正的池子大小 */
 export const TOTAL_UNIQUE_WORDS = 21736;
@@ -49,6 +53,8 @@ export const LEVEL_LABELS: Record<string, string> = {
   gaokao: '高考',
   cet4: '四级',
   cet6: '六级',
+  cet46freq: '四六级高频',
+  cet46elite: '四六级高分',
   ielts: '雅思',
   toefl: '托福',
   postgraduate: '考研',
@@ -56,18 +62,20 @@ export const LEVEL_LABELS: Record<string, string> = {
   advanced: '高阶',
 };
 
-export const ALL_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] as const;
+export const ALL_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'cet46freq', 'cet46elite', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] as const;
 
 export const LEVEL_ORDER: Record<string, number> = {
   zhongkao: 0,
   gaokao: 1,
   cet4: 2,
   cet6: 3,
-  ielts: 4,
-  toefl: 5,
-  postgraduate: 6,
-  professional: 7,
-  advanced: 8,
+  cet46freq: 4,
+  cet46elite: 5,
+  ielts: 6,
+  toefl: 7,
+  postgraduate: 8,
+  professional: 9,
+  advanced: 10,
 };
 
 /** Level accent colors — single source of truth for all components */
@@ -76,6 +84,8 @@ export const LEVEL_COLORS: Record<string, string> = {
   gaokao: '#F97316',
   cet4: '#0EA5E9',
   cet6: '#6C5CE7',
+  cet46freq: '#10B981',
+  cet46elite: '#EAB308',
   ielts: '#F59E0B',
   toefl: '#EC4899',
   postgraduate: '#8B5CF6',

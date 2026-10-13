@@ -838,7 +838,7 @@ export default function SpellingPage() {
     return 'intermediate';
   }, []);
 
-  const ALL_LEVELS = ['zhongkao','gaokao','cet4','cet6','ielts','toefl','postgraduate','professional','advanced'];
+  const ALL_LEVELS = ['zhongkao','gaokao','cet4','cet6','cet46freq','cet46elite','ielts','toefl','postgraduate','professional','advanced'];
 
   /** Cache extracted sentences per level to avoid redundant work */
   const levelSentencesCache = useRef<Record<string, Omit<ISpellingSentence, 'id' | 'createdAt'>[]>>({});
@@ -905,7 +905,7 @@ export default function SpellingPage() {
             createdAt: Date.now(),
           }));
           cacheWBSentences(lvl, sents);
-          toast.success(`已加载 ${({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'})[lvl] || lvl} 词库 ${sents.length} 条例句`);
+          toast.success(`已加载 ${({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',cet46freq:'四六级高频',cet46elite:'四六级高分',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'})[lvl] || lvl} 词库 ${sents.length} 条例句`);
         } else {
           toast.info('该词库没有例句');
         }
@@ -1058,6 +1058,8 @@ export default function SpellingPage() {
       { level: 'gaokao', label: '高考', desc: '高中核心词汇' },
       { level: 'zhongkao', label: '中考', desc: '初中入门' },
       { level: 'cet6', label: '六级', desc: '大学进阶' },
+      { level: 'cet46freq', label: '四六级高频', desc: '真题考频精选' },
+      { level: 'cet46elite', label: '四六级高分', desc: '六级拔高词' },
       { level: 'ielts', label: '雅思', desc: '出国留学' },
       { level: 'toefl', label: '托福', desc: '北美学术' },
       { level: 'postgraduate', label: '考研', desc: '研究生考试' },
@@ -1242,7 +1244,7 @@ export default function SpellingPage() {
                 title="切换词书"
               >
                 <Library className="size-3.5 text-ink-teal" />
-                {activeLevel === 'all' ? '全部词库' : ({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[activeLevel] || activeLevel}
+                {activeLevel === 'all' ? '全部词库' : ({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',cet46freq:'四六级高频',cet46elite:'四六级高分',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[activeLevel] || activeLevel}
                 {building || levelLoading
                   ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
                   : <ChevronDown className="size-3.5 text-muted-foreground" />}
@@ -1266,7 +1268,7 @@ export default function SpellingPage() {
                 全部词库
               </DropdownMenuItem>
               <div className="h-px bg-border my-1" />
-              {(['zhongkao','gaokao','cet4','cet6','ielts','toefl','postgraduate','professional','advanced'] as const).map((lvl) => (
+              {(['zhongkao','gaokao','cet4','cet6','cet46freq','cet46elite','ielts','toefl','postgraduate','professional','advanced'] as const).map((lvl) => (
                 <DropdownMenuItem
                   key={lvl}
                   onClick={() => handleLevelChange(lvl)}
@@ -1274,7 +1276,7 @@ export default function SpellingPage() {
                   className="gap-2 text-xs font-bold"
                 >
                   <BookOpen className={cn('size-3.5', activeLevel === lvl ? 'text-ink-teal' : 'text-muted-foreground')} />
-                  {({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[lvl]}
+                  {({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',cet46freq:'四六级高频',cet46elite:'四六级高分',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[lvl]}
                   {activeLevel === lvl && <Check className="size-3.5 text-ink-teal ml-auto" />}
                 </DropdownMenuItem>
               ))}

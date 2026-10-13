@@ -390,10 +390,10 @@ check(
   // 真正的口径是：**不许出现词条总数**（这仓库踩过"把 75,113 当可学词数"的坑）
   check((help.match(/21,736/g) || []).length >= 1 && !new RegExp(String(entries) + '|' + entries.toLocaleString('en-US')).test(help),
     `帮助里的"全部"词数只用去重词数 ${unique.toLocaleString('en-US')}，不出现词条总数 ${entries.toLocaleString('en-US')}`);
-  check(/九档词库|聚合九档/.test(help) && !/五个等级/.test(help),
-    '词库档数写的是九档（"五个等级"这条过期文案不许回来）');
-  check(/中考[\s\S]{0,40}高考[\s\S]{0,40}四级[\s\S]{0,40}六级[\s\S]{0,40}雅思[\s\S]{0,40}托福[\s\S]{0,40}考研[\s\S]{0,40}专业[\s\S]{0,40}高阶/.test(help),
-    '九档名字逐个列全（用户能对着找）');
+  check(/十一档词库|聚合十一档/.test(help) && !/五个等级|九档词库|聚合九档/.test(help),
+    '词库档数写的是十一档（"五个等级"/"九档"这两条过期文案不许回来）');
+  check(/中考[\s\S]{0,40}高考[\s\S]{0,40}四级[\s\S]{0,40}六级[\s\S]{0,40}四六级高频[\s\S]{0,40}四六级高分[\s\S]{0,40}雅思[\s\S]{0,40}托福[\s\S]{0,40}考研[\s\S]{0,40}专业[\s\S]{0,40}高阶/.test(help),
+    '十一档名字逐个列全（用户能对着找）');
 
   const provBlock = aiCfg.slice(aiCfg.indexOf('export const ALL_PROVIDERS'), aiCfg.indexOf('];', aiCfg.indexOf('export const ALL_PROVIDERS')));
   const providers = (provBlock.match(/'[a-z]+'/g) || []).map((s) => s.replace(/'/g, ''));

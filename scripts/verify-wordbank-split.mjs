@@ -16,7 +16,7 @@ import ts from 'typescript';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, '../src/data/wordbank/data');
-const LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
+const LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'cet46freq', 'cet46elite', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
 const TMP = path.join(process.env.TEMP || '/tmp', 'wb-verify-load');
 fs.mkdirSync(TMP, { recursive: true });
 
@@ -196,7 +196,7 @@ async function check(baselineFile) {
     for (const m of fail.slice(0, 20)) console.log('  - ' + m);
     process.exit(1);
   }
-  console.log(`全部断言通过（9 个等级，共 ${LEVELS.reduce((s, l) => s + snap.levels[l].count, 0)} 条词条）`);
+  console.log(`全部断言通过（${LEVELS.length} 个等级，共 ${LEVELS.reduce((s, l) => s + snap.levels[l].count, 0)} 条词条）`);
 }
 
 /**

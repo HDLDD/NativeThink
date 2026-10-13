@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
-import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, ArrowRight, Notebook, NotebookPen, BookMarked, Plane, GraduationCap, Briefcase, Award, Zap, Library, Layers, Globe, type LucideIcon } from 'lucide-react';
+import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, ArrowRight, Notebook, NotebookPen, BookMarked, Plane, GraduationCap, Briefcase, Award, TrendingUp, Trophy, Zap, Library, Layers, Globe, type LucideIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -39,6 +39,8 @@ const LEVELS = [
   { key: 'gaokao', label: '高考' },
   { key: 'cet4', label: '四级' },
   { key: 'cet6', label: '六级' },
+  { key: 'cet46freq', label: '四六级高频' },
+  { key: 'cet46elite', label: '四六级高分' },
   { key: 'ielts', label: '雅思' },
   { key: 'toefl', label: '托福' },
   { key: 'postgraduate', label: '考研' },
@@ -73,6 +75,8 @@ const BOOKS: { key: string; label: string; icon: LucideIcon; color: string; desc
   { key: 'gaokao', label: '高考词汇', icon: NotebookPen, color: '#F97316', desc: '高中英语高考核心词汇', gradient: 'from-orange-50 to-amber-50 dark:from-orange-500/10 dark:to-amber-500/10' },
   { key: 'cet4', label: '四级词汇', icon: BookOpen, color: '#0EA5E9', desc: '大学英语四级考试核心词汇', gradient: 'from-sky-50 to-blue-50 dark:from-sky-500/10 dark:to-blue-500/10' },
   { key: 'cet6', label: '六级词汇', icon: BookMarked, color: '#6C5CE7', desc: '大学英语六级考试核心词汇', gradient: 'from-violet-50 to-purple-50 dark:from-violet-500/10 dark:to-purple-500/10' },
+  { key: 'cet46freq', label: '四六级高频', icon: TrendingUp, color: '#10B981', desc: '四六级真题词频精选', gradient: 'from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10' },
+  { key: 'cet46elite', label: '四六级高分', icon: Trophy, color: '#EAB308', desc: '六级拔高词精选', gradient: 'from-yellow-50 to-amber-50 dark:from-yellow-500/10 dark:to-amber-500/10' },
   { key: 'ielts', label: '雅思词汇', icon: Plane, color: '#F59E0B', desc: 'IELTS 雅思考试核心词汇', gradient: 'from-amber-50 to-yellow-50 dark:from-amber-500/10 dark:to-yellow-500/10' },
   { key: 'toefl', label: '托福词汇', icon: Globe, color: '#EC4899', desc: 'TOEFL 托福考试核心词汇', gradient: 'from-pink-50 to-rose-50 dark:from-pink-500/10 dark:to-rose-500/10' },
   { key: 'postgraduate', label: '考研词汇', icon: GraduationCap, color: '#8B5CF6', desc: '研究生入学考试核心词汇', gradient: 'from-purple-50 to-violet-50 dark:from-purple-500/10 dark:to-violet-500/10' },
@@ -376,7 +380,7 @@ export default function DeepVocabularyPage() {
 
 
   // Browse tab: level filter, memory, page size
-  const SUB_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] as const;
+  const SUB_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'cet46freq', 'cet46elite', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] as const;
   const [browseMemoryFilter, setBrowseMemoryFilter] = useState<'all' | 'memorized' | 'unmemorized'>(
     () => memory.browseMemoryFilter || 'all',
   );
@@ -415,7 +419,7 @@ export default function DeepVocabularyPage() {
   // ── Lazy data loading ──
   const levelReady = (lv: string) => {
     if (lv === 'all') {
-      return ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'].every((l) => isLevelReady(l));
+      return ['zhongkao', 'gaokao', 'cet4', 'cet6', 'cet46freq', 'cet46elite', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'].every((l) => isLevelReady(l));
     }
     return isLevelReady(lv);
   };
@@ -424,15 +428,15 @@ export default function DeepVocabularyPage() {
   useEffect(() => {
     /**
      * 首启向导还挂着（没选过词书）时**一本都不预载**。
-     * selectedLevel 的默认值是 'all'，以前挂载即把 9 本书连 detail 一起拉进来 ——
-     * 实测全新 profile 进 /vocabulary：18 个词库 chunk / 3.16MB（压缩后 ≈40MB 源码）、
+     * selectedLevel 的默认值是 'all'，以前挂载即把 11 本书连 detail 一起拉进来 ——
+     * 实测全新 profile 进 /vocabulary：22 个词库 chunk / 3.7MB（压缩后 ≈41.6MB 源码）、
      * 15 个长任务合计 1.6s，而此时用户连一本都还没点。
      * 选完书由向导的完成路径（handleWizardComplete / handleWizardContinue）按需预载那一本；
      * 换书路径靠下面 setupDone 变 true 后本 effect 重跑接上（幂等）。
      */
     if (!setupDone) return;
     if (levelReady(selectedLevel)) { setDataReady(true); setDataVersion((v) => v + 1); return; }
-    const levels = selectedLevel === 'all' ? ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] : [selectedLevel];
+    const levels = selectedLevel === 'all' ? ['zhongkao', 'gaokao', 'cet4', 'cet6', 'cet46freq', 'cet46elite', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'] : [selectedLevel];
     // 失败也放行（下面 finally）：不能把人永久卡在"加载中"，模式内部各自还有空数据兜底
     preloadLevels(levels)
       .catch(() => { /* 网络/解析失败：仍进入界面，功能按空数据降级 */ })
@@ -534,10 +538,10 @@ export default function DeepVocabularyPage() {
 
   // Browse level colors
   const LEVEL_COLORS: Record<string, string> = {
-    zhongkao: '#EF4444', gaokao: '#F97316', cet4: '#0EA5E9', cet6: '#6C5CE7', ielts: '#F59E0B', toefl: '#EC4899', postgraduate: '#8B5CF6', professional: '#14B8A6', advanced: '#64748B',
+    zhongkao: '#EF4444', gaokao: '#F97316', cet4: '#0EA5E9', cet6: '#6C5CE7', cet46freq: '#10B981', cet46elite: '#EAB308', ielts: '#F59E0B', toefl: '#EC4899', postgraduate: '#8B5CF6', professional: '#14B8A6', advanced: '#64748B',
   };
   const LEVEL_LABELS: Record<string, string> = {
-    zhongkao: '中考', gaokao: '高考', cet4: '四级', cet6: '六级', ielts: '雅思', toefl: '托福', postgraduate: '考研', professional: '专业', advanced: '高阶',
+    zhongkao: '中考', gaokao: '高考', cet4: '四级', cet6: '六级', cet46freq: '四六级高频', cet46elite: '四六级高分', ielts: '雅思', toefl: '托福', postgraduate: '考研', professional: '专业', advanced: '高阶',
   };
 
   // filteredWords must be declared BEFORE it's used in startAutoPlay & useEffect

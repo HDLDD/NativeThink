@@ -30,6 +30,8 @@ const LEVEL_COLORS: Record<string, { hex: string; bg: string; text: string }> = 
   gaokao:       { hex: '#F97316', bg: 'bg-orange-50 dark:bg-orange-500/15', text: 'text-orange-600' },
   cet4:         { hex: '#0EA5E9', bg: 'bg-sky-50 dark:bg-sky-500/15', text: 'text-sky-600' },
   cet6:         { hex: '#6C5CE7', bg: 'bg-violet-50 dark:bg-violet-500/15', text: 'text-violet-600' },
+  cet46freq:    { hex: '#10B981', bg: 'bg-emerald-50 dark:bg-emerald-500/15', text: 'text-emerald-600' },
+  cet46elite:   { hex: '#EAB308', bg: 'bg-yellow-50 dark:bg-yellow-500/15', text: 'text-yellow-600' },
   ielts:        { hex: '#F59E0B', bg: 'bg-amber-50 dark:bg-amber-500/15', text: 'text-amber-600' },
   toefl:        { hex: '#EC4899', bg: 'bg-rose-50 dark:bg-rose-500/15', text: 'text-rose-600' },
   postgraduate: { hex: '#8B5CF6', bg: 'bg-purple-50 dark:bg-purple-500/15', text: 'text-purple-600' },
@@ -39,6 +41,7 @@ const LEVEL_COLORS: Record<string, { hex: string; bg: string; text: string }> = 
 
 const LEVEL_LABELS: Record<string, string> = {
   zhongkao: '中考', gaokao: '高考', cet4: '四级', cet6: '六级',
+  cet46freq: '四六级高频', cet46elite: '四六级高分',
   ielts: '雅思', toefl: '托福', postgraduate: '考研', professional: '专业', advanced: '高阶',
 };
 
@@ -75,7 +78,7 @@ export default function GlobalWordSearch() {
         setDataReady(true);
         setLoading(false);
         // Phase 2: Load remaining levels in background (non-blocking)
-        const allLevels = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
+        const allLevels = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'cet46freq', 'cet46elite', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
         const remaining = allLevels.filter(l => !essential.includes(l));
         remaining.forEach(level => preloadCoreOnly([level]));
       });

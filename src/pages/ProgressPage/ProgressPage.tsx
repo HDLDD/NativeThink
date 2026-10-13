@@ -85,6 +85,8 @@ const VOCAB_LEVELS: { key: string; label: string; icon: typeof BookOpen; color: 
   { key: 'gaokao', label: '高考词库', icon: BookOpen, color: 'text-orange-500' },
   { key: 'cet4', label: '四级词库', icon: BookOpen, color: 'text-sky-500' },
   { key: 'cet6', label: '六级词库', icon: BookOpen, color: 'text-violet-500' },
+  { key: 'cet46freq', label: '四六级高频', icon: BookOpen, color: 'text-emerald-500' },
+  { key: 'cet46elite', label: '四六级高分', icon: BookOpen, color: 'text-yellow-500' },
   { key: 'ielts', label: '雅思词库', icon: BookOpen, color: 'text-amber-500' },
   { key: 'toefl', label: '托福词库', icon: BookOpen, color: 'text-rose-500' },
   { key: 'postgraduate', label: '考研词库', icon: BookOpen, color: 'text-purple-500' },
@@ -167,7 +169,7 @@ export default function ProgressPage() {
 
   const handleResetWordLearning = () => {
     // Clear all per-level word learning storage
-    const LEVELS = ['all', 'zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
+    const LEVELS = ['all', 'zhongkao', 'gaokao', 'cet4', 'cet6', 'cet46freq', 'cet46elite', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
     LEVELS.forEach((l) => {
       safeStorage.removeItem(`__nativethink_word_learning_${l}`);
       safeStorage.removeItem(`__nativethink_daily_quota_${l}`);
@@ -251,7 +253,7 @@ export default function ProgressPage() {
     // 同 handleResetFavorites：清空收藏必须走 clearAll（陈旧闭包只删一条）
     clearAll();
     // Clear all per-level word learning storage
-    const LEVELS = ['all', 'zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
+    const LEVELS = ['all', 'zhongkao', 'gaokao', 'cet4', 'cet6', 'cet46freq', 'cet46elite', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
     LEVELS.forEach((l) => {
       safeStorage.removeItem(`__nativethink_word_learning_${l}`);
       safeStorage.removeItem(`__nativethink_daily_quota_${l}`);
@@ -617,7 +619,7 @@ export default function ProgressPage() {
                         case 'spelling': handleResetSpelling(); break;
                         case 'reading': void handleResetReading(); break;
                         case 'aicache': handleResetAiCaches(); break;
-                        case 'zhongkao': case 'gaokao': case 'cet4': case 'cet6': case 'ielts': case 'toefl': case 'postgraduate': case 'professional': case 'advanced': handleResetWordLevel(resetConfirm); break;
+                        case 'zhongkao': case 'gaokao': case 'cet4': case 'cet6': case 'cet46freq': case 'cet46elite': case 'ielts': case 'toefl': case 'postgraduate': case 'professional': case 'advanced': handleResetWordLevel(resetConfirm); break;
                         case 'phrases': handleResetPhraseLearning(); break;
                         case 'ai': handleResetAIContent(); break;
                         case 'favs': handleResetFavorites(); break;

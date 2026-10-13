@@ -71,7 +71,7 @@ const bad = (re, what) => list.filter((f) => re.test(f));
 check(bad(/charts|ProgressCharts|recharts|d3-/i, '').length === 0, '首屏不下载图表库（只有 /progress 用得到）', bad(/charts|ProgressCharts/i).join(','));
 check(bad(/markdown|micromark|mdast|unified|lib-/i, '').length === 0, '首屏不下载 Markdown 渲染器（只有 5 个页面 + 更新日志用得到）', bad(/markdown|lib-/i).join(','));
 // 词书**数据** chunk 命名是 wordbank-<level>-<hash>.js；wordbank-<hash>.js 是加载器本体（2.4KB，必须首屏在）
-const LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
+const LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'cet46freq', 'cet46elite', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
 const bookChunks = list.filter((f) => LEVELS.some((l) => new RegExp(`^wordbank-${l}-`).test(f) || new RegExp(`^${l}\\.detail-`).test(f)));
 check(bookChunks.length === 0, '首屏不下载任何一本词书数据', bookChunks.join(','));
 check(bad(/^books-|^scp|^reading/i, '').length === 0, '首屏不下载书/语料正文', bad(/^books-|^reading/i).join(','));

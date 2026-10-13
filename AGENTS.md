@@ -30,7 +30,7 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 模块 / 路由 | 文档 | 一句话 |
 |-----------|------|--------|
 | 背单词 `/vocabulary` | [modules/vocabulary.md](./docs/modules/vocabulary.md) | 7 种模式（含「短语闪卡」—— 九个考试短语库共用短语侧 SM-2）、三个正交开关（`setupDone`/`showWizard`/`immersed`）、SM-2、三套并行重排实现 |
-| 词库数据 | [modules/wordbank-data.md](./docs/modules/wordbank-data.md) | 两层去重、核心/detail 拆分、IDB 主 + localStorage 兜底、改完必跑的两个脚本 |
+| 词库数据 | [modules/wordbank-data.md](./docs/modules/wordbank-data.md) | 11 本、两层去重、核心/detail 拆分、IDB 主 + localStorage 兜底、改完必跑的两个脚本；四六级两本派生词书（真题考频口径）单点生成 |
 | 阅读 `/articles` | [modules/reading.md](./docs/modules/reading.md) | 五种来源一套阅读器、运行时全文升级、**两套切章必须对齐**、复习词文章词表是派生的（删文章即回词表） |
 | 朗读 TTS | [modules/tts.md](./docs/modules/tts.md) | 引擎降级链、切片 180 由上游 200 硬上限钉死、闪退自愈、音色四处同步、云端缓存 FIFO 400 条 + Blob URL 用完即 revoke、**系统语音的插件边界（async 别 return 插件对象，否则永久挂死）** |
 | AI 服务与端侧模型 | [modules/ai-services.md](./docs/modules/ai-services.md) | Key 优先级、服务端免费档回退、端侧回落条件、`extractJson` 规定由 `verify:ai-parse` 全仓扫、**中继防滥用守卫（Origin/限流/形状校验/出厂 Key 用量，无守卫覆盖）** |
@@ -97,7 +97,7 @@ npm run check:tts-voices
 **回归守卫**（本项目没有测试框架，这些就是防线；当前实测全绿，断言数见 [verification.md](./docs/modules/verification.md)）：
 
 ```powershell
-node scripts/verify-wordbank-loading.mjs          # 45  加载层集成（无需浏览器）
+node scripts/verify-wordbank-loading.mjs          # 49  加载层集成（无需浏览器；11 本词书）
 node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆分（基线任意时刻可重采）
 node scripts/verify-tts-progress.mjs              # 6175 朗读切片与进度反查表
 node scripts/verify-tts-hardening.mjs             # 15   TTS 降级/在途去重/桌面限定（注意：没有 npm script）
@@ -128,6 +128,7 @@ npm run verify:all                                # —    收尾必跑：typech
 
 ```powershell
 npm run wordbank:split        # 改词库后必跑（见工作约定第 6 条）
+node scripts/generate-cet46-books.mjs      # 重生成四六级高频/高分两本（改词单快照 scripts/data/cet46*.json 之后）
 npm run books:gen-meta        # 改书目后重生成 books-meta.ts
 node scripts/fetch-scp.cjs    # 重新抓取 SCP（约 1 req/s，产物 src/data/scp.ts 勿手改）
 node scripts/clean-wordbank-mojibake.mjs   # 清词库 U+FFFD 乱码（幂等）
@@ -299,7 +300,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 45 · books-meta 227 · vocab-cards 390 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 37** · chunks-data **55** · overlay-fit **38** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · rv-articles 104 · study-credit 77 · chain-verdict 36 · dashboard-glance 16；合计 **7,528**，2026-10-13 第 21 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 49 · books-meta 227 · vocab-cards 390 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 37** · chunks-data **55** · overlay-fit **38** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · rv-articles 104 · study-credit 77 · chain-verdict 36 · dashboard-glance 16；合计 **7,532**，2026-10-13 第 22 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**

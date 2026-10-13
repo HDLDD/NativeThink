@@ -25,7 +25,7 @@ import ts from 'typescript';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/data/wordbank');
 const OUT = path.join(process.env.TEMP || '/tmp', 'wb-loading-check');
-const LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
+const LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'cet46freq', 'cet46elite', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
 
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(path.join(OUT, 'data'), { recursive: true });
@@ -153,7 +153,7 @@ ok(retriedOk === false,
   const alone = wbmod.queryWords({ level: 'professional', limit: 99999 }).length;
   ok(alone === own.professional, `只加载「专业」时池子 = 书内唯一词数 ${own.professional}`, `实际 ${alone}`);
 
-  // 再把九本全加载：新逻辑下每本都不许被别人抢走
+  // 再把全部词书加载：新逻辑下每本都不许被别人抢走
   await wbmod.preloadCoreOnly(LEVELS);
   const pools = {};
   for (const lv of LEVELS) pools[lv] = wbmod.queryWords({ level: lv, limit: 99999 }).length;
@@ -163,7 +163,7 @@ ok(retriedOk === false,
     ok(meta.WORD_COUNTS[lv] === own[lv], `${lv} 词书卡显示数 WORD_COUNTS = 唯一词数`, `表 ${meta.WORD_COUNTS[lv]} / 实际 ${own[lv]}`);
   }
   ok(pools.professional === alone,
-    '九本全载后「专业」池子不缩水（跨书去重已改为书内去重）', `${alone} → ${pools.professional}`);
+    '全部词书加载后「专业」池子不缩水（跨书去重已改为书内去重）', `${alone} → ${pools.professional}`);
   ok(pools.postgraduate > 0,
     '正对照：考研池子不再是 0（旧算法九本全载时它是 0）', `实际 ${pools.postgraduate}`);
   ok(pools.cet6 === 7404,
@@ -194,7 +194,7 @@ ok(retriedOk === false,
 
 // ── ⑦ 缓存写入：IDB 成功就不再镜像 localStorage；IDB 挂了才兜底 ──
 {
-  // 上面已经把 9 个等级都加载过一遍（idb 桩是"写成功"），此刻 localStorage 里不该有任何词库键。
+  // 上面已经把全部等级都加载过一遍（idb 桩是"写成功"），此刻 localStorage 里不该有任何词库键。
   // 旧实现是无条件双写：单本级 JSON 3~12MB，而 localStorage 配额只有 5MB ——
   // 每次加载词书都要先付一次几 MB 的**同步 stringify**，再吃一发注定失败的 QuotaExceeded。
   const mirrored = [...store.keys()].filter((k) => /__nativethink_wb/.test(k));

@@ -9,7 +9,7 @@ import { idbGet, idbSet } from '@/lib/idb';
 // 以前 wordbank.ts 里另抄了一份，两边各自演进过 —— 现在只转发，不再重复定义。
 // 语义：WORD_COUNTS = 该词书**可学的去重单词数**（书内同形词只算一个），
 //       与 queryWords({level}) 的池子严格相等；词条原文数见 WORD_ENTRIES。
-import { WORD_COUNTS, TOTAL_UNIQUE_WORDS, ALL_LEVELS as META_ALL_LEVELS } from './meta';
+import { WORD_COUNTS, TOTAL_UNIQUE_WORDS, ALL_LEVELS as META_ALL_LEVELS, LEVEL_ORDER } from './meta';
 export { WORD_COUNTS, TOTAL_UNIQUE_WORDS };
 
 export const ALL_PARTS_OF_SPEECH: string[] = [
@@ -157,6 +157,8 @@ async function loadCore(level: string): Promise<void> {
       case 'gaokao': mod = await import('./data/gaokao'); break;
       case 'cet4': mod = await import('./data/cet4'); break;
       case 'cet6': mod = await import('./data/cet6'); break;
+      case 'cet46freq': mod = await import('./data/cet46freq'); break;
+      case 'cet46elite': mod = await import('./data/cet46elite'); break;
       case 'ielts': mod = await import('./data/ielts'); break;
       case 'toefl': mod = await import('./data/toefl'); break;
       case 'postgraduate': mod = await import('./data/postgraduate'); break;
@@ -233,6 +235,8 @@ async function loadDetail(level: string): Promise<void> {
       case 'gaokao': mod = await import('./data/gaokao.detail'); break;
       case 'cet4': mod = await import('./data/cet4.detail'); break;
       case 'cet6': mod = await import('./data/cet6.detail'); break;
+      case 'cet46freq': mod = await import('./data/cet46freq.detail'); break;
+      case 'cet46elite': mod = await import('./data/cet46elite.detail'); break;
       case 'ielts': mod = await import('./data/ielts.detail'); break;
       case 'toefl': mod = await import('./data/toefl.detail'); break;
       case 'postgraduate': mod = await import('./data/postgraduate.detail'); break;
@@ -279,7 +283,7 @@ async function loadAll(): Promise<void> {
   if (_allReady) return;
   // Load levels SEQUENTIALLY to avoid memory spikes from parallel imports.
   // Each level contains 3k–18k word entries with examples, collocations, etc.
-  // Loading 9 levels simultaneously (~75k entries) risks tab crashes.
+  // Loading all levels simultaneously (~81k entries) risks tab crashes.
   for (const lvl of ALL_LEVELS) {
     try { await loadLevel(lvl); } catch { /* skip failed level — other levels still load */ }
   }
@@ -330,7 +334,7 @@ function getAllWords(): IWordEntry[] {
  * 「全部」模式的可学单词总数 —— 跨书按词去重（一词只算一次），只统计已加载的等级。
  *
  * ⚠️ 不要把 `getWordCounts()` 的各本书数字相加来当"全部"：词书是累积式的
- * （同一个词同时属于中考和六级），相加会得到 62,633，而真正能出的卡是 21,736 张。
+ * （同一个词同时属于中考和六级），相加会得到 68,633，而真正能出的卡是 21,736 张。
  */
 export function getTotalLearnableCount(): number {
   ensureIndexes();
@@ -400,7 +404,8 @@ export function queryWords(params: IWordQuery = {}): IWordEntry[] {
   } else if (params.sortBy === 'alphabetical') {
     words = [...words].sort((a, b) => a.word.localeCompare(b.word));
   } else if (params.sortBy === 'level') {
-    const ord: Record<string, number> = { zhongkao: 0, gaokao: 1, cet4: 2, cet6: 3, ielts: 4, toefl: 5, postgraduate: 6, professional: 7, advanced: 8 };
+    // 顺序表单一来源是 meta.LEVEL_ORDER（以前这里另抄了一份，新增词书时会漏改）
+    const ord: Record<string, number> = LEVEL_ORDER;
     words = [...words].sort((a, b) => (ord[a.level] || 0) - (ord[b.level] || 0));
   }
   // No sort requested → return the filtered array as-is (or a shallow copy for slicing)
@@ -489,7 +494,7 @@ export function getUserLevel(): string {
 /** Get a small set of "essential" levels for fast preload (user's level + 1 adjacent). */
 export function getEssentialLevels(): string[] {
   const userLevel = getUserLevel();
-  const levelOrder = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
+  const levelOrder: readonly string[] = ALL_LEVELS;
   const idx = levelOrder.indexOf(userLevel);
   const essential = [userLevel];
   // Add one adjacent level for broader coverage without loading all

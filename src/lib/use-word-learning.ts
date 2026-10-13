@@ -10,7 +10,7 @@ const DAILY_QUOTA_KEY_PREFIX = '__nativethink_daily_quota';
  * 参与聚合与落盘的等级。'custom' = 生词本（从阅读里收集、词库未收录的词），
  * 它不在词库里，但学习进度与其它等级同构，所以一起聚合 —— 这样 'all' 视图能看到它。
  */
-const SUB_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced', 'custom'];
+const SUB_LEVELS = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'cet46freq', 'cet46elite', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced', 'custom'];
 /** 词库里真实存在的等级（'all' 模式下决定进度落到哪本词书；生词本单独处理） */
 const WORDBANK_LEVELS = SUB_LEVELS.filter((l) => l !== 'custom');
 
