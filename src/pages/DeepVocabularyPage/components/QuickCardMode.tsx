@@ -937,27 +937,38 @@ export default function QuickCardMode({ level }: { level: string }) {
               )}
             >
               <CardContent className="p-8 text-center space-y-3">
-                <div data-fit-box className="flex items-center justify-center gap-2 max-w-full">
+                {/*
+                  词排 = 单词 + 朗读/收藏两个动作按钮。
+                  **按钮组必须能整体换到下一行**（flex-wrap）—— 卡片是 w-full，428 CSS 宽的
+                  手机上词排只剩 ~328px，两个按钮固定吃 ~86px；长词（>14 字母 text-3xl ≈ 250px+）
+                  被挤进 ~242px 的窄列里 break-words 折成两截（2026-10-13 真机反馈「长单词被
+                  分割为两列」）。单词与按钮组同排放得下就并排（短词版式不变），
+                  放不下时按钮组**整组**落到单词下方：换行以组为单位，不许拆散两个按钮
+                  （逐个换行会出现「词+🔊 一行、⭐ 单独一行」的碎排）。
+                */}
+                <div data-fit-box className="flex flex-wrap items-center justify-center gap-2 max-w-full">
                   <h2 className={cn(
                     'font-black italic text-foreground tracking-tight break-words min-w-0',
                     cw.word.length > 14 ? 'text-3xl' : cw.word.length > 10 ? 'text-4xl' : 'text-5xl',
                   )}>{cw.word}</h2>
-                  <Button
-                    variant="ghost" size="icon"
-                    onClick={(e) => { e.stopPropagation(); speak(cw.word); }}
-                    className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal shrink-0"
-                  >
-                    <Volume2 className="size-4.5" />
-                  </Button>
-                  {/* 收藏：正反面都在，随手就能标（同步进「收藏」页） */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleFav(cw); }}
-                    className={cn('shrink-0 rounded-2xl p-2 transition-colors',
-                      isFav(cw.word) ? 'bg-amber-400/15 text-amber-500' : 'bg-muted text-muted-foreground hover:text-amber-500')}
-                    title={isFav(cw.word) ? '取消收藏' : '收藏这个单词'}
-                  >
-                    <Star className={cn('size-4.5', isFav(cw.word) && 'fill-amber-400 text-amber-400')} />
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="ghost" size="icon"
+                      onClick={(e) => { e.stopPropagation(); speak(cw.word); }}
+                      className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal shrink-0"
+                    >
+                      <Volume2 className="size-4.5" />
+                    </Button>
+                    {/* 收藏：正反面都在，随手就能标（同步进「收藏」页） */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleFav(cw); }}
+                      className={cn('shrink-0 rounded-2xl p-2 transition-colors',
+                        isFav(cw.word) ? 'bg-amber-400/15 text-amber-500' : 'bg-muted text-muted-foreground hover:text-amber-500')}
+                      title={isFav(cw.word) ? '取消收藏' : '收藏这个单词'}
+                    >
+                      <Star className={cn('size-4.5', isFav(cw.word) && 'fill-amber-400 text-amber-400')} />
+                    </button>
+                  </div>
                 </div>
 
                 {revealed ? (

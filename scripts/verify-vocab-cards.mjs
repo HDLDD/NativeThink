@@ -776,6 +776,22 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   }
 
   /**
+   * ⑭b 词面与动作按钮同一行时，按钮组必须能**整体换行**（2026-10-13 真机反馈
+   * 「快速闪卡长单词会被分割为两列」）。
+   *
+   * 词排 = 单词 h2 + 朗读钮 + 收藏钮（同一 flex 行）。卡片 w-full，428 CSS 宽的手机上
+   * 词排只有 ~328px，两个按钮固定吃 ~86px；长词（>14 字母 text-3xl ≈250px+）被挤进
+   * ~242px 的窄列里，break-words 从词中间折成两截。修法 = 词排 flex-wrap + 两按钮包进
+   * 一个 shrink-0 组：短词并排（版式不变），长词时按钮组**整组**落到下一行，词面拿回整行宽；
+   * 不许逐项换行拆成「词+🔊 一行 / ⭐ 一行」的碎排。8 词矩阵（428×925，修复前 h2W=242
+   * 两行/4 词 → 修复后全单行）见 verification.md §5 第 19 测。
+   */
+  check(/<div data-fit-box className="flex flex-wrap items-center justify-center gap-2 max-w-full">/.test(qc),
+    '⑭b 快速闪卡词排允许换行（长词时按钮组落下一行，词面拿整行宽）');
+  check(/<div className="flex items-center gap-2 shrink-0">\s*<Button/.test(qc),
+    '⑭b 朗读/收藏包在 shrink-0 组里整体换行（不许拆成「词+🔊 / ⭐」的碎排）');
+
+  /**
    * ⑮ 短语闪卡（词汇深度页第 7 个模式，2026-10-09）——「复习检测」的短语库移植。
    *
    * 用户需求：「在词汇深度界面，做一个对各短语库进行学习的闪卡学习功能，功能需要模仿
