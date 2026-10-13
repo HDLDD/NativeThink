@@ -812,13 +812,13 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
                         )}
                       </Badge>
                       {/* 短语按长度三档字号（比单词短——上限收到 4xl 以内，长短语可折行不硬缩） */}
-                      <div data-fit-box className="flex items-center justify-center gap-3 mb-2 max-w-full">
+                      <div data-fit-box className="flex flex-wrap items-center justify-center gap-3 mb-2 max-w-full">
                         <h2 className={cn(
                           'font-black italic text-foreground tracking-tight break-words min-w-0',
                           cw.content.length > 24 ? 'text-xl sm:text-2xl' : cw.content.length > 14 ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl',
                         )}>{cw.content}</h2>
                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); try { tts.speak(cw.content, { rate: 0.9 }); } catch { /* ignore */ } }}
-                          className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal"><Volume2 className="size-5" /></Button>
+                          className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal shrink-0"><Volume2 className="size-5" /></Button>
                       </div>
                       <p className="text-sm font-bold text-ink-teal mb-1">{PHRASE_LEVEL_LABELS[bank]}短语库</p>
                       <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-4">

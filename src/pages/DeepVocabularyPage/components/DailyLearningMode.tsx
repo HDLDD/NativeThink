@@ -762,11 +762,11 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
   // 不能让它顺带清标记（否则答错的自动跳页会被取消）
   useEffect(() => { setRatedNow(null); }, [currentIdx]);
 
-  // 闪卡：评分后自动进入下一张（答对 120ms / 答错 300ms —— 与复习检测同一节奏）。
-  // 2026-09-30 与复习检测一起缩短：旧值 550/900 让"翻下一张"有明显停顿（用户反馈）。
+  // 闪卡：评分后自动进入下一张 —— 答对零等待（与快速闪卡同速），答错 300ms 看反馈。
+  // 2026-09-30 从 550/900 缩短；2026-10-13 答对改为 0：实测比快速闪卡慢的 ~120ms 全部来自这段停留。
   useEffect(() => {
     if (reviewMode !== 'flashcard' || sessionDone || !ratedNow) return;
-    const delay = lastQualityRef.current >= 3 ? 120 : 300;
+    const delay = lastQualityRef.current >= 3 ? 0 : 300;
     const t = setTimeout(() => handleNextRef.current(), delay);
     return () => clearTimeout(t);
   }, [reviewMode, ratedNow, sessionDone]);
@@ -1200,25 +1200,26 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                     exit={{ opacity: 0, x: -60 }}
                     transition={{ duration: 0.18, ease: 'easeOut' }}
                     onClick={() => setFlipped(!isFlipped)}
+                    className="w-full max-w-md"
                   >
                     <Card className={cn(
-                      'rounded-[40px] border-2 shadow-xl transition-all min-h-[300px] flex flex-col justify-center',
+                      'rounded-[40px] border-2 shadow-xl transition-all',
                       isFlipped
-                        ? 'border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-50 dark:border-indigo-500/30 dark:from-indigo-500/10 dark:to-violet-500/10'
-                        : 'border-border bg-card',
+                        ? 'border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-50 dark:border-indigo-500/30 dark:from-indigo-500/10 dark:to-violet-500/10 max-h-[62vh] overflow-y-auto'
+                        : 'border-border bg-card min-h-[260px] flex flex-col justify-center',
                     )}>
-                      <CardContent className="p-10 text-center">
+                      <CardContent className="p-7 text-center">
                         {!isFlipped ? (
                           <>
                             <Badge className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground mb-4">
                               {state.progress[currentWord.word.toLowerCase()] ? '复习' : '新学'}
                             </Badge>
-                            <div data-fit-box className="flex items-center justify-center gap-3 mb-3 max-w-full">
+                            <div data-fit-box className="flex flex-wrap items-center justify-center gap-3 mb-3 max-w-full">
                               <h2 className={cn(
                                 'font-black italic text-foreground tracking-tight break-words min-w-0',
                                 currentWord.word.length > 14 ? 'text-3xl' : currentWord.word.length > 10 ? 'text-4xl' : 'text-5xl',
                               )}>{currentWord.word}</h2>
-                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(currentWord.word, { rate: 0.9 }); }} className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal">
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(currentWord.word, { rate: 0.9 }); }} className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-teal shrink-0">
                                 <Volume2 className="size-5" />
                               </Button>
                             </div>

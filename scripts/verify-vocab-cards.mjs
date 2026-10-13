@@ -790,6 +790,22 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '⑭b 快速闪卡词排允许换行（长词时按钮组落下一行，词面拿整行宽）');
   check(/<div className="flex items-center gap-2 shrink-0">\s*<Button/.test(qc),
     '⑭b 朗读/收藏包在 shrink-0 组里整体换行（不许拆成「词+🔊 / ⭐」的碎排）');
+  /**
+   * ⑭b（续）2026-10-13 用户：「复习检测的也有同样的问题」—— 复习检测/每日学习/短语闪卡
+   * 三个模式的词排是同构的（h2 + 单个朗读钮），快速闪卡修好后同样的折两截在它们身上仍会复现
+   * （桌面 1280 实测 FM telecom 被折进第二行）。同修 = 词排加 flex-wrap + 朗读钮 shrink-0。
+   */
+  const wrapRows = [
+    ['复习检测', fc, 'mb-2', 'violet'],
+    ['每日学习', dl, 'mb-3', 'teal'],
+    ['短语闪卡', pfm, 'mb-2', 'teal'],
+  ];
+  for (const [name, src, mb, tone] of wrapRows) {
+    check(new RegExp(`<div data-fit-box className="flex flex-wrap items-center justify-center gap-3 ${mb} max-w-full">`).test(src),
+      `⑭b ${name}词排允许换行（长词拿整行宽，不再被朗读钮挤折两截）`);
+    check(new RegExp(`rounded-2xl bg-muted text-muted-foreground hover:text-ink-${tone} shrink-0"`).test(src),
+      `⑭b ${name}朗读钮 shrink-0（换行决策时钮不被压缩）`);
+  }
 
   /**
    * ⑮ 短语闪卡（词汇深度页第 7 个模式，2026-10-09）——「复习检测」的短语库移植。
@@ -901,6 +917,32 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/if \(safeStorage\.getItem\(STORAGE_KEY\) === json\) return;/.test(phraseLib),
     '⑮d 一字不差就不写（掐掉下行重读→回写的云同步回声）');
   check(/useSyncDown\(\(\) => \{/.test(phraseLib), '⑮d 云同步下行后重读（否则本机拿着陈旧状态覆盖远端）');
+}
+
+// ── ⑯ 每日学习：卡片几何恒定 + 答对零等待（2026-10-13 用户：「每日学习的闪卡切换慢且卡，同时卡片太大」）──
+{
+  /**
+   * 测量基线（428×925 无头 Chrome，verification.md §5 第 20 测）：
+   * - 卡宽随词伸缩：同一轮 425/400/392/356/379px，切换瞬间 Δw 最高 ±139px（"卡"的来源之一），
+   *   20 字符词时 460px 超出 428 视口并出现横向滚动条；桌面 1280 背卡宽 1200px（无上限）；
+   * - 背卡无高度上限（overflowY=visible），CardContent p-10 / 正卡 min-h-[300px] 比复习检测 bulky；
+   * - 答对停留 120ms 是"比快速闪卡慢"的全部差值：tNew 实测 315ms vs 195ms。
+   * 修法 = MotionDiv w-full max-w-md（428 上恒 396px、桌面封 448px）+ Card 前后分支几何与
+   * 复习检测逐字对齐 + 答对 0ms（不许改回任何 >0 的停留：那正是本轮用户报的"慢"）。
+   */
+  check(/className="w-full max-w-md"/.test(dl), '⑯ DL 卡片宽度恒定（修前 425→356 逐卡跳变、20 词 460px 溢出视口）');
+  check(/'border-border bg-card min-h-\[260px\] flex flex-col justify-center'/.test(dl),
+    '⑯ DL 正卡几何与复习检测对齐（min-h-[260px]，原 300 + p-10 是"卡片太大"的一半）');
+  check(/'border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-50 dark:border-indigo-500\/30 dark:from-indigo-500\/10 dark:to-violet-500\/10 max-h-\[62vh\] overflow-y-auto'/.test(dl),
+    '⑯ DL 背卡有高度上限且可滚动（原无上限，桌面实测背卡宽 1200px 且不封高）');
+  check(/<CardContent className="p-7 text-center">/.test(dl), '⑯ DL 卡内边距收到 p-7（与复习检测一致）');
+  check(/transition=\{\{ duration: 0\.18, ease: 'easeOut' \}\}/.test(dl),
+    '⑯ DL 退场定长 tween 0.18（mode="wait" 下 spring 长尾 ~400ms，与两闪卡同一条曲线）');
+  const dlDwellM = dl.match(/const delay = lastQualityRef\.current >= 3 \? (\d+) : (\d+);/);
+  check(!!dlDwellM, '⑯ DL 自动跳转停留时长可解析');
+  check(!!dlDwellM && Number(dlDwellM[1]) === 0,
+    '⑯ DL 答对零等待（与快速闪卡同速；120ms 停留即 tNew 315 vs 195 的全部差值）', dlDwellM ? `${dlDwellM[1]}ms` : '未匹配');
+  check(!!dlDwellM && Number(dlDwellM[2]) <= 400, '⑯ DL 答错停留 ≤ 400ms（看反馈但不拖节奏）', dlDwellM ? `${dlDwellM[2]}ms` : '未匹配');
 }
 
 console.log('');console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);

@@ -906,13 +906,13 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                         </span>
                       )}
                     </Badge>
-                    <div data-fit-box className="flex items-center justify-center gap-3 mb-2 max-w-full">
+                    <div data-fit-box className="flex flex-wrap items-center justify-center gap-3 mb-2 max-w-full">
                       <h2 className={cn(
                         'font-black italic text-foreground tracking-tight break-words min-w-0',
                         shown!.word.length > 14 ? 'text-2xl sm:text-3xl' : shown!.word.length > 10 ? 'text-3xl sm:text-4xl' : 'text-4xl',
                       )}>{shown!.word}</h2>
                       <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(shown!.word, { rate: 0.9 }); }}
-                        className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-violet"><Volume2 className="size-5" /></Button>
+                        className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-violet shrink-0"><Volume2 className="size-5" /></Button>
                     </div>
                     <p className="text-sm font-bold text-ink-violet mb-1">{shown!.partOfSpeech}</p>
                     <p className="text-sm text-muted-foreground font-medium">{shown!.phonetic}</p>
