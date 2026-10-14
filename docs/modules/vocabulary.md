@@ -68,13 +68,19 @@
 | 复习检测（答错） | 卡死不动（见下） | 489-505ms |
 | 快速闪卡 | ~200ms | 不变 |
 
-三个来源叠加（`FlashcardMode.tsx`）：① 评分后停留 550/900ms；② `advance` 里"先翻回正面、`setTimeout(…,150)` 后再换下标"的干等；③ `AnimatePresence mode="wait"` 串行等退场 —— spring 要衰减到**亚像素**才算完，`spring(260/24)` 尾巴就有 ≈400ms。现在：停留 FM **120/300**（`FlashcardMode.tsx:434`）、DL 答对 **0** / 答错 300（`DailyLearningMode.tsx:769`）+ 换卡**一次批量**（去掉 150ms，`FlashcardMode.tsx:402-416`）+ 定长 **tween 0.18s**（`FlashcardMode.tsx:872`、`DailyLearningMode.tsx:1201`）。守卫按**数值**锁（答对 < 答错、答错 ≤ 400ms），不锁字面量。
+三个来源叠加（`FlashcardMode.tsx`）：① 评分后停留 550/900ms；② `advance` 里"先翻回正面、`setTimeout(…,150)` 后再换下标"的干等；③ `AnimatePresence mode="wait"` 串行等退场 —— spring 要衰减到**亚像素**才算完，`spring(260/24)` 尾巴就有 ≈400ms。现在：停留 FM **120/300**（`FlashcardMode.tsx:438`）、DL 答对 **0** / 答错 300（`DailyLearningMode.tsx:769`）+ 换卡**一次批量**（去掉 150ms，`FlashcardMode.tsx:403-421`）+ 定长 **tween 0.18s**（`FlashcardMode.tsx:956`、`DailyLearningMode.tsx:1201`）。守卫按**数值**锁（答对 < 答错、答错 ≤ 400ms），不锁字面量。
 
 ### 答错重排必须"延后到前进"（`pendingRelearnRef`）
 
-`FlashcardMode.tsx:262` 的 ref：评分时**只记 key**，`advance` 时才 `scheduleRelearn`（`:402-405`）。原因：`cw`/`currentKey` 都取自 `session.order[currentIdx]`，若在评分那刻同步重排，该位置当场被换成下一张 → `currentKey` 变化 → `justRated`（`ratedNow === currentKey`）立即为 false → **自动跳转定时器永远排不上**，屏幕还直接换成下一个词的背面（评分按钮健在）。真机实测现象就是「点完全忘了卡死在本张」。延后之后评分那一刻 session 不动，"刚评分"成立 → 300ms 自动前进，重排词隔 4 张如约再现（CDP 实测：`trip → … → trip` 第 5 张，与 `RELEARN_GAP=4` 吻合）。
+`FlashcardMode.tsx:266` 的 ref：评分时**只记 key**，`advance` 时才 `scheduleRelearn`（`:409`）。原因：`cw`/`currentKey` 都取自 `session.order[currentIdx]`，若在评分那刻同步重排，该位置当场被换成下一张 → `currentKey` 变化 → `justRated`（`ratedNow === currentKey`）立即为 false → **自动跳转定时器永远排不上**，屏幕还直接换成下一个词的背面（评分按钮健在）。真机实测现象就是「点完全忘了卡死在本张」。延后之后评分那一刻 session 不动，"刚评分"成立 → 300ms 自动前进，重排词隔 4 张如约再现（CDP 实测：`trip → … → trip` 第 5 张，与 `RELEARN_GAP=4` 吻合）。
 
-**回看态出口**：再现的重排词 `ratedKeys` 里已有它 → 回看态（无评分按钮、无「下一个」按钮，只有「已评过的卡 · 滑动 / 按 → 继续」提示，`FlashcardMode.tsx:1125-1135`）。滑动手势表同步改为 **rated 即导航**（`vocab-swipe.ts:42`；2026-10-13 起复习检测另传 `allowRate:false`，见注意事项 18）—— 旧表在"正面朝上的已评卡"上返回 `flip`，手机上滑了没反应，与卡死叠成同一个体感。
+**回看态出口**：再现的重排词 `ratedKeys` 里已有它 → 回看态（无评分按钮、无「下一个」按钮，只有「已评过的卡 · 滑动 / 按 → 继续」提示，`FlashcardMode.tsx:1214-1224`）。滑动手势表同步改为 **rated 即导航**（`vocab-swipe.ts:42`；2026-10-13 起复习检测另传 `allowRate:false`，见注意事项 18）—— 旧表在"正面朝上的已评卡"上返回 `flip`，手机上滑了没反应，与卡死叠成同一个体感。
+
+### 一轮结束态与跨词书空态（2026-10-14 用户三连反馈）
+
+- **结束态**：`FlashcardMode.advance` 到队尾原先静默 `setIdx(0)` 回开头（短语闪卡同款），评过的卡全成"回看态"，**没有任何结束出口** —— 用户原话「复习完一轮单词，没有结束功能，只能往回查看单词」。现在队尾进**完成页**（`finished`：`FlashcardMode.tsx:102,418,563-608`；短语闪卡 `PhraseFlashcardMode.tsx:110,369,510-555` 同构）：本轮完成！ + 共 N 张 · 记得率 X% · 最佳连对 + 记得/需加强 + 「返回概览 / 回看本轮」双出口（回看=浏览已评卡，再走到队尾回到完成页）。完成页上键盘不参与（`if (finished) return;`，否则空格会把会话又搅起来）；复位点六处（开轮/续学/换书/返回/Esc）。基准 = 每日学习/快速闪卡既有的「本轮完成！」完成页。
+- **跨词书空态指路**：角标/首页横幅走 `getGlobalDueCount`（**全词书**），而复习队列按**当前词书**取 —— 当前书没学过、到期词都在别的书时是死路（实测：横幅 7 个到期、当前书「四六级高频」进复习检测显示"当前没有已学习的单词"）。空态现在按 `getDueCountsByLevel()`（`use-word-learning.ts:152`）给「《当前书》没有可复习的单词，其他词书还有 N 个到期」+「去《X》复习（n 个）」一步切书按钮（排除当前书与生词本，`FlashcardMode.tsx:623-666`）；模式卡在「当前书 0 到期、全站 >0」时显示「其他词书 N 个到期」兜底（`DeepVocabularyPage.tsx:926,1038-1044,1180` —— 页面把 `levels` + `onLevelChange=handleSwitchBook` 传给了复习检测）。⚠️ **单本词书看不见生词本**仍是设计（见注意事项 15 的提醒），所以指路按钮刻意不给 custom。
+- **换等级的状态切换必须走渲染期**（同批挖出的数据竞态，是"点进去还是空"的更深根因）：`useWordLearning` 的 reload effect 与 persist effect 同在 `[level]` 变化的 commit 里跑，persist 闭包握**旧 state** + **新 level** → 把旧书状态整份写进新书存储键。实测：空态点「去《中考》复习」后，中考的 3 个到期词被四六级高频的空状态冲掉，点进去仍空。现改为渲染期同步调整（`use-word-learning.ts:306-312`，React "adjusting state when props change"），persist 只剩"内容不变就不写"。**改这段前先读注释 —— effect 版会复现写坏新书存储键**（守卫 `verify-vocab-cards` ⑰d 正反双向锁）。
 
 ## 断点续学与存储键清单
 
@@ -82,18 +88,18 @@
 
 | 键 | 用途 | 位置 |
 |---|---|---|
-| `__nativethink_vocab_session_<level>` | 复习检测断点（读时校验下标越界即作废） | `use-word-learning.ts:143-164` |
+| `__nativethink_vocab_session_<level>` | 复习检测断点（读时校验下标越界即作废） | `use-word-learning.ts:172-193` |
 | `__nativethink_phrase_session_<bank>` | 短语闪卡断点（按短语库分键，与单词侧断点分开命名；读时校验越界即作废） | `use-phrase-learning.ts:113-132` |
 | `__nativethink_daily_session_<level>` | 每日学习断点 | `DailyLearningMode.tsx:813-856` |
 | `__nativethink_quickcard_session_<level>` | 快速闪卡断点（含作答/翻面/暂停） | `quickcard-history.ts:233-237` |
 | `__nativethink_quickcard_runs` / `_pending` | 留档（≤20 轮、单轮 ≤300 词）与余数桶 | `quickcard-history.ts:18-25,129,164-206` |
-| `__nativethink_daily_quota_<level>` / `__nativethink_daily_vocab_count` | 每本今日量 / 全局默认量 | `use-word-learning.ts:23-25,166-181` |
+| `__nativethink_daily_quota_<level>` / `__nativethink_daily_vocab_count` | 每本今日量 / 全局默认量 | `use-word-learning.ts:23-25,195-209` |
 | `__nativethink_vocab_autospeak` | 自动发音开关，**默认开**（只有显式存 `'0'` 才算关）。2026-09-30 起**四处都读** —— 快速闪卡原先完全不读它、出卡无条件朗读，本轮补齐（门控 effect + 进度行开关）；2026-10-09 短语闪卡（第 7 模式）成为第五处 | `FlashcardMode.tsx:33,203-236`、`DailyLearningMode.tsx:34,275-318`、`QuickCardMode.tsx`（AUTO_SPEAK_KEY）、`ChunkTrainingPage.tsx:100,373-379`、`PhraseFlashcardMode.tsx:45,97-99` |
 | `__nativethink_level_memory` | 浏览位置记忆 —— **故意用裸 `localStorage`**（不经 safeStorage 就不会因登录前缀变化而"隐身"，也因此不参与云同步，见 [storage-and-stats.md](./storage-and-stats.md) §3.2/§3.4） | `DeepVocabularyPage.tsx:353-359`、`wordbank.ts:477` |
 
 ### 短语闪卡（第 7 模式，2026-10-09）
 
-用户需求：「在词汇深度界面，做一个对各短语库进行学习的闪卡学习功能，功能需要模仿复习闪卡的逻辑，实现其对应有的功能以及同样的优化体验，这样就可以不用挤在短语库那小的界面里了」。`PhraseFlashcardMode.tsx`（约 925 行）**逐条移植复习检测的会话逻辑**：冻结会话顺序、SM-2 五档 + 键盘 `[0,2,3,4,5]`、答错延迟重排（`pendingRelearnRef` 模式）、评分后 120/300ms 自动跳卡 + 定长 tween 0.18、滑动手势（同一张 `decideSwipe` 决策表，**保留滑动评分** —— 复习检测 2026-10-13 起禁，见注意事项 18）、共用自动发音键（默认开，预热门控）、「不再出现」带撤销、断点续学。
+用户需求：「在词汇深度界面，做一个对各短语库进行学习的闪卡学习功能，功能需要模仿复习闪卡的逻辑，实现其对应有的功能以及同样的优化体验，这样就可以不用挤在短语库那小的界面里了」。`PhraseFlashcardMode.tsx`（约 988 行）**逐条移植复习检测的会话逻辑**：冻结会话顺序、SM-2 五档 + 键盘 `[0,2,3,4,5]`、答错延迟重排（`pendingRelearnRef` 模式）、评分后 120/300ms 自动跳卡 + 定长 tween 0.18、滑动手势（同一张 `decideSwipe` 决策表，**保留滑动评分** —— 复习检测 2026-10-13 起禁，见注意事项 18）、共用自动发音键（默认开，预热门控）、「不再出现」带撤销、断点续学。
 
 - **数据**：9 个考试短语库（`src/data/phrase-bank/`，共 ≈7.6MB）**按需懒加载**，一次一本；映射成 `IChunk` 兼容对象（`id: pbc_<bank>_<i>`、`usage: 来源词：x`）后过 `dedupeChunks` 读取层去重 —— 与语块页短语库同一映射口径。
 - **进度**：写 `use-phrase-learning`（键 `__nativethink_phrase_learning` / `__nativethink_phrase_daily_quota`）—— 与语块页「短语复习 / 闪卡」**同一份 SM-2**，哪个入口学都算数；本次为该 store 加了 `wrongCount` / `suspended` / `todayLearned` / `history` 加法项与 `normalize()` 老存档补齐。
@@ -104,13 +110,13 @@
 ## 收藏 / 生词本 / 助记
 
 - 收藏与 `FavoritesPage` 同源（`use-favorites.ts`，键 `__nativethink_favorites`）。⚠️ **同一个"收藏单词"存两种 type**：词库浏览用 `'vocabulary'`（`DeepVocabularyPage.tsx:910`），每日学习与快速闪卡用 `'word'`（`DailyLearningMode.tsx:424-442`、`QuickCardMode.tsx:163-182`）。判重/统计必须同时看两个 type。
-- 生词本 `custom-words.ts`（键 `__nativethink_custom_words`）：阅读器收集词库未收录的词，词条 `level:'custom'`（`:106`），进度经 `SUB_LEVELS` 走独立一路；复习队列把**已有进度记录的生词本词排在队首**（`FlashcardMode.tsx:147-150`），2026-10-05 起**不再要求账号另有词库进度**，且跳过被「不再出现」屏蔽的词（见注意事项 15）。
-- 助记 `word-notes.ts`（键 `__nativethink_word_notes`）：**目前只有复习检测卡背接了线**（`FlashcardMode.tsx:1066-1089`），其它模式不显示。
+- 生词本 `custom-words.ts`（键 `__nativethink_custom_words`）：阅读器收集词库未收录的词，词条 `level:'custom'`（`:106`），进度经 `SUB_LEVELS` 走独立一路；复习队列把**已有进度记录的生词本词排在队首**（`FlashcardMode.tsx:149-152`），2026-10-05 起**不再要求账号另有词库进度**，且跳过被「不再出现」屏蔽的词（见注意事项 15）。
+- 助记 `word-notes.ts`（键 `__nativethink_word_notes`）：**目前只有复习检测卡背接了线**（`FlashcardMode.tsx:1142-1165`），其它模式不显示。
 
 ## 注意事项
 
 1. **`memo` 依赖里必须有"数据到位"信号**：`filteredWords` 的 deps 带 `dataReady, dataVersion`（`:564`）；`DailyLearningMode` 的「本书进度」memo 只依赖 `progressKeyCount`（`:73-84`）—— 所以模式子树必须等 `dataReady` 才挂载，否则数据晚到不会重算，表现为"选了书、进度条整块消失"。
-2. **本轮顺序必须冻结**：队列若直接依赖 `state.progress`，每评一次分就重算、当前题会漂（`FlashcardMode.tsx:56-60,119-155`）。`use-stable-shuffle` 只被思维页与语块页使用，**本模块没有用它**。
+2. **本轮顺序必须冻结**：队列若直接依赖 `state.progress`，每评一次分就重算、当前题会漂（`FlashcardMode.tsx:56-62,119-164`）。`use-stable-shuffle` 只被思维页与语块页使用，**本模块没有用它**。
 3. **ref 不随组件重挂载归零**：`lastSpokenKey` 一类要在每轮开始显式清空（`FlashcardMode.tsx:165-172,446,471`、`QuickCardMode.tsx:147,198,242`），否则"第二轮起第一张卡不出声"。
 4. **`setState` updater 里不许有副作用**（toast / 落盘 / 改 ref）—— StrictMode 双调用会翻倍（`DailyLearningMode.tsx:227-233`、`QuickCardMode.tsx:384-387`）。
 5. **完成判定不能读闭包里的 `queue.length`**：重排插入后那是旧值，最后一卡答错会被直接判完成（`QuickCardMode.tsx:365` 用 `queueRef.current.length`）。
@@ -129,17 +135,19 @@
     **同排的两个动作按钮（朗读/收藏）必须能整组换行**（2026-10-13 真机反馈「快速闪卡长单词会被分割为两列」）：词排是「单词 + 两按钮」同一 flex 行，卡片定宽 `w-full`，393 CSS 真机视口里词排 301px（报障时 QC 仍 p-8 只有 ~293px，⑭c 收到 p-7 后 301px）里按钮固定吃 ~86px，长词（>14 字母手机档实渲 36px ≈250px+）被挤进 ~215px 窄列折成两截；修法 = 词排 `flex-wrap` + 两按钮包进一个 `shrink-0` 组（`QuickCardMode.tsx:952,960`）—— 短词并排版式不变，长词时按钮组**整组**落到下一行，不许逐项换行拆成「词+🔊 / ⭐」的碎排。守卫 ⑭b 2 条（变异 2/2：去 `flex-wrap`、解组按钮各恰好红 1 条）、⑭c 1 条（QC 卡内边距 p-7：p-8 时词排 293px < `recommendation` 手机档需要的 298px，M7b 回 p-8 验红）；行为矩阵见 [验证体系](./verification.md) §5 第 19 测（428×925 采的修复前后对照，第 21 测已按 393 重验）。
 
     ⑭b 于同日下半场**扩到复习检测/每日学习/短语闪卡的单词词排**（四个同构词排同修，+6 条断言）—— 短语闪卡是本轮顺带：同构缺陷不留给下一轮，见 §5 第 20 测。**第 21 测的档位修法只动手机(<sm)档与 QC 卡内边距，没动 `break-words`、没复活 `nowrap`/自适应；短语闪卡无折行报告（词排与 FM 同构）保持原样**。
-15. **生词本的词必须自己就能进队列**（2026-10-05 修）：`queue` 的两支（到期词、其它已学词）都用**只查词库**的 `findWord()` 解析，而空队列判据原先只看这两支 —— 于是"只有生词本"的账号（新装、换设备还没同步、或 agent 把 AI 词表灌进生词本）点复习检测是**空态**，可入口角标按进度算，照样显示「N 个到期」，用户视角就是"点了没反应"。现在把 `customEntries` 提到判据之前（`FlashcardMode.tsx:147-150`），判据加第三个条件（`:154`），补量 `fillCount` 也扣掉它（`:159`，会话仍是"补到 20 张"，不会在 20 之外再加一层）；顺带补上同一个筛选里漏掉的**屏蔽承诺**（`!prog.suspended`，之前被「不再出现」的生词本词照样出卡，与上面 otherWords 的处理不一致）。守卫 ⑧ 加 5 条：声明顺序、判据第三条件、旧判据必须消失（反向正对照）、补量扣减、屏蔽跳过 —— 4 组变异 5 条红点全中。行为对照：本机独立 profile、**零词库进度**灌 3 个词 → 修复前空态，修复后复习检测首张即 `goblemuch`。⚠️ **单本词书仍然看不见生词本**（`state.progress` 里没有 custom 键，只有 `'all'` 聚合才有）—— 这是设计而非 bug，但它让"选一本词书背生词本"这条路径不成立，改这里前先想清楚要不要连它一起统一。
+15. **生词本的词必须自己就能进队列**（2026-10-05 修）：`queue` 的两支（到期词、其它已学词）都用**只查词库**的 `findWord()` 解析，而空队列判据原先只看这两支 —— 于是"只有生词本"的账号（新装、换设备还没同步、或 agent 把 AI 词表灌进生词本）点复习检测是**空态**，可入口角标按进度算，照样显示「N 个到期」，用户视角就是"点了没反应"。现在把 `customEntries` 提到判据之前（`FlashcardMode.tsx:149-152`），判据加第三个条件（`:156`），补量 `fillCount` 也扣掉它（`:161`，会话仍是"补到 20 张"，不会在 20 之外再加一层）；顺带补上同一个筛选里漏掉的**屏蔽承诺**（`!prog.suspended`，之前被「不再出现」的生词本词照样出卡，与上面 otherWords 的处理不一致）。守卫 ⑧ 加 5 条：声明顺序、判据第三条件、旧判据必须消失（反向正对照）、补量扣减、屏蔽跳过 —— 4 组变异 5 条红点全中。行为对照：本机独立 profile、**零词库进度**灌 3 个词 → 修复前空态，修复后复习检测首张即 `goblemuch`。⚠️ **单本词书仍然看不见生词本**（`state.progress` 里没有 custom 键，只有 `'all'` 聚合才有）—— 这是设计而非 bug，但它让"选一本词书背生词本"这条路径不成立，改这里前先想清楚要不要连它一起统一。
 16. **搭配页的滚动位置写盘是 debounce 的**（2026-10-05）：`handleCollocListScroll` 原来每个 scroll 事件都同步 `localStorage.setItem`（主线程磁盘 I/O，长列表滚动掉帧），现在 400ms 防抖（`CollocationsTab.tsx:181-189`）。两个已知边角：定时器**没在卸载时 clear**，但回调里有 `if (collocListRef.current)` 判空 —— 卸载后那次只会跳过，不会报错也不会写脏数据；代价是**滚完 400ms 内就切页会丢这一次位置**（重进页面位置略旧，属于可接受取舍）。要接新的滚动记忆就照这份抄，别退回逐事件写盘。
 
 17. **每日学习的卡片几何 = 恒定宽度 + 封顶背卡；答对零等待**（2026-10-13 用户：「每日学习的闪卡切换慢且卡，同时卡片太大」）：`DailyLearningMode.tsx:1196,1205-1211,1217,1223` 换卡那段与两个闪卡对齐 —— MotionDiv `w-full max-w-md`（修前无宽度类、卡随内容伸缩逐卡跳变 425→356px、20 词共 460px 溢出视口 —— 428 视口下的旧测量，第 21 测起口径为真机 393 / 卡恒 361px、桌面封 448px）、Card 前后分支按复习检测拆开（正卡 `min-h-[260px] flex flex-col justify-center`、背卡 `max-h-[62vh] overflow-y-auto`、`CardContent p-7`）。⚠️ **`justify-center` 的列方向容器不许直接挂 `overflow-y-auto`**：内容超高时溢出从上下两头同时裁，上端裁进滚动区外够不着；前后分支拆开正是为避开它。答对停留 `120 → 0`（`:769`；实测那 120ms 就是 tNew 315 vs 195 的全部差值，"与快速闪卡同速"自此成立）—— 改这里**别顺手把定时器换成同步 `handleNext()`**：`ratedNow` 已有自动跳页 effect，双触发会一次推进两张。守卫 ⑯ 8 条（卡宽类 / 正卡 / 背卡 / p-7 / tween / dwell 精确 0 + 答错 ≤400），变异 M5-M11 七条逐条验红，见 [验证体系](./verification.md) §5 第 20 测。
 
-18. **复习检测不做左右滑评分**（2026-10-13 用户：「复习检测不要做左右划来判断单词熟悉还是不熟悉」）：`decideSwipe` 新增 `allowRate?: boolean`（`vocab-swipe.ts:29`，缺省即旧行为），复习检测调用点传 `allowRate: false`（`FlashcardMode.tsx:548`）—— 未翻面仍→`flip`（`vocab-swipe.ts:43`）、已翻面未评分→`'none'`（拖拽回弹，不评也不切，`:44`）、已评分→`prev`/`next` 导航（`:42`）。短语闪卡**保留滑动评分**（不传该参，`PhraseFlashcardMode.tsx:495`）—— 它就是"默认表未破坏"的正对照。守卫 ⑤b 12 条按 `(face, rated, allowRate?)` 组合穷举（含 2 条短语闪卡正对照）；第 21 测变异 M5（FM 去掉 `allowRate:false`）/ M6（纯函数删 allowRate 档）/ M7（评分映射复活）/ M8（swipeHint 方向提示复活）/ M9（PFM 也传 `allowRate:false`，正对照）/ M10（默认表破坏）6 条全部验红。背景：旧表在"未翻分的背面"一滑就成评分并直接跳词（第 21 测 CDP 实测：拖一下 `rated=1` 换词，覆盖层「不认识/认识」还在屏幕上）。
+18. **复习检测不做左右滑评分**（2026-10-13 用户：「复习检测不要做左右划来判断单词熟悉还是不熟悉」）：`decideSwipe` 新增 `allowRate?: boolean`（`vocab-swipe.ts:29`，缺省即旧行为），复习检测调用点传 `allowRate: false`（`FlashcardMode.tsx:555`）—— 未翻面仍→`flip`（`vocab-swipe.ts:43`）、已翻面未评分→`'none'`（拖拽回弹，不评也不切，`:44`）、已评分→`prev`/`next` 导航（`:42`）。短语闪卡**保留滑动评分**（不传该参，`PhraseFlashcardMode.tsx:501`）—— 它就是"默认表未破坏"的正对照。守卫 ⑤b 12 条按 `(face, rated, allowRate?)` 组合穷举（含 2 条短语闪卡正对照）；第 21 测变异 M5（FM 去掉 `allowRate:false`）/ M6（纯函数删 allowRate 档）/ M7（评分映射复活）/ M8（swipeHint 方向提示复活）/ M9（PFM 也传 `allowRate:false`，正对照）/ M10（默认表破坏）6 条全部验红。背景：旧表在"未翻分的背面"一滑就成评分并直接跳词（第 21 测 CDP 实测：拖一下 `rated=1` 换词，覆盖层「不认识/认识」还在屏幕上）。
+
+19. **复习/短语闪卡一轮结束必须进完成页（不许静默回开头）；换等级的状态切换必须走渲染期**（2026-10-14，详见上方「一轮结束态与跨词书空态」）：前者两个模式同构（`verify-vocab-cards` ⑰a/⑰b 正反双向锁 —— 队尾分支出现 `setIdx(0);` 即红）；后者是 `useWordLearning` 的**数据竞态**：reload effect 先把新等级状态读进来，但同一 commit 里 persist effect 的闭包还握旧 state、读到的 `level` 已是新的，于是 `saveState(新level, 旧state)` **把新书的存储键整份覆盖**（实测：切书后目标书 3 个到期词被冲掉，用户视角"点进去是空的"）。修法 = `stateLevel` 闸门 + 渲染期 `loadState` + `setState`（`use-word-learning.ts:306-312`），旧 effect 形态由 ⑰d 反向断言钉死；变异 M4（闸门失效）/ M5（旧 effect 复活）各验红。
 
 ## 怎么验证
 
 ```bash
 npm run typecheck
-node scripts/verify-vocab-cards.mjs      # 390 断言：手势决策表（含复习检测禁滑动评分 allowRate:false，短语闪卡正对照）、排卡、换卡节奏（数值锁）、答错重排延后、回看出口、断点、静默契约、换书一步生效、预载门、单词分档字号（DL/QC 手机档=FM 档，PFM 正对照）、词面按钮组整组换行（⑭b：四个模式长词不折两截）、快速闪卡卡内边距（⑭c）、每日学习卡片几何与答对零等待（⑯）、短语闪卡（接线/懒加载去重/会话同构/存储扩展）
+node scripts/verify-vocab-cards.mjs      # 409 断言：手势决策表（含复习检测禁滑动评分 allowRate:false，短语闪卡正对照）、排卡、换卡节奏（数值锁）、答错重排延后、回看出口、断点、静默契约、换书一步生效、预载门、单词分档字号（DL/QC 手机档=FM 档，PFM 正对照）、词面按钮组整组换行（⑭b：四个模式长词不折两截）、快速闪卡卡内边距（⑭c）、每日学习卡片几何与答对零等待（⑯）、短语闪卡（接线/懒加载去重/会话同构/存储扩展）、复习结束态/跨词书空态/换等级竞态（⑰）
 ```
 交互类改动（"点了没反应"、状态不写回）静态检查看不出来 —— 用本机无头 Chrome + CDP 真点一遍（见 [验证体系](./verification.md)）。换卡耗时这类体感问题同样要按帧量：`TEMP/nt-flip-timing.mjs` 会点真实评分按钮、按帧采样卡片 DOM，直接报"进 DOM 毫秒数"。

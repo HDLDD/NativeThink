@@ -45,6 +45,9 @@ const server = http.createServer((req, res) => {
       proxyRes.pipe(res);
     });
     proxyReq.on('error', (err) => {
+      // 上游半途断流：响应头已发出（proxyRes 已开始 pipe）时**不能再 writeHead**，
+      // 否则 ERR_HTTP_HEADERS_SENT 会把整个静态服务打崩（本机验收时表现为"服务突然没了"）。
+      if (res.headersSent) { res.destroy(); return; }
       res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: `本地 /api 代理到 ${API_ORIGIN} 失败：${err.message}` }));
     });

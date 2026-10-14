@@ -16,7 +16,7 @@
 - **朗读**：三级降级（内置 sherpa 离线 → 系统引擎 → 云端）。默认 piper lessac（真机 RTF **0.076**），Kokoro int8 11 个英语音色作音质选项（RTF **1.008**，长文物理上无法连续播放）；云端走 `functions/api/tts.js`，上游硬上限 200 字符 → 客户端切片上限 180。
 - **句子学习**：158 句语料（手写 24 + 补充 12 + 脚本自动标注 122），拆句 / 句型 / 造句 / 语法，含错句复习队列与跟读评价。
 - **端侧 AI 兜底**：随包 Qwen2.5-0.5B-Instruct（q4）+ Xenova/opus-mt-en-zh（q8）；打包版同源 `/models/` 零下载，网页版回落 hf-mirror。云端 AI 失败时 `streamChat/chat` 自动切端侧小模型。
-- **验证体系**：没有测试框架，靠 `typecheck` + `lint:eslint` + `build:web` + 19 条可跑的 `scripts/verify-*.mjs`（收尾用 `npm run verify:all` 一次跑完）（完整断言数表与最近复测记录见 [docs/modules/verification.md](./docs/modules/verification.md)，计数以那张表为准），再加**本机无头 Chrome + CDP 真点一遍**的行为验收（静态检查看不见"入口在但状态不写回"那类缺陷）。
+- **验证体系**：没有测试框架，靠 `typecheck` + `lint:eslint` + `build:web` + 24 条可跑的 `scripts/verify-*.mjs`（收尾用 `npm run verify:all` 一次跑完）（完整断言数表与最近复测记录见 [docs/modules/verification.md](./docs/modules/verification.md)，计数以那张表为准），再加**本机无头 Chrome + CDP 真点一遍**的行为验收（静态检查看不见"入口在但状态不写回"那类缺陷）。
 
 ## 下一步
 

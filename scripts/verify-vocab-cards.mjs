@@ -982,6 +982,67 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(!!dlDwellM && Number(dlDwellM[2]) <= 400, '⑯ DL 答错停留 ≤ 400ms（看反馈但不拖节奏）', dlDwellM ? `${dlDwellM[2]}ms` : '未匹配');
 }
 
+// ── ⑰ 复习一轮的「结束态」与跨词书空态指路（2026-10-14 用户三连反馈之①+②）──
+{
+  /**
+   * 用户原话：「复习完一轮单词，没有结束功能，只能往回查看单词」「打开软件明明显示有需要
+   * 复习的单词，但是点进去是空的」。
+   *
+   * 无头 Chrome 实测基线（dist 走 20 张全评完）：卡面序号跳回 `1/20`、出现「回看第 1 张 /
+   * 已评过的卡 · 滑动 / 按 → 继续」，全程无完成页 —— 旧 `advance` 到队尾静默 `setIdx(0)`，
+   * 评过的卡全成"回看态"，没有任何结束出口（短语闪卡同款，`:362-366`）。
+   *
+   * ② 的根因在数据口径而不是组件：角标/首页横幅走 `getGlobalDueCount`（**全词书**），
+   * 复习队列按 `useWordLearning(level)` 只取**当前词书** —— 当前书没学过、到期词都在别的
+   * 书时（实测：横幅 7 个到期、当前书「四六级高频」进复习检测显示"当前没有已学习的单词"）
+   * 就是死路。修法 = 空态按书拆分指路 + 一步切书；模式卡给兜底提示。
+   *
+   * 扫描前剥注释：上面这些说明文字本身就写着 `setIdx(0)` / 关键字样，
+   * 不剥的话我们自己的注释会把反向断言判红（verify-chain-verdict 的老坑）。
+   */
+  const stripComments = (s) => s.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const fcSrc = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/FlashcardMode.tsx'), 'utf8'));
+  const pfmSrc = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/PhraseFlashcardMode.tsx'), 'utf8'));
+  const dvpSrc = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx'), 'utf8'));
+  const uwlSrc = stripComments(readFileSync(join(ROOT, 'src/lib/use-word-learning.ts'), 'utf8'));
+
+  // ⑰a 队尾 → 完成页（正反双向：新形态在、旧形态不许回来）
+  for (const [name, src] of [['复习检测', fcSrc], ['短语闪卡', pfmSrc]]) {
+    check(/if \(next === null\) \{[\s\S]{0,260}?setFinished\(true\);/.test(src),
+      `⑰a ${name} 到队尾 → 完成页（setFinished(true)）`);
+    check(!/if \(next === null\) \{[\s\S]{0,260}?setIdx\(0\);/.test(src),
+      `⑰a ${name} 队尾分支不许再 setIdx(0)（回看态陷阱：评完只能往回翻，无结束出口）`);
+  }
+
+  // ⑰b 完成页结构与出口（与快速闪卡/每日学习的「本轮完成！」完成页同一套语言）
+  for (const [name, src] of [['复习检测', fcSrc], ['短语闪卡', pfmSrc]]) {
+    check(/if \(finished\) \{/.test(src) && /本轮完成！/.test(src), `⑰b ${name} 完成页在位（finished 分支 +「本轮完成！」）`);
+    check(/返回概览/.test(src) && /回看本轮（\{/.test(src), `⑰b ${name} 完成页有「返回概览 / 回看本轮」两个出口`);
+    check(/if \(finished\) return;/.test(src), `⑰b ${name} 完成页上键盘不参与（else 空格会把会话又搅起来）`);
+    check((src.match(/setFinished\(false\)/g) ?? []).length >= 6,
+      `⑰b ${name} 所有复位点都清 finished（开轮/续学/换书/返回/Esc）`,
+      `实际 ${(src.match(/setFinished\(false\)/g) ?? []).length} 处`);
+  }
+
+  // ⑰c 跨词书到期口径 + 空态指路 + 模式卡兜底
+  check(/export function getDueCountsByLevel\(\)/.test(uwlSrc),
+    '⑰c use-word-learning 提供按书到期口径 getDueCountsByLevel（空态指路的唯一数据源）');
+  check(/getDueCountsByLevel\(\)\.filter\(\(x\) => x\.level !== currentLevel && x\.level !== 'custom'\)/.test(fcSrc),
+    '⑰c 空态指路排除当前书与生词本（生词本不在词书选择器里，切过去没有意义）');
+  check(/其他词书还有 \$\{otherTotal\} 个到期/.test(fcSrc) && /onLevelChange\(top\.level\)/.test(fcSrc) && /去《\{topLabel\}》复习/.test(fcSrc),
+    '⑰c 空态明说"其他词书还有 N 个到期"+ 一步切书按钮（去《X》复习（n 个））');
+  check(/levels=\{LEVELS\} onLevelChange=\{handleSwitchBook\}/.test(dvpSrc),
+    '⑰c 页面把 levels + onLevelChange 传给复习检测（复用"换书一步生效"路径）');
+  check(/其他词书 \{globalDue\} 个到期/.test(dvpSrc),
+    '⑰c 模式卡兜底提示（当前书 0 到期、全站 >0 时明说，别让用户以为角标在骗人）');
+
+  // ⑰d 换等级的状态回调必须走渲染期（effect 版有"旧书 state 写进新书键"的竞态，实测复现）
+  check(/if \(stateLevel !== level\) \{/.test(uwlSrc) && /loadedFromStorageRef\.current = next;\s*\n\s*setState\(next\);\s*\n\s*\}/.test(uwlSrc),
+    '⑰d 换等级状态切换在渲染期同步调整（stateLevel 闸门 + 读新档 + setState）');
+  check(!/useEffect\(\(\) => \{[\s\S]{0,300}?loadState\(level\)[\s\S]{0,160}?\}, \[level, isAllLevels\]\);/.test(uwlSrc),
+    '⑰d 旧的 reload effect 形态不许回来（会与新 level 的 persist 闭包竞态，写坏新书存储键）');
+}
+
 console.log('');console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
 if (fail) {
   failures.slice(0, 20).forEach((f) => console.log('  ✗ ' + f));

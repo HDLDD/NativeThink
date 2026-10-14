@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFavorites } from '@/lib/use-favorites';
-import { useWordLearning } from '@/lib/use-word-learning';
+import { useWordLearning, useGlobalDueCount } from '@/lib/use-word-learning';
 import { WordImage } from '@/components/WordImage';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
@@ -918,6 +918,12 @@ export default function DeepVocabularyPage() {
   // ── 沉浸式模式：进入某模式后隐藏其它模式入口，<- 返回模式选择 ──
   const [immersed, setImmersed] = useState(false);
   const { dueForReview: homeDue, state: homeWordState } = useWordLearning(selectedLevel);
+  /**
+   * 全词书到期数（角标同源）—— 复习检测卡在「当前书没有到期」时给"其他词书 N 个到期"的
+   * 兜底提示：全站口径是全部词书，而复习队列按当前书取，两者不一致时用户看到的
+   * 就是"首页说有到期、点进去是空的"（2026-10-14 用户报告）。
+   */
+  const globalDue = useGlobalDueCount();
   const homeLearnedToday = Object.keys(homeWordState.progress).length > 0
     ? homeWordState.todayLearned.length
     : 0;
@@ -1027,11 +1033,16 @@ export default function DeepVocabularyPage() {
           <span className="flex-1 min-w-0">
             <span className="flex items-center gap-2">
               <span className="text-sm font-black text-foreground group-hover:text-ink-violet transition-colors">复习检测</span>
-              {homeDue.length > 0 && (
+              {homeDue.length > 0 ? (
                 <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 text-[10px] font-black">{homeDue.length} 个到期</span>
-              )}
+              ) : globalDue > 0 ? (
+                /* 当前书没有到期、但别的书有 —— 明说，别让用户以为角标在骗人（点进去才空） */
+                <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px] font-black">其他词书 {globalDue} 个到期</span>
+              ) : null}
             </span>
-            <span className="block text-[11px] text-muted-foreground mt-0.5">SM-2 闪卡 · 巩固记忆{homeDue.length > 0 ? ' · 有到期单词待复习' : ''}</span>
+            <span className="block text-[11px] text-muted-foreground mt-0.5">
+              SM-2 闪卡 · 巩固记忆{homeDue.length > 0 ? ' · 有到期单词待复习' : globalDue > 0 ? ' · 其他词书有到期单词' : ''}
+            </span>
           </span>
           <ChevronRight className="size-4 text-muted-foreground shrink-0 group-hover:text-ink-violet transition-colors" />
         </button>
@@ -1166,7 +1177,7 @@ export default function DeepVocabularyPage() {
         </TabsContent>
 
         <TabsContent value="flashcard" className="mt-0">
-          <FlashcardMode level={selectedLevel} counts={counts} />
+          <FlashcardMode level={selectedLevel} counts={counts} levels={LEVELS} onLevelChange={handleSwitchBook} />
         </TabsContent>
 
         <TabsContent value="phrasecard" className="mt-0">

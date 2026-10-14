@@ -141,6 +141,27 @@ export function useGlobalDueCount(): number {
   return n;
 }
 
+/**
+ * 每个词书的到期数（只含有到期的，降序）—— 复习检测空态用它指路。
+ *
+ * 背景（2026-10-14 用户：「打开软件显示有需要复习的单词，点进去是空的」）：
+ * 角标/首页横幅走 `getGlobalDueCount`（**全词书**），而复习队列按 `useWordLearning(level)`
+ * 只取**当前词书** —— 当前书没学过、到期词都在别的书时，复习检测是死路。
+ * 这里给出按书拆分的口径，空态据此给「一步切过去」的出口。
+ */
+export function getDueCountsByLevel(): { level: string; count: number }[] {
+  const now = Date.now();
+  const out: { level: string; count: number }[] = [];
+  for (const lvl of SUB_LEVELS) {
+    let n = 0;
+    for (const p of Object.values(loadState(lvl).progress)) {
+      if (!p.suspended && p.status !== 'new' && p.nextReview <= now) n++;
+    }
+    if (n > 0) out.push({ level: lvl, count: n });
+  }
+  return out.sort((a, b) => b.count - a.count);
+}
+
 // ── 复习会话的断点续学（中途退出后能接着上次的位置）──
 export interface ISavedSession {
   order: string[];
@@ -271,19 +292,28 @@ export function useWordLearning(level: string) {
    */
   const loadedFromStorageRef = useRef<ILearningState | null>(null);
 
-  // Reload state + quota when level changes (separate word pools per level)
+  /**
+   * 换等级的状态切换走**渲染期同步调整**（React 官方 "adjusting state when props change"），
+   * **不放 effect** —— effect 版有真实数据竞态（2026-10-14 无头 Chrome 实测复现）：
+   * level 变化的那个 commit 里，reload effect（声明在前）先把新等级的状态读进来，
+   * 但同一个 commit 里 persist effect 的闭包**还握着旧等级的 state**，而它读到的 `level`
+   * 已经是新的 → 把旧等级的状态整份写进**新等级的存储键**。实测：复习检测空态点
+   * 「去《中考》复习」切书后，中考键里的 3 个到期词被「四六级高频」的空状态冲掉，
+   * 点进去又变空（用户原话："显示有需要复习的单词，但是点进去是空的"的另一半根因）。
+   * 渲染期调整保证任何一次 commit 的 (level, state) 自洽，persist effect 只剩
+   * 「内容不变就不写」这一条语义。
+   */
+  const [stateLevel, setStateLevel] = useState(level);
+  if (stateLevel !== level) {
+    setStateLevel(level);
+    const next = isAllLevels ? aggregateAllLevels() : loadState(level);
+    loadedFromStorageRef.current = next;
+    setState(next);
+  }
+  // 每级每日配额独立（与 state 一起在等级变化时重读）
   useEffect(() => {
-    if (isAllLevels) {
-      const next = aggregateAllLevels();
-      loadedFromStorageRef.current = next;
-      setState(next);
-    } else {
-      const next = loadState(level);
-      loadedFromStorageRef.current = next;
-      setState(next);
-    }
     setDailyQuota(loadDailyQuota(level));
-  }, [level, isAllLevels]);
+  }, [level]);
 
   // Reset daily counters if it's a new day
   useEffect(() => {

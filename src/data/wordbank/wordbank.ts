@@ -19,7 +19,7 @@ export const ALL_PARTS_OF_SPEECH: string[] = [
 // ── Dynamic level loaders ──
 const ALL_LEVELS = META_ALL_LEVELS;
 
-const CACHE_VERSION = 3; // v3: detail 拆分为独立文件 + 词条新增 hasCollocations
+const CACHE_VERSION = 4; // v4: 释义/例文清理坏字符（U+FFFD + 私用区 PUA，见 clean-wordbank-mojibake.mjs）——不递增的话老缓存会把清理后的数据挡住
 const LS_PREFIX = '__nativethink_wb_';
 const IDB_PREFIX = 'wb_';
 

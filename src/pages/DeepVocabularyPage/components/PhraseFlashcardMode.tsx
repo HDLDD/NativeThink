@@ -19,7 +19,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import {
   Layers, RotateCw, Volume2, Sparkles, XCircle, ArrowLeft, ChevronLeft,
-  BookOpen, Gauge, Flame, History, Loader2,
+  BookOpen, Gauge, Flame, History, Loader2, Target,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -106,6 +106,8 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
   const [sessionRated, setSessionRated] = useState(0);
   const [sessionGood, setSessionGood] = useState(0);
   const [started, setStarted] = useState(false);
+  /** 完成页：评分走到队尾后进入（与复习检测同构；旧行为是静默回开头，只能往回翻） */
+  const [finished, setFinished] = useState(false);
   const [wrongDrill, setWrongDrill] = useState(false);
   // 滑动位移（跟随手指）；>0 右滑=认识，<0 左滑=不认识
   const [dragX, setDragX] = useState(0);
@@ -140,6 +142,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
   // 换库 = 换一本短语书：会话整体复位（ref 不随重渲染归零，必须显式清）
   useEffect(() => {
     setStarted(false); setWrongDrill(false);
+    setFinished(false);
     setIdx(0); setFlipped(false); setDir(0);
     setSession(createSessionOrder([]));
     setSessionEntries([]);
@@ -338,7 +341,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
 
   /**
    * 前后翻卡。
-   *  - 向前：按会话顺序推进；到队尾则本轮结束并回到开头。
+   *  - 向前：按会话顺序推进；到队尾则本轮结束并进入**完成页**（`finished`）。
    *  - 向后（direction < 0）：回到上一张并**直接翻到背面**（用户点"上一个"就是为了看释义）。
    */
   const advance = useCallback((direction = 1) => {
@@ -359,11 +362,11 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
     }
     const next = nextIndex(session, currentIdx);
     if (next === null) {
-      // 走到队尾：本轮结束，回开头再来一轮（重排插入的短语也已经消费完）。
-      // 不弹提示（练习界面零提示口径）——"练完一轮"由界面自己说：卡面序号回到 1/N、
-      // 顶部「已评」继续累加、进度条走满；音效保留（那是声音，不是弹窗）。
+      // 走到队尾：本轮结束 → 完成页（与复习检测同构；旧的静默 `setIdx(0)` 回开头
+      // 会让评过的卡全成"回看态"、没有任何结束出口，2026-10-14 用户口径）。
+      // 不弹提示（练习界面零提示口径）；音效保留（那是声音，不是弹窗）。
       sfxComplete();
-      setIdx(0);
+      setFinished(true);
       return;
     }
     setIdx(applies ? currentIdx : next);
@@ -388,6 +391,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
     setSession(createSessionOrder(list.map((c) => phraseKey(c))));
     setIdx(0); setFlipped(false); setDir(0);
     setRatedKeys(new Set()); setRatedNow(null);   // 必须清空：否则新一轮里这些卡会被当成"已评"
+    setFinished(false);   // 上一轮的完成页不跨轮
     setSessionRated(0); setSessionGood(0);
     setCombo(0);
     clearPhraseSession(bank); // 新开一轮就丢掉旧断点
@@ -414,6 +418,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
     setIdx(idx);
     setFlipped(false); setDir(0);
     setRatedKeys(new Set()); setRatedNow(null);
+    setFinished(false);  // 断点续学也不进完成页
     setSessionRated(0); setSessionGood(0); setCombo(0);
     lastSpokenKey.current = '';  // 同上：恢复的那一轮也要从第一张卡正常出声
     pendingRelearnRef.current = null;  // 断点里不保存"待重排"，续学从干净状态开始
@@ -450,6 +455,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || !cw) return;
       if (document.querySelector('[role="dialog"]')) return;
+      if (finished) return;   // 完成页只有两个按钮，键盘不参与（空格别把会话又搅起来）
       if (!started) { if (e.code === 'Space') { e.preventDefault(); startSession(queue); } return; }
       if (e.code === 'Space') {
         e.preventDefault();
@@ -466,14 +472,14 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cw, isFlipped, rated, started, flip, advance, markWithQuality, toggleAutoSpeak, startSession, queue]);
+  }, [cw, isFlipped, rated, started, finished, flip, advance, markWithQuality, toggleAutoSpeak, startSession, queue]);
 
   // 专注模式下 ESC 退出到概览
   useEffect(() => {
     if (!started) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) {
-        setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false);
+        setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); setFinished(false);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -499,6 +505,59 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
     if (action === 'prev') { advance(-1); return; }
     markWithQuality(action === 'rate-unknown' ? SWIPE_QUALITY_UNKNOWN : SWIPE_QUALITY_KNOWN);
   };
+
+  // ── 完成页：走到队尾后的结束态（与复习检测同构；结束出口 = 返回概览 / 回看本轮） ──
+  if (finished) {
+    const totalDone = session.order.length;
+    const accuracyDone = sessionRated > 0 ? Math.round((sessionGood / sessionRated) * 100) : 0;
+    const missed = sessionRated - sessionGood;
+    return (
+      <div className="space-y-4">
+        <MotionDiv
+          initial={{ scale: 0.94, opacity: 0, y: 12 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 220, damping: 20 }}
+          className="rounded-[32px] border-2 border-[#14B8A6]/25 bg-card shadow-sm p-6 sm:p-8 space-y-5"
+        >
+          <div className="text-center space-y-5">
+            <Target className="size-12 text-muted-foreground/40 mx-auto" />
+            <div className="space-y-1">
+              <p className="text-2xl font-black italic text-foreground">本轮完成！</p>
+              <p className="text-xs font-bold text-muted-foreground">
+                共 {totalDone} 张 · 记得率 {accuracyDone}%
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-100 dark:border-emerald-500/20">
+                <p className="text-xl font-black text-ink-teal">{sessionGood}</p>
+                <p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">记得</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/15 border border-amber-100 dark:border-amber-500/20">
+                <p className="text-xl font-black text-amber-500">{missed}</p>
+                <p className="text-[9px] font-black uppercase tracking-wider text-amber-600">需加强</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => { setFinished(false); setStarted(false); }}
+              className="flex-1 rounded-2xl text-xs font-black"
+            >
+              返回概览
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => { setFinished(false); setIdx(0); setFlipped(false); setDir(0); }}
+              className="flex-1 rounded-2xl text-xs font-black border-[#14B8A6]/40 text-ink-teal"
+            >
+              回看本轮（{totalDone} 张）
+            </Button>
+          </div>
+        </MotionDiv>
+      </div>
+    );
+  }
 
   // ── 概览：标题 + 选库 + 统计 + 开始/续学 ──
   if (!started || !cw) {
@@ -720,7 +779,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => { setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); }}
+          onClick={() => { setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); setFinished(false); }}
           className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-ink-teal"
           title="返回概览"
         >

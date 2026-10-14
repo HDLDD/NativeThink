@@ -46,10 +46,10 @@ isLevelReady(level)        核心就绪        isDetailReady(level)  detail 就�
 | 核心 | `wb_<level>` | `__nativethink_wb_<level>` |
 | detail | `wb_detail_<level>` | `__nativethink_wbd_<level>` |
 
-库名 `nativethink-wordbank`，store `wordbank`。存的值是 `{ v: CACHE_VERSION, d: ... }`，读取时 `v !== CACHE_VERSION` 视为未命中、回落网络，下次写用同键覆盖（当前 `CACHE_VERSION = 3`，`wordbank.ts:22`）。**旧版本条目不会被主动删**。
+库名 `nativethink-wordbank`，store `wordbank`。存的值是 `{ v: CACHE_VERSION, d: ... }`，读取时 `v !== CACHE_VERSION` 视为未命中、回落网络，下次写用同键覆盖（当前 `CACHE_VERSION = 4`：v4 = 释义/例文坏字符清理，见下方「坏字符清理」；`wordbank.ts:22`）。**旧版本条目不会被主动删**。
 
 ⚠️ 两条硬规则：
-1. **改了词条结构必须递增 `CACHE_VERSION`**，否则命中旧缓存 → 数据形态混杂（旧结构有 detail 值但缺 `hasCollocations`），而且只在部分设备上出现。
+1. **改了词条结构、或对数据做了内容清洗（如 U+FFFD / PUA 坏字符清理）必须递增 `CACHE_VERSION`**，否则命中旧缓存 → 数据形态/内容混杂（旧结构有 detail 值但缺 `hasCollocations`；或清理后 UI 仍显示坏字符 —— 2026-10-14 实测确认），而且只在部分设备上出现。
 2. **IDB 写成功就不再镜像 localStorage**（`wordbank.ts:63-86`）。以前是无条件双写：每次加载词书都要付一次几 MB 的**同步 `JSON.stringify`** 再吃一发注定失败的 QuotaExceeded（被 catch 吞掉）。隐私模式等 IDB 不可用时兜底仍在（`verify-wordbank-loading.mjs:195-221` 两个方向都测）。
 
 ## 去重是两层，不是一层
@@ -96,12 +96,22 @@ node scripts/verify-wordbank-loading.mjs # 新书池子 = WORD_COUNTS = 3000、�
 - `cappedPut` 是纯函数**不落盘**；落盘交给 persist effect —— 否则 StrictMode 双调用会翻倍。
 - 现有上限：AI 例句 `__nativethink_word_ai_data` 200 条、搭配释义 `__nativethink_colloc_cache` 300、深度解析 `__nativethink_word_deep` 300、搭配 AI 译文 `__nativethink_colloc_ai_translations` 400（单点归属在 `colloc-ai-cache.ts`，含旧拼写键 `tranlations` 的自动迁移）。
 
+## 坏字符清理（U+FFFD 与私用区 PUA）
+
+两类字符任何字体都渲染不出，真机上显示为 "?" / 方块（2026-10-14 用户：「单词的『?』未知图标出现在中文注释里」；更早还有一例「翻译里有 ???」）。净化脚本 `scripts/clean-wordbank-mojibake.mjs`（幂等，`--dry` 可干跑不写盘）：
+
+- **U+FFFD**（第一批）：曾 10 个词库文件共 5,909 处，成因是丢单个汉字、无法在文件内恢复；口径 = `meaning` 丢掉含乱码的 `；` token、`phonetic`/`examples.zh` 置空、`deepExplanation` 就地去掉。
+- **U+E000–U+F8FF 私用区 PUA**（第二批，扩进同一脚本）：全量 16 处 —— 词库 3 处（考研 `common` 的单条释义尾 = 用户可见真身；专业 `verbose`/`prolix` 的带 PUA 重复条目 = 被干净首条按书内去重挡住的隐患）+ 词典 13 处（化学式下标被编成 PUA、`(曾用×)` 等）；词库同口径，**词典整份就地祛符**（`C₁₇H₁₈F₃NO` → `C17H18F3NO`，不编造）。
+- **清完必须递增 `CACHE_VERSION`**：文件改了但设备命中的还是 IDB 旧缓存，UI 照旧显示坏字符（实测确认）；老缓存条目等版本不符自然回落。
+- 守卫 `node scripts/verify-char-hygiene.mjs`（9 条，verify:all 自动带上）：全量零残留 + 扫描器正/负对照固件自证 + 扫描文件数下限（防路径失效假绿）+ 净化脚本覆盖两个数据目录的自证。
+
 ## 改了词库之后必须跑什么
 
 ```bash
 npm run wordbank:split                        # 幂等：detail 已存在且主文件已含 hasCollocations 就跳过
 node scripts/generate-cet46-books.mjs         # 只有改过词单快照、要重生成四六级两本时才需要
 node scripts/verify-wordbank-loading.mjs      # 运行时集成：真跑 loadCore/loadDetail/applyDetail
+node scripts/verify-char-hygiene.mjs          # 坏字符零残留（U+FFFD + PUA；净化脚本覆盖词库+词典）
 node scripts/verify-wordbank-split.mjs --baseline /tmp/wb.json    # 基线（拆分前后都能采）
 node scripts/verify-wordbank-split.mjs --check  /tmp/wb.json
 ```
@@ -122,3 +132,4 @@ node scripts/verify-wordbank-split.mjs --check  /tmp/wb.json
 | 第一个等级没 detail | `levels.map(loadLevel)` | `wordbank.ts:299-303` |
 | 加载词书卡一下 | 每次冷加载多付一次几 MB 同步 stringify | `wordbank.ts:63-86` |
 | 拆分后 detail 与展示词条错配 / TS1117 | 拆分脚本的去重规则与 `ensureIndexes` 不一致 | `split-wordbank-detail.mjs:83-105` |
+| 中文注释里出现 "?" 未知图标 / 翻译里有 `???` | 数据里混进私用区 PUA（U+E000–F8FF，无字形）或 U+FFFD（丢字） | `clean-wordbank-mojibake.mjs` 清理 + **递增 `CACHE_VERSION`**（见「坏字符清理」） |

@@ -46,7 +46,7 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 存储与学习统计 | [modules/storage-and-stats.md](./docs/modules/storage-and-stats.md) | 四套存储、safeStorage 前缀自愈、`addStudyMinutes` 真实语义、同步边界 |
 | 云同步与账号 | [modules/cloud-sync.md](./docs/modules/cloud-sync.md) | 两条上行口径不同；回声抑制/失败提示/按需补推由 `verify:cloud-sync` 守；下行重读订阅收进 `sync-down.ts`（13 个 hook 已接；三个模块缓存库的重读必须先作废缓存） |
 | 构建与发布 | [modules/build-release.md](./docs/modules/build-release.md) | 脚本地图与重复 bump、**缺资产静默出残包**、APK 版本线与产物命名、产物版本核对走构建期 meta |
-| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 20 条可跑的契约守卫 + verify:all 全量跑法 + 无头 Chrome/CDP + 真机通道 + 写守卫四条硬规矩 |
+| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 24 条可跑的契约守卫 + verify:all 全量跑法 + 无头 Chrome/CDP + 真机通道 + 写守卫四条硬规矩 |
 
 ---
 
@@ -98,13 +98,14 @@ npm run check:tts-voices
 
 ```powershell
 node scripts/verify-wordbank-loading.mjs          # 49  加载层集成（无需浏览器；11 本词书）
+node scripts/verify-char-hygiene.mjs              # 9   数据不可见坏字符（U+FFFD + PUA）零残留：扫描器正/负对照 + src/data + public/books + 脚本覆盖自证
 node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆分（基线任意时刻可重采）
 node scripts/verify-tts-progress.mjs              # 6175 朗读切片与进度反查表
 node scripts/verify-tts-hardening.mjs             # 15   TTS 降级/在途去重/桌面限定（注意：没有 npm script）
 node scripts/verify-chunks-data.mjs               # 55   语块库 963 条数据卫生 + 读取层去重（12 组重复冻结成基线、去重顺序判别、已记组行为）+ 短语库/语块库显示语言同源 + 列表内移动的单一滚动权威
 node scripts/verify-native-tts.mjs                # 37   原生插件边界：替身真跑「async return 插件对象＝永久挂死」+ 取语音列表 4s 超时 + 六处调用点 + 先问能力再猜沉默（看门狗吃句长、每词 ≥380ms、起播证据两档）
 node scripts/verify-books-meta.mjs                # 227  书目元数据 + 复习词高亮
-node scripts/verify-vocab-cards.mjs               # 390  背单词卡片契约 + 手势决策表（含复习检测禁滑动评分 allowRate:false + 短语闪卡正对照） + 换卡节奏 + 答错重排延后 + 单词档位字号（DL/QC 手机档=FM 档 + PFM 正对照） + 词面按钮组整组换行（⑭b，四个模式） + 快速闪卡卡内边距（⑭c） + 每日学习卡片几何与答对零等待（⑯） + 生词本入队（顺序/判据/补量/屏蔽）+ ⑮ 短语闪卡（接线/懒加载去重/会话同构/档位即补新张数/共享 store 扩展）
+node scripts/verify-vocab-cards.mjs               # 409  背单词卡片契约 + 手势决策表（含复习检测禁滑动评分 allowRate:false + 短语闪卡正对照） + 换卡节奏 + 答错重排延后 + 单词档位字号（DL/QC 手机档=FM 档 + PFM 正对照） + 词面按钮组整组换行（⑭b，四个模式） + 快速闪卡卡内边距（⑭c） + 每日学习卡片几何与答对零等待（⑯） + 生词本入队（顺序/判据/补量/屏蔽）+ ⑮ 短语闪卡（接线/懒加载去重/会话同构/档位即补新张数/共享 store 扩展）+ ⑰ 复习结束态/跨词书空态与换等级竞态
 node scripts/verify-vocab-caches.mjs              # 85   缓存封顶 + 存储写失败可见（替身真跑）+ trimOldest 滚动窗口双封顶
 node scripts/verify-overlay-fit.mjs               # 38   窄视口浮层契约 + 全屏层自带 safe-area + 全站唯一 Toaster 出口 + ⑥ 手机抽屉导航后必须关
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
@@ -300,8 +301,8 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 49 · books-meta 227 · vocab-cards 390 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 37** · chunks-data **55** · overlay-fit **38** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · rv-articles 104 · study-credit 77 · chain-verdict 36 · dashboard-glance 16；合计 **7,532**，2026-10-13 第 22 测）
-- [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 49 · books-meta 227 · vocab-cards 409 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 37** · chunks-data **55** · overlay-fit **38** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit 77 · chain-verdict 36 · dashboard-glance 16；合计 **7,560**，2026-10-14 第 23 测）
+- [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs` + `node scripts/verify-char-hygiene.mjs`（清了坏字符还要递增 `CACHE_VERSION`，否则老缓存挡住修复）
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`

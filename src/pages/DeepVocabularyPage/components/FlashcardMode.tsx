@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import {
   RotateCw, Volume2, Sparkles, XCircle, ArrowLeft, ChevronLeft, ChevronDown, ChevronUp,
-  Link2, BookOpen, Gauge, Flame, PenLine, History,
+  Link2, BookOpen, Gauge, Flame, PenLine, History, Target,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { IWordEntry } from '@/data/wordbank/schema';
 import { findWord, getWordCounts, getTotalLearnableCount, preloadDetail } from '@/data/wordbank';
-import { useWordLearning, saveSession, loadSession, clearSession, type ISavedSession } from '@/lib/use-word-learning';
+import { useWordLearning, saveSession, loadSession, clearSession, getDueCountsByLevel, type ISavedSession } from '@/lib/use-word-learning';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useImmersive } from '@/lib/focus-mode';
 import { safeStorage } from '@/lib/safe-storage';
@@ -98,6 +98,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   // ── 错词重练队列 ──
   const [wrongDrill, setWrongDrill] = useState(false);
   const [started, setStarted] = useState(false); // 概览 vs 学习中
+  /** 完成页：评分走到队尾后进入（旧行为是静默 `setIdx(0)` 回开头，用户唯一出路是往回翻） */
+  const [finished, setFinished] = useState(false);
   const wrongEntries = useMemo(() => {
     const out: IWordEntry[] = [];
     for (const [key, p] of Object.entries(state.progress)) {
@@ -238,6 +240,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
 
   useEffect(() => {
     setIdx(0); setFlipped(false); setDir(0); setShowDeep(false);
+    setFinished(false);
   }, [currentLevel]);
 
   /**
@@ -275,7 +278,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     if (!started) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) {
-        setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); setShowDeep(false);
+        setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); setShowDeep(false); setFinished(false);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -374,7 +377,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
 
   /**
    * 前后翻卡。
-   *  - 向前：按会话顺序推进；到队尾则本轮结束并回到开头。
+   *  - 向前：按会话顺序推进；到队尾则本轮结束并进入**完成页**（`finished`）。
    *  - 向后（direction < 0）：回到上一张并**直接翻到背面** —— 用户点"上一个"就是为了
    *    看那个词的具体信息（释义/搭配/例句），停在正面等于什么都没看到。
    *    （原先 advance 忽略 direction 符号，左滑"上一个"其实还是往前走，是 bug。）
@@ -407,11 +410,12 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     }
     const next = nextIndex(session, currentIdx);
     if (next === null) {
-      // 走到队尾：本轮结束，回开头再来一轮（重排插入的词也已经消费完）。
-      // 不弹 toast（2026-09-30 用户要求练习界面零提示）——"练完一轮"由界面自己说：
-      // 卡面序号回到 1/N、顶部「已评」继续累加、进度条走满；音效保留（那是声音，不是弹窗）。
+      // 走到队尾：本轮结束 → 完成页。旧行为是静默 `setIdx(0)` 回开头 —— 评过的卡全成
+      // "回看态"，屏幕上没有任何结束出口，只能往回翻（2026-10-14 用户：「复习完一轮
+      // 没有结束功能，只能往回查看单词」）。完成页给统计 +「返回概览 / 回看本轮」两个出口。
+      // 不弹 toast（2026-09-30 用户要求练习界面零提示）；音效保留（那是声音，不是弹窗）。
       sfxComplete();
-      setIdx(0);
+      setFinished(true);
       return;
     }
     setIdx(applies ? currentIdx : next);
@@ -441,6 +445,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setSession(createSessionOrder(entries.map((w) => w.word.toLowerCase())));
     setIdx(0); setFlipped(false); setDir(0); setShowDeep(false);
     setRatedKeys(new Set()); setRatedNow(null);   // 必须清空：否则新一轮里这些卡会被当成"已评"，评分按钮不出现
+    setFinished(false);   // 上一轮的完成页不跨轮
     setSessionRated(0); setSessionGood(0);
     setCombo(0); setBestCombo(0);
     clearSession(currentLevel); // 新开一轮就丢掉旧断点
@@ -468,6 +473,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setIdx(idx);
     setFlipped(false); setDir(0); setShowDeep(false);
     setRatedKeys(new Set()); setSessionRated(0); setSessionGood(0);
+    setFinished(false);  // 断点续学也不进完成页
     setCombo(0); setBestCombo(0);
     lastSpokenKey.current = '';  // 同上：恢复的那一轮也要从第一张卡正常出声
     pendingRelearnRef.current = null;  // 同上：断点里不保存"待重排"，续学从干净状态开始
@@ -509,6 +515,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       if (tag === 'INPUT' || tag === 'TEXTAREA' || !cw) return;
       // 生词本管理等弹窗打开时不抢键盘 —— 否则空格会在弹窗后面直接开始一轮复习
       if (document.querySelector('[role="dialog"]')) return;
+      if (finished) return;   // 完成页只有两个按钮，键盘不参与（空格别把会话又搅起来）
       if (!started) { if (e.code === 'Space') { e.preventDefault(); startSession(queue); } return; }
       if (e.code === 'Space') {
         e.preventDefault();
@@ -525,7 +532,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cw, isFlipped, rated, started, flip, advance, markWithQuality, toggleAutoSpeak]);
+  }, [cw, isFlipped, rated, started, finished, flip, advance, markWithQuality, toggleAutoSpeak]);
 
   // ── 滑动手势：未翻面→翻面；已评分→前后导航。已翻面未评分的滑动不评分 ──
   // 2026-10-13 用户口径：熟悉程度不许用左右划表达（方向≠五档），只认评分按钮 / 数字键，
@@ -552,8 +559,74 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     if (action === 'prev') { advance(-1); return; }
   };
 
+  // ── 完成页：走到队尾后的结束态（结束出口 = 返回概览；回看本轮 = 浏览已评卡，再走到队尾回到这里） ──
+  if (finished) {
+    const total = session.order.length;
+    const accuracyDone = sessionRated > 0 ? Math.round((sessionGood / sessionRated) * 100) : 0;
+    const missed = sessionRated - sessionGood;
+    return (
+      <div className="space-y-4">
+        <MotionDiv
+          initial={{ scale: 0.94, opacity: 0, y: 12 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 220, damping: 20 }}
+          className="rounded-[32px] border-2 border-[#6C5CE7]/20 bg-card shadow-sm p-6 sm:p-8 space-y-5"
+        >
+          <div className="text-center space-y-5">
+            <Target className="size-12 text-muted-foreground/40 mx-auto" />
+            <div className="space-y-1">
+              <p className="text-2xl font-black italic text-foreground">本轮完成！</p>
+              <p className="text-xs font-bold text-muted-foreground">
+                共 {total} 张 · 记得率 {accuracyDone}%{bestCombo >= 3 && ` · 最佳连对 ${bestCombo}`}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-100 dark:border-emerald-500/20">
+                <p className="text-xl font-black text-ink-teal">{sessionGood}</p>
+                <p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">记得</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/15 border border-amber-100 dark:border-amber-500/20">
+                <p className="text-xl font-black text-amber-500">{missed}</p>
+                <p className="text-[9px] font-black uppercase tracking-wider text-amber-600">需加强</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => { setFinished(false); setStarted(false); }}
+              className="flex-1 rounded-2xl text-xs font-black"
+            >
+              返回概览
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => { setFinished(false); setIdx(0); setFlipped(false); setDir(0); setShowDeep(false); }}
+              className="flex-1 rounded-2xl text-xs font-black border-[#6C5CE7]/40 text-ink-violet"
+            >
+              回看本轮（{total} 张）
+            </Button>
+          </div>
+        </MotionDiv>
+      </div>
+    );
+  }
+
   // 只有"根本没词可复习"才走空状态；会话未开始时 cw 也是 undefined，不能混为一谈
   if (queue.length === 0) {
+    /**
+     * 跨词书到期指引（2026-10-14 用户：「打开软件显示有需要复习的单词，点进去是空的」）：
+     * 侧边栏角标 / 首页横幅是**全词书**口径，而这里的队列按**当前词书**取 —— 当前书没学过、
+     * 到期词都在别的书时，这页就是死路。给一个一步切到有到期那本书的出口
+     * （"全部"本就覆盖所有书、生词本不在词书选择器里，这两种都不给按钮）。
+     */
+    const otherDue = currentLevel === 'all'
+      ? []
+      : getDueCountsByLevel().filter((x) => x.level !== currentLevel && x.level !== 'custom');
+    const otherTotal = otherDue.reduce((s, x) => s + x.count, 0);
+    const top = otherDue[0];
+    const curLabel = levels?.find((l) => l.key === currentLevel)?.label || (currentLevel === 'all' ? '全部' : currentLevel);
+    const topLabel = top ? (levels?.find((l) => l.key === top.level)?.label || top.level) : '';
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-2">
@@ -567,16 +640,27 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             <RotateCw className="size-8 text-ink-violet" />
           </div>
           <p className="text-muted-foreground text-sm font-medium">
-            {stats.due > 0
-              ? `还有 ${stats.due} 个单词待复习，开始巩固记忆吧！`
-              : stats.learning > 0
-                ? `有 ${stats.learning} 个单词正在学习中，继续加油！`
-                : '当前没有已学习的单词，请先到「每日学习」模式学习新单词后再来复习。'}
+            {top
+              ? `《${curLabel}》没有可复习的单词，其他词书还有 ${otherTotal} 个到期。`
+              : stats.due > 0
+                ? `还有 ${stats.due} 个单词待复习，开始巩固记忆吧！`
+                : stats.learning > 0
+                  ? `有 ${stats.learning} 个单词正在学习中，继续加油！`
+                  : '当前没有已学习的单词，请先到「每日学习」模式学习新单词后再来复习。'}
           </p>
-          {stats.due === 0 && stats.learning === 0 && (
+          {!top && stats.due === 0 && stats.learning === 0 && (
             <p className="text-xs text-muted-foreground/70 mt-2">
               复习模式需要先有已学习的单词才能使用
             </p>
+          )}
+          {top && onLevelChange && (
+            <Button
+              onClick={() => onLevelChange(top.level)}
+              className="bg-[#6C5CE7] hover:bg-[#5A4BD1] text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-wider gap-2 mx-auto"
+            >
+              <RotateCw className="size-3.5" />
+              去《{topLabel}》复习（{top.count} 个）
+            </Button>
           )}
         </div>
       </div>
@@ -813,7 +897,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => { setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); setShowDeep(false); }}
+            onClick={() => { setStarted(false); setWrongDrill(false); setIdx(0); setFlipped(false); setShowDeep(false); setFinished(false); }}
             className="rounded-xl size-9 shrink-0 text-muted-foreground hover:text-ink-violet"
             title="返回概览"
           >
