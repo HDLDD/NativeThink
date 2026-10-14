@@ -130,11 +130,18 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     // 复习减负：到期堆积过多时本轮只取前 30 个，避免心理压力
     const MAX_DUE = 30;
     const cappedDue = dueWords.slice(0, MAX_DUE);
+    // 同日已评不回队（2026-10-14 用户：「复习完还不记作复习完成，再次点击开始复习还是
+    // 同样的单词」）：无头实测，整轮评完再开一轮，前 4 词与上一轮 4/4 全重叠 —— 复习
+    // 永远"做不完"。SM-2 本来就把它们排到明天（nextReview ≥ 明天）；要再练走「错词重练」。
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
     const otherWords: IWordEntry[] = [];
     for (const key of Object.keys(state.progress)) {
       // 屏蔽（不再出现）的词**必须**跳过 —— 此前只滤了 dueForReview，
       // 屏蔽过的词以"其他已学词"身份每轮照常出卡，屏蔽承诺失效
       if (state.progress[key].suspended) continue;
+      // 今天已评过的词同样跳过（lastReview ≥ 今日零点），否则刚复习完的一轮原地再来
+      if (state.progress[key].lastReview >= todayStart.getTime()) continue;
       if (!seen.has(key)) {
         const w = findWord(key);
         if (w) { seen.add(key); otherWords.push(w); }
@@ -639,6 +646,11 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       : getDueCountsByLevel().filter((x) => x.level !== currentLevel && x.level !== 'custom');
     const otherTotal = otherDue.reduce((s, x) => s + x.count, 0);
     const top = otherDue[0];
+    // 同日已评不回队（见 queue 的 todayStart）之后，"进度全在今天评过"也会落到空态 ——
+    // 这时要说"今天的复习已完成"，不能再谎报"没有已学习的单词"
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const reviewedToday = Object.values(state.progress).filter((p) => !p.suspended && p.lastReview >= dayStart.getTime()).length;
     const curLabel = levels?.find((l) => l.key === currentLevel)?.label || (currentLevel === 'all' ? '全部' : currentLevel);
     const topLabel = top ? (levels?.find((l) => l.key === top.level)?.label || top.level) : '';
     return (
@@ -658,11 +670,13 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
               ? `《${curLabel}》没有可复习的单词，其他词书还有 ${otherTotal} 个到期。`
               : stats.due > 0
                 ? `还有 ${stats.due} 个单词待复习，开始巩固记忆吧！`
-                : stats.learning > 0
-                  ? `有 ${stats.learning} 个单词正在学习中，继续加油！`
-                  : '当前没有已学习的单词，请先到「每日学习」模式学习新单词后再来复习。'}
+                : reviewedToday > 0
+                  ? `今天的复习已完成：${reviewedToday} 个单词都已过一遍，明天按间隔再来；也可以到「每日学习」学新词。`
+                  : stats.learning > 0
+                    ? `有 ${stats.learning} 个单词正在学习中，继续加油！`
+                    : '当前没有已学习的单词，请先到「每日学习」模式学习新单词后再来复习。'}
           </p>
-          {!top && stats.due === 0 && stats.learning === 0 && (
+          {!top && stats.due === 0 && reviewedToday === 0 && stats.learning === 0 && (
             <p className="text-xs text-muted-foreground/70 mt-2">
               复习模式需要先有已学习的单词才能使用
             </p>

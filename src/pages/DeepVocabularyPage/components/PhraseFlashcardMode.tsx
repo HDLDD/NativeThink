@@ -186,11 +186,15 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
       if (dueCards.length < MAX_DUE) dueCards.push(c);
     }
     const otherCards: IChunk[] = [];
+    // 同日已评不回队（与复习检测同构，2026-10-14）：今天学/评过的短语下一轮不再原样重来，
+    // 补新支会按「每日目标」补进没学过的短语；SM-2 本来就把它们排到明天。
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
     for (const c of entries) {
       const k = phraseKey(c);
       if (seen.has(k)) continue;
       const p = state.progress[k];
-      if (p && !p.suspended) { seen.add(k); otherCards.push(c); }
+      if (p && !p.suspended && p.lastReview < todayStart.getTime()) { seen.add(k); otherCards.push(c); }
     }
     const fillCount = Math.max(0, dailyQuota - dueCards.length - otherCards.length);
     const newCards: IChunk[] = [];

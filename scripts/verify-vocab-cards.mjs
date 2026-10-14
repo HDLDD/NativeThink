@@ -1079,6 +1079,27 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   }
 }
 
+// ── ⑲ 同日已评不回队（2026-10-14 用户：「复习完还不记作复习完成，再次点击开始复习还是同样的单词」）──
+{
+  /**
+   * 无头实测基线：整轮评完（20 词，断点 order 留档）→ 回概览（待复习 0）→ 再开一轮，
+   * 前 4 词与第一轮 **4/4 全重叠**（apple/water/happy/bottle）—— "其他已学词"支不排除
+   * 今天刚评过的词，复习永远"做不完"。修法 = 队列构建跳过 `lastReview ≥ 今日零点` 的词
+   * （两模式同构；SM-2 本来就把它们排到明天，错词要再练走「错词重练」）；
+   * 空态补「今天的复习已完成」分支（同日全评完 ≠ "没有已学习的单词"）。
+   * 剥注释后扫描（本注释里就写着判据字面量）。
+   */
+  const stripComments = (s) => s.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const fcCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/FlashcardMode.tsx'), 'utf8'));
+  const pfmCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/PhraseFlashcardMode.tsx'), 'utf8'));
+  check(/if \(state\.progress\[key\]\.lastReview >= todayStart\.getTime\(\)\) continue;/.test(fcCode),
+    '⑲a 复习检测「其他已学」支跳过同日已评的词（刚复习完的一轮不许原地再来）');
+  check(/p && !p\.suspended && p\.lastReview < todayStart\.getTime\(\)/.test(pfmCode),
+    '⑲a 短语闪卡「已学未到期」支同构排除同日已评');
+  check(/今天的复习已完成/.test(fcCode) && /reviewedToday > 0\s*\?/.test(fcCode),
+    '⑲b 空态有「今天的复习已完成」分支（同日全评完不许谎报"没有已学习的单词"）');
+}
+
 console.log('');console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
 if (fail) {
   failures.slice(0, 20).forEach((f) => console.log('  ✗ ' + f));
