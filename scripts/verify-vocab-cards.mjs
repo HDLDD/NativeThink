@@ -270,8 +270,8 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '空队列判据含第三个条件 customEntries');
   check(!/if \(dueWords\.length === 0 && otherWords\.length === 0\) \{/.test(fc),
     '旧判据（只看两支词库解析结果）必须消失 —— 反向正对照，防退回旧逻辑');
-  check(/20 - cappedDue\.length - otherWords\.length - customEntries\.length/.test(fc),
-    '补量扣掉生词本词数（会话仍是"补到 20 张"，不会在 20 之外再加一层）');
+  check(/dailyQuota - cappedDue\.length - otherWords\.length - customEntries\.length/.test(fc),
+    '补量扣掉生词本词数（2026-10-14 起补新吃「每日目标」档位 —— ⑳；扣减生词本的口径不变）');
   check(/const customEntries = customList\.map\(toWordEntry\)\.filter\(\(w\) => \{[\s\S]{0,240}!prog\.suspended/.test(fc),
     '被「不再出现」屏蔽的生词本词也不进队列（与上面 otherWords 的屏蔽承诺一致）');
 }
@@ -1098,6 +1098,24 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '⑲a 短语闪卡「已学未到期」支同构排除同日已评');
   check(/今天的复习已完成/.test(fcCode) && /reviewedToday > 0\s*\?/.test(fcCode),
     '⑲b 空态有「今天的复习已完成」分支（同日全评完不许谎报"没有已学习的单词"）');
+}
+
+// ── ⑳ 每日目标档位必须真实作用于复习队列张数（2026-10-14 用户：「每日目标和学习的卡片的单词数量不挂钩」）──
+{
+  /**
+   * 复习检测概览的 10/20/30/50/100 档原本只改「今天新学 x/N」的显示数字，
+   * 队列补新写死 20 —— 档位只当标签（preserve-user-controls 的经典缺陷形态；
+   * 无头实测：点 100 档后开始按钮仍是「开始复习（20 张卡片）」）。
+   * 每日学习侧一直是挂钩的（`due.slice(0, dailyQuota)` + `remaining`），短语闪卡 ⑮c
+   * 2026-10-09 修过同款 —— 复习检测是最后一个。修法 = fillCount 吃 dailyQuota + 依赖补齐。
+   * 剥注释后扫描。
+   */
+  const stripComments = (s) => s.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const fcCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/FlashcardMode.tsx'), 'utf8'));
+  check(/const fillCount = Math\.max\(0, dailyQuota - cappedDue\.length - otherWords\.length - customEntries\.length\);/.test(fcCode),
+    '⑳ 复习检测补新张数吃「每日目标」档位（写死 20 = 档位只当标签）');
+  check(/\}, \[wrongDrill, wrongEntries, dueForReview, state\.progress, getNewWords, customList, dailyQuota\]\);/.test(fcCode),
+    '⑳ 队列 memo 依赖含 dailyQuota（漏掉＝改档位后张数不变，得重挂载才生效）');
 }
 
 console.log('');console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);

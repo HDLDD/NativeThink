@@ -163,12 +163,15 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     if (dueWords.length === 0 && otherWords.length === 0 && customEntries.length === 0) {
       return []; // Return empty queue - show "no words to review" message
     }
-    // Otherwise, fill with new words to reach 20 cards（生词本的词也算在这 20 张里）
+    // 补新到「每日目标」档位（2026-10-14 用户：「每日目标和学习的卡片的单词数量不挂钩」）：
+    // 原先写死 20 —— 概览的 10/20/30/50/100 档只改「今天新学 x/N」的显示数字，纯标签。
+    // 现与短语闪卡 ⑮c 同构：档位即补新张数（到期/其他已学/生词本照旧先计入）；
+    // memo 依赖必须含 dailyQuota，漏掉＝改档位后张数不变，得重挂载才生效。
     customEntries.forEach((w) => seen.add(w.word.toLowerCase()));
-    const fillCount = Math.max(0, 20 - cappedDue.length - otherWords.length - customEntries.length);
+    const fillCount = Math.max(0, dailyQuota - cappedDue.length - otherWords.length - customEntries.length);
     const newWords = fillCount > 0 ? getNewWords(fillCount).filter((w) => !seen.has(w.word.toLowerCase())) : [];
     return [...customEntries, ...cappedDue, ...otherWords, ...newWords];
-  }, [wrongDrill, wrongEntries, dueForReview, state.progress, getNewWords, customList]);
+  }, [wrongDrill, wrongEntries, dueForReview, state.progress, getNewWords, customList, dailyQuota]);
 
   const ttsRef = useRef(tts);
   ttsRef.current = tts;
