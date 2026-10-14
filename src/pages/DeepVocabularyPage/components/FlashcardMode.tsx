@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import {
-  RotateCw, Volume2, Sparkles, XCircle, ArrowLeft, ChevronLeft, ChevronDown, ChevronUp,
+  RotateCw, Volume2, Sparkles, XCircle, ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Link2, BookOpen, Gauge, Flame, PenLine, History, Target,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
@@ -407,6 +407,20 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     if (applies) {
       pendingRelearnRef.current = null;
       setSession(scheduleRelearn(session, currentIdx, pending));
+      /**
+       * 重排再现的那张必须是**可重评**的：只挪位置、不清 ratedKeys 的话，它再露面时会被判成
+       * "已评过"→ 回看态（背面无五档按钮、只有「已评过的卡 · 滑动 / 按 → 继续」），
+       * 手机用户看到的正是「学着学着就无法对下一个单词做熟悉度点击」（2026-10-14 报告；
+       * 无头实测：错词第 6 次露面 pastPrompt=true / hasRateBtns=false）。
+       * 清掉后它以正常卡片再评一次：重评结果照常写 SM-2（后评覆盖前评），
+       * relearnCounts 仍封顶（MAX_RELEARN 次后不再排）——即时巩固的语义才闭环。
+       */
+      setRatedKeys((prev) => {
+        if (!prev.has(pending)) return prev;
+        const next = new Set(prev);
+        next.delete(pending);
+        return next;
+      });
     }
     const next = nextIndex(session, currentIdx);
     if (next === null) {
@@ -1207,15 +1221,21 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
         </div>
       )}
       {/*
-        回看态（含答错重排再现的那张）**必须有可见的继续出口**：
-        没有评分按钮、也没有「下一个」按钮，光靠"滑动/按 →"的隐藏手势会让手机用户
-        直接卡在这张上。滑动手势本身也改成 rated 即导航（见 vocab-swipe.ts）。
+        回看态必须有**可点**的继续出口（2026-10-14 用户：「只要进入了回看单词的功能就会
+        卡住，进入一个单词循环」—— 原提示是纯 span，手机点不了：点卡片只会翻面、来回翻
+        同一张，唯一出路是"右滑"而用户不知道方向就困死）。改成按钮；滑动 / 键盘 → 仍照常
+        可用。注：答错重排再现的那张自 2026-10-14 起不再进回看态（落位时撤出 ratedKeys，
+        以正常卡片可重评，见 advance 的 applies 分支）。
       */}
       {viewingPast && (
         <div className="flex justify-center">
-          <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-muted/60 text-muted-foreground text-[10px] font-black uppercase tracking-wider">
-            已评过的卡 · 滑动 / 按 → 继续
-          </span>
+          <button
+            onClick={() => advance()}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#6C5CE7] text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-violet-200/50 transition-all hover:bg-[#5A4BD1] active:scale-[0.98]"
+          >
+            已评过的卡 · 继续
+            <ChevronRight className="size-3.5" />
+          </button>
         </div>
       )}
     </div>

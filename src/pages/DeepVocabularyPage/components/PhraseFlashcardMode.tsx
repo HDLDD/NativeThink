@@ -18,7 +18,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import {
-  Layers, RotateCw, Volume2, Sparkles, XCircle, ArrowLeft, ChevronLeft,
+  Layers, RotateCw, Volume2, Sparkles, XCircle, ArrowLeft, ChevronLeft, ChevronRight,
   BookOpen, Gauge, Flame, History, Loader2, Target,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -359,6 +359,14 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
     if (applies) {
       pendingRelearnRef.current = null;
       setSession(scheduleRelearn(session, currentIdx, pending));
+      // 同复习检测：重排再现的短语必须可重评（不清 ratedKeys 会变"已评过"回看态，
+      // 背面无五档按钮 —— 2026-10-14 用户「学着学着点不了熟悉度」的根因）。
+      setRatedKeys((prev) => {
+        if (!prev.has(pending)) return prev;
+        const next = new Set(prev);
+        next.delete(pending);
+        return next;
+      });
     }
     const next = nextIndex(session, currentIdx);
     if (next === null) {
@@ -975,12 +983,16 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
           </span>
         </div>
       )}
-      {/* 回看态（含答错重排再现的那张）必须有可见的继续出口 */}
+      {/* 回看态必须有**可点**的继续出口（原为纯 span，手机点不了 —— 与复习检测同批修） */}
       {viewingPast && (
         <div className="flex justify-center">
-          <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-muted/60 text-muted-foreground text-[10px] font-black uppercase tracking-wider">
-            已评过的卡 · 滑动 / 按 → 继续
-          </span>
+          <button
+            onClick={() => advance()}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#14B8A6] text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-teal-200/50 transition-all hover:bg-[#0FA795] active:scale-[0.98]"
+          >
+            已评过的卡 · 继续
+            <ChevronRight className="size-3.5" />
+          </button>
         </div>
       )}
     </div>

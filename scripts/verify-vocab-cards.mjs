@@ -522,8 +522,19 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
 
 // ── ⑫ 复习检测：取消「下一个」按钮 + 快速闪卡交互补齐 ──
 {
-  // 用户明确要求「下一个按钮去掉」：评分后自动跳转已经足够，多一个按钮只是负担
-  check(!/onClick=\{\(\) => advance\(\)\}/.test(fc), '复习检测不再有「下一个」按钮');
+  /**
+   * 用户明确要求「下一个按钮去掉」：**评分后**（`rated && !viewingPast`）自动跳转已经足够，
+   * 多一个按钮只是负担。2026-10-14 按新语义**重新推导**（不是放宽）：该断言的意图是
+   * "评分后不出现下一个按钮"，不是"全文件禁掉 advance 按钮" —— 本轮回看态（viewingPast）
+   * 加了**唯一**的「已评过的卡 · 继续」按钮（用户：「进入回看就卡住，一个单词循环」，
+   * 原纯 span 手机点不了）。两条断言合起来：评分后无按钮 + 全文件唯一的 advance 按钮
+   * 就是那个"继续"（防悄悄在别处再塞一个）。
+   */
+  check(!/rated && !viewingPast && \([\s\S]{0,400}?<button/.test(fc),
+    '复习检测评分后仍无「下一个」按钮（自动跳转已足够）');
+  check((fc.match(/onClick=\{\(\) => advance\(\)\}/g) ?? []).length === 1
+    && /viewingPast && \([\s\S]{0,460}?onClick=\{\(\) => advance\(\)\}[\s\S]{0,460}?已评过的卡 · 继续/.test(fc),
+    '全文件唯一的 advance 按钮 = 回看态「继续」（2026-10-14 回看态出口；别处不许再冒出第二个）');
   check(/即将进入下一张/.test(fc), '评分后改为「即将进入下一张」过渡提示');
   check(/rated && !viewingPast && \(/.test(fc), '过渡提示只在本次刚评分时显示（回看态不显示）');
   // 回看态（含答错重排再现的卡）没有评分按钮也没有「下一个」按钮 → 必须给出可见的继续出口，
@@ -1041,6 +1052,31 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '⑰d 换等级状态切换在渲染期同步调整（stateLevel 闸门 + 读新档 + setState）');
   check(!/useEffect\(\(\) => \{[\s\S]{0,300}?loadState\(level\)[\s\S]{0,160}?\}, \[level, isAllLevels\]\);/.test(uwlSrc),
     '⑰d 旧的 reload effect 形态不许回来（会与新 level 的 persist 闭包竞态，写坏新书存储键）');
+}
+
+// ── ⑱ 错词重排再现的那张必须可重评（2026-10-14 用户：「复习检测学着学着就无法对下一个单词做熟悉度点击」）──
+{
+  /**
+   * 根因：`advance` 的 applies 分支只把错词挪到 +4 位置（scheduleRelearn），没有把它从
+   * `ratedKeys` 撤出 —— 再现时被判成"已评过"→ 回看态：背面**没有五档按钮**、只有
+   * 「已评过的卡 · 滑动 / 按 → 继续」，手机用户就卡在"点不了熟悉度"。
+   * 无头 Chrome 基线（第 1 张 apple 评「完全忘了」）：再现卡正面/背面均
+   * `pastPrompt=true / hasRateBtns=false`；修法 = 落位时 `setRatedKeys(delete(pending))`。
+   * 同样剥注释后扫描（上面的说明文字里就写着 setRatedKeys / ratedKeys）。
+   */
+  const stripComments = (s) => s.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const fcCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/FlashcardMode.tsx'), 'utf8'));
+  const pfmCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/PhraseFlashcardMode.tsx'), 'utf8'));
+  for (const [name, src] of [['复习检测', fcCode], ['短语闪卡', pfmCode]]) {
+    check(/if \(applies\) \{[\s\S]{0,520}?setRatedKeys\(\(prev\) =>/.test(src),
+      `⑱a ${name} 重排落位时从 ratedKeys 撤出该词（否则再现成"已评过"回看态，背面没有五档按钮）`);
+    check(/next\.delete\(pending\)/.test(src),
+      `⑱a ${name} 撤出的正是被重排的那个词（delete(pending)）`);
+    check(/viewingPast && \([\s\S]{0,460}?<button[\s\S]{0,460}?onClick=\{\(\) => advance\(\)\}[\s\S]{0,460}?已评过的卡 · 继续/.test(src),
+      `⑱b ${name} 回看态有**可点**的「继续」按钮（原纯 span 手机点不了 —— 点卡片只会来回翻同一张）`);
+    check(!/已评过的卡 · 滑动 \/ 按 → 继续/.test(src),
+      `⑱b ${name} 旧的不可点提示形态不许回来`);
+  }
 }
 
 console.log('');console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
