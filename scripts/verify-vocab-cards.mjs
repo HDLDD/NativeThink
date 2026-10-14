@@ -263,15 +263,15 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
    * 用户视角就是"点了没反应"。下面四条钉住修好的顺序、判据、补量与屏蔽承诺。
    */
   const ixCustom = fc.indexOf('const customEntries = customList.map(toWordEntry)');
-  const ixEmpty = fc.indexOf('dueWords.length === 0 && otherWords.length === 0');
+  const ixEmpty = fc.indexOf('dueWords.length === 0 && staleOtherKeys.length === 0');
   check(ixCustom > -1 && ixEmpty > -1 && ixCustom < ixEmpty,
     '生词本词条在「空队列判据」之前算出（顺序反了纯生词本账号就永远出不了卡）', `ixCustom=${ixCustom} ixEmpty=${ixEmpty}`);
-  check(/dueWords\.length === 0 && otherWords\.length === 0 && customEntries\.length === 0/.test(fc),
-    '空队列判据含第三个条件 customEntries');
+  check(/dueWords\.length === 0 && staleOtherKeys\.length === 0 && customEntries\.length === 0/.test(fc),
+    '空队列判据含第三个条件 customEntries（中间条件 2026-10-14 起为 staleOtherKeys 存在性 —— 预算耗尽 ≠ 没内容）');
   check(!/if \(dueWords\.length === 0 && otherWords\.length === 0\) \{/.test(fc),
     '旧判据（只看两支词库解析结果）必须消失 —— 反向正对照，防退回旧逻辑');
-  check(/dailyQuota - cappedDue\.length - otherWords\.length - customEntries\.length/.test(fc),
-    '补量扣掉生词本词数（2026-10-14 起补新吃「每日目标」档位 —— ⑳；扣减生词本的口径不变）');
+  check(/Math\.max\(0, dailyQuota - customEntries\.length\)/.test(fc),
+    '本轮预算先扣掉生词本词数（2026-10-14 起总张数受「每日目标」约束 —— ⑳/㉑；扣减生词本的口径不变）');
   check(/const customEntries = customList\.map\(toWordEntry\)\.filter\(\(w\) => \{[\s\S]{0,240}!prog\.suspended/.test(fc),
     '被「不再出现」屏蔽的生词本词也不进队列（与上面 otherWords 的屏蔽承诺一致）');
 }
@@ -1092,30 +1092,60 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   const stripComments = (s) => s.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
   const fcCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/FlashcardMode.tsx'), 'utf8'));
   const pfmCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/PhraseFlashcardMode.tsx'), 'utf8'));
-  check(/if \(state\.progress\[key\]\.lastReview >= todayStart\.getTime\(\)\) continue;/.test(fcCode),
-    '⑲a 复习检测「其他已学」支跳过同日已评的词（刚复习完的一轮不许原地再来）');
+  check(/!p\.suspended && p\.lastReview < todayStart\.getTime\(\) && !!findWord\(key\)/.test(fcCode),
+    '⑲a 复习检测「其他已学」合格集排除同日已评的词（刚复习完的一轮不许原地再来；2026-10-14 起收进 staleOtherKeys 过滤器）');
   check(/p && !p\.suspended && p\.lastReview < todayStart\.getTime\(\)/.test(pfmCode),
     '⑲a 短语闪卡「已学未到期」支同构排除同日已评');
   check(/今天的复习已完成/.test(fcCode) && /reviewedToday > 0\s*\?/.test(fcCode),
     '⑲b 空态有「今天的复习已完成」分支（同日全评完不许谎报"没有已学习的单词"）');
 }
 
-// ── ⑳ 每日目标档位必须真实作用于复习队列张数（2026-10-14 用户：「每日目标和学习的卡片的单词数量不挂钩」）──
+// ── ⑳ 每日目标档位必须真实作用于复习队列总张数（2026-10-14 用户：「一次复习太多单词」「每日学习目标跟摆设一样设置的」）──
 {
   /**
-   * 复习检测概览的 10/20/30/50/100 档原本只改「今天新学 x/N」的显示数字，
-   * 队列补新写死 20 —— 档位只当标签（preserve-user-controls 的经典缺陷形态；
-   * 无头实测：点 100 档后开始按钮仍是「开始复习（20 张卡片）」）。
-   * 每日学习侧一直是挂钩的（`due.slice(0, dailyQuota)` + `remaining`），短语闪卡 ⑮c
-   * 2026-10-09 修过同款 —— 复习检测是最后一个。修法 = fillCount 吃 dailyQuota + 依赖补齐。
-   * 剥注释后扫描。
+   * 复习检测概览的 10/20/30/50/100 档原本只改「今天新学 x/N」的显示数字：
+   * 补新写死 20（quota 场景实测点 100 档按钮仍是 20 张），且 otherWords 支**不设上限**
+   * —— 几百张已学词照出，档位管不住总量。修法 = 本轮**总张数 ≤ 每日目标**（Anki 式
+   * 每日上限）：quotaLeft = 档位 − 生词本；到期 ≤ min(30, 余量)（超额的仍是到期、
+   * 明天继续）；其他已学受余量约束；补新吃剩余。剥注释后扫描。
    */
   const stripComments = (s) => s.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
   const fcCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/FlashcardMode.tsx'), 'utf8'));
-  check(/const fillCount = Math\.max\(0, dailyQuota - cappedDue\.length - otherWords\.length - customEntries\.length\);/.test(fcCode),
-    '⑳ 复习检测补新张数吃「每日目标」档位（写死 20 = 档位只当标签）');
+  check(/const quotaLeft = Math\.max\(0, dailyQuota - customEntries\.length\);/.test(fcCode),
+    '⑳ 本轮预算 = 每日目标 − 生词本（档位管总量，不是只管补新）');
+  check(/Math\.min\(MAX_DUE, quotaLeft\)/.test(fcCode) && /if \(left <= 0\) break;/.test(fcCode),
+    '⑳ 到期支 ≤ min(30, 余量)、其他已学支受余量约束（超额的明天继续）');
   check(/\}, \[wrongDrill, wrongEntries, dueForReview, state\.progress, getNewWords, customList, dailyQuota\]\);/.test(fcCode),
     '⑳ 队列 memo 依赖含 dailyQuota（漏掉＝改档位后张数不变，得重挂载才生效）');
+}
+
+// ── ㉑ 断点 v2：已评状态随断点存取 + 有断点时「接着上次」是主按钮（2026-10-14 用户：「只要中途退出就进度清零」）──
+{
+  /**
+   * 两处"清零"体感：① 断点只存位置不存已评状态 —— 续学回来「已评 0」、走过的卡还能重评；
+   * ② 主按钮是开始复习，一点就把断点丢掉重排。修法 = 断点携带 rated/ratedCount/goodCount
+   * （可选字段，老断点免迁移，loadSession 校验），续学恢复；有断点时「接着上次」升为主按钮，
+   * 「重新开始」退居次位并明说丢弃断点。剥注释后扫描。
+   */
+  const stripComments = (s) => s.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const fcCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/FlashcardMode.tsx'), 'utf8'));
+  const uwlCode = stripComments(readFileSync(join(ROOT, 'src/lib/use-word-learning.ts'), 'utf8'));
+  check(/rated: Array\.from\(ratedKeys\), ratedCount: sessionRated, goodCount: sessionGood/.test(fcCode),
+    '㉑a 断点携带本轮已评状态与计数（只存位置 = 续学回来"已评 0"）');
+  check(/setRatedKeys\(new Set\(Array\.isArray\(saved\.rated\) \? saved\.rated\.filter\(\(k\) => order\.includes\(k\)\) : \[\]\)\)/.test(fcCode)
+    && /typeof saved\.ratedCount === 'number' \? saved\.ratedCount : 0/.test(fcCode),
+    '㉑a 续学恢复已评状态与计数（老断点无字段 → 干净状态，向后兼容）');
+  check(/p\.rated !== undefined && !Array\.isArray\(p\.rated\)/.test(uwlCode),
+    '㉑a loadSession 校验 v2 字段（坏断点判无效而不是半恢复）');
+  check(/savedSession && \([\s\S]{0,160}?onClick=\{resumeSession\}/.test(fcCode)
+    && /接着上次（还剩 \{Math\.max\(0, savedSession\.order\.length - savedSession\.index\)\} 张）/.test(fcCode),
+    '㉑b 有断点时「接着上次」是主按钮（旧版主按钮 = 开始复习，一点就丢断点重排）');
+  check(/重新开始（\$\{queue\.length\} 张）/.test(fcCode),
+    '㉑b 「重新开始」明示与开始复习不同（不许再伪装成普通的"开始复习"误导续学）');
+  check(/title=\{isFav\(shown!\.word\) \? '取消收藏' : '收藏这个单词'\}/.test(fcCode)
+    && /toggleFav\(shown!\)/.test(fcCode)
+    && /type: 'word',\s*\n?\s*content: w\.word,/.test(fcCode),
+    '㉑c 复习检测词排有收藏 ★（2026-10-14 用户：「复习检测无法收藏单词」——此前只有朗读钮；type=\'word\' 与每日学习/快速闪卡同源收藏页）');
 }
 
 console.log('');console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);

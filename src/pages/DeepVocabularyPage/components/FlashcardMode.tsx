@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import {
   RotateCw, Volume2, Sparkles, XCircle, ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Link2, BookOpen, Gauge, Flame, PenLine, History, Target,
+  Link2, BookOpen, Gauge, Flame, PenLine, History, Target, Star,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,6 +22,7 @@ import { sfxComplete } from '@/lib/sfx';
 import { decideSwipe, SWIPE_THRESHOLD } from '@/lib/vocab-swipe';
 import { createSessionOrder, scheduleRelearn, nextIndex, forecastByDay, MAX_RELEARN, type ISessionOrder } from '@/lib/vocab-session';
 import { useCustomWords, toWordEntry } from '@/lib/custom-words';
+import { useFavorites } from '@/lib/use-favorites';
 import { useWordNote, countWordNotes } from '@/lib/word-notes';
 
 const FL_LEVEL_COLORS: Record<string, string> = {
@@ -47,6 +48,24 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const currentLevel = level || 'all';
   const { addStudyMinutes } = useLearningStats();
   const { state, dueForReview, getNewWords, recordReview, setSuspended, suspendedCount, dailyQuota, setDailyQuota } = useWordLearning(currentLevel);
+  // 收藏（type='word'，与每日学习/快速闪卡同源；2026-10-14 用户：「复习检测无法收藏单词」
+  // —— 卡面上此前只有朗读钮，想标生词只能去词库浏览搜一遍）。刻意不弹提示：★ 即时变实心。
+  const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
+  const isFav = useCallback((word: string) => isFavorited(word, 'word'), [isFavorited]);
+  const toggleFav = useCallback((w: IWordEntry) => {
+    const existing = favorites.find((f) => f.type === 'word' && f.content === w.word);
+    if (existing) {
+      removeFavorite(existing.id);
+    } else {
+      addFavorite({
+        type: 'word',
+        content: w.word,
+        meaning: w.meaning,
+        example: w.examples[0]?.en,
+        category: `复习检测 · ${currentLevel === 'all' ? '全部词库' : currentLevel}`,
+      });
+    }
+  }, [favorites, addFavorite, removeFavorite, currentLevel]);
   // 生词本：阅读里收集、词库未收录的词（进度走独立的 'custom' 一路）
   const { words: customList, remove: removeCustom } = useCustomWords();
   const tts = useTTS();
@@ -127,26 +146,6 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
         dueWords.push(w);
       }
     }
-    // 复习减负：到期堆积过多时本轮只取前 30 个，避免心理压力
-    const MAX_DUE = 30;
-    const cappedDue = dueWords.slice(0, MAX_DUE);
-    // 同日已评不回队（2026-10-14 用户：「复习完还不记作复习完成，再次点击开始复习还是
-    // 同样的单词」）：无头实测，整轮评完再开一轮，前 4 词与上一轮 4/4 全重叠 —— 复习
-    // 永远"做不完"。SM-2 本来就把它们排到明天（nextReview ≥ 明天）；要再练走「错词重练」。
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const otherWords: IWordEntry[] = [];
-    for (const key of Object.keys(state.progress)) {
-      // 屏蔽（不再出现）的词**必须**跳过 —— 此前只滤了 dueForReview，
-      // 屏蔽过的词以"其他已学词"身份每轮照常出卡，屏蔽承诺失效
-      if (state.progress[key].suspended) continue;
-      // 今天已评过的词同样跳过（lastReview ≥ 今日零点），否则刚复习完的一轮原地再来
-      if (state.progress[key].lastReview >= todayStart.getTime()) continue;
-      if (!seen.has(key)) {
-        const w = findWord(key);
-        if (w) { seen.add(key); otherWords.push(w); }
-      }
-    }
     // 生词本的词优先排进来（它们来自用户真实阅读，意愿最强）。
     // **必须算在下面那个空队列判据之前**：上面两支都用只查词库的 `findWord()` 解析，
     // 生词本的词（词库未收录）解析不到，若留在后面，"只有生词本"的账号 —— 新装、换设备
@@ -158,17 +157,41 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       const prog = state.progress[key];
       return !seen.has(key) && prog && !prog.suspended;
     });
+    // 同日已评不回队（2026-10-14 用户：「复习完还不记作复习完成，再次点击开始复习还是
+    // 同样的单词」）：SM-2 本来就把它们排到明天；要再练走「错词重练」。
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    /** 「其他已学」的合格词（未屏蔽 + 非今天评过 + 词库可解析）—— 判据与预算都用它 */
+    const staleOtherKeys = Object.keys(state.progress).filter((key) => {
+      const p = state.progress[key];
+      return !p.suspended && p.lastReview < todayStart.getTime() && !!findWord(key);
+    });
     // Only add new words if there are no due or learning words
     // This prevents random word switching when user hasn't learned anything yet
-    if (dueWords.length === 0 && otherWords.length === 0 && customEntries.length === 0) {
+    // （判据用**存在性**：预算耗尽 ≠ 没内容，总量由档位管）
+    if (dueWords.length === 0 && staleOtherKeys.length === 0 && customEntries.length === 0) {
       return []; // Return empty queue - show "no words to review" message
     }
-    // 补新到「每日目标」档位（2026-10-14 用户：「每日目标和学习的卡片的单词数量不挂钩」）：
-    // 原先写死 20 —— 概览的 10/20/30/50/100 档只改「今天新学 x/N」的显示数字，纯标签。
-    // 现与短语闪卡 ⑮c 同构：档位即补新张数（到期/其他已学/生词本照旧先计入）；
-    // memo 依赖必须含 dailyQuota，漏掉＝改档位后张数不变，得重挂载才生效。
+    // 本轮**总张数以「每日目标」为上限**（Anki 式每日复习上限；2026-10-14 用户：
+    // 「一次复习太多单词」「每日学习目标跟摆设一样设置的」—— otherWords 原先不设上限，
+    // 几百张照出，档位只管补新管不住总量）。分配顺序：生词本 → 到期（≤30 且 ≤余量，
+    // 超出的仍是到期、明天继续）→ 其他已学（受余量约束）→ 补新。
+    const MAX_DUE = 30; // 到期支的绝对上限（防档位设 100 时到期堆积一次全压进来）
+    const quotaLeft = Math.max(0, dailyQuota - customEntries.length);
+    const cappedDue = dueWords.slice(0, Math.min(MAX_DUE, quotaLeft));
+    let left = quotaLeft - cappedDue.length;
+    const otherWords: IWordEntry[] = [];
+    for (const key of staleOtherKeys) {
+      if (left <= 0) break;
+      if (!seen.has(key)) {
+        const w = findWord(key);
+        if (w) { seen.add(key); otherWords.push(w); left--; }
+      }
+    }
+    // 补新吃剩余档位（与短语闪卡 ⑮c 同构）；memo 依赖必须含 dailyQuota，
+    // 漏掉＝改档位后张数不变，得重挂载才生效。
     customEntries.forEach((w) => seen.add(w.word.toLowerCase()));
-    const fillCount = Math.max(0, dailyQuota - cappedDue.length - otherWords.length - customEntries.length);
+    const fillCount = Math.max(0, left);
     const newWords = fillCount > 0 ? getNewWords(fillCount).filter((w) => !seen.has(w.word.toLowerCase())) : [];
     return [...customEntries, ...cappedDue, ...otherWords, ...newWords];
   }, [wrongDrill, wrongEntries, dueForReview, state.progress, getNewWords, customList, dailyQuota]);
@@ -496,7 +519,11 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setSession({ order, relearnCounts: {} });
     setIdx(idx);
     setFlipped(false); setDir(0); setShowDeep(false);
-    setRatedKeys(new Set()); setSessionRated(0); setSessionGood(0);
+    // 断点 v2：恢复"已评"状态与计数（老断点无此字段 → 干净状态）——
+    // 否则续学回来「已评 0」、走过的卡还能重评，用户视角就是进度清零（2026-10-14）。
+    setRatedKeys(new Set(Array.isArray(saved.rated) ? saved.rated.filter((k) => order.includes(k)) : []));
+    setSessionRated(typeof saved.ratedCount === 'number' ? saved.ratedCount : 0);
+    setSessionGood(typeof saved.goodCount === 'number' ? saved.goodCount : 0);
     setFinished(false);  // 断点续学也不进完成页
     setCombo(0); setBestCombo(0);
     lastSpokenKey.current = '';  // 同上：恢复的那一轮也要从第一张卡正常出声
@@ -504,11 +531,11 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setStarted(true);
   }, [currentLevel, customList]);
 
-  /** 本轮断点（顺序 + 当前位置）—— 中途退出后仍可续学 */
+  /** 本轮断点（顺序 + 当前位置 + 已评状态 v2）—— 中途退出后仍可续学 */
   useEffect(() => {
     if (!started || !session.order.length) return;
-    saveSession(currentLevel, { order: session.order, index: currentIdx, savedAt: Date.now() });
-  }, [started, currentLevel, session.order, currentIdx]);
+    saveSession(currentLevel, { order: session.order, index: currentIdx, savedAt: Date.now(), rated: Array.from(ratedKeys), ratedCount: sessionRated, goodCount: sessionGood });
+  }, [started, currentLevel, session.order, currentIdx, ratedKeys, sessionRated, sessionGood]);
 
   /** 已会/不感兴趣 → 屏蔽该词，并从本轮移除 */
   const suspendCurrent = useCallback(() => {
@@ -869,23 +896,30 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
         </div>
 
         <div className="flex justify-center gap-2 pt-2 flex-wrap">
-          <Button
-            onClick={() => { setWrongDrill(false); startSession(queue); }}
-            disabled={queue.length === 0}
-            className="bg-[#6C5CE7] hover:bg-[#5A4BD1] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-violet-200/50 gap-2"
-          >
-            <RotateCw className="size-4" />开始复习（{queue.length} 张卡片）
-          </Button>
-          {/* 断点续学：上次没读完的那一轮 */}
+          {/*
+            有断点时「接着上次」是**主按钮**（2026-10-14 用户：「只要中途退出就进度清零」——
+            旧版主按钮是开始复习，一点就把断点丢掉重排；断点 v2 还携带已评状态与计数，
+            续学不再"看起来清零"）。「重新开始」退居次位并在 title 里明说会丢弃断点。
+          */}
           {savedSession && (
             <Button
-              variant="outline" onClick={resumeSession}
-              className="rounded-2xl px-6 py-4 text-xs font-black uppercase tracking-wider gap-2 border-[#6C5CE7]/40 text-ink-violet"
-              title="恢复上次的顺序与位置"
+              onClick={resumeSession}
+              className="bg-[#6C5CE7] hover:bg-[#5A4BD1] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-violet-200/50 gap-2"
             >
               <History className="size-4" />接着上次（还剩 {Math.max(0, savedSession.order.length - savedSession.index)} 张）
             </Button>
           )}
+          <Button
+            variant={savedSession ? 'outline' : 'default'}
+            onClick={() => { setWrongDrill(false); startSession(queue); }}
+            disabled={queue.length === 0}
+            className={savedSession
+              ? 'rounded-2xl px-6 py-4 text-xs font-black uppercase tracking-wider gap-2 border-border text-muted-foreground'
+              : 'bg-[#6C5CE7] hover:bg-[#5A4BD1] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-violet-200/50 gap-2'}
+            title={savedSession ? '丢弃断点，按当前队列重新开始' : undefined}
+          >
+            <RotateCw className="size-4" />{savedSession ? `重新开始（${queue.length} 张）` : `开始复习（${queue.length} 张卡片）`}
+          </Button>
         </div>
 
         {/* 生词本管理：朗读 / 移除（这些词已进复习队列，SM-2 与屏蔽同样适用） */}
@@ -1017,8 +1051,19 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                         'font-black italic text-foreground tracking-tight break-words min-w-0',
                         shown!.word.length > 14 ? 'text-2xl sm:text-3xl' : shown!.word.length > 10 ? 'text-3xl sm:text-4xl' : 'text-4xl',
                       )}>{shown!.word}</h2>
-                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(shown!.word, { rate: 0.9 }); }}
-                        className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-violet shrink-0"><Volume2 className="size-5" /></Button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); tts.speak(shown!.word, { rate: 0.9 }); }}
+                          className="rounded-2xl bg-muted text-muted-foreground hover:text-ink-violet shrink-0"><Volume2 className="size-5" /></Button>
+                        {/* 收藏：随手就能标（与快速闪卡同款交互；type='word' 同源收藏页） */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleFav(shown!); }}
+                          className={cn('shrink-0 rounded-2xl p-2 transition-colors',
+                            isFav(shown!.word) ? 'bg-amber-400/15 text-amber-500' : 'bg-muted text-muted-foreground hover:text-amber-500')}
+                          title={isFav(shown!.word) ? '取消收藏' : '收藏这个单词'}
+                        >
+                          <Star className={cn('size-5', isFav(shown!.word) && 'fill-amber-400 text-amber-400')} />
+                        </button>
+                      </div>
                     </div>
                     <p className="text-sm font-bold text-ink-violet mb-1">{shown!.partOfSpeech}</p>
                     <p className="text-sm text-muted-foreground font-medium">{shown!.phonetic}</p>

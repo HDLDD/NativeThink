@@ -167,6 +167,11 @@ export interface ISavedSession {
   order: string[];
   index: number;
   savedAt: number;
+  /** 断点 v2（2026-10-14）：本轮已评的词与计数 —— 续学时恢复"已评"状态，
+   *  否则中途退出一回来看「已评 0」、走过的卡还能重评，用户视角就是进度清零。可选，老断点免迁移。 */
+  rated?: string[];
+  ratedCount?: number;
+  goodCount?: number;
 }
 
 function sessionKey(level: string): string {
@@ -184,6 +189,9 @@ export function loadSession(level: string): ISavedSession | null {
     const p = JSON.parse(raw) as ISavedSession;
     if (!p || !Array.isArray(p.order) || !p.order.length) return null;
     if (typeof p.index !== 'number' || p.index < 0 || p.index >= p.order.length) return null;
+    if (p.rated !== undefined && !Array.isArray(p.rated)) return null;
+    if (p.ratedCount !== undefined && typeof p.ratedCount !== 'number') return null;
+    if (p.goodCount !== undefined && typeof p.goodCount !== 'number') return null;
     return p;
   } catch { return null; }
 }
