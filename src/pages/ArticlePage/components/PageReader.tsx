@@ -100,7 +100,7 @@ interface Props {
 
 export default function PageReader({ content, onClose, startPage = 0 }: Props) {
   const { isConfigured, chat: aiChat } = useAI();
-  const { addFavorite, isFavorited, favorites, removeFavorite } = useFavorites();
+  const { addFavorite, isWordFavorited, isFavorited, favorites, removeFavorite } = useFavorites();
   // 查词 → 一键加入学习队列（'all' 模式自动落到词的源词书，复习队列立即可见）
   const { recordReview: recordWordLearn } = useWordLearning('all');
   const addToLearning = useCallback((word: string) => {
@@ -866,12 +866,12 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
     setLookupLoading(false);
   }, [pushRecentLookup]);
 
-  // Favorite word
-  const favWord = isFavorited(lookupWord_State, 'word');
+  // Favorite word（词族判重：学习卡 'word' 与词库浏览 'vocabulary' 视为同一条）
+  const favWord = isWordFavorited(lookupWord_State);
   const toggleWordFav = () => {
     if (!lookupWord_State) return;
     if (favWord) {
-      const f = favorites.find((x) => x.content === lookupWord_State && x.type === 'word');
+      const f = favorites.find((x) => x.content === lookupWord_State && (x.type === 'word' || x.type === 'vocabulary'));
       if (f) removeFavorite(f.id);
       toast('已取消收藏');
     } else {

@@ -28,6 +28,36 @@ function migrateLegacyFavorites(): void {
   } catch { /* ignore */ }
 }
 
+/**
+ * 词族：同一个单词的两种收藏来源 —— 词库浏览存 'vocabulary'、学习卡存 'word'。
+ * 判重与删除必须同时看两个 type（vocabulary.md 收藏一节的既定口径）。
+ */
+export function isWordFavType(t: IFavoriteItem['type']): boolean {
+  return t === 'word' || t === 'vocabulary';
+}
+
+/**
+ * 同词去重：2026-10-15 前的旧版判重只看单一 type，同一单词可能存了 'vocabulary' + 'word'
+ * 两条 —— 两 type 判重下 isFav 恒真，点一下只删掉一条，星标看起来"点了没反应"。
+ * 保留 createdAt 较新的一条（其他条目顺序不变）。载入时跑一遍并回写，存量脏数据自愈。
+ */
+export function dedupeWordFavs(items: IFavoriteItem[]): IFavoriteItem[] {
+  const kept = new Map<string, IFavoriteItem>();
+  const out: IFavoriteItem[] = [];
+  for (const f of items) {
+    if (isWordFavType(f.type)) {
+      const prev = kept.get(f.content);
+      if (prev) {
+        if (f.createdAt > prev.createdAt) out[out.indexOf(prev)] = f;
+        continue;
+      }
+      kept.set(f.content, f);
+    }
+    out.push(f);
+  }
+  return out;
+}
+
 export function useFavorites() {
   const [favorites, setFavorites] = useState<IFavoriteItem[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -35,7 +65,15 @@ export function useFavorites() {
   const loadFromStorage = useCallback(() => {
     try {
       const saved = safeStorage.getItem(FAVORITES_KEY);
-      if (saved) setFavorites(JSON.parse(saved));
+      if (saved) {
+        const parsed = JSON.parse(saved) as IFavoriteItem[];
+        // 同词双条目去重（词族口径）—— 存在脏数据就回写，不派事件（防 reload 循环）
+        const cleaned = dedupeWordFavs(parsed);
+        if (cleaned.length !== parsed.length) {
+          try { safeStorage.setItem(FAVORITES_KEY, JSON.stringify(cleaned)); } catch { /* ignore */ }
+        }
+        setFavorites(cleaned);
+      }
     } catch {
       // storage unavailable — use defaults
     }
@@ -71,7 +109,10 @@ export function useFavorites() {
 
   const addFavorite = useCallback(
     (item: Omit<IFavoriteItem, 'id' | 'createdAt'>) => {
-      const exists = favorites.some((f) => f.content === item.content && f.type === item.type);
+      // 词族判重：同词的 'word'/'vocabulary' 视为同一条（跨来源收藏不再同词存两条）
+      const exists = favorites.some(
+        (f) => f.content === item.content && (f.type === item.type || (isWordFavType(item.type) && isWordFavType(f.type))),
+      );
       if (exists) return false;
       const newItem: IFavoriteItem = {
         ...item,
@@ -86,7 +127,13 @@ export function useFavorites() {
 
   const removeFavorite = useCallback(
     (id: string) => {
-      persist(favorites.filter((f) => f.id !== id));
+      const target = favorites.find((f) => f.id === id);
+      if (!target) { persist(favorites); return; }
+      // 词族删除：删掉的若是单词条目，它的同词异 type 孪生条目一并清掉 ——
+      // 否则存量双条目下点一下只删一条，星标看起来"点了没反应"
+      persist(favorites.filter(
+        (f) => f.id !== id && !(isWordFavType(target.type) && isWordFavType(f.type) && f.content === target.content),
+      ));
     },
     [favorites, persist],
   );
@@ -103,8 +150,17 @@ export function useFavorites() {
     [favorites],
   );
 
+  /** 词族判重版「是否已收藏」：同词的 'word'/'vocabulary' 两条来源视为同一条 ——
+   *  学习卡（'word'）与词库浏览（'vocabulary'）的星标/心形都必须用这个，
+   *  否则跨来源收藏过的词显示未收藏、再点就同词存两条（2026-10-15 用户报告）。 */
+  const isWordFavorited = useCallback(
+    (content: string) => favorites.some((f) => isWordFavType(f.type) && f.content === content),
+    [favorites],
+  );
+
   return {
     favorites,
+    isWordFavorited,
     loaded,
     addFavorite,
     removeFavorite,

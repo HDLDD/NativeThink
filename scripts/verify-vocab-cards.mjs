@@ -1156,6 +1156,43 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
       && /\(f\.type === 'word' \|\| f\.type === 'vocabulary'\) && f\.content === w\.word/.test(src),
       `㉑d ${name} 收藏判重同时看 'word' 与 'vocabulary' 两个 type（同词两来源不许存两条）`);
   }
+  // ㉑e hook 单点 + 全部词族调用方（2026-10-15 用户：「快速闪卡有时候会无法收藏单词」）：
+  // 存量双条目（旧版单一 type 判重时代产生）下点一下只删一条 → 星标看起来"点了没反应"。
+  const favLib = readFileSync(join(ROOT, 'src/lib/use-favorites.ts'), 'utf8');
+  const dvpCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx'), 'utf8'));
+  const gwsCode = stripComments(readFileSync(join(ROOT, 'src/components/GlobalWordSearch.tsx'), 'utf8'));
+  const prCode = stripComments(readFileSync(join(ROOT, 'src/pages/ArticlePage/components/PageReader.tsx'), 'utf8'));
+  check(/export function isWordFavType/.test(favLib) && /export function dedupeWordFavs/.test(favLib),
+    '㉑e use-favorites 导出词族判型与去重纯函数（供守卫真跑）');
+  check(/f\.type === item\.type \|\| \(isWordFavType\(item\.type\) && isWordFavType\(f\.type\)\)/.test(favLib),
+    '㉑e addFavorite 词族判重（跨来源收藏不再同词存两条）');
+  check(/isWordFavType\(target\.type\) && isWordFavType\(f\.type\) && f\.content === target\.content/.test(favLib),
+    '㉑e removeFavorite 词族删除（存量双条目一次点按全清，星标不再"点了没反应"）');
+  check(/const cleaned = dedupeWordFavs\(parsed\);/.test(favLib),
+    '㉑e 载入时同词去重并回写（存量脏数据自愈，不派事件防循环）');
+  for (const [name, src] of [['词汇深度页', dvpCode], ['全局单词搜索', gwsCode], ['阅读器查词', prCode]]) {
+    check(/isWordFavorited\(/.test(src),
+      `㉑e ${name} 词族判重（学习卡 'word' 与词库浏览 'vocabulary' 视为同一条）`);
+  }
+  // ㉑f 真跑 dedupeWordFavs（提取纯函数转译执行）：双条目留新、无重复原样、非词族不误伤
+  {
+    const m = favLib.match(/export function isWordFavType[\s\S]*?export function dedupeWordFavs[\s\S]*?\n\}/);
+    check(!!m, '㉑f 提取到 isWordFavType + dedupeWordFavs 纯函数段（转译真跑）');
+    if (m) {
+      const mod = { exports: {} };
+      new Function('exports', 'module', ts.transpileModule(m[0], { compilerOptions: { module: 'commonjs' } }).outputText)(mod.exports, mod);
+      const dedupe = mod.exports.dedupeWordFavs;
+      const mk = (id, type, content, createdAt) => ({ id, type, content, meaning: '', category: '', createdAt });
+      const dup = dedupe([mk('a', 'word', 'x', 100), mk('b', 'vocabulary', 'x', 200)]);
+      check(dup.length === 1 && dup[0].id === 'b',
+        '㉑f 真跑：同词 word+vocabulary 双条目去重、保留较新一条（旧数据自愈）');
+      const clean = dedupe([mk('a', 'word', 'x', 100), mk('b', 'word', 'y', 100)]);
+      check(clean.length === 2, '㉑f 真跑：不同词原样保留');
+      const mixed = dedupe([mk('a', 'expression', 'x', 100), mk('b', 'word', 'x', 100)]);
+      check(mixed.length === 2,
+        '㉑f 真跑：非词族 type（expression）同串不误伤');
+    }
+  }
 }
 
 // ── ㉒ 快速闪卡专项（2026-10-15 用户：「部分单词无法自动朗读，点击却可以」「把列表按日期整理」）──

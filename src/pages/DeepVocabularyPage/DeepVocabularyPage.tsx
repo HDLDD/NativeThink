@@ -324,7 +324,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook, curren
 }
 
 export default function DeepVocabularyPage() {
-  const { addFavorite, removeFavorite, isFavorited, favorites } = useFavorites();
+  const { favorites, addFavorite, removeFavorite, isWordFavorited, isFavorited } = useFavorites();
   const { isConfigured, chat: aiChat } = useAI();
   const [memory, setMemory] = usePageMemory(MEMORY_KEY, {
     level: 'all', tab: 'daily', word: '',
@@ -907,8 +907,9 @@ export default function DeepVocabularyPage() {
   useEffect(() => { setMemory((p) => ({ ...p, collocOnly })); }, [collocOnly, setMemory]);
 
   const toggleFavorite = (word: IWordEntry) => {
-    if (isFavorited(word.word, 'vocabulary')) {
-      const fav = favorites.find((f) => f.content === word.word && f.type === 'vocabulary');
+    // 词族判重：学习卡（'word'）与词库浏览（'vocabulary'）的收藏视为同一条（use-favorites.isWordFavorited）
+    if (isWordFavorited(word.word)) {
+      const fav = favorites.find((f) => f.content === word.word && (f.type === 'vocabulary' || f.type === 'word'));
       if (fav) removeFavorite(fav.id);
     } else {
       addFavorite({ type: 'vocabulary', content: word.word, meaning: word.meaning, example: word.examples[0]?.en || '', category: word.level });
@@ -1480,8 +1481,8 @@ export default function DeepVocabularyPage() {
                           </Button>
                           <Badge className="rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal border-none">{selectedWord.level.toUpperCase()}</Badge>
                           <Button variant="ghost" size="icon" onClick={() => toggleFavorite(selectedWord)}
-                            className={cn('rounded-2xl', isFavorited(selectedWord.word, 'vocabulary') ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')}>
-                            <Heart className={cn('size-5', isFavorited(selectedWord.word, 'vocabulary') && 'fill-current')} />
+                            className={cn('rounded-2xl', isWordFavorited(selectedWord.word) ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')}>
+                            <Heart className={cn('size-5', isWordFavorited(selectedWord.word) && 'fill-current')} />
                           </Button>
                         </div>
                       </div>

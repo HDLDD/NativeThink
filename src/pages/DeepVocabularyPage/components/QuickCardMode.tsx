@@ -40,7 +40,7 @@ import { useLearningStats } from '@/lib/use-learning-stats';
 import { sfxTick, sfxComplete } from '@/lib/sfx';
 import { safeStorage } from '@/lib/safe-storage';
 import { cleanText, cn, formatDate } from '@/lib/utils';
-import { useFavorites, type IFavoriteItem } from '@/lib/use-favorites';
+import { useFavorites, isWordFavType, type IFavoriteItem } from '@/lib/use-favorites';
 import {
   absorbQuickCardRun, useQuickCardRuns,
   loadQuickCardSession, saveQuickCardSession, clearQuickCardSession,
@@ -158,8 +158,9 @@ export default function QuickCardMode({ level }: { level: string }) {
   const { runs, pending, remove: removeRun } = useQuickCardRuns(level);
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
 
-  /** 收藏的词（与收藏页同源，用于「只练收藏的词」与卡片上的 ★ 态） */
-  const favWords = useMemo(() => favorites.filter((f) => f.type === 'word'), [favorites]);
+  /** 收藏的词（与收藏页同源，用于「只练收藏的词」与卡片上的 ★ 态）—— 词族口径：
+   *  'word' 与 'vocabulary'（词库浏览来源）都算，否则跨来源收藏的词在面板里隐身 */
+  const favWords = useMemo(() => favorites.filter((f) => isWordFavType(f.type)), [favorites]);
   const isFav = useCallback((word: string) => isFavorited(word, 'word') || isFavorited(word, 'vocabulary'), [isFavorited]);
 
   /**

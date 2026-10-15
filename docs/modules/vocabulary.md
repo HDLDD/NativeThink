@@ -109,7 +109,7 @@
 
 ## 收藏 / 生词本 / 助记
 
-- 收藏与 `FavoritesPage` 同源（`use-favorites.ts`，键 `__nativethink_favorites`）。⚠️ **同一个"收藏单词"存两种 type**：词库浏览用 `'vocabulary'`（`DeepVocabularyPage.tsx:910`），每日学习与快速闪卡用 `'word'`（`DailyLearningMode.tsx:424-442`、`QuickCardMode.tsx:163-182`）。判重/统计必须同时看两个 type —— **2026-10-15 起三处学习卡的 `isFav`/`toggleFav` 已按此实现**（`isFavorited(word,'word') || isFavorited(word,'vocabulary')`，取消移除任一来源那条；守卫 ㉑d 三模式点名）—— 此前只查单一 type，"浏览里收藏过的词"在学习卡上显示未收藏、再点就同词存两条（用户：「同样单词但是收藏情况不同的列表」）。
+- 收藏与 `FavoritesPage` 同源（`use-favorites.ts`，键 `__nativethink_favorites`）。⚠️ **同一个"收藏单词"存两种 type**：词库浏览用 `'vocabulary'`（`DeepVocabularyPage.tsx:910`），每日学习与快速闪卡用 `'word'`（`DailyLearningMode.tsx:424-442`、`QuickCardMode.tsx:163-182`）。判重/统计必须同时看两个 type —— **2026-10-15 起全链路落实**：三处学习卡 + 词汇深度页/全局搜索/阅读器查词的星标心形都用 `isWordFavorited`（hook 导出的词族判重版）；`use-favorites` 单点加装：载入同词去重回写（`dedupeWordFavs`，存量脏数据自愈）、新增词族判重、删除词族双条目（守卫 ㉑d/㉑e/㉑f，其中 ㉑f 转译真跑）。
 - 生词本 `custom-words.ts`（键 `__nativethink_custom_words`）：阅读器收集词库未收录的词，词条 `level:'custom'`（`:106`），进度经 `SUB_LEVELS` 走独立一路；复习队列把**已有进度记录的生词本词排在队首**（`FlashcardMode.tsx:149-152`），2026-10-05 起**不再要求账号另有词库进度**，且跳过被「不再出现」屏蔽的词（见注意事项 15）。
 - 助记 `word-notes.ts`（键 `__nativethink_word_notes`）：**目前只有复习检测卡背接了线**（`FlashcardMode.tsx:1142-1165`），其它模式不显示。
 

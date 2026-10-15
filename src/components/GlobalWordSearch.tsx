@@ -58,7 +58,7 @@ export default function GlobalWordSearch() {
   const [dataReady, setDataReady] = useState(() => isAllReady());
   const inputRef = useRef<HTMLInputElement>(null);
   const tts = useTTS();
-  const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
+  const { favorites, addFavorite, removeFavorite, isWordFavorited } = useFavorites();
 
   // Expanded word for detail view
   const [expandedWord, setExpandedWord] = useState<string | null>(null);
@@ -130,11 +130,11 @@ export default function GlobalWordSearch() {
     return () => { alive = false; };
   }, [expandedWord, results]);
 
-  // Favorite toggle
+  // Favorite toggle（词族判重：学习卡 'word' 与词库浏览 'vocabulary' 视为同一条）
   const handleToggleFav = (word: IWordEntry) => {
     const key = word.word;
-    if (isFavorited(key, 'vocabulary')) {
-      const fav = favorites.find((f) => f.content === key && f.type === 'vocabulary');
+    if (isWordFavorited(key)) {
+      const fav = favorites.find((f) => f.content === key && (f.type === 'vocabulary' || f.type === 'word'));
       if (fav) removeFavorite(fav.id);
     } else {
       addFavorite({
@@ -236,7 +236,7 @@ export default function GlobalWordSearch() {
               <div className="space-y-2">
                 {results.map((word) => {
                   const lc = LEVEL_COLORS[word.level] || LEVEL_COLORS.advanced;
-                  const isFav = isFavorited(word.word, 'vocabulary');
+                  const isFav = isWordFavorited(word.word);
                   const isExpanded = expandedWord?.toLowerCase() === word.word.toLowerCase();
 
                   return (
