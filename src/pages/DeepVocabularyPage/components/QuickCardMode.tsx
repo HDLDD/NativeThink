@@ -39,7 +39,7 @@ import { useImmersive } from '@/lib/focus-mode';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { sfxTick, sfxComplete } from '@/lib/sfx';
 import { safeStorage } from '@/lib/safe-storage';
-import { cleanText, cn } from '@/lib/utils';
+import { cleanText, cn, formatDate } from '@/lib/utils';
 import { useFavorites, type IFavoriteItem } from '@/lib/use-favorites';
 import {
   absorbQuickCardRun, useQuickCardRuns,
@@ -160,7 +160,7 @@ export default function QuickCardMode({ level }: { level: string }) {
 
   /** 收藏的词（与收藏页同源，用于「只练收藏的词」与卡片上的 ★ 态） */
   const favWords = useMemo(() => favorites.filter((f) => f.type === 'word'), [favorites]);
-  const isFav = useCallback((word: string) => isFavorited(word, 'word'), [isFavorited]);
+  const isFav = useCallback((word: string) => isFavorited(word, 'word') || isFavorited(word, 'vocabulary'), [isFavorited]);
 
   /**
    * 收藏（type='word'，与收藏页同源，在「收藏」页也能看到）。
@@ -168,7 +168,10 @@ export default function QuickCardMode({ level }: { level: string }) {
    * 连点几十个词时每条提示只会挡视线 —— 反馈交给控件本身，交给位置固定的收藏计数。
    */
   const toggleFav = useCallback((w: IWordEntry) => {
-    const existing = favorites.find((f) => f.type === 'word' && f.content === w.word);
+    // 判重必须同时看两个 type（vocabulary.md 收藏一节的既定口径）：词库浏览存 'vocabulary'、
+    // 学习卡存 'word' —— 只查单一 type 会让"浏览里收藏过的词"在学习卡上显示未收藏，
+    // 再点一次就同词存两条（2026-10-15 用户：「同样单词但是收藏情况不同的列表」）。
+    const existing = favorites.find((f) => (f.type === 'word' || f.type === 'vocabulary') && f.content === w.word);
     if (existing) {
       removeFavorite(existing.id);
     } else {
@@ -324,7 +327,12 @@ export default function QuickCardMode({ level }: { level: string }) {
     if (lastSpokenRef.current === key) return;
     lastSpokenRef.current = key;
     try { tts.speak(cw.word, { rate: 0.9 }); } catch { /* ignore */ }
-  }, [inSession, cw, idx, tts, autoSpeak]);
+    // 预合成下一张（镜像复习检测 :219-221）：原先只预热本轮前 5 张，第 6 张起按需合成 ——
+    // sherpa 按需合成的时延会让"部分单词不自动朗读，点击却有声"（点的时候已入缓存）。
+    // 2026-10-15 用户报告，桌面 SpeechSynthesis 路径复现不出（逐词都有日志）→ 安卓专属。
+    const nxt = queue[idx + 1];
+    if (nxt) tts.prewarm(nxt.word, { rate: 0.9 });
+  }, [inSession, cw, idx, tts, autoSpeak, queue]);
 
   /**
    * 翻面后才按需拉 detail —— 例句/搭配只在真正要看释义时才需要，
@@ -1388,8 +1396,27 @@ function HistoryPanel({
           还没有记录 —— 每学完一轮会自动按「选择的数量」把词表存成记录，方便下次重练。
         </p>
       ) : (
-        <div className="space-y-2 max-h-80 overflow-y-auto overscroll-contain">
-          {runs.map((r) => {
+        <div className="space-y-3 max-h-80 overflow-y-auto overscroll-contain">
+          {/*
+            按日期分组（2026-10-15 用户：「把列表添加按照日期整理的功能，实现不同日期的列表分类」）。
+            日期一律本地日历日（formatDate），禁 toISOString（东八区凌晨会错天）。
+          */}
+          {(() => {
+            const today = formatDate(new Date());
+            const yesterday = formatDate(new Date(Date.now() - 86400000));
+            const groups = new Map<string, typeof runs>();
+            for (const r of runs) {
+              const d = formatDate(new Date(r.at));
+              if (!groups.has(d)) groups.set(d, []);
+              groups.get(d)!.push(r);
+            }
+            return [...groups.entries()].map(([day, dayRuns]) => (
+              <div key={day} className="space-y-2">
+                <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground/70 sticky top-0 bg-card/95 backdrop-blur-sm py-0.5">
+                  {day === today ? '今天' : day === yesterday ? '昨天' : day}
+                  <span className="ml-1.5 normal-case font-bold">{dayRuns.length} 组</span>
+                </p>
+                {dayRuns.map((r) => {
             const open = openRunId === r.id;
             const wrong = r.words.filter((w) => !w.known).length;
             const rate = r.words.length ? Math.round((r.known / r.words.length) * 100) : 0;
@@ -1448,7 +1475,10 @@ function HistoryPanel({
                 )}
               </div>
             );
-          })}
+            })}
+              </div>
+          ));
+        })()}
         </div>
       )}
     </div>

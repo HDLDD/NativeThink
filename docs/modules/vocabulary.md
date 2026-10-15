@@ -109,7 +109,7 @@
 
 ## 收藏 / 生词本 / 助记
 
-- 收藏与 `FavoritesPage` 同源（`use-favorites.ts`，键 `__nativethink_favorites`）。⚠️ **同一个"收藏单词"存两种 type**：词库浏览用 `'vocabulary'`（`DeepVocabularyPage.tsx:910`），每日学习与快速闪卡用 `'word'`（`DailyLearningMode.tsx:424-442`、`QuickCardMode.tsx:163-182`）。判重/统计必须同时看两个 type。
+- 收藏与 `FavoritesPage` 同源（`use-favorites.ts`，键 `__nativethink_favorites`）。⚠️ **同一个"收藏单词"存两种 type**：词库浏览用 `'vocabulary'`（`DeepVocabularyPage.tsx:910`），每日学习与快速闪卡用 `'word'`（`DailyLearningMode.tsx:424-442`、`QuickCardMode.tsx:163-182`）。判重/统计必须同时看两个 type —— **2026-10-15 起三处学习卡的 `isFav`/`toggleFav` 已按此实现**（`isFavorited(word,'word') || isFavorited(word,'vocabulary')`，取消移除任一来源那条；守卫 ㉑d 三模式点名）—— 此前只查单一 type，"浏览里收藏过的词"在学习卡上显示未收藏、再点就同词存两条（用户：「同样单词但是收藏情况不同的列表」）。
 - 生词本 `custom-words.ts`（键 `__nativethink_custom_words`）：阅读器收集词库未收录的词，词条 `level:'custom'`（`:106`），进度经 `SUB_LEVELS` 走独立一路；复习队列把**已有进度记录的生词本词排在队首**（`FlashcardMode.tsx:149-152`），2026-10-05 起**不再要求账号另有词库进度**，且跳过被「不再出现」屏蔽的词（见注意事项 15）。
 - 助记 `word-notes.ts`（键 `__nativethink_word_notes`）：**目前只有复习检测卡背接了线**（`FlashcardMode.tsx:1142-1165`），其它模式不显示。
 
@@ -155,6 +155,10 @@
 24. **断点 v2：已评状态随断点存取；有断点时「接着上次」是主按钮**（2026-10-14 用户：「只要中途退出就进度清零」）：两处"清零"体感 —— ① 断点只存位置，续学回来「已评 0」、走过的卡还能重评；② 主按钮是开始复习，一点就把断点丢掉重排。修法 = 断点携带 `rated/ratedCount/goodCount`（可选字段，老断点免迁移，`loadSession` 校验坏断点判无效），续学恢复已评状态与计数（实测：评 5 张退出 → 续学后 已评 5 / 位置 6/20 原样）；有断点时主按钮 = **接着上次（还剩 N 张）**，「重新开始（N 张）」退居次位并在 title 明说丢弃断点。守卫 ㉑ 5 条。
 
 25. **复习检测卡面有收藏 ★**（2026-10-14 用户：「复习检测无法收藏单词」——卡面上此前只有朗读钮）：词排 = 朗读 + ★（`FlashcardMode.tsx` 词排 shrink-0 组），与快速闪卡同款交互：`type='word'` 同源收藏页、★ 即时变实心、**不弹提示**。守卫 ㉑c。
+
+26. **快速闪卡：读当前 + 预合成下一张；学习记录按日期分组**（2026-10-15 用户：「部分单词无法自动朗读，但是点击朗读却可以朗读」「把列表添加按照日期整理的功能」）：① 自动朗读缺失 —— QC 原先只预热本轮**前 5 张**（`sessionEntries.slice(0, 5)`），第 6 张起按需合成，sherpa 按需合成时延造成"部分不读、点击有声"（点时已入缓存）；桌面 SpeechSynthesis 路径插桩复现不出（逐词都有日志）→ 安卓离线引擎专属。修法 = 镜像复习检测：朗读当前 + `tts.prewarm(queue[idx+1])`（`QuickCardMode.tsx` 朗读 effect）。② 学习记录按本地日期分组（今天/昨天/具体日期，`formatDate(new Date(r.at))`，禁 toISOString）。守卫 ㉒ 3 条。
+
+27. **收藏判重同时看两个 type（三处学习卡）**（2026-10-15 用户：「快速闪卡重练过程中收藏单词……同样单词但是收藏情况不同的列表」）：QC/DL/FM 的 `isFav`/`toggleFav` 原先只查 `'word'` 单一 type —— 词库浏览收藏过的词（`'vocabulary'`）在学习卡上显示未收藏，再点就**同词存两条**（收藏页出现两来源重复项）。修法 = 判重看 `'word' || 'vocabulary'`、取消移除任一来源那条、再收藏统一落 `'word'`（三模式同构，守卫 ㉑d 逐模式点名；实'verify'：注入 'vocabulary'-type 收藏 → QC 记录面板 chip 立即实心）。详见上方「收藏 / 生词本 / 助记」。
 
 ## 怎么验证
 

@@ -48,12 +48,14 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const currentLevel = level || 'all';
   const { addStudyMinutes } = useLearningStats();
   const { state, dueForReview, getNewWords, recordReview, setSuspended, suspendedCount, dailyQuota, setDailyQuota } = useWordLearning(currentLevel);
-  // 收藏（type='word'，与每日学习/快速闪卡同源；2026-10-14 用户：「复习检测无法收藏单词」
+  // 收藏（与每日学习/快速闪卡同源；2026-10-14 用户：「复习检测无法收藏单词」
   // —— 卡面上此前只有朗读钮，想标生词只能去词库浏览搜一遍）。刻意不弹提示：★ 即时变实心。
+  // 判重同时看两个 type（vocabulary.md 收藏一节的既定口径）：词库浏览存 'vocabulary'、
+  // 学习卡存 'word' —— 只查单一 type 会让"浏览里收藏过的词"在卡上显示未收藏，再点就同词存两条。
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
-  const isFav = useCallback((word: string) => isFavorited(word, 'word'), [isFavorited]);
+  const isFav = useCallback((word: string) => isFavorited(word, 'word') || isFavorited(word, 'vocabulary'), [isFavorited]);
   const toggleFav = useCallback((w: IWordEntry) => {
-    const existing = favorites.find((f) => f.type === 'word' && f.content === w.word);
+    const existing = favorites.find((f) => (f.type === 'word' || f.type === 'vocabulary') && f.content === w.word);
     if (existing) {
       removeFavorite(existing.id);
     } else {

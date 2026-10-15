@@ -419,9 +419,11 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
 
   // ── 收藏（type='word'，与收藏页同源）—— 词条详情弹窗里用 ──
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
-  const isFav = useCallback((word: string) => isFavorited(word, 'word'), [isFavorited]);
+  // 判重同时看两个 type（vocabulary.md 收藏一节的既定口径）：词库浏览存 'vocabulary'、
+  // 学习卡存 'word' —— 只查单一 type 会让"浏览里收藏过的词"在卡上显示未收藏，再点就同词存两条。
+  const isFav = useCallback((word: string) => isFavorited(word, 'word') || isFavorited(word, 'vocabulary'), [isFavorited]);
   const toggleFav = (w: IWordEntry) => {
-    const existing = favorites.find((f) => f.type === 'word' && f.content === w.word);
+    const existing = favorites.find((f) => (f.type === 'word' || f.type === 'vocabulary') && f.content === w.word);
     if (existing) {
       removeFavorite(existing.id);
     } else {

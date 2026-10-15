@@ -64,7 +64,7 @@ for (const [name, src] of [['快速闪卡', qc], ['每日学习', dl], ['语块�
 }
 check(/const AUTO_SPEAK_KEY = '__nativethink_vocab_autospeak';/.test(qc), '快速闪卡定义共享键');
 check(/if \(!inSession \|\| !cw \|\| !autoSpeak\) return;/.test(qc), '快速闪卡的自动朗读受开关门控');
-check(/\[inSession, cw, idx, tts, autoSpeak\]/.test(qc), '快速闪卡朗读 effect 依赖 autoSpeak（切换后立即生效）');
+check(/\[inSession, cw, idx, tts, autoSpeak, queue\]/.test(qc), '快速闪卡朗读 effect 依赖 autoSpeak（切换后立即生效）+ queue（预合成下一张）');
 check(/safeStorage\.getItem\(AUTO_SPEAK_KEY\) !== '0'/.test(qc), '快速闪卡默认开（与其余三处同口径）');
 check(/onClick=\{toggleAutoSpeak\}/.test(qc), '快速闪卡有自动发音开关入口（不能只读键不给开关）');
 // 正对照：门控真的在 speak 之前，而不是写在后面当摆设
@@ -1146,6 +1146,35 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     && /toggleFav\(shown!\)/.test(fcCode)
     && /type: 'word',\s*\n?\s*content: w\.word,/.test(fcCode),
     '㉑c 复习检测词排有收藏 ★（2026-10-14 用户：「复习检测无法收藏单词」——此前只有朗读钮；type=\'word\' 与每日学习/快速闪卡同源收藏页）');
+  // ㉑d 收藏判重必须同时看两个 type（2026-10-15 用户：「同样单词但是收藏情况不同的列表」）：
+  // 词库浏览存 'vocabulary'、学习卡存 'word' —— 只查单一 type 会让"浏览里收藏过的词"
+  // 在学习卡上显示未收藏，再点一次就同词存两条（收藏页出现同词两来源的重复项）。
+  const qcCode2 = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/QuickCardMode.tsx'), 'utf8'));
+  const dlCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/DailyLearningMode.tsx'), 'utf8'));
+  for (const [name, src] of [['复习检测', fcCode], ['快速闪卡', qcCode2], ['每日学习', dlCode]]) {
+    check(/isFavorited\(word, 'word'\) \|\| isFavorited\(word, 'vocabulary'\)/.test(src)
+      && /\(f\.type === 'word' \|\| f\.type === 'vocabulary'\) && f\.content === w\.word/.test(src),
+      `㉑d ${name} 收藏判重同时看 'word' 与 'vocabulary' 两个 type（同词两来源不许存两条）`);
+  }
+}
+
+// ── ㉒ 快速闪卡专项（2026-10-15 用户：「部分单词无法自动朗读，点击却可以」「把列表按日期整理」）──
+{
+  /**
+   * ① 自动朗读缺失：QC 原先只预热本轮前 5 张（sessionEntries.slice(0, 5)），第 6 张起
+   *    按需合成 —— sherpa 按需合成的时延造成"部分单词不自动朗读，点击却有声"
+   *    （点的时候已入缓存）。桌面 SpeechSynthesis 路径插桩复现不出（逐词都有日志）→
+   *    安卓离线引擎专属。修法 = 镜像复习检测：读当前 + 预合成下一张。
+   * ② 学习记录按本地日期分组（今天/昨天/具体日期；formatDate，禁 toISOString）。
+   * 剥注释后扫描。
+   */
+  const stripComments = (s) => s.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const qcCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/QuickCardMode.tsx'), 'utf8'));
+  check(/const nxt = queue\[idx \+ 1\];/.test(qcCode) && /tts\.prewarm\(nxt\.word, \{ rate: 0\.9 \}\)/.test(qcCode),
+    '㉒a 快速闪卡读当前 + 预合成下一张（只预热前 5 张 = 第 6 张起按需合成，安卓上"部分不读"）');
+  check(/formatDate\(new Date\(r\.at\)\)/.test(qcCode) && /今天/.test(qcCode) && /昨天/.test(qcCode),
+    '㉒b 学习记录按本地日期分组（formatDate，今天/昨天/具体日期；禁 toISOString 错天）');
+  check(!/toISOString/.test(qcCode), '㉒b 快速闪卡不使用 toISOString（东八区凌晨错天）');
 }
 
 console.log('');console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
