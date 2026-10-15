@@ -646,7 +646,9 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/<WordChip/.test(qc), '词表用带星标的词片');
   check(/function WordChip\(/.test(qc) && /onToggleFav/.test(qc), 'WordChip 支持收藏');
   check(/function FavoritesPanel\(/.test(qc), '有收藏面板');
-  check(/只练收藏的词/.test(qc), '收藏可单独成组重练');
+  // 2026-10-15 重推：收藏练习从「只练收藏的词」单按钮升级为「词数档位 + 轮转去重」，
+  // 起跑入口仍在（正对照是 onDrill 接线 + 档位 chips，见 ㉓a）
+  check(/FAV_ROUND_SIZES/.test(qc) && /onDrill=\{drillFavorites\}/.test(qc), '收藏可单独成组重练（词数档位 + 起跑接线）');
   check(/const drillFavorites = useCallback/.test(qc), '收藏重练回调存在');
   check(/收藏\{favWords\.length > 0 \? ` \$\{favWords\.length\}` : ''\}/.test(qc), '顶栏收藏入口带数量');
   const favPage = readFileSync(join(ROOT, 'src/pages/FavoritesPage/FavoritesPage.tsx'), 'utf8');
@@ -1212,6 +1214,84 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/formatDate\(new Date\(r\.at\)\)/.test(qcCode) && /今天/.test(qcCode) && /昨天/.test(qcCode),
     '㉒b 学习记录按本地日期分组（formatDate，今天/昨天/具体日期；禁 toISOString 错天）');
   check(!/toISOString/.test(qcCode), '㉒b 快速闪卡不使用 toISOString（东八区凌晨错天）');
+}
+
+// ── ㉓ 四件新事（2026-10-15 用户需求批）──
+{
+  /**
+   * ㉓a 收藏练习分批轮转：词数档位（10/20/50/100/全部）+ 练过的下一轮不再重复。
+   * ㉓b 已学单词清单：复习检测概览「词书掌握度」块可展开已学词（分页，不一次铺完）。
+   * ㉓c 中译英第 8 模式：看中文拼/选英文；已学词到期优先冻结队列；对 q4/错 q1 首答写 SM-2。
+   * ㉓d 统一进度口径：浏览「已记」同步 SM-2（markLearned，不计今日复习量）；掌握度统计排除屏蔽词。
+   * 剥注释后扫描；轮转与判定的关键行为靠锚点切片（声明→deps）防"删功能换绿"。
+   */
+  const stripComments = (s) => s.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const qcCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/QuickCardMode.tsx'), 'utf8'));
+  const qchCode = stripComments(readFileSync(join(ROOT, 'src/lib/quickcard-history.ts'), 'utf8'));
+  const fcCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/FlashcardMode.tsx'), 'utf8'));
+  const dvpCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx'), 'utf8'));
+  const c2eCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/ChineseToEnglishMode.tsx'), 'utf8'));
+  const uwlCode = stripComments(readFileSync(join(ROOT, 'src/lib/use-word-learning.ts'), 'utf8'));
+
+  // ㉓a 收藏练习轮转
+  check(/const FAV_ROUND_SIZES = \[10, 20, 50, 100, 0\] as const;/.test(qcCode),
+    '㉓a 收藏练习有词数档位（10/20/50/100/0=全部；0 档保留旧"一次练完"行为不削弱入口）');
+  check(/words\.filter\(\(w\) => !favSeen\.includes\(w\)\)/.test(qcCode),
+    '㉓a 分批只从没练过的收藏里取（favSeen 过滤 = 下一轮不重复同一批）');
+  check(/saveFavSeen\(nextSeen\); setFavSeen\(nextSeen\);/.test(qcCode) && /words\.every\(\(w\) => seenSet\.has\(w\)\) \? \[\] : \[\.\.\.seenSet\]/.test(qcCode),
+    '㉓a 起跑即记轮转指针 + 收藏全部练过自动清空从头再转');
+  check(/export function listFavSeen/.test(qchCode) && /export function saveFavSeen/.test(qchCode) && /export function resetFavSeen/.test(qchCode),
+    '㉓a 轮转指针存储三件套（quickcard-history，独立键不混留档语义）');
+  check(/FAV_SEEN_KEY = '__nativethink_quickcard_fav_seen'/.test(qchCode),
+    '㉓a 轮转指针独立存储键（不走 MAX_RUNS 滚动淘汰窗口）');
+  check(/已轮转 \{words\.length - remaining\}\/\{words\.length\}/.test(qcCode) && /重置轮转/.test(qcCode),
+    '㉓a 面板可见轮转进度与重置入口（指针不是黑箱）');
+
+  // ㉓b 已学单词清单
+  check(/const \[showLearnedList, setShowLearnedList\]/.test(fcCode) && /已学单词清单 · \{learnedList\.length\}/.test(fcCode),
+    '㉓b 复习检测概览有已学单词清单（默认折叠，点开列出）');
+  check(/\.filter\(\(p\) => !p\.suspended\)/.test(fcCode) && /arr\.sort\(\(a, b\) => a\.wordKey\.localeCompare\(b\.wordKey\)\)/.test(fcCode),
+    '㉓b 清单非屏蔽词按词面排序（屏蔽词有自己的出口，不混进清单）');
+  check(/learnedList\.slice\(0, learnedListLimit\)/.test(fcCode) && /显示更多（还有 \{learnedList\.length - learnedListLimit\} 个）/.test(fcCode),
+    '㉓b 清单分页展开（整书几千词不许一次铺进 DOM）');
+
+  // ㉓c 中译英第 8 模式
+  check(/\{ key: 'c2e', label: '中译英'/.test(dvpCode) && /<TabsContent value="c2e"[\s\S]{0,60}<ChineseToEnglishMode level=\{selectedLevel\} \/>/.test(dvpCode),
+    '㉓c 词汇页 MODES 注册 c2e + TabsContent 挂载（挂了才点得到）');
+  check(/import ChineseToEnglishMode from '\.\/components\/ChineseToEnglishMode';/.test(dvpCode),
+    '㉓c 组件 import 在场（正对照：不是只写了标签）');
+  check(/sort\(\(a, b\) => a\.nextReview - b\.nextReview\)/.test(c2eCode) && /setQueue\(entries\)/.test(c2eCode),
+    '㉓c 队列=已学词到期优先，起跑时冻结（评分不改本轮顺序）');
+  check(/recordReview\(cw, ok \? 4 : 1\)/.test(c2eCode),
+    '㉓c 作答写 SM-2：对 q4 / 错 q1（中译英与复习系统同进度）');
+  check(/setResults\(\(prev\) => \{ const next = \[\.\.\.prev\]; next\[idx\] = ok;/.test(c2eCode) && /if \(!cw \|\| revealed\) return;/.test(c2eCode),
+    '㉓c 首答为准（revealed 守卫 = 回看/重复提交不重写）');
+  check(/normalize\(typed\) === normalize\(cw\.word\)/.test(c2eCode) && /(function normalize\(s: string\)|const normalize = \(s: string\))/.test(c2eCode),
+    '㉓c 拼写判定走归一化（大小写不敏感、空格折叠）');
+  check(/queryWords\(\{ level: level === 'all' \? undefined : level \}\)/.test(c2eCode),
+    '㉓c 选择题干扰项取同词书池（跨书抽词会超出学习范围）');
+  check(/vocab_c2e_session_/.test(c2eCode) && /safeStorage\.(getItem|setItem)\(SESS_KEY\)/.test(c2eCode) && /raw\.index < 0 \|\| raw\.index >= raw\.order\.length/.test(c2eCode),
+    '㉓c 断点按 level 分键走 safeStorage + 下标越界作废');
+  check(!/toast/.test(c2eCode), '㉓c 中译英零提示（练习界面不许弹 toast）');
+  check(/addStudyMinutes\(0\.2, 'vocabulary'\)/.test(c2eCode), '㉓c 每题计学习时长（vocabulary 域，与闪卡同参）');
+
+  // ㉓d 统一进度口径
+  check(/const markLearned = \(word: IWordEntry\) =>/.test(uwlCode) && /markLearned,/.test(uwlCode),
+    '㉓d use-word-learning 暴露 markLearned（浏览「已记」纳入 SM-2 的单点）');
+  {
+    const mkStart = uwlCode.indexOf('const markLearned = (word: IWordEntry) =>');
+    const mkEnd = uwlCode.indexOf('const resetProgress', mkStart + 1);
+    const body = mkStart >= 0 && mkEnd > mkStart ? uwlCode.slice(mkStart, mkEnd) : '';
+    check(body.length > 200, `㉓d 脚手架自检：抓到 markLearned 函数体（实际 ${body.length} 字符）`);
+    check(!/todayReviewed/.test(body) && !/bumpHistory/.test(body),
+      '㉓d markLearned 不计今日复习量/历史（词表点一下「已记」不是一次复习动作）');
+    check(/if \(!sourceState\.progress\[key\]\)/.test(body) && /if \(prev\.progress\[key\]\) return prev;/.test(body),
+      '㉓d 已有 SM-2 进度的词不动（别处学过的那份更权威）');
+  }
+  check(/const marking = !memorizedWords\.has\(key\);/.test(dvpCode) && /if \(e\) markLearned\(e\);/.test(dvpCode),
+    '㉓d 浏览标记「已记」同步 SM-2（marking 在 updater 外算 —— updater 非同步）');
+  check(/if \(p\.suspended\) \{ suspended\+\+; continue; \}/.test(fcCode),
+    '㉓d 掌握度分布排除已屏蔽词（与 dueForReview 口径一致）');
 }
 
 console.log('');console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);

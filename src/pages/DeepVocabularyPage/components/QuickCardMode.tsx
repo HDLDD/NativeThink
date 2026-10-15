@@ -44,12 +44,15 @@ import { useFavorites, isWordFavType, type IFavoriteItem } from '@/lib/use-favor
 import {
   absorbQuickCardRun, useQuickCardRuns,
   loadQuickCardSession, saveQuickCardSession, clearQuickCardSession,
+  listFavSeen, saveFavSeen, resetFavSeen,
   type IQuickCardRun, type IQuickCardWordResult, type IQuickCardPending,
 } from '@/lib/quickcard-history';
 
 const ROUND_SIZES = [10, 20, 50, 100] as const;
 /** 0 = 不限量（整本）——「单词上限解开」 */
 const ROUND_ALL = 0;
+/** 收藏练习的每轮词数档位（0 = 全部，即旧行为一次练完） */
+const FAV_ROUND_SIZES = [10, 20, 50, 100, 0] as const;
 /** 答错的词隔几张卡重新插回队列（与复习检测的即时巩固同参） */
 const RELEARN_GAP = 4;
 /** 同一个词一轮最多重排几次，防止一个词反复出现拖长一轮 */
@@ -158,7 +161,11 @@ export default function QuickCardMode({ level }: { level: string }) {
   const { runs, pending, remove: removeRun } = useQuickCardRuns(level);
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
 
-  /** 收藏的词（与收藏页同源，用于「只练收藏的词」与卡片上的 ★ 态）—— 词族口径：
+  /** 收藏练习的轮转指针（已练过的词面）与每轮词数档位 —— 持久化在 quickcard-history */
+  const [favSeen, setFavSeen] = useState<string[]>(() => listFavSeen());
+  const [favRound, setFavRound] = useState<number>(10);
+
+  /** 收藏的词（与收藏页同源，用于收藏练习与卡片上的 ★ 态）—— 词族口径：
    *  'word' 与 'vocabulary'（词库浏览来源）都算，否则跨来源收藏的词在面板里隐身 */
   const favWords = useMemo(() => favorites.filter((f) => isWordFavType(f.type)), [favorites]);
   const isFav = useCallback((word: string) => isFavorited(word, 'word') || isFavorited(word, 'vocabulary'), [isFavorited]);
@@ -575,8 +582,33 @@ export default function QuickCardMode({ level }: { level: string }) {
     setDetailWord(hit);
   }, [queue]);
 
-  /** 只练收藏的词 —— 收藏的真正用途：把"我特意存下来的词"单独过一遍 */  const drillFavorites = useCallback((words: string[]) => {
-    const entries = words
+  /**
+   * 练收藏的词 —— 收藏的真正用途：把"我特意存下来的词"单独过一遍。
+   *
+   * 分批轮转（#101）：size=0（全部）保持旧行为一次练完；size>0 时**只从没练过的收藏里取**
+   * 前 size 个 —— 练过的记进 favSeen（持久化），下一轮不再重复；剩下的不够一批时
+   * 就练完剩下的短批次，收藏全练过一轮后指针自动清空、从头再转。
+   * 起跑前就记 seen（而不是跑完再记）：中途退出这批也算"已轮过"，重进拿到的是下一批；
+   * 想重练特定批走「学习记录」的重练入口，想从头轮转用面板上的「重置轮转」。
+   */
+  const drillFavorites = useCallback((words: string[], size: number) => {
+    let pickedWords: string[];
+    if (size <= 0 || size >= words.length) {
+      pickedWords = [...words];
+    } else {
+      let remaining = words.filter((w) => !favSeen.includes(w));
+      if (remaining.length === 0) {
+        saveFavSeen([]); setFavSeen([]);
+        remaining = [...words];
+      }
+      pickedWords = remaining.slice(0, size);
+    }
+    const seenSet = new Set(favSeen);
+    for (const w of pickedWords) seenSet.add(w);
+    // 收藏全部练过 → 新一轮从头开始（指针清空）
+    const nextSeen = words.length > 0 && words.every((w) => seenSet.has(w)) ? [] : [...seenSet];
+    saveFavSeen(nextSeen); setFavSeen(nextSeen);
+    const entries = pickedWords
       .map((w) => findWord(w) ?? queryWords({ search: w, limit: 1 })[0])
       .filter((w): w is IWordEntry => !!w);
     if (entries.length === 0) { toast.info('收藏的词在词库里找不到了', { duration: 2000 }); return; }
@@ -584,7 +616,7 @@ export default function QuickCardMode({ level }: { level: string }) {
     setPaused(false);
     setShowFavs(false);
     setShowHistory(false);
-  }, [startRun]);
+  }, [startRun, favSeen]);
 
   /**
    * 词条详情弹窗 —— **三个分支（进行中 / 完成页 / 起跑页）都要渲染它**。
@@ -603,7 +635,11 @@ export default function QuickCardMode({ level }: { level: string }) {
   const favoritesPanel = (
     <FavoritesPanel
       words={favWords}
+      favSeen={favSeen}
+      favRound={favRound}
+      onFavRoundChange={setFavRound}
       onDrill={drillFavorites}
+      onResetRotation={() => { saveFavSeen([]); setFavSeen([]); }}
       onRemove={(word) => { const e = findWord(word); if (e) toggleFav(e); }}
       onSpeak={speak}
       onOpen={(word) => openDetail(word)}
@@ -852,15 +888,7 @@ export default function QuickCardMode({ level }: { level: string }) {
         </div>
       </div>
 
-      {showFavs && (
-        <FavoritesPanel
-          words={favWords}
-          onDrill={drillFavorites}
-          onRemove={(word) => { const e = findWord(word); if (e) toggleFav(e); }}
-          onSpeak={speak}
-          onOpen={(word) => openDetail(word)}
-        />
-      )}
+      {showFavs && favoritesPanel}
 
       {showHistory && (
         <HistoryPanel
@@ -1274,16 +1302,26 @@ function WordChip({
   );
 }
 
-/** 收藏面板：收藏的词集中看 / 朗读 / 取消 / **只练收藏的词** */
+/** 收藏面板：收藏的词集中看 / 朗读 / 取消 / **分批练收藏的词**（词数档位 + 轮转去重） */
 function FavoritesPanel({
-  words, onDrill, onRemove, onSpeak, onOpen,
+  words, favSeen, favRound, onFavRoundChange, onDrill, onResetRotation, onRemove, onSpeak, onOpen,
 }: {
   words: IFavoriteItem[];
-  onDrill: (words: string[]) => void;
+  /** 已练过（本轮转中）的词面 —— 练过的排后 */
+  favSeen: string[];
+  /** 本轮词数档位（FAV_ROUND_SIZES，0=全部） */
+  favRound: number;
+  onFavRoundChange: (n: number) => void;
+  onDrill: (words: string[], size: number) => void;
+  onResetRotation: () => void;
   onRemove: (word: string) => void;
   onSpeak: (text: string) => void;
   onOpen: (word: string) => void;
 }) {
+  const remaining = words.filter((w) => !favSeen.includes(w.content)).length;
+  const planned = remaining > 0
+    ? (favRound === 0 ? words.length : Math.min(favRound, remaining))
+    : (favRound === 0 ? words.length : Math.min(favRound, words.length));
   return (
     <div className="rounded-[28px] border-2 border-amber-200/60 bg-card shadow-sm p-4 space-y-3">
       <div className="flex items-center gap-1.5">
@@ -1291,40 +1329,68 @@ function FavoritesPanel({
         <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
           我的收藏 · {words.length} 词（与「收藏」页同源）
         </span>
-        {words.length > 0 && (
-          <button
-            onClick={() => onDrill(words.map((w) => w.content))}
-            className="ml-auto px-2.5 py-1 rounded-xl bg-amber-400/15 text-amber-600 text-[10px] font-black hover:bg-amber-400/25"
-          >
-            只练收藏的词
-          </button>
-        )}
       </div>
       {words.length === 0 ? (
         <p className="text-xs text-muted-foreground/70 font-bold py-2">
           还没有收藏 —— 卡片上、词表里、词条详情里都能点 ★ 收藏，收藏的词还能单独成组重练。
         </p>
       ) : (
-        <div className="space-y-1.5 max-h-72 overflow-y-auto overscroll-contain">
-          {words.map((w) => (
-            <div key={w.id} className="flex items-center gap-2 p-2 rounded-xl border border-border/60">
-              <button onClick={() => onSpeak(w.content)} className="shrink-0 text-muted-foreground hover:text-ink-teal" title="朗读">
-                <Volume2 className="size-3.5" />
-              </button>
-              <button onClick={() => onOpen(w.content)} className="flex-1 min-w-0 text-left">
-                <p className="text-[11px] font-black italic text-foreground truncate">{w.content}</p>
-                {w.meaning && <p className="text-[10px] text-muted-foreground truncate">{w.meaning}</p>}
-              </button>
+        <>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {FAV_ROUND_SIZES.map((n) => (
               <button
-                onClick={() => onRemove(w.content)}
-                className="shrink-0 p-1 rounded-lg text-amber-500 hover:bg-amber-400/10"
-                title="取消收藏"
+                key={n}
+                onClick={() => onFavRoundChange(n)}
+                className={cn(
+                  'px-2.5 py-1 rounded-xl text-[10px] font-black border transition-colors',
+                  favRound === n
+                    ? 'bg-amber-400/20 text-amber-700 border-amber-400/40'
+                    : 'bg-muted/50 text-muted-foreground border-transparent hover:bg-muted',
+                )}
               >
-                <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                {n === 0 ? '全部' : n}
               </button>
-            </div>
-          ))}
-        </div>
+            ))}
+            <button
+              onClick={() => onDrill(words.map((w) => w.content), favRound)}
+              className="ml-auto px-2.5 py-1 rounded-xl bg-amber-400/15 text-amber-600 text-[10px] font-black hover:bg-amber-400/25"
+            >
+              练 {planned} 张
+            </button>
+          </div>
+          <p className="text-[9px] font-bold text-muted-foreground/60 leading-relaxed">
+            {remaining > 0
+              ? <>已轮转 {words.length - remaining}/{words.length} —— 练过的这轮不再重复，全部练过后从头再转。</>
+              : <>一轮收藏已全部练过，下次将从头再转。</>}
+            {favSeen.length > 0 && (
+              <button onClick={onResetRotation} className="ml-1 underline hover:text-amber-600">重置轮转</button>
+            )}
+          </p>
+          <div className="space-y-1.5 max-h-72 overflow-y-auto overscroll-contain">
+            {words.map((w) => {
+              const seen = favSeen.includes(w.content);
+              return (
+                <div key={w.id} className="flex items-center gap-2 p-2 rounded-xl border border-border/60">
+                  <button onClick={() => onSpeak(w.content)} className="shrink-0 text-muted-foreground hover:text-ink-teal" title="朗读">
+                    <Volume2 className="size-3.5" />
+                  </button>
+                  <button onClick={() => onOpen(w.content)} className="flex-1 min-w-0 text-left">
+                    <p className="text-[11px] font-black italic text-foreground truncate">{w.content}</p>
+                    {w.meaning && <p className="text-[10px] text-muted-foreground truncate">{w.meaning}</p>}
+                  </button>
+                  {seen && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-muted text-[8px] font-black text-muted-foreground">已轮过</span>}
+                  <button
+                    onClick={() => onRemove(w.content)}
+                    className="shrink-0 p-1 rounded-lg text-amber-500 hover:bg-amber-400/10"
+                    title="取消收藏"
+                  >
+                    <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );

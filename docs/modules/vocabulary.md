@@ -93,6 +93,8 @@
 | `__nativethink_daily_session_<level>` | 每日学习断点 | `DailyLearningMode.tsx:813-856` |
 | `__nativethink_quickcard_session_<level>` | 快速闪卡断点（含作答/翻面/暂停） | `quickcard-history.ts:233-237` |
 | `__nativethink_quickcard_runs` / `_pending` | 留档（≤20 轮、单轮 ≤300 词）与余数桶 | `quickcard-history.ts:18-25,129,164-206` |
+| `__nativethink_quickcard_fav_seen` | 收藏练习**轮转指针**（已练过的词面数组）—— 独立键不进 runs 留档，否则会被 MAX_RUNS 滚动淘汰截断；收藏全部练过自动清空从头再转 | `quickcard-history.ts:99-120` |
+| `__nativethink_vocab_c2e_session_<level>` | 中译英断点（order/index/results，读时校验下标越界即作废；完成后清键） | `ChineseToEnglishMode.tsx:60-95` |
 | `__nativethink_daily_quota_<level>` / `__nativethink_daily_vocab_count` | 每本今日量 / 全局默认量 | `use-word-learning.ts:23-25,195-209` |
 | `__nativethink_vocab_autospeak` | 自动发音开关，**默认开**（只有显式存 `'0'` 才算关）。2026-09-30 起**四处都读** —— 快速闪卡原先完全不读它、出卡无条件朗读，本轮补齐（门控 effect + 进度行开关）；2026-10-09 短语闪卡（第 7 模式）成为第五处 | `FlashcardMode.tsx:33,203-236`、`DailyLearningMode.tsx:34,275-318`、`QuickCardMode.tsx`（AUTO_SPEAK_KEY）、`ChunkTrainingPage.tsx:100,373-379`、`PhraseFlashcardMode.tsx:45,97-99` |
 | `__nativethink_level_memory` | 浏览位置记忆 —— **故意用裸 `localStorage`**（不经 safeStorage 就不会因登录前缀变化而"隐身"，也因此不参与云同步，见 [storage-and-stats.md](./storage-and-stats.md) §3.2/§3.4） | `DeepVocabularyPage.tsx:353-359`、`wordbank.ts:477` |
@@ -107,11 +109,33 @@
 - **「每日目标」档位即本轮补新张数（2026-10-09 用户要求「学习单词量要可调」）**：此前档位只改计数标签（今天新学 x/N），本轮写死 20，点 100 档「开始学习」仍是 20 张。现 `fillCount = Math.max(0, dailyQuota - dueCards.length - otherCards.length)`，且队列 memo 依赖含 `dailyQuota`（漏了＝改档位张数不变，得重挂载才生效）。到期（≤30）/ 已学未到期两支照旧参与，所以有复习义务时总数可能大于档位。
 - 零提示契约同一条（见注意事项 13）；守卫 `verify-vocab-cards` ⑮a-d：接线 / 懒加载去重 / 会话同构 / 存储扩展四组，变异 6 组全红；⑮c 另有「档位即补新张数」2 条断言（去掉 `dailyQuota` 或写回 20，各红 1 条）。
 
+### 中译英（第 8 模式，2026-10-15）
+
+用户需求：「再想办法弄一个给出中文拼写或者选择中文做为复习单词的功能，用以练习中文转英文的能力」。`ChineseToEnglishMode.tsx`（约 400 行）：**给中文释义，产出英文** —— 两种作答形式随时可切（四选一 / 拼写输入，拼写判定大小写不敏感 + 空格折叠）。
+
+- **队列**：本词书**已学词**（SM-2 progress，屏蔽词除外），到期优先排序，起跑时冻结；档位 10/20/50/全部。没有已学词时空态指路「每日学习」。
+- **评分**：对 q4 / 错 q1，**首答为准**（revealed 守卫），与快速闪卡同口径；每题计 0.2 分钟（vocabulary 域）；作答后朗读英文；零提示（无 toast，文件里没有 sonner import）。
+- **断点**：`__nativethink_vocab_c2e_session_<level>`（order/index/results 走 safeStorage，下标越界作废）—— 切 tab 卸载再回来能续到原题。
+- 守卫 `verify-vocab-cards` ㉓c：注册+挂载 / 冻结队列 / SM-2 写入 / 首答为准 / 判定归一化 / 同书干扰项 / 断点 / 零提示 / 计时长，9 条；变异 M6/M7 验红。
+
+### 收藏练习分批轮转（2026-10-15）
+
+用户需求：「快速闪卡对收藏单词练习也可以选择一次性练的词数 10、20、50、100 等，而不是一次性练完，但又不能重复练习同一批收藏单词」。`FavoritesPanel` 头部档位 chips（`FAV_ROUND_SIZES = [10,20,50,100,0]`，0=全部 保留旧"一次练完"行为不削弱入口）+「练 N 张」起跑；`drillFavorites` 只从**没练过的**收藏里取前 N 个，起跑即把本批记进 `__nativethink_quickcard_fav_seen`（中途退出也算已轮过，重进拿到下一批）；收藏全部练过一轮后指针自动清空从头再转；面板显示「已轮转 x/N」+「重置轮转」入口。**轮转指针必须独立键**：混进 runs 留档会被 MAX_RUNS=20 滚动淘汰截断。守卫 ㉓a 六条，变异 M1-M3 验红。
+
 ## 收藏 / 生词本 / 助记
 
 - 收藏与 `FavoritesPage` 同源（`use-favorites.ts`，键 `__nativethink_favorites`）。⚠️ **同一个"收藏单词"存两种 type**：词库浏览用 `'vocabulary'`（`DeepVocabularyPage.tsx:910`），每日学习与快速闪卡用 `'word'`（`DailyLearningMode.tsx:424-442`、`QuickCardMode.tsx:163-182`）。判重/统计必须同时看两个 type —— **2026-10-15 起全链路落实**：三处学习卡 + 词汇深度页/全局搜索/阅读器查词的星标心形都用 `isWordFavorited`（hook 导出的词族判重版）；`use-favorites` 单点加装：载入同词去重回写（`dedupeWordFavs`，存量脏数据自愈）、新增词族判重、删除词族双条目（守卫 ㉑d/㉑e/㉑f，其中 ㉑f 转译真跑）。
 - 生词本 `custom-words.ts`（键 `__nativethink_custom_words`）：阅读器收集词库未收录的词，词条 `level:'custom'`（`:106`），进度经 `SUB_LEVELS` 走独立一路；复习队列把**已有进度记录的生词本词排在队首**（`FlashcardMode.tsx:149-152`），2026-10-05 起**不再要求账号另有词库进度**，且跳过被「不再出现」屏蔽的词（见注意事项 15）。
 - 助记 `word-notes.ts`（键 `__nativethink_word_notes`）：**目前只有复习检测卡背接了线**（`FlashcardMode.tsx:1142-1165`），其它模式不显示。
+
+## 进度口径统一与已学清单（2026-10-15）
+
+用户需求：「各单词学习功能对于同一本词书采用同样的单词进度」+「显示当前学习单词进度，具体列出已经学了多少的单词」。两处改动：
+
+- **浏览「已记」纳入 SM-2**：`use-word-learning` 新增 `markLearned(word)`（`use-word-learning.ts:478-507`）—— 词表里点一下「已记」= 这个词进入 SM-2 进度（reviewing / rep=2 / 3 天后到期），复习队列与词书掌握度从此认可它；**不计** todayReviewed/todayLearned/history（词表点一下不是一次复习动作，不进每日量与本周报告）；已有 SM-2 进度的词不动（别处学过的更权威）；取消已记只撤浏览侧标记，SM-2 历史保留。`toggleMemorizedWord` 的 `marking` 必须在 updater **外**算（updater 非同步，闭包 state 在事件回调这一刻总是最新）。
+- **掌握度分布排除已屏蔽词**：`FlashcardMode` stats 把 suspended 从 mastered/learning 里剔除（与 dueForReview 口径一致），屏蔽词仍占"已学"键数；图例在屏蔽数 >0 时显示「已屏蔽 N」。
+- **已学单词清单**：复习检测概览「词书掌握度」块新增可折叠清单（`已学单词清单 · N`），非屏蔽词按词面排序 + 状态 chip；**分页展开**（一次 50 条，「显示更多」续 100）—— 整书几千词不许一次铺进 DOM（verify-list-scaling 同一条坑）。
+- 守卫 ㉓b/㉓d 七条，变异 M4/M5/M8/M9 验红。
 
 ## 注意事项
 

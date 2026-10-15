@@ -93,6 +93,31 @@ export function listSignature(words: IQuickCardWordResult[]): string {
   return words.map((w) => w.word.trim().toLowerCase()).sort().join('\u0001');
 }
 
+/**
+ * 收藏练习轮转指针（「收藏的词分批练，练过的下一轮不再重复」）。
+ *
+ * 独立键、不进 runs 留档 —— 留档是"学过什么"的历史（有 MAX_RUNS 滚动淘汰），
+ * 轮转指针是"下一批从哪开始"的游标，两者语义不同，混在一起会被淘汰窗口截断。
+ * 存词面数组（按练习顺序追加）；收藏被取消时里面的残留词在轮转计算里自然失效。
+ */
+const FAV_SEEN_KEY = '__nativethink_quickcard_fav_seen';
+
+export function listFavSeen(): string[] {
+  try {
+    const s = safeStorage.getItem(FAV_SEEN_KEY);
+    const arr = s ? JSON.parse(s) : [];
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string') : [];
+  } catch { return []; }
+}
+
+export function saveFavSeen(words: string[]): void {
+  try { safeStorage.setItem(FAV_SEEN_KEY, JSON.stringify(words)); } catch { /* quota：轮转退化为从头开始，可接受 */ }
+}
+
+export function resetFavSeen(): void {
+  try { safeStorage.removeItem(FAV_SEEN_KEY); } catch { /* ignore */ }
+}
+
 /** 落一条记录；返回写入后的记录（id/at 已补齐）。重复词表会**替换**已有条目而不是新增 */
 export function saveQuickCardRun(
   run: Omit<IQuickCardRun, 'id' | 'at'> & { id?: string; at?: number },

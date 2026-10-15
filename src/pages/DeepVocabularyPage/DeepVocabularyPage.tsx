@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
-import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, ArrowRight, Notebook, NotebookPen, BookMarked, Plane, GraduationCap, Briefcase, Award, TrendingUp, Trophy, Zap, Library, Layers, Globe, type LucideIcon } from 'lucide-react';
+import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, ArrowRight, Notebook, NotebookPen, BookMarked, Plane, GraduationCap, Briefcase, Award, TrendingUp, Trophy, Zap, Library, Layers, Globe, Languages, type LucideIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -24,6 +24,7 @@ import { usePageMemory, usePageMemoryDebounced } from '@/lib/use-page-memory';
 import DailyLearningMode from './components/DailyLearningMode';
 import FlashcardMode from './components/FlashcardMode';
 import PhraseFlashcardMode from './components/PhraseFlashcardMode';
+import ChineseToEnglishMode from './components/ChineseToEnglishMode';
 import QuickCardMode from './components/QuickCardMode';
 import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
 import CollocationsTab from './components/CollocationsTab';
@@ -89,6 +90,7 @@ const MODES: { key: string; label: string; icon: LucideIcon; color: string; desc
   { key: 'quickcard', label: '快速闪卡', icon: Zap, color: '#0EA5E9', desc: '只单词 · 认识/不认识' },
   { key: 'flashcard', label: '复习检测', icon: RotateCw, color: '#6C5CE7', desc: 'SM-2 间隔记忆复习' },
   { key: 'phrasecard', label: '短语闪卡', icon: Layers, color: '#14B8A6', desc: '九个考试短语库 · SM-2 闪卡' },
+  { key: 'c2e', label: '中译英', icon: Languages, color: '#0EA5E9', desc: '看中文拼/选英文 · 主动提取' },
   { key: 'browse', label: '词库浏览', icon: Library, color: '#64748B', desc: '自由浏览全部词汇' },
   { key: 'collocations', label: '搭配学习', icon: Link2, color: '#F59E0B', desc: '常用搭配与短语' },
   { key: 'vocabtest', label: '词汇量测试', icon: Target, color: '#EC4899', desc: '1分钟估算词汇量' },
@@ -389,16 +391,25 @@ export default function DeepVocabularyPage() {
     try { const s = safeStorage.getItem('__nativethink_browse_memorized'); return s ? new Set(JSON.parse(s)) : new Set(); }
     catch { return new Set(); }
   });
-  const toggleMemorizedWord = (word: string) => {
+  const toggleMemorizedWord = (word: string, entry?: IWordEntry) => {
+    // marking 必须在 updater 外算 —— updater 不是同步执行，闭包里的 memorizedWords
+    // 在事件处理这一刻总是最新（两处调用点都是事件回调）
+    const key = word.toLowerCase();
+    const marking = !memorizedWords.has(key);
     setMemorizedWords((prev) => {
       const next = new Set(prev);
-      const key = word.toLowerCase();
       if (next.has(key)) next.delete(key); else next.add(key);
       // 「已记住」是用户状态、不可重算 —— 写失败要说出来（warnStorageFull 全站 60s 去抖，
       // 即便 StrictMode 把这里的更新函数跑两遍也不会叠成两条 toast）
       if (!persistJson('__nativethink_browse_memorized', [...next])) warnStorageFull();
       return next;
     });
+    // 统一进度口径：浏览里标记「已记」= 这个词进入 SM-2 进度（复习队列/掌握度同步认可）；
+    // 取消已记只撤浏览侧标记，SM-2 那份学习历史保留（不能假装没学过）。
+    if (marking) {
+      const e = entry ?? queryWords({ search: word, limit: 1 })[0];
+      if (e) markLearned(e);
+    }
   };
 
   // Use pre-computed constants (avoids loading all word data just for metadata)
@@ -918,7 +929,7 @@ export default function DeepVocabularyPage() {
 
   // ── 沉浸式模式：进入某模式后隐藏其它模式入口，<- 返回模式选择 ──
   const [immersed, setImmersed] = useState(false);
-  const { dueForReview: homeDue, state: homeWordState } = useWordLearning(selectedLevel);
+  const { dueForReview: homeDue, state: homeWordState, markLearned } = useWordLearning(selectedLevel);
   /**
    * 全词书到期数（角标同源）—— 复习检测卡在「当前书没有到期」时给"其他词书 N 个到期"的
    * 兜底提示：全站口径是全部词书，而复习队列按当前书取，两者不一致时用户看到的
@@ -1185,6 +1196,10 @@ export default function DeepVocabularyPage() {
           <PhraseFlashcardMode level={selectedLevel} />
         </TabsContent>
 
+        <TabsContent value="c2e" className="mt-0">
+          <ChineseToEnglishMode level={selectedLevel} />
+        </TabsContent>
+
         <TabsContent value="browse" className="mt-0">
           <div className="grid grid-cols-12 gap-6">
             {/* Left: word list */}
@@ -1351,7 +1366,7 @@ export default function DeepVocabularyPage() {
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); toggleMemorizedWord(w.word); }}
+                                    onClick={(e) => { e.stopPropagation(); toggleMemorizedWord(w.word, w); }}
                                     title={memorized ? '取消记忆' : '标记为已记'}
                                     className={cn(
                                       'p-0.5 rounded-lg transition-colors',
@@ -1471,7 +1486,7 @@ export default function DeepVocabularyPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Button variant="ghost" size="icon"
-                            onClick={() => toggleMemorizedWord(selectedWord.word)}
+                            onClick={() => toggleMemorizedWord(selectedWord.word, selectedWord)}
                             title={memorizedWords.has(selectedWord.word.toLowerCase()) ? '取消记忆' : '标记为已记'}
                             className={cn('rounded-2xl',
                               memorizedWords.has(selectedWord.word.toLowerCase())

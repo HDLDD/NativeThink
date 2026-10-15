@@ -360,14 +360,27 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   }, [state.progress, setSuspended]);
 
   const stats = useMemo(() => {
-    let mastered = 0, learning = 0;
+    let mastered = 0, learning = 0, suspended = 0, keys = 0;
     for (const p of Object.values(state.progress)) {
+      keys++;
+      // 已屏蔽的词不算进掌握度分布（与 dueForReview 的口径一致：屏蔽 = 暂不参与），
+      // 但它仍占"已学"键数 —— 未学数不能把屏蔽词算回去
+      if (p.suspended) { suspended++; continue; }
       if (p.status === 'mastered') mastered++;
       else if (p.status === 'reviewing' || p.status === 'learning') learning++;
     }
-    const unstarted = Math.max(0, totalForLevel - Object.keys(state.progress).length);
-    return { mastered, learning, new: unstarted, total: totalForLevel, due: dueForReview.length };
+    const unstarted = Math.max(0, totalForLevel - keys);
+    return { mastered, learning, new: unstarted, total: totalForLevel, due: dueForReview.length, suspended };
   }, [state.progress, totalForLevel, dueForReview.length]);
+
+  /** 已学单词清单（#102）：非屏蔽的进度词，按词面排；列表分页展示（长清单不许一次铺完） */
+  const [showLearnedList, setShowLearnedList] = useState(false);
+  const [learnedListLimit, setLearnedListLimit] = useState(50);
+  const learnedList = useMemo(() => {
+    const arr = Object.values(state.progress).filter((p) => !p.suspended);
+    arr.sort((a, b) => a.wordKey.localeCompare(b.wordKey));
+    return arr;
+  }, [state.progress]);
 
   const flip = useCallback(() => { setFlipped((f) => { if (!f) addStudyMinutes(0.2, 'vocabulary'); return !f; }); }, [addStudyMinutes]);
 
@@ -803,8 +816,53 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-[#00B894] inline-block" />已掌握 {stats.mastered}</span>
             <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-amber-400 inline-block" />学习中 {stats.learning}</span>
             <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-muted-foreground/30 inline-block" />未学 {stats.new}</span>
+            {stats.suspended > 0 && <span className="text-muted-foreground/60">已屏蔽 {stats.suspended}</span>}
             <span className="ml-auto">共 {stats.total.toLocaleString()}</span>
           </div>
+          {/*
+            已学单词清单（#102）：点开列出这本书已学过哪些词。分页展开
+            （一次 50 条，点「显示更多」续 100）—— 整本书几千词不能一次铺进 DOM。
+          */}
+          <button
+            onClick={() => setShowLearnedList((v) => !v)}
+            className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/40 hover:bg-muted/70 text-[10px] font-black text-muted-foreground transition-colors"
+          >
+            <span>已学单词清单 · {learnedList.length}</span>
+            {showLearnedList ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+          </button>
+          {showLearnedList && (
+            <div className="space-y-1">
+              {learnedList.length === 0 ? (
+                <p className="text-[10px] text-muted-foreground/70 font-bold py-2 text-center">这本书还没有已学的单词</p>
+              ) : (
+                <>
+                  {learnedList.slice(0, learnedListLimit).map((p) => (
+                    <div key={p.wordKey} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-muted/30">
+                      <span className="text-[11px] font-black italic text-foreground truncate">{p.wordKey}</span>
+                      <span
+                        className={
+                          'ml-auto shrink-0 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ' +
+                          (p.status === 'mastered'
+                            ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600'
+                            : 'bg-amber-50 dark:bg-amber-500/15 text-amber-600')
+                        }
+                      >
+                        {p.status === 'mastered' ? '已掌握' : p.status === 'reviewing' ? '复习中' : '学习中'}
+                      </span>
+                    </div>
+                  ))}
+                  {learnedList.length > learnedListLimit && (
+                    <button
+                      onClick={() => setLearnedListLimit((l) => l + 100)}
+                      className="w-full py-1.5 rounded-lg border border-dashed border-border text-[10px] font-black text-muted-foreground hover:bg-muted/40"
+                    >
+                      显示更多（还有 {learnedList.length - learnedListLimit} 个）
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 未来 7 天复习负担 + 已屏蔽出口 —— 预期管理，避免"怎么又来一堆"的挫败 */}

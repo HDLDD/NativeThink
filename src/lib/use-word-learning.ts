@@ -475,6 +475,36 @@ export function useWordLearning(level: string) {
     });
   };
 
+  /**
+   * 浏览里标记「已记」→ 把这个词纳入 SM-2 进度（统一口径：已学就是已学，不分入口）。
+   *
+   * 与 recordReview 的区别：**不计** todayReviewed / todayLearned / history ——
+   * 用户在词表里点一下「已记」不是一次复习动作，不该进每日量与本周报告；
+   * 只写 progress（词书掌握度、复习队列从此把它当已学词对待）。
+   * 已有进度的词不动（用户可能在别的模式已经学过，那份 SM-2 更权威）。
+   * 未学词给一个"自认已记"的默认排期：repetitions=2 / interval=3，3 天后进复习队列。
+   */
+  const markLearned = (word: IWordEntry) => {
+    const key = wordKey(word);
+    const base: IWordProgress = {
+      wordKey: key, status: 'reviewing', easeFactor: 2.5, interval: 3, repetitions: 2,
+      nextReview: Date.now() + 3 * 24 * 60 * 60 * 1000, lastReview: Date.now(),
+    };
+    // For 'all' mode: persist to the word's source level so per-level data stays accurate
+    if (isAllLevels) {
+      const sourceLevel = word.level && WORDBANK_LEVELS.includes(word.level) ? word.level : (word.level === 'custom' ? 'custom' : 'cet4');
+      const sourceState = loadState(sourceLevel);
+      if (!sourceState.progress[key]) {
+        sourceState.progress[key] = base;
+        saveState(sourceLevel, sourceState);
+      }
+    }
+    setState((prev) => {
+      if (prev.progress[key]) return prev;
+      return { ...prev, progress: { ...prev.progress, [key]: base } };
+    });
+  };
+
   const resetProgress = () => {
     const empty = { progress: {}, todayLearned: [], todayReviewed: [], lastActiveDate: todayKey() };
     if (isAllLevels) {
@@ -511,6 +541,7 @@ export function useWordLearning(level: string) {
     knownKeys,
     getNewWords,
     recordReview,
+    markLearned,
     resetProgress,
     resetLevelProgress,
     wordKey,
