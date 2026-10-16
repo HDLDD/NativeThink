@@ -2,7 +2,7 @@
 // Data files are dynamically imported per-level. Components preload via `preloadLevel()` / `preloadAll()`
 // then use sync wrappers once `isLevelReady()` returns true.
 import type { IWordEntry, IWordQuery, IWordDetailMap } from './schema';
-import { idbGet, idbSet } from '@/lib/idb';
+import { idbGet, idbSet, idbHas, idbDelete } from '@/lib/idb';
 
 // ── Pre-computed constants (no data loading needed) ──
 // 计数表只有一个来源：meta.ts（词书卡片、进度分母、快速闪卡概览都用它）。
@@ -136,9 +136,42 @@ function ensureIndexes() {
   _indexesDirty = false;
 }
 
+/**
+ * 旧时代 localStorage 镜像清理。
+ *
+ * 「无条件双写」年代给每本词书都在 localStorage 留了一份 0.5~1.5MB 的镜像；
+ * 自 IDB 优先后这些镜像**只在 IDB 挂掉时才有人读**，但旧装机上它们不会自己消失 ——
+ * 实测一台真机 5MB 配额被 wb_ 与 wbd_ 两族镜像吃到顶格（总计 5,120KB，连 100KB 探测都写不进），
+ * 用户数据（收藏/进度）的新增写入全部静默失败。这里在 IDB 探活成功时把
+ * **IDB 里已有对应缓存**的镜像删掉（没有的不删 —— 那还是它唯一的兜底，等下次命中迁移）。
+ */
+let _purgeStarted = false;
+function purgeLsMirrorsIfIdbHealthy(): void {
+  if (_purgeStarted) return;
+  _purgeStarted = true;
+  void (async () => {
+    let idbOk = false;
+    try {
+      await idbSet(`${IDB_PREFIX}__quota_probe`, 1);
+      idbOk = true;
+    } catch { /* IDB 不可用 → 兜底镜像还有用，保留 */ }
+    try { await idbDelete(`${IDB_PREFIX}__quota_probe`); } catch { /* ignore */ }
+    if (!idbOk) return;
+    for (const level of ALL_LEVELS) {
+      try {
+        if (await idbHas(`${IDB_PREFIX}${level}`)) localStorage.removeItem(`${LS_PREFIX}${level}`);
+      } catch { /* ignore */ }
+      try {
+        if (await idbHas(`${DETAIL_IDB_PREFIX}${level}`)) localStorage.removeItem(`${DETAIL_LS_PREFIX}${level}`);
+      } catch { /* ignore */ }
+    }
+  })();
+}
+
 async function loadCore(level: string): Promise<void> {
   if (_loaded.has(level)) return;
   if (_loading.has(level)) { await _loading.get(level); return; }
+  purgeLsMirrorsIfIdbHealthy();
 
   // ── Fast path: try IndexedDB/localStorage (instant on repeat visits) ──
   const cached = await loadFromCache(level);

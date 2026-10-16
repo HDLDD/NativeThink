@@ -462,12 +462,25 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
       // 网络不可用时仍能出声。开着「只用系统引擎」时只走离线通道。
       // 内置引擎被闪退护栏停用时，不把它排进候选（否则每次都白试一遍）
       const piperOk = isSherpaAvailable() && !isBundledEngineDisabled();
+      /**
+       * 单词级短朗读（闪卡自动读词 / 点喇叭）：**联网时云端优先**。
+       * 包内两个离线模型有单词级发音缺陷（2026-10-16 PC 上用包内同款模型 + ASR 回转写定量实测：
+       * Kokoro 读 "stuff" 在 /s/ 前插浊音段（ASR 听成 "This stuff"）、"input" 读成 "import"，
+       * 54 个音色只有 1 个过三项起首测试；lessac 把 "study" 读成 "Sorry"）—— 音素输入是对的，
+       * 是小模型合成质量问题，注音表/文本变体都救不了。单词就几个字节，云端缓存
+       * （FIFO 400 条）让重复朗读秒出；失败自动落回离线链。例句/长文本仍离线优先：
+       * 往返时延与流式稳定性不值当，且长句没有这些问题。
+       */
+      const shortWordRead = chunks.length === 1
+        && chunks[0].trim().length <= 24
+        && typeof navigator !== 'undefined' && navigator.onLine !== false;
+      const cloudFirst = wantsOnlineVoice || shortWordRead;
       const engines: Array<'piper' | 'native' | 'cf' | 'edge' | 'google'> = IS_ANDROID_NATIVE
         ? (settings.preferNative
           // 「只用系统引擎」必须真的只用系统引擎：内置引擎一旦不可用（含原生线程耗尽导致的
           // 闪退）用户就会打开这个开关来避开它，若仍把 piper 排第一就完全避不开。
           ? ['native']
-          : (wantsOnlineVoice
+          : (cloudFirst
             ? (piperOk ? ['cf', 'piper', 'native', 'edge', 'google'] : ['cf', 'native', 'edge', 'google'])
             : (piperOk ? ['piper', 'native', 'cf', 'edge', 'google'] : ['native', 'cf', 'edge', 'google'])))
         : ['cf', 'edge', 'google'];

@@ -36,8 +36,13 @@ const tr = (src) => ts.transpileModule(src, {
 
 // ── wordbank.ts：桩掉 idb，补齐动态导入扩展名，逻辑不改 ──
 let wb = fs.readFileSync(path.join(ROOT, 'wordbank.ts'), 'utf8');
-wb = wb.replace(/^import \{ idbGet, idbSet \} from '@\/lib\/idb';$/m,
-  'const idbGet = async () => null; const idbSet = async () => {};');
+if (!/import \{ idbGet, idbSet, idbHas, idbDelete \} from '@\/lib\/idb';/.test(wb)) {
+  console.error('脚手架错误：wordbank 的 idb import 形状变了（桩只覆盖 idbGet/idbSet/idbHas/idbDelete）');
+  process.exit(2);
+}
+// 默认桩：idb「健康但空」—— get 返回 null（缓存未命中）、has 返回 false、set/delete 成功
+wb = wb.replace(/^import \{ idbGet, idbSet, idbHas, idbDelete \} from '@\/lib\/idb';$/m,
+  'const idbGet = async () => null; const idbSet = async () => {}; const idbHas = async () => false; const idbDelete = async () => {};');
 // meta.ts 是纯常量（无数据依赖），照样桩成 .mjs 再导入
 fs.writeFileSync(path.join(OUT, 'meta.mjs'),
   tr(fs.readFileSync(path.join(ROOT, 'meta.ts'), 'utf8')));
@@ -207,8 +212,15 @@ ok(retriedOk === false,
   fs.copyFileSync(path.join(OUT, 'meta.mjs'), path.join(noIdbDir, 'meta.mjs'));
   fs.cpSync(path.join(OUT, 'data'), path.join(noIdbDir, 'data'), { recursive: true });
   const srcNoIdb = fs.readFileSync(path.join(OUT, 'wordbank.mjs'), 'utf8')
-    .replace(/const idbGet = async \(\) =>[^;]*;\s*const idbSet = async \(\) =>[^;]*;/,
-      'const idbGet = async () => { throw new Error("no idb"); }; const idbSet = async () => { throw new Error("no idb"); };');
+    .replace(/const idbGet = async \(\) =>[^;]*;\s*const idbSet = async \(\) =>[^;]*;\s*const idbHas = async \(\) =>[^;]*;\s*const idbDelete = async \(\) =>[^;]*;/,
+      [
+        'const idbGet = async () => { throw new Error("no idb"); };',
+        'const idbSet = async () => { throw new Error("no idb"); };',
+        // idbHas 故意报"有货"：模拟 IDB **部分故障**（探活写失败但查询成功）——
+        // 只有 purge 的「探活失败必须提前返回」护得住这种形态，绕过它就会误删唯一兜底
+        'const idbHas = async () => true;',
+        'const idbDelete = async () => {};',
+      ].join(' '));
   ok(/throw new Error\("no idb"\)/.test(srcNoIdb),
     '脚手架自检：IDB 桩确实换成了"抛错"版（没换就等于没测兜底）');
   fs.writeFileSync(path.join(noIdbDir, 'wordbank-noidb.mjs'), srcNoIdb);
@@ -218,6 +230,35 @@ ok(retriedOk === false,
   const fallbackKeys = [...store.keys()].filter((k) => /__nativethink_wb_/.test(k));
   ok(fallbackKeys.length > 0 && store.size > before,
     '正对照：IDB 不可用时仍回写 localStorage（兜底没被顺手删掉）', fallbackKeys.join(','));
+  ok(fallbackKeys.every((k) => store.has(k)),
+    'IDB 不可用时旧镜像不被清理（purge 在探活失败时必须提前返回）');
+
+  // ── ⑧ 旧镜像清理：IDB 健康 + IDB 里已有该级缓存 → 对应 localStorage 镜像删除 ──
+  // 实测真机：旧「无条件双写」年代的镜像把 5MB 配额吃到顶格（连 100KB 探测都写不进），
+  // 收藏/进度的新增写入全部静默失败 —— 镜像只是缓存，IDB 有货就该让位给用户数据。
+  {
+    const purgeDir = path.join(OUT, 'purge');
+    fs.mkdirSync(purgeDir, { recursive: true });
+    fs.cpSync(path.join(OUT, 'data'), path.join(purgeDir, 'data'), { recursive: true });
+    fs.copyFileSync(path.join(OUT, 'meta.mjs'), path.join(purgeDir, 'meta.mjs'));
+    const srcPurge = fs.readFileSync(path.join(OUT, 'wordbank.mjs'), 'utf8')
+      .replace('const idbHas = async () => false;',
+        'const idbHas = async (k) => !String(k).includes("__quota_probe");');
+    ok(/includes\("__quota_probe"\)/.test(srcPurge),
+      '脚手架自检：purge 变体的 idbHas 桩已换成"IDB 有货"版');
+    fs.writeFileSync(path.join(purgeDir, 'wordbank-purge.mjs'), srcPurge);
+    // 种三面"旧镜像"：两本 IDB 里有的（该删）+ 一个不在词书清单里的键（不该误伤）
+    store.set('__nativethink_wb_zhongkao', '{"v":1,"d":[]}');
+    store.set('__nativethink_wbd_cet4', '{"v":1,"d":{}}');
+    store.set('__nativethink_wb_not_a_level', '{"v":1,"d":[]}');
+    const m3 = await import(pathToFileURL(path.join(purgeDir, 'wordbank-purge.mjs')).href);
+    await m3.preloadCoreOnly(['zhongkao']);
+    await new Promise((r) => setTimeout(r, 50)); // purge 是 fire-and-forget，给它一个微任务回合
+    ok(!store.has('__nativethink_wb_zhongkao') && !store.has('__nativethink_wbd_cet4'),
+      'IDB 已有对应缓存时，旧 localStorage 镜像被清理（给用户数据让出配额）');
+    ok(store.has('__nativethink_wb_not_a_level'),
+      '清理只按词书清单枚举，清单外的同名前缀键不误伤');
+  }
 }
 
 let failed = 0;

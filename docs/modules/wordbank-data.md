@@ -5,6 +5,12 @@
 > 守卫：`node scripts/verify-wordbank-loading.mjs`（49 项）+ `node scripts/verify-wordbank-split.mjs --check <baseline.json>`
 > 最后校准：2026-10-13
 
+## 旧镜像清理（2026-10-16，"无法收藏"的底层根因）
+
+真机实测：一台设备的 localStorage 被旧「无条件双写」年代的词库镜像吃到 **5MB 配额顶格**（wb_cet4 1476KB / wb_zhongkao 1124KB / wbd_gaokao 991KB / wbd_zhongkao 587KB / wbd_professional 484KB，总计 5,120KB，**连 100KB 探测都写不进**）—— 收藏/学习进度等用户数据的新增写入全部静默失败（`safeStorage.setItem` 返回 false）。IDB 优先后这些镜像**只在 IDB 挂掉时才有人读**，但旧装机上不会自己消失。
+
+修法（`wordbank.ts` `purgeLsMirrorsIfIdbHealthy`，`loadCore` 首次触发，fire-and-forget）：IDB 探活（set+delete 一个 probe 键）成功时，遍历 `ALL_LEVELS`，**IDB 里已有对应缓存**的 `wb_*`/`wbd_*` LS 镜像删掉；没有的不删（那是它唯一兜底，等 LS 命中迁移）；清单外的同名前缀键不误伤。守卫 `verify-wordbank-loading` ⑧（49→**53**）：清理生效 / 清单外不误伤 / IDB 不可用（含"探活失败但 idbHas 报有货"的**部分故障**形态）不清理，变异 M1（不触发）/M2（绕过提前返回）各红 1 条。
+
 ## 数据是怎么摆的
 
 11 个等级（中考 / 高考 / 四级 / 六级 / **四六级高频** / **四六级高分** / 雅思 / 托福 / 考研 / 专业 / 高阶），每等级两个文件：
