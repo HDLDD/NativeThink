@@ -59,6 +59,40 @@ export function dedupeWordFavs(items: IFavoriteItem[]): IFavoriteItem[] {
   return out;
 }
 
+/**
+ * 读盘边界的形状清洗（2026-10-17）。收藏是全站**唯一不做形状校验的清单加载器**，
+ * 而它的数据有两条外部来源：`__nativethink_favorites_v2` 旧键迁移、云同步下行。
+ * 渲染层是 `{f.content}` 直出 + `cleanText(f.example)`（对非字符串直接 `.replace` 抛错），
+ * 所以字段形状一坏就是**整页白屏**（ErrorBoundary 接走），不是某条显示异常。
+ * 口径照 `correction-notes.ts` 的 read()：条目不合法就丢出视图（不删存储），文本一律收成字符串。
+ */
+function asText(v: unknown): string {
+  return typeof v === 'string' ? v : typeof v === 'number' || typeof v === 'boolean' ? String(v) : '';
+}
+
+export function sanitizeFavorites(raw: unknown): IFavoriteItem[] {
+  if (!Array.isArray(raw)) return [];
+  const out: IFavoriteItem[] = [];
+  for (const f of raw) {
+    if (!f || typeof f !== 'object') continue;
+    const it = f as Record<string, unknown>;
+    if (typeof it.id !== 'string') continue;
+    const content = asText(it.content);
+    if (!content) continue;
+    const item: IFavoriteItem = {
+      id: it.id,
+      type: asText(it.type) as IFavoriteItem['type'],
+      content,
+      meaning: asText(it.meaning),
+      category: asText(it.category),
+      createdAt: Number(it.createdAt) || 0,
+    };
+    if (it.example !== undefined && it.example !== null) item.example = asText(it.example);
+    out.push(item);
+  }
+  return out;
+}
+
 export function useFavorites() {
   const [favorites, setFavorites] = useState<IFavoriteItem[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -67,10 +101,13 @@ export function useFavorites() {
     try {
       const saved = safeStorage.getItem(FAVORITES_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved) as IFavoriteItem[];
-        // 同词双条目去重（词族口径）—— 存在脏数据就回写，不派事件（防 reload 循环）
-        const cleaned = dedupeWordFavs(parsed);
-        if (cleaned.length !== parsed.length) {
+        const raw = JSON.parse(saved) as unknown;
+        const rawArr = Array.isArray(raw) ? raw : [];
+        // 形状清洗 + 同词双条目去重 —— **只在条目数变了**才回写（存量脏数据自愈）：
+        // 字段类型修正不改条数，而重建对象会重排键序，按序列化比较会每次挂载都写盘。
+        // 视图内存里的形状已经是干净的，存储那份等下一次收藏增删（persist 写的是清洗后的 state）自愈。
+        const cleaned = dedupeWordFavs(sanitizeFavorites(raw));
+        if (Array.isArray(raw) && cleaned.length !== rawArr.length) {
           try { safeStorage.setItem(FAVORITES_KEY, JSON.stringify(cleaned)); } catch { /* ignore */ }
         }
         setFavorites(cleaned);

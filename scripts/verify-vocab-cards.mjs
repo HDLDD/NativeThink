@@ -1170,8 +1170,8 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '㉑e addFavorite 词族判重（跨来源收藏不再同词存两条）');
   check(/isWordFavType\(target\.type\) && isWordFavType\(f\.type\) && f\.content === target\.content/.test(favLib),
     '㉑e removeFavorite 词族删除（存量双条目一次点按全清，星标不再"点了没反应"）');
-  check(/const cleaned = dedupeWordFavs\(parsed\);/.test(favLib),
-    '㉑e 载入时同词去重并回写（存量脏数据自愈，不派事件防循环）');
+  check(/const cleaned = dedupeWordFavs\(sanitizeFavorites\(raw\)\);/.test(favLib),
+    '㉑e 载入时同词去重并回写（存量脏数据自愈，不派事件防循环；2026-10-17 起先去重前清洗形状，见 ㉔）');
   for (const [name, src] of [['词汇深度页', dvpCode], ['全局单词搜索', gwsCode], ['阅读器查词', prCode]]) {
     check(/isWordFavorited\(/.test(src),
       `㉑e ${name} 词族判重（学习卡 'word' 与词库浏览 'vocabulary' 视为同一条）`);
@@ -1314,6 +1314,51 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '㉓d 浏览标记「已记」同步 SM-2（marking 在 updater 外算 —— updater 非同步）');
   check(/if \(p\.suspended\) \{ suspended\+\+; continue; \}/.test(fcCode),
     '㉓d 掌握度分布排除已屏蔽词（与 dueForReview 口径一致）');
+}
+
+// ── ㉔ 收藏读盘层的形状清洗（2026-10-17 真机：收藏页「开始回顾」整页白屏那批排查） ──
+// 收藏是全站唯一不校验的清单加载器，而数据有两条外部来源（旧键迁移 + 云同步下行）；
+// 渲染层直接 {f.content} 直出 + cleanText(f.example)，字段类型一坏就是整页崩，不是某条显示异常。
+{
+  const favLib = readFileSync(join(ROOT, 'src/lib/use-favorites.ts'), 'utf8');
+  const m = favLib.match(/function asText[\s\S]*?export function sanitizeFavorites[\s\S]*?\n\}/);
+  check(!!m, '㉔ 提取到 asText + sanitizeFavorites 纯函数段（转译真跑）');
+  if (m) {
+    const mod = { exports: {} };
+    new Function('exports', 'module', ts.transpileModule(m[0] + '\nmodule.exports={sanitizeFavorites};',
+      { compilerOptions: { module: 'commonjs' } }).outputText)(mod.exports, mod);
+    const sanitize = mod.exports.sanitizeFavorites;
+    const healthy = [
+      { id: 'a', type: 'word', content: 'outweigh', meaning: '比…重要', category: '', createdAt: 1 },
+      { id: 'b', type: 'vocabulary', content: 'stuff', meaning: '东西', example: 'Put it away.', category: 'cet4', createdAt: 2 },
+      { id: 'c', type: 'legacy', content: 'abc', meaning: '老类型', category: '', createdAt: 3 },
+    ];
+    const kept = sanitize(healthy);
+    check(kept.length === 3 && kept[1].example === 'Put it away.' && kept[2].type === 'legacy',
+      '㉔ 真跑：健康条目原样保留（未知 type 也只降级标签，不许替用户丢条目）', JSON.stringify(kept[2]));
+    check(sanitize([{ id: 'x', type: 'expression', content: { en: 'boom' }, meaning: '对象' }]).length === 0,
+      '㉔ 真跑：content 是对象 → 丢出视图（直出会让 ErrorBoundary 接走整页）');
+    check(sanitize([{ type: 'word', content: 'abc', meaning: 'm' }, null, 'oops']).length === 0,
+      '㉔ 真跑：缺 id 的条目丢掉（没有 id 就删不掉、词族去重也拿不到键）');
+    check(sanitize([{ id: 'y', meaning: 'm' }, { id: 'z', content: '', meaning: 'm' }]).length === 0,
+      '㉔ 真跑：content 缺失或空串丢掉，条目不是对象/null 也不抛错');
+    const coerced = sanitize([{ id: 'n', type: 'chunk', content: 123, meaning: true, example: ['a', 'b'], category: { x: 1 }, createdAt: '2026' }]);
+    check(coerced.length === 1 && coerced[0].content === '123' && coerced[0].meaning === 'true'
+      && coerced[0].example === '' && coerced[0].category === '' && coerced[0].createdAt === 2026,
+      '㉔ 真跑：能收成字符串的就收（不丢用户条目），收不了的落空串', JSON.stringify(coerced[0] || null));
+    check(sanitize([null, 'oops', 42]).length === 0,
+      '㉔ 真跑：条目本身不是对象（null / 字符串 / 数字）只丢不抛');
+    check(sanitize({ notes: [] }).length === 0 && sanitize(null).length === 0 && sanitize('x').length === 0,
+      '㉔ 真跑：整份不是数组（同步下行写坏/半写）→ 空清单而不是抛错');
+    check(sanitize([{ id: 'e', type: 'word', content: 'ok', example: null, meaning: undefined }]).length === 1
+      && !('example' in sanitize([{ id: 'e', type: 'word', content: 'ok', example: null }])[0]),
+      '㉔ 真跑：example 为 null/缺失时不凭空造键（否则健康数据也会被判定"变了"而每次挂载回写）');
+    // 读盘入口必须真的走清洗，并且只在条数变化时回写
+    check(/const cleaned = dedupeWordFavs\(sanitizeFavorites\(raw\)\);/.test(favLib),
+      '㉔ loadFromStorage 必经 sanitizeFavorites（清洗后再词族去重）');
+    check(/if \(Array\.isArray\(raw\) && cleaned\.length !== rawArr\.length\)/.test(favLib),
+      '㉔ 回写判据=条数变化：字段修正不改条数，按序列化比较会每次挂载都写盘（键序被重建）');
+  }
 }
 
 console.log('');console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);

@@ -64,10 +64,20 @@ export function LazyFramerProvider({ children }: { children: ReactNode }) {
 }
 
 // ---------- hook ----------
+let warnedOutsideProvider = false;
+
 export function useFramerMotion() {
   const ctx = useContext(Ctx);
-  if (!ctx) throw new Error('useFramerMotion must be used within <LazyFramerProvider>');
-  return ctx;
+  if (ctx) return ctx;
+  // 以前这里 throw：漏包一层 provider 的代价是**整页白屏**（2026-10-17 真机报障 ——
+  // 收藏页「开始回顾」渲染 ProgressPage 的 FavoriteReviewMode 却没带 provider）。
+  // 共享组件的动画前置条件不该能掀翻用户正在用的页面，所以退化成无动画渲染，
+  // 同时留一条一次性警告当开发期的绊线。
+  if (!warnedOutsideProvider) {
+    warnedOutsideProvider = true;
+    console.warn('[framer] useFramerMotion 在 <LazyFramerProvider> 之外被调用 —— 本次动画降级为无动画（渲染点请补 provider）');
+  }
+  return fallback;
 }
 
 // ---------- fallback components (render children without animation) ----------

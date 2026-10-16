@@ -195,32 +195,46 @@ function classNameOf(src, tagRe, label) {
   const users = allTsx.filter((f) => /useFramerMotion\(\)/.test(readFileSync(join(ROOT, f), 'utf8')));
   check(users.length >= 3, '⑦ 扫到使用 useFramerMotion 的组件（正对照的前提）', `扫到 ${users.length} 个`);
 
-  const orphans = [];
+  /**
+   * ⚠️ 这条 2026-10-17 重推过：旧写法是"任意一个宿主包了 Provider 就算包住"，于是
+   * `FavoriteReviewMode`（ProgressPage 包了 / 收藏页没包）永远绿，而用户点收藏页的
+   * 「开始回顾」整页白屏。共享组件的**每一个渲染宿主**都必须自带祖先，逐个点名。
+   */
+  const unwrapped = [];
   for (const f of users) {
     const src = readFileSync(join(ROOT, f), 'utf8');
     // 自身渲染了 Provider → 放行（只认 JSX 用法，光 import 不算）
     if (/<LazyFramerProvider/.test(src)) continue;
     const name = f.split('/').pop().replace(/\.tsx$/, '');
-    let wrapped = false;
     for (const host of allTsx) {
       if (host === f) continue;
       const hostSrc = readFileSync(join(ROOT, host), 'utf8');
-      // 宿主必须渲染这个组件
       if (!new RegExp(`<${name}[\\s/>]`).test(hostSrc)) continue;
       // 宿主必须**真的用 JSX 渲染** Provider —— 只 import 不算（那是假绿：
       // 2026-10 复核时正是 import 语句让这条断言空转）
-      if (/<LazyFramerProvider/.test(hostSrc)) { wrapped = true; break; }
+      if (!/<LazyFramerProvider/.test(hostSrc)) unwrapped.push(`${name} @ ${host}`);
     }
-    if (!wrapped) orphans.push(f);
   }
-  check(orphans.length === 0,
-    '⑦ 每个 useFramerMotion 组件都被 <LazyFramerProvider> 包住（漏了 → 那个页面/tab 直接崩）',
-    orphans.join(', '));
+  check(unwrapped.length === 0,
+    '⑦ 每个 useFramerMotion 组件的**每个宿主**都被 <LazyFramerProvider> 包住（"任意一个包住"是假绿）',
+    unwrapped.join(', '));
 
-  // 正对照：hook 确实在缺 Provider 时抛错（证明这条断言不是空转）
+  // 逐个点名两处收藏回顾宿主（真机报障那处 + 一直正常那处，缺一条就是清单漂了）
+  const strip = (s) => s.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const favPage = strip(readFileSync(join(ROOT, 'src/pages/FavoritesPage/FavoritesPage.tsx'), 'utf8'));
+  const progPage = strip(readFileSync(join(ROOT, 'src/pages/ProgressPage/ProgressPage.tsx'), 'utf8'));
+  check(/<LazyFramerProvider>[\s\S]{0,200}<FavoriteReviewMode/.test(favPage),
+    '⑦ 收藏页的回顾分支确实把 FavoriteReviewMode 包在 Provider 里（2026-10-17 白屏那处）');
+  check(/<LazyFramerProvider>[\s\S]{0,200}<FavoriteReviewMode/.test(progPage),
+    '⑦ 正对照：学习记录页同样包住（同一个组件两个入口，口径必须一致）');
+
+  // 正对照（按新语义重推）：缺 Provider 时**退化 + 一次性警告**，不再抛错掀翻整页。
+  // 断言钉的是"不许把动画前置条件写成致命错误"，与上面两条一起构成双向锁。
   const framer = readFileSync(join(ROOT, 'src/lib/lazy-framer-motion.tsx'), 'utf8');
-  check(/if \(!ctx\) throw new Error\('useFramerMotion must be used within <LazyFramerProvider>'\)/.test(framer),
-    '⑦ 正对照：useFramerMotion 缺 Provider 时确实抛错（不是警告，是崩）');
+  check(!/throw new Error\('useFramerMotion/.test(framer),
+    '⑦ 正对照：useFramerMotion 不再 throw（共享组件的动画前置条件不许让用户的页面崩）');
+  check(/if \(ctx\) return ctx;/.test(framer) && /return fallback;/.test(framer) && /console\.warn/.test(framer),
+    '⑦ 缺 Provider 时返回 fallback 并留一条开发期警告（绊线还在，只是不再致命）');
 }
 
 console.log('');

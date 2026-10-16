@@ -16,6 +16,7 @@ import { useCorrectionNotes } from '@/lib/correction-notes';
 import { useTTS } from '@/lib/use-tts';
 import { cn, cleanText } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
+import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
 import { toast } from 'sonner';
 import FavoriteReviewMode from '@/pages/ProgressPage/components/FavoriteReviewMode';
 
@@ -91,10 +92,15 @@ export default function FavoritesPage() {
   if (reviewMode) {
     return (
       <div className="max-w-4xl mx-auto pt-4">
-        <FavoriteReviewMode
-          favorites={filteredFavorites}
-          onExit={() => setReviewMode(false)}
-        />
+        {/* FavoriteReviewMode 里的卡面动画走 useFramerMotion，而那个 hook 要求外面有
+            LazyFramerProvider —— ProgressPage 包了，这里以前没包，点「开始回顾」直接整页白屏
+            （2026-10-17 真机报障）。跨页复用的组件，渲染点必须自己带 provider。 */}
+        <LazyFramerProvider>
+          <FavoriteReviewMode
+            favorites={filteredFavorites}
+            onExit={() => setReviewMode(false)}
+          />
+        </LazyFramerProvider>
       </div>
     );
   }
