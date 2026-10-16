@@ -371,6 +371,16 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
                 {shown?.partOfSpeech && (
                   <p className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-wider">{shown.partOfSpeech}</p>
                 )}
+                {/* 手动朗读：听音拼写/校对 —— 用户主动点，不算泄露答案 */}
+                {!revealed && (
+                  <button
+                    onClick={() => tts.speak(cw.word, { rate: 0.9 })}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 text-muted-foreground text-[10px] font-black hover:bg-muted"
+                    title="朗读单词（听音辅助拼写）"
+                  >
+                    <Volume2 className="size-3.5" />听发音
+                  </button>
+                )}
               </div>
 
               {answerType === 'choice' ? (
@@ -418,13 +428,22 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
                     )}
                   />
                   {!revealed && (
-                    <button
-                      onClick={submitSpell}
-                      disabled={!typed.trim()}
-                      className="w-full py-2.5 rounded-2xl bg-sky-500 text-white text-xs font-black hover:bg-sky-600 disabled:opacity-40"
-                    >
-                      提交（Enter）
-                    </button>
+                    <>
+                      <button
+                        onClick={submitSpell}
+                        disabled={!typed.trim()}
+                        className="w-full py-2.5 rounded-2xl bg-sky-500 text-white text-xs font-black hover:bg-sky-600 disabled:opacity-40"
+                      >
+                        提交（Enter）
+                      </button>
+                      {/* 不会的出口：按答错计（q1），亮出答案后照常前进 —— 拼写卡不许有死路 */}
+                      <button
+                        onClick={() => settle(false)}
+                        className="w-full py-2 rounded-2xl border border-dashed border-border text-muted-foreground text-[10px] font-black hover:bg-muted/40"
+                      >
+                        不会？看答案
+                      </button>
+                    </>
                   )}
                 </div>
               )}

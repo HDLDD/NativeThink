@@ -1290,6 +1290,11 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/vocab_c2e_session_/.test(c2eCode) && /safeStorage\.(getItem|setItem)\(SESS_KEY\)/.test(c2eCode) && /raw\.index < 0 \|\| raw\.index >= raw\.order\.length/.test(c2eCode),
     '㉓c 断点按 level 分键走 safeStorage + 下标越界作废');
   check(!/toast/.test(c2eCode), '㉓c 中译英零提示（练习界面不许弹 toast）');
+  // 拼写卡不许有死路：不会 → 看答案（按答错计）照常前进；题面有手动朗读（听音辅助拼写）
+  check(/不会？看答案/.test(c2eCode) && /onClick=\{\(\) => settle\(false\)\}/.test(c2eCode),
+    '㉓c 拼写卡「不会？看答案」接 settle(false)（答错计 + 亮答案 + 可前进）');
+  check(/听音辅助拼写/.test(c2eCode) && /tts\.speak\(cw\.word, \{ rate: 0\.9 \}\)/.test(c2eCode),
+    '㉓c 题面有手动朗读（听发音；用户主动点，零提示契约不受影响）');
   check(/addStudyMinutes\(0\.2, 'vocabulary'\)/.test(c2eCode), '㉓c 每题计学习时长（vocabulary 域，与闪卡同参）');
 
   // ㉓d 统一进度口径
