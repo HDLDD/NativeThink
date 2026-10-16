@@ -3,7 +3,8 @@
  *
  * 为什么需要：思维检测 / 写作批改 / 对话分析三处都会以 Markdown 表格给出
  * 「中式表达 → 地道说法」的对照，但看完就散在历史里 —— 摆脱中式英语恰恰需要
- * 把这些**自己的错句**攒起来反复重看重练（本模块只做收集与回看，重考走中译英变体）。
+ * 把这些**自己的错句**攒起来反复重看重练（收集与回看在收藏页，重考走词汇页第 9 模式
+ * 「纠偏重考」，本模块只负责存储、抽取、记账与排序）。
  *
  * 设计取舍：
  *  - 照抄 custom-words 的 store 骨架（safeStorage + 模块级缓存 + 事件广播 + 云同步下行重读）；
@@ -33,6 +34,8 @@ export interface ICorrectionNote {
   /** 说明（AI 的 notes/explanation/原因分析） */
   note: string;
   createdAt: number;
+  /** 重考统计（纠偏重考模式写；没考过就没有这个字段） */
+  review?: { lastAt: number; correct: number; wrong: number };
 }
 
 function norm(s: string): string {
@@ -148,6 +151,43 @@ export function addCorrectionNotes(
 
 export function removeCorrectionNote(id: string): void {
   write(read().filter((n) => n.id !== id));
+}
+
+/** 重考记账：答对/答错都更新 review（最久没练的下次排前面） */
+export function recordCorrectionReview(id: string, correct: boolean): void {
+  const list = read();
+  const now = Date.now();
+  let hit = false;
+  const next = list.map((n) => {
+    if (n.id !== id) return n;
+    hit = true;
+    return {
+      ...n,
+      review: {
+        lastAt: now,
+        correct: (n.review?.correct ?? 0) + (correct ? 1 : 0),
+        wrong: (n.review?.wrong ?? 0) + (correct ? 0 : 1),
+      },
+    };
+  });
+  if (hit) write(next);
+}
+
+/**
+ * 重考队列排序（纯函数）：**没考过的优先**，其次"最久没练"在前，最后按答错次数多者优先。
+ * 与收藏练习的轮转同一思路 —— 不重复、不把已经记住的反复端上来。
+ */
+export function orderForDrill(notes: ICorrectionNote[]): ICorrectionNote[] {
+  return [...notes].sort((a, b) => {
+    const au = a.review ? 1 : 0;
+    const bu = b.review ? 1 : 0;
+    if (au !== bu) return au - bu;
+    if (au === 0) return b.createdAt - a.createdAt;
+    const al = a.review!.lastAt;
+    const bl = b.review!.lastAt;
+    if (al !== bl) return al - bl;
+    return (b.review!.wrong - a.review!.wrong);
+  });
 }
 
 export function invalidateCorrectionNotesCache(): void {

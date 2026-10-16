@@ -1,12 +1,12 @@
 # 词汇深度（`/vocabulary`）
 
-> 代码：`src/pages/DeepVocabularyPage/`（页面 1 个 + `components/` 6 个，约 8,700 行）+ `src/lib/` 里 6 个支撑模块
-> 数据来自：[词库数据层](./wordbank-data.md) · 朗读见 [朗读引擎](./tts.md) · 守卫：`npm run verify:vocab-cards`（390 断言）
-> 最后校准：2026-10-13
+> 代码：`src/pages/DeepVocabularyPage/`（页面 1 个 + `components/` 8 个，约 10,000 行）+ `src/lib/` 里的支撑模块（SM-2 进度、短语进度、收藏、生词本、助记、纠偏本、会话与手势、断点）
+> 数据来自：[词库数据层](./wordbank-data.md) · 朗读见 [朗读引擎](./tts.md) · 守卫：`npm run verify:vocab-cards` + `node scripts/verify-correction-notes.mjs`
+> 最后校准：2026-10-16
 
 ## 这个模块是什么
 
-背单词的主场，七种学习方式：前六个共用一套**单词**进度与 SM-2 状态；`phrasecard` 用**短语侧独立的一套**（`use-phrase-learning`，与语块页「短语复习 / 闪卡」共享 —— 哪个入口学都算同一份）：
+背单词的主场，九种学习方式。`daily`/`quickcard`/`flashcard`/`c2e` 与词库浏览的「已记」共用一套**单词**进度与 SM-2 状态（`markLearned` 把浏览侧标记也纳进来，见「进度口径统一」一节）；`phrasecard` 用**短语侧独立的一套**（`use-phrase-learning`，与语块页「短语复习 / 闪卡」共享 —— 哪个入口学都算同一份）；`correction` 谁都不碰，只记纠偏本自己的 `review`（见「纠偏重考」一节）：
 
 | 模式 key | 名称 | 组件 | 干什么 |
 |---|---|---|---|
@@ -14,11 +14,13 @@
 | `quickcard` | 快速闪卡 | `components/QuickCardMode.tsx` | 只看词形，认识/不认识两键过卡，可批量留档 |
 | `flashcard` | 复习检测 | `components/FlashcardMode.tsx` | SM-2 五档评分复习到期待巩固的词；滑动只翻面/前后导航，**不做滑评分**（见注意事项 18） |
 | `phrasecard` | 短语闪卡 | `components/PhraseFlashcardMode.tsx` | 九个考试短语库的 SM-2 闪卡（逐条移植复习检测的会话逻辑，进度走短语侧存储，见「短语闪卡」一节） |
-| `browse` | 词库浏览 | 内联在 `DeepVocabularyPage.tsx:1168-1740` | 筛选/搜索/翻页浏览整本书 |
+| `c2e` | 中译英 | `components/ChineseToEnglishMode.tsx` | 给中文释义产出英文（四选一 / 拼写），本词书已学词，SM-2 对 q4 / 错 q1（见「中译英」一节） |
+| `correction` | 纠偏重考 | `components/CorrectionDrillMode.tsx` | 把纠偏本里 AI 判过的中式表达重新端上来认一遍，四选一（见「纠偏重考」一节） |
+| `browse` | 词库浏览 | 内联在 `DeepVocabularyPage.tsx:1209-1782` | 筛选/搜索/翻页浏览整本书 |
 | `collocations` | 搭配学习 | `components/CollocationsTab.tsx` | 高频搭配与短语 |
-| `vocabtest` | 词汇量测试 | `components/VocabSizeTest.tsx` | 1 分钟估算词汇量，含近 10 次趋势 |
+| `vocabtest` | 词汇量测试 | `components/VocabTestTab.tsx` | 1 分钟估算词汇量，含近 10 次趋势 |
 
-模式清单定义在 `DeepVocabularyPage.tsx:82-90`。
+模式清单定义在 `DeepVocabularyPage.tsx:89-99`（图标用 lucide 组件不用 emoji，原因见该处注释）。
 
 ## 入口与状态机（改这里最容易出事）
 
@@ -119,6 +121,16 @@
 - **拼写卡的死路出口与听音辅助（2026-10-16 用户补充）**：拼写输入下方有「不会？看答案」（按答错计 q1、亮出答案后照常「下一个」）；题面释义下有「听发音」手动朗读钮（用户主动点，不算泄露答案；作答后照旧自动朗读）。守卫 ㉓c 增 2 断言（478），变异 3 条验红。
 - 守卫 `verify-vocab-cards` ㉓c：注册+挂载 / 冻结队列 / SM-2 写入 / 首答为准 / 判定归一化 / 同书干扰项 / 断点 / 零提示 / 计时长，9 条；变异 M6/M7 验红。
 
+### 纠偏重考（第 9 模式，2026-10-16）
+
+表达纠偏本（`src/lib/correction-notes.ts`，收集与回看见 [首页/记录/收藏/备份](./dashboard-progress-favorites.md)）的一期只做"攒起来看"，本模式把它变成**认一遍哪句才是对的**。`CorrectionDrillMode.tsx`（约 310 行）只有四选一一种作答：
+
+- **题面** = 条目的 `chineseHint`（对话分析表带中文翻译）；没有中文提示就退化成"你的原句"（斜体划线）。**选项** = 本条目的地道说法 + 从其它条目随机抽 3 个（`options` `:68-72`）—— 干扰项全是真英文，逼的是"哪句才对应这个意思"。不考拼整句：逐词敲一个句子太折磨人。
+- **进度走纠偏本自己的 `review`**：`recordCorrectionReview(id, correct)` 累加 `correct/wrong` 与 `lastAt`（`correction-notes.ts:156-173`）。⚠️ **绝不写 SM-2**（组件头注 `:7-11`）：句子不是词书词条，写进 `__nativethink_word_learning_<level>` 会污染「已学单词清单」、待复习数与掌握度分布。
+- **队列** `orderForDrill(notes)`（`:179-190`）＝ 没考过的优先（其中新抓的在前）→ 最久没练 → 答错过得多。起跑时排一次并 `setQueue`（`:55-65`），之后每答一题的写盘广播会重渲染组件，但**不改本轮顺序**。
+- **计时**：每答一题 `addStudyMinutes(0.2, 'vocabulary')`（与中译英/闪卡翻面同参）；零提示，反馈交给 `已答/总数`、`✓ 数`、来源徽标、揭示后的对照块；音效保留。
+- **出口**：完成页逐题 ✓/✗ +「回纠偏本」；中途 ◀ 或 Esc 退出（键盘监听**捕获阶段** `:99`，Esc 带 `[role="dialog"]` 守卫）。**没有断点续学键** —— 队列由 `orderForDrill` 现算，重进自然接着没考过的排，比多存一份 session 更不会漂。
+
 ### 收藏练习分批轮转（2026-10-15）
 
 用户需求：「快速闪卡对收藏单词练习也可以选择一次性练的词数 10、20、50、100 等，而不是一次性练完，但又不能重复练习同一批收藏单词」。`FavoritesPanel` 头部档位 chips（`FAV_ROUND_SIZES = [10,20,50,100,0]`，0=全部 保留旧"一次练完"行为不削弱入口）+「练 N 张」起跑；`drillFavorites` 只从**没练过的**收藏里取前 N 个，起跑即把本批记进 `__nativethink_quickcard_fav_seen`（中途退出也算已轮过，重进拿到下一批）；收藏全部练过一轮后指针自动清空从头再转；面板显示「已轮转 x/N」+「重置轮转」入口。**轮转指针必须独立键**：混进 runs 留档会被 MAX_RUNS=20 滚动淘汰截断。守卫 ㉓a 六条，变异 M1-M3 验红。
@@ -186,10 +198,13 @@
 
 27. **收藏判重同时看两个 type（三处学习卡）**（2026-10-15 用户：「快速闪卡重练过程中收藏单词……同样单词但是收藏情况不同的列表」）：QC/DL/FM 的 `isFav`/`toggleFav` 原先只查 `'word'` 单一 type —— 词库浏览收藏过的词（`'vocabulary'`）在学习卡上显示未收藏，再点就**同词存两条**（收藏页出现两来源重复项）。修法 = 判重看 `'word' || 'vocabulary'`、取消移除任一来源那条、再收藏统一落 `'word'`（三模式同构，守卫 ㉑d 逐模式点名；实'verify'：注入 'vocabulary'-type 收藏 → QC 记录面板 chip 立即实心）。详见上方「收藏 / 生词本 / 助记」。
 
+28. **新增模式是"列表 + 挂载"两处登记，只写一处静默不显示**（2026-10-16 第 9 模式接线时落成总闸）：`MODES[]` 决定首页模式卡、向导第三步、顶栏标题（`:89-99`、`:972`），`<TabsContent value="…">` 决定点进去有没有内容 —— 漏了后者不报错、不白屏，就是"点了没反应"（AGENTS.md「功能两端都写了却点不到」的同族）。守卫 `verify-correction-notes` ⑥ 有一条**通用总闸**：剥注释后从 `const MODES:` 切到 `const REVIEW_MODES:`，抽出的每个 key 都必须能在页面里找到 `<TabsContent value="<key>"`，孤儿列表非空即红（变异 M13 只删组件挂载 → 红；M12 只删 MODES 条目 → 红）。⚠️ 抽 key 的正则要带数字（`c2e`），只写 `[a-z]+` 会静默漏掉一条、把总闸变成 8 个 key 的假绿。
+
 ## 怎么验证
 
 ```bash
 npm run typecheck
-node scripts/verify-vocab-cards.mjs      # 409 断言：手势决策表（含复习检测禁滑动评分 allowRate:false，短语闪卡正对照）、排卡、换卡节奏（数值锁）、答错重排延后、回看出口、断点、静默契约、换书一步生效、预载门、单词分档字号（DL/QC 手机档=FM 档，PFM 正对照）、词面按钮组整组换行（⑭b：四个模式长词不折两截）、快速闪卡卡内边距（⑭c）、每日学习卡片几何与答对零等待（⑯）、短语闪卡（接线/懒加载去重/会话同构/存储扩展）、复习结束态/跨词书空态/换等级竞态（⑰）
+node scripts/verify-vocab-cards.mjs      # 478 断言：手势决策表（含复习检测禁滑动评分 allowRate:false，短语闪卡正对照）、排卡、换卡节奏（数值锁）、答错重排延后、回看出口、断点、静默契约、换书一步生效、预载门、单词分档字号（DL/QC 手机档=FM 档，PFM 正对照）、词面按钮组整组换行（⑭b：四个模式长词不折两截）、快速闪卡卡内边距（⑭c）、每日学习卡片几何与答对零等待（⑯）、短语闪卡（接线/懒加载去重/会话同构/存储扩展）、复习结束态/跨词书空态/换等级竞态（⑰）、收藏轮转/已学清单/中译英/进度统一（㉑㉓）
+node scripts/verify-correction-notes.mjs # 46 断言：三源表格抽取真跑 + store 整段真跑（去重/记账/删除/只拒不裁/写失败可见）+ orderForDrill 真跑 + 第 9 模式接线总闸与卡面契约
 ```
 交互类改动（"点了没反应"、状态不写回）静态检查看不出来 —— 用本机无头 Chrome + CDP 真点一遍（见 [验证体系](./verification.md)）。换卡耗时这类体感问题同样要按帧量：`TEMP/nt-flip-timing.mjs` 会点真实评分按钮、按帧采样卡片 DOM，直接报"进 DOM 毫秒数"。

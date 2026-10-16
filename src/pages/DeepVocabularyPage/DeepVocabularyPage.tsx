@@ -25,6 +25,7 @@ import DailyLearningMode from './components/DailyLearningMode';
 import FlashcardMode from './components/FlashcardMode';
 import PhraseFlashcardMode from './components/PhraseFlashcardMode';
 import ChineseToEnglishMode from './components/ChineseToEnglishMode';
+import CorrectionDrillMode from './components/CorrectionDrillMode';
 import QuickCardMode from './components/QuickCardMode';
 import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
 import CollocationsTab from './components/CollocationsTab';
@@ -91,6 +92,7 @@ const MODES: { key: string; label: string; icon: LucideIcon; color: string; desc
   { key: 'flashcard', label: '复习检测', icon: RotateCw, color: '#6C5CE7', desc: 'SM-2 间隔记忆复习' },
   { key: 'phrasecard', label: '短语闪卡', icon: Layers, color: '#14B8A6', desc: '九个考试短语库 · SM-2 闪卡' },
   { key: 'c2e', label: '中译英', icon: Languages, color: '#0EA5E9', desc: '看中文拼/选英文 · 主动提取' },
+  { key: 'correction', label: '纠偏重考', icon: Wand2, color: '#F97316', desc: 'AI 判过的中式表达 · 四选一重考' },
   { key: 'browse', label: '词库浏览', icon: Library, color: '#64748B', desc: '自由浏览全部词汇' },
   { key: 'collocations', label: '搭配学习', icon: Link2, color: '#F59E0B', desc: '常用搭配与短语' },
   { key: 'vocabtest', label: '词汇量测试', icon: Target, color: '#EC4899', desc: '1分钟估算词汇量' },
@@ -1198,6 +1200,10 @@ export default function DeepVocabularyPage() {
 
         <TabsContent value="c2e" className="mt-0">
           <ChineseToEnglishMode level={selectedLevel} />
+        </TabsContent>
+
+        <TabsContent value="correction" className="mt-0">
+          <CorrectionDrillMode />
         </TabsContent>
 
         <TabsContent value="browse" className="mt-0">
