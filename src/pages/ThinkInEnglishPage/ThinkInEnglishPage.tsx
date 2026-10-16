@@ -24,6 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { getCapabilityClient } from '@/lib/capability-client';
 import { toast } from 'sonner';
+import { addCorrectionNotes, extractDetectorRows } from '@/lib/correction-notes';
 import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { MOCK_THINK_EXERCISES, type IThinkExercise } from '@/data/thinkexercises';
 import { MOCK_BACK_TRANSLATIONS, type IBackTranslation } from '@/data/backtranslation';
@@ -209,7 +210,11 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
         }
       }
       // 历史只在真拿到内容时留档；计时按「提交这次作答」的动作计（见 study-credit.ts 头部口径说明）
-      if (full.trim()) recordDetectorHistory(input);
+      if (full.trim()) {
+        recordDetectorHistory(input);
+        // 表达纠偏本：检测结果里的「Chinglish Expression | Natural English | Notes」表自动收集
+        addCorrectionNotes('think', extractDetectorRows(full));
+      }
     } catch (err) {
       toast.error('AI 服务暂不可用，请稍后重试');
       setDetectorResult('> ⚠️ AI 服务连接失败，请检查网络后重试。');

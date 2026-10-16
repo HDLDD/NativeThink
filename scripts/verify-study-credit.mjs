@@ -146,7 +146,7 @@ function fnBody(src, name) {
   check(!/if \(feedback\.trim\(\)\) addStudyMinutes/.test(chunks), '语块：不存在"AI 回了才计时"的写法');
 
   // 历史留档仍按内容判（计时与留档是两件事，不许顺手把 recordDetectorHistory 也挪走）
-  check(/if \(full\.trim\(\)\) recordDetectorHistory\(input\);/.test(think), '思维：检测历史仍只在真拿到内容时留档');
+  check(/if \(full\.trim\(\)\) \{\s*recordDetectorHistory\(input\);/.test(think), '思维：检测历史仍只在真拿到内容时留档（2026-10-16 起块内含纠偏收集，判据不变）');
 }
 
 // ── ④ 本地动作不许被闸门吞掉（正对照：全页一刀切改 creditOnce 会红） ──

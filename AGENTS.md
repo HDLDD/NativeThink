@@ -118,6 +118,7 @@ node scripts/verify-spelling-resume.mjs           # 24   拼写断点按词书�
 node scripts/verify-chain-verdict.mjs             # 36   语块接龙判定三档（未判定不计分也不判错）
 node scripts/verify-ai-parse.mjs                  # 10   AI 解析约定：25 个解析点判空 + 无贪婪正则（元判据固件自证）
 node scripts/verify-dashboard-glance.mjs            # 16   首页内容扩展：续学标签表穷举（/sentences 漏过）+ 待复习横幅到期 0 整卡不渲染 + 本周柱状日期与高度
+node scripts/verify-correction-notes.mjs            # 19   表达纠偏本：Markdown 表格抽取真跑（三源列序/表头噪声/错=对跳过）+ appendCapped 只拒不裁 + 写失败可见 + 三处收集接线 + 收藏页折叠列表
 node scripts/verify-app-version.mjs                 # 11   版本号单一载体：meta 注入链路 + 产物一致性（产物段先 build:web）
 node scripts/verify-brand-fonts.mjs                 # 26   品牌资产自托管：字体与 favicon 外链零残留 + woff2 结构自洽 + 生效栈正对照（产物段先 build:web）
 npm run verify:rv-articles                        # 104  复习词汇文章：选词/分篇/覆盖出队/体裁主题/原位重写（含旧 slice(0,10) 正对照）
@@ -201,6 +202,7 @@ src/
 │   ├── vocab-session.ts        # 复习顺序 + 答错重排（隔 4 张，最多 2 次）
 │   ├── vocab-swipe.ts          # 滑动手势决策表
 │   ├── custom-words.ts         # 生词本（level='custom'）
+│   ├── correction-notes.ts     # 表达纠偏本（AI 反馈里的错句→地道说法，自动收集）
 │   ├── word-notes.ts           # 每词助记
 │   ├── reader-highlight.ts     # 阅读器复习词高亮
 │   ├── use-stable-shuffle.ts   # 稳定洗牌（洗牌列表 + 下标定位当前题必须用它）
@@ -301,7 +303,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 476 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 44** · chunks-data **55** · overlay-fit **38** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit 77 · chain-verdict 36 · dashboard-glance 16；合计 **7,634**，2026-10-16 第 33 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 476 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 44** · chunks-data **55** · overlay-fit **38** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit 77 · chain-verdict 36 · dashboard-glance 16；合计 **7,653**，2026-10-16 第 34 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs` + `node scripts/verify-char-hygiene.mjs`（清了坏字符还要递增 `CACHE_VERSION`，否则老缓存挡住修复）
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**

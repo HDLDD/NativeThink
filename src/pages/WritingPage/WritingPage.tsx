@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/select';
 import { getCapabilityClient } from '@/lib/capability-client';
 import { toast } from 'sonner';
+import { addCorrectionNotes, extractWritingRows } from '@/lib/correction-notes';
 import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useStudyCredit, creditKey } from '@/lib/study-credit';
@@ -591,6 +592,8 @@ Suggest 2-3 more advanced or natural alternatives to words used in the essay.`,
         ...prev,
         { prompt: selectedPrompt.title, essay: text, feedback: full, date: Date.now() },
       ]);
+      // 表达纠偏本：批改里的「Original | Correction | Explanation」表自动收集
+      addCorrectionNotes('writing', extractWritingRows(full));
       // 已提交 → 草稿完成，清除自动保存
       try { safeStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
       setDraftRestored(false);

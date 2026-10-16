@@ -1,5 +1,16 @@
 # NativeThink 开发日志
 
+## 2026-10-16
+- chore(apk): bump 120 / 2.0.75（c2e 看答案出口 + 听发音） (`f31b340`)
+- docs(vocabulary): 中译英拼写卡出口与听音辅助 (`e284779`)
+- feat(c2e): 拼写卡「不会？看答案」出口 + 题面手动朗读（听音辅助拼写） (`c7a08fd`)
+- fix(tts): prewarm 尊重「只用系统引擎」—— preferNative 时早退，不再在用户避开云端的排法里偷发 /api/tts (`e2bc0ad`)
+- fix(tts): prewarm 与 speak 同路 —— 单词短文本预热云端 URL（4f58fca 欠账：预热喂错引擎致每次单词朗读冷启动） (`10f1e95`)
+- chore(apk): bump 117 / 2.0.72（配额清理 + 单词朗读云端优先） (`be72871`)
+- fix(storage,tts): 词库旧镜像吃满 5MB 配额致收藏写失败（IDB 探活清理）+ 单词短朗读云端优先（离线小模型单词级缺陷，ASR 定量实证） (`4f58fca`)
+- fix(favorites): 收藏写失败必须可见 —— safeStorage 配额满返回 false 被 try/catch 吞掉，星标内存点亮落盘丢失（「无法收藏仍存在」的收口） (`8c7338c`)
+- chore(apk): bump 116 / 2.0.71（收藏轮转 + 已学清单 + 中译英 + 进度统一） (`6344ea7`)
+
 ## 2026-10-15
 - feat(vocab): 收藏练习分批轮转 + 已学单词清单 + 中译英第 8 模式 + 进度口径统一 markLearned (`67df70e`)
 - fix(favorites): 收藏词族全链路 —— 同词双条目一次点按全清 + 跨来源星标可见 (`2f7b442`)

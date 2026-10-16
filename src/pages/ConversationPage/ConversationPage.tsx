@@ -34,6 +34,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { getCapabilityClient } from '@/lib/capability-client';
 import { toast } from 'sonner';
+import { addCorrectionNotes, extractConversationRows } from '@/lib/correction-notes';
 import { PLUGIN_IDS } from '@/lib/plugin-ids';
 import { useStudyCredit, creditKey } from '@/lib/study-credit';
 import { useAI } from '@/hooks/use-ai';
@@ -424,6 +425,8 @@ export default function ConversationPage() {
           }
         }
       }
+      // 表达纠偏本：分析里的「我的表达 → 更地道的说法」表自动收集（按 wrong 去重）
+      if (full.trim()) addCorrectionNotes('conversation', extractConversationRows(full));
       // 流式正常结束但为空 = AI 调用失败（use-ai 吞错只 toast）——
       // 不许把用户留在一张空分析弹窗里
       if (!full.trim()) {
