@@ -1247,6 +1247,23 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/已轮转 \{words\.length - remaining\}\/\{words\.length\}/.test(qcCode) && /重置轮转/.test(qcCode),
     '㉓a 面板可见轮转进度与重置入口（指针不是黑箱）');
 
+  // ㉓a' 收藏写失败必须可见（2026-10-16 用户："快速闪卡无法收藏还是存在，彻底排除"）
+  //     safeStorage.setItem 配额满返回 false 而不抛错 —— persist 只写 try/catch 时写失败
+  //     完全无声：星标内存里点亮、退出回来就没了，与"无法收藏"症状逐字吻合。
+  const favLibCode = stripComments(readFileSync(join(ROOT, 'src/lib/use-favorites.ts'), 'utf8'));
+  {
+    const psStart = favLibCode.indexOf('const persist = useCallback(');
+    const psEnd = favLibCode.indexOf('}, []);', psStart + 1);
+    const psBody = psStart >= 0 && psEnd > psStart ? favLibCode.slice(psStart, psEnd) : '';
+    check(psBody.length > 100, `㉓a' 脚手架自检：抓到 persist 函数体（实际 ${psBody.length} 字符）`);
+    check(/if \(!safeStorage\.setItem\(FAVORITES_KEY, JSON\.stringify\(items\)\)\)/.test(psBody) && /warnStorageFull\(\)/.test(psBody),
+      '㉓a' + "' 收藏落盘检查 setItem 返回值并在失败时喊出来（配额满不许静默丢）");
+    check(/dispatchEvent\(new Event\('nativethink-favorites-changed'\)\)/.test(psBody),
+      "㉓a' 正对照：收藏广播仍在（不是靠删通知换绿）");
+    check(/import \{ warnStorageFull \} from '\.\/capped-cache';/.test(favLibCode),
+      "㉓a' warnStorageFull 接线在场（全站 60s 去抖那条 toast）");
+  }
+
   // ㉓b 已学单词清单
   check(/const \[showLearnedList, setShowLearnedList\]/.test(fcCode) && /已学单词清单 · \{learnedList\.length\}/.test(fcCode),
     '㉓b 复习检测概览有已学单词清单（默认折叠，点开列出）');

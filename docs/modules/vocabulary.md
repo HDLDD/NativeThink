@@ -125,6 +125,7 @@
 ## 收藏 / 生词本 / 助记
 
 - 收藏与 `FavoritesPage` 同源（`use-favorites.ts`，键 `__nativethink_favorites`）。⚠️ **同一个"收藏单词"存两种 type**：词库浏览用 `'vocabulary'`（`DeepVocabularyPage.tsx:910`），每日学习与快速闪卡用 `'word'`（`DailyLearningMode.tsx:424-442`、`QuickCardMode.tsx:163-182`）。判重/统计必须同时看两个 type —— **2026-10-15 起全链路落实**：三处学习卡 + 词汇深度页/全局搜索/阅读器查词的星标心形都用 `isWordFavorited`（hook 导出的词族判重版）；`use-favorites` 单点加装：载入同词去重回写（`dedupeWordFavs`，存量脏数据自愈）、新增词族判重、删除词族双条目（守卫 ㉑d/㉑e/㉑f，其中 ㉑f 转译真跑）。
+- **写失败必须可见（2026-10-16"无法收藏仍存在"的收口）**：`safeStorage.setItem` 配额满是**返回 false 而不抛错**，`persist` 只写 try/catch 时写失败完全无声 —— 星标在内存里点亮（`setFavorites` 先执行）、退出回来就没了，与"无法收藏/退出后又可以"症状逐字吻合。现 `persist` 检查返回值并 `warnStorageFull()`（全站 60s 去抖一条），广播移出 try（守卫 ㉓a'，变异 3 条：恢复 try/catch / 删提示 / 撤广播，各红 1 条）。**再遇"点了没反应"先看有没有存储满 toast，再看 158+ 收藏是否写失败**。
 - 生词本 `custom-words.ts`（键 `__nativethink_custom_words`）：阅读器收集词库未收录的词，词条 `level:'custom'`（`:106`），进度经 `SUB_LEVELS` 走独立一路；复习队列把**已有进度记录的生词本词排在队首**（`FlashcardMode.tsx:149-152`），2026-10-05 起**不再要求账号另有词库进度**，且跳过被「不再出现」屏蔽的词（见注意事项 15）。
 - 助记 `word-notes.ts`（键 `__nativethink_word_notes`）：**目前只有复习检测卡背接了线**（`FlashcardMode.tsx:1142-1165`），其它模式不显示。
 

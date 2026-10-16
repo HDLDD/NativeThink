@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { safeStorage } from './safe-storage';
 import { useSyncDown } from './sync-down';
+import { warnStorageFull } from './capped-cache';
 
 const FAVORITES_KEY = '__nativethink_favorites';
 /** Legacy unprefixed backup key — read once for migration, then removed */
@@ -98,13 +99,16 @@ export function useFavorites() {
 
   const persist = useCallback((items: IFavoriteItem[]) => {
     setFavorites(items);
-    try {
-      safeStorage.setItem(FAVORITES_KEY, JSON.stringify(items));
-      // Notify other mounted favorites consumers (e.g. CollocationsTab / page heart icons)
-      window.dispatchEvent(new Event('nativethink-favorites-changed'));
-    } catch {
-      // ignore
+    /**
+     * safeStorage.setItem 配额满时**返回 false 而不抛错** —— 只写 try/catch 看不见失败，
+     * 表现就是"星标点了会亮（内存已改）、退出回来又没了"（2026-10-16 用户报"无法收藏仍存在"）。
+     * 收藏是用户清单、不可重算：写失败必须像 persistJson 一样喊出来，不许静默。
+     */
+    if (!safeStorage.setItem(FAVORITES_KEY, JSON.stringify(items))) {
+      warnStorageFull();
     }
+    // Notify other mounted favorites consumers (e.g. CollocationsTab / page heart icons)
+    try { window.dispatchEvent(new Event('nativethink-favorites-changed')); } catch { /* ignore */ }
   }, []);
 
   const addFavorite = useCallback(
