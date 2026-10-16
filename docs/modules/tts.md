@@ -6,7 +6,7 @@
 
 用户报「in 开头的单词不发 i 的音，stuff 不发 s」。PC 上用 **APK 包内同款模型 + 同份 lexicon/espeak 数据**合成并用 ASR 回转写定量实测：Kokoro int8 读 "stuff" 在 /s/ 前插一段浊音（帧级剖面 lf=1.00，ASR 听成 "This stuff"/"Stop!"）、"input" 读成 "import"、"in" 读成含混音，**54 个音色只有 1 个过起首三项测试**；lessac 把 "study" 读成 "Sorry"。注音表逐词核对是对的（`stuff s t ˈ ʌ f`）—— 音素输入正确、模型合成缺陷，**词库 override / 文本变体 / 换音色都救不了**，这是小模型的质量上限。
 
-修法（`use-tts.ts` 引擎排序处）：单词级短文本（**单切片 ≤24 字符**）且 `navigator.onLine !== false` 时，安卓默认排列把云端 `cf` 插到最前（`cloudFirst = wantsOnlineVoice || shortWordRead`，并进「选在线音色」那条既有分支）；失败自动落回原离线链；例句/长文本仍离线优先。四种排法语义：默认（单词联网=云端先，其余不变）/ 选在线音色（原本就 cf 先）/ 只用系统引擎（`preferNative` 分支在 cloudFirst **之前**判断，仍是纯 `['native']`）/ 护栏停用（piper 不进候选）。桌面本来就是 `['cf','edge','google']` 不受影响。守卫 `verify-native-tts` D23-D26（4 断言，变异 3 条：去联网判定 / shortWordRead 不并入 / preferNative 被掺，各红 1 条）；**改排序的真机验证四排法仍欠**（见 verification.md 第 31 测）。
+修法（`use-tts.ts` 引擎排序处）：单词级短文本（**单切片 ≤24 字符**）且 `navigator.onLine !== false` 时，安卓默认排列把云端 `cf` 插到最前（`cloudFirst = wantsOnlineVoice || shortWordRead`，并进「选在线音色」那条既有分支）；失败自动落回原离线链；例句/长文本仍离线优先。四种排法语义：默认（单词联网=云端先，其余不变）/ 选在线音色（原本就 cf 先）/ 只用系统引擎（`preferNative` 分支在 cloudFirst **之前**判断，仍是纯 `['native']`）/ 护栏停用（piper 不进候选）。桌面本来就是 `['cf','edge','google']` 不受影响。**prewarm 必须与 speak 同路（117 装机后发现的欠账）**：`prewarm` 原先还按旧规则把单词预热给离线引擎 —— speak 已云端优先、预热却喂错引擎，每次单词朗读冷启动。现把判定收敛为模块级共享判据 `isShortWordRead(text)`（联网 && ≤24 字符），speak 与 prewarm 单点共用；prewarm 对单词短文本预热同一个云端 URL，长文本仍预热离线引擎。守卫 `verify-native-tts` D23-D27（44 断言；变异：去联网判定 / shortWordRead 不并入 / preferNative 被掺 / prewarm 不同路，各红 1 条）。真机排法验证见 verification.md 第 33 测。
 
 
 ## 1. 功能

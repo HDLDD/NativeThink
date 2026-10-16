@@ -263,6 +263,15 @@ function cfTtsUrl(text: string, rate: number, voice?: string | null, lang?: stri
   return `${base}/api/tts?text=${encodeURIComponent(text)}&rate=${rate.toFixed(2)}${v}${l}`;
 }
 
+/**
+ * 单词级短文本判定 —— 云端优先的共享判据，**speak 与 prewarm 必须同路**：
+ * speak 对这种文本把云端排最前（playChunkWithFallback 的 shortWordRead），
+ * prewarm 就必须预热同一个云端 URL；两处各写一份字面量迟早漂移（prewarm 曾漏改）。
+ */
+function isShortWordRead(text: string): boolean {
+  return typeof navigator !== 'undefined' && navigator.onLine !== false && text.trim().length <= 24;
+}
+
 // ── Cache API 层：合成过的语音本地永久缓存 — 手机端重复朗读零等待 ──
 const TTS_CACHE_NAME = 'nativethink-tts-v1';
 
@@ -471,9 +480,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
        * （FIFO 400 条）让重复朗读秒出；失败自动落回离线链。例句/长文本仍离线优先：
        * 往返时延与流式稳定性不值当，且长句没有这些问题。
        */
-      const shortWordRead = chunks.length === 1
-        && chunks[0].trim().length <= 24
-        && typeof navigator !== 'undefined' && navigator.onLine !== false;
+      const shortWordRead = chunks.length === 1 && isShortWordRead(chunks[0]);
       const cloudFirst = wantsOnlineVoice || shortWordRead;
       const engines: Array<'piper' | 'native' | 'cf' | 'edge' | 'google'> = IS_ANDROID_NATIVE
         ? (settings.preferNative
@@ -874,7 +881,10 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     const rate = opts?.rate ?? settings.rate;
     // 安卓未选在线音色时朗读走内置离线引擎 —— 预热它才有意义，
     // 此时再往云端拉合成纯属浪费流量，直接跳过。
-    if (IS_ANDROID_NATIVE && isSherpaAvailable() && !isBundledEngineDisabled() && !isEdgeCatalogVoice(settings.selectedVoiceURI)) {
+    // 例外：单词级短朗读与 speak() 同路 —— 联网时 speak 会云端优先（见 playChunkWithFallback
+    // 的 shortWordRead），预热必须喂同一个云端 URL，否则每次单词朗读都是冷启动。
+    if (IS_ANDROID_NATIVE && isSherpaAvailable() && !isBundledEngineDisabled() && !isEdgeCatalogVoice(settings.selectedVoiceURI)
+      && !isShortWordRead(cleaned)) {
       warmSherpa(); // 首次触发即开始加载模型（Kokoro 109MB，别等用户点了才加载）
       sherpaPrewarm(cleaned, { voiceId: localVoiceIdFor(settings.selectedVoiceURI), speed: rate });
       return;

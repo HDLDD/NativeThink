@@ -266,8 +266,8 @@ function buildModule(name = 'native-tts-under-test') {
      长文本（例句/文章）仍离线优先。四种排法里只有「默认」受影响。 */
   const stripC = (s) => s.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
   const ttsCode = stripC(useTts);
-  ok(/const shortWordRead = chunks\.length === 1\s*&& chunks\[0\]\.trim\(\)\.length <= 24\s*&& typeof navigator !== 'undefined' && navigator\.onLine !== false;/.test(ttsCode),
-    'D23 单词短朗读判定：单切片 ≤24 字符且联网（离线时不让云端插队白等）');
+  ok(/function isShortWordRead\(text: string\): boolean \{\s*return typeof navigator !== 'undefined' && navigator\.onLine !== false && text\.trim\(\)\.length <= 24;/.test(ttsCode),
+    'D23 单词短朗读判定收敛为共享判据：联网 && ≤24 字符（speak/prewarm 单点共用，不许两处各写一份字面量）');
   ok(/const cloudFirst = wantsOnlineVoice \|\| shortWordRead;/.test(ttsCode) && /cloudFirst\s*\?/.test(ttsCode),
     'D24 云端优先只并进「选在线音色」那条既有分支（默认排列的其余语义不动）');
   ok(/\? \['native'\]/.test(ttsCode) && /piperOk \? \['cf', 'piper', 'native', 'edge', 'google'\] : \['cf', 'native', 'edge', 'google'\]/.test(ttsCode)
@@ -275,6 +275,16 @@ function buildModule(name = 'native-tts-under-test') {
     'D25 四种排法字面量全在：「只用系统引擎」仍是纯 native，护栏停用/未停用两形态各自保留');
   ok(!/shortWordRead[\s\S]{0,120}preferNative\s*\?/.test(ttsCode.split("const engines")[1] || ''),
     'D26 「只用系统引擎」优先级最高：shortWordRead 不得插到它前面（用户开开关就是要避开云端/内置）');
+  {
+    const pwStart = ttsCode.indexOf('const prewarm = useCallback(');
+    const pwEnd = ttsCode.indexOf('}, [settings.rate, settings.selectedVoiceURI]);', pwStart + 1);
+    const pwBody = pwStart >= 0 && pwEnd > pwStart ? ttsCode.slice(pwStart, pwEnd) : '';
+    ok(pwBody.length > 200, `D27 脚手架自检：抓到 prewarm 函数体（实际 ${pwBody.length} 字符）`);
+    ok(/&& !isShortWordRead\(cleaned\)/.test(pwBody) && /cfTtsUrl\(cleaned/.test(pwBody),
+      'D27 prewarm 与 speak 同路：单词短文本预热云端 URL（漏了=每次单词朗读冷启动，4f58fca 欠账）');
+    ok(/isSherpaAvailable\(\) && !isBundledEngineDisabled\(\)/.test(pwBody),
+      "D27 正对照：长文本仍预热离线引擎（不是靠删预热换绿）");
+  }
 }
 
 /* ───────────────────────── 汇总 ───────────────────────── */
