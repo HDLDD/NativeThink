@@ -879,6 +879,9 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     const cleaned = cleanText(text);
     if (!cleaned) return;
     const rate = opts?.rate ?? settings.rate;
+    // 「只用系统引擎」：native 引擎没有可预热的东西（无合成缓存），
+    // 云端/离线预热都是白费 —— 还会在用户明确避开云端的排法里偷偷发 /api/tts 请求。
+    if (IS_ANDROID_NATIVE && settings.preferNative) return;
     // 安卓未选在线音色时朗读走内置离线引擎 —— 预热它才有意义，
     // 此时再往云端拉合成纯属浪费流量，直接跳过。
     // 例外：单词级短朗读与 speak() 同路 —— 联网时 speak 会云端优先（见 playChunkWithFallback

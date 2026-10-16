@@ -284,6 +284,8 @@ function buildModule(name = 'native-tts-under-test') {
       'D27 prewarm 与 speak 同路：单词短文本预热云端 URL（漏了=每次单词朗读冷启动，4f58fca 欠账）');
     ok(/isSherpaAvailable\(\) && !isBundledEngineDisabled\(\)/.test(pwBody),
       "D27 正对照：长文本仍预热离线引擎（不是靠删预热换绿）");
+    ok(/if \(IS_ANDROID_NATIVE && settings\.preferNative\) return;/.test(pwBody),
+      'D27 「只用系统引擎」时 prewarm 早退（native 无预热物；漏了=用户避开云端的排法里偷发 /api/tts）');
   }
 }
 
