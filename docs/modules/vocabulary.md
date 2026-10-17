@@ -28,7 +28,8 @@
 
 - `setupDone`（`:405-407`，键 `__nativethink_vocab_setup_done`）—— 是否完成过首启设置。
 - `showWizard`（`:410`）—— 向导遮罩是否显示。首次自动 `true`。
-- `immersed`（`:915`）—— 是否已进入某个模式。**模式内容写在 `{!showWizard && immersed && dataReady && <Tabs/>}`（`:1079`）里**，只改 `tab` 不改 `immersed` 的话，用户会"选完了却停在列表上"。反向同理：**模式卡列表在 `{!immersed && !showWizard && …}`（`:999`）里** —— 向导打开时列表整块让位，否则向导被渲染在七张模式卡下面（真机 393×851 上从 y≈809 才开始，视口内只剩 42px，看起来就是"点了没反应"）。
+- `immersed`（`:934`）—— 是否已进入某个模式。**模式内容写在 `{!showWizard && immersed && dataReady && <Tabs/>}`（`:1127`）里**，只改 `tab` 不改 `immersed` 的话，用户会"选完了却停在列表上"。反向同理：**模式卡列表在 `{!immersed && !showWizard && …}`（`:1042`）里** —— 向导打开时列表整块让位，否则向导被渲染在七张模式卡下面（真机 393×851 上从 y≈809 才开始，视口内只剩 42px，看起来就是"点了没反应"）。
+- **`?tab=<模式 key>` 深链**（`:946-963`，2026-10-17 为首页纠偏横幅加的）：挂载后一次性校验 key ∈ `MODES` → `enterMode(key)`（同时 `setTab` + `setImmersed`）→ `setSearchParams({}, {replace:true})` 抹掉参数。三道门：`setupDone` 为假或向导开着不强进（那时该先选书）、key 不认识就无视（乱参数不该把人踢进某个模式）、只进一次（`deepLinkedRef`，`enterMode` 每次 render 重建所以不进依赖）。
 
 因此有两条完成路径，走的是两套代码：
 

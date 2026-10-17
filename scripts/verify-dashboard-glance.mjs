@@ -30,6 +30,8 @@ const FILES = {
   dashboard: 'src/pages/DashboardPage/DashboardPage.tsx',
   review: 'src/pages/DashboardPage/ReviewDueCard.tsx',
   week: 'src/pages/DashboardPage/WeekGlanceCard.tsx',
+  notedrill: 'src/pages/DashboardPage/NoteDrillCard.tsx',
+  vocab: 'src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx',
 };
 
 const originals = {};
@@ -57,8 +59,11 @@ function runChecks(srcs) {
     '待复习卡：到期 0 → 整卡 return null（不渲染"已清零"占位）');
   ok(/onNavigate\('\/vocabulary'\)/.test(review),
     '待复习卡点击去 /vocabulary（复习入口）');
-  ok(/\{\(lastVisit \|\| dueCount > 0\) && \(/.test(dash),
-    '续学/复习行整体门控：两卡都空时该行不占位');
+  // 门控按新增的第三张卡**重新推导**（不是放宽）：三卡都空才不占行，两卡版式必须消失。
+  ok(/\{\(lastVisit \|\| dueCount > 0 \|\| pendingCorrections > 0\) && \(/.test(dash),
+    '续学/复习/纠偏行整体门控：三卡都空时该行不占位');
+  ok(!/\{\(lastVisit \|\| dueCount > 0\) && \(/.test(dash),
+    '正对照：旧的两卡门控必须消失（漏掉第三张 = 只有纠偏待办时整行不出现）');
 
   /* 3. 本周概览：本地日期 + 查表 + 图表三层不互压 */
   ok(/import \{ formatDate \} from '@\/lib\/utils'/.test(week),
@@ -77,6 +82,25 @@ function runChecks(srcs) {
     '本周概览点击去 /progress 看详情');
   ok(/d\.minutes > 0 \? Math\.max\(8, /.test(week),
     '0 分钟的日子有 4px 存根柱（不是整列消失）');
+
+  /* 4. 首页「表达纠偏待重考」横幅 + ?tab= 深链（2026-10-17 新增） */
+  const note = srcs.notedrill, vpage = srcs.vocab;
+  ok(/if \(pendingCount <= 0\) return null;/.test(note),
+    '纠偏横幅：0 条待重考 → 整卡 return null（与待复习卡同一条口径，不许常驻占行）');
+  ok(/onNavigate\('\/vocabulary\?tab=correction'\)/.test(note),
+    '纠偏横幅点击带 ?tab=correction 深链（只跳 /vocabulary 等于还要再点一次模式卡）');
+  ok(/<NoteDrillCard pendingCount=\{pendingCorrections\} onNavigate=\{navigate\} \/>/.test(dash),
+    '首页真的挂上纠偏横幅并把计数传进去（写了组件没挂载 = 用户永远看不见）');
+  ok(/corrNotes\.filter\(\(n\) => !n\.review\)\.length/.test(dash),
+    '横幅计数 = **还没重考过**的条数（拿全部条数会把已处理的常驻催用户）');
+  ok(/\(lastVisit \|\| dueCount > 0 \|\| pendingCorrections > 0\) && \(/.test(dash),
+    '续学/复习/纠偏三卡都空时整行不占位');
+  ok(/const want = searchParams\.get\('tab'\);\s*\n\s*if \(!want \|\| !MODES\.some\(\(m\) => m\.key === want\)\) return;/.test(vpage),
+    '深链只认 MODES 里的 key（拼错或外来参数一律无视，不硬切 tab）');
+  ok(/setSearchParams\(\{\}, \{ replace: true \}\);\s*\n\s*enterMode\(want\);/.test(vpage),
+    '深链：抹掉参数 + 走 enterMode（只 setTab 会停在模式列表；留参数则刷新再抢一次焦点）');
+  ok(/if \(!setupDone \|\| showWizard\) return;/.test(vpage),
+    '首设向导没走完不强进模式（那时该让用户先选书）');
 
   return results;
 }
@@ -98,6 +122,18 @@ const MUTATIONS = [
     from: 'h-28 flex items-end', to: 'flex items-end' },
   { name: '首页传给待复习卡的到期数写死 0（断线伪装）', file: 'dashboard',
     from: '<ReviewDueCard dueCount={dueCount}', to: '<ReviewDueCard dueCount={0}' },
+  { name: '纠偏横幅 0 条也照常渲染（谎报待重考）', file: 'notedrill',
+    from: 'if (pendingCount <= 0) return null;', to: 'if (pendingCount < 0) return null;' },
+  { name: '纠偏横幅丢掉深链参数（进去还得再点一次模式卡）', file: 'notedrill',
+    from: "onNavigate('/vocabulary?tab=correction')", to: "onNavigate('/vocabulary')" },
+  { name: '首页把横幅计数换成全部条数', file: 'dashboard',
+    from: 'corrNotes.filter((n) => !n.review).length', to: 'corrNotes.length' },
+  { name: '续学/复习/纠偏三卡的行门控漏掉第三张', file: 'dashboard',
+    from: ' || pendingCorrections > 0', to: '' },
+  { name: '深链只 setTab 不进沉浸态（用户仍停在模式列表）', file: 'vocab',
+    from: '    enterMode(want);', to: '    setTab(want);' },
+  { name: '深链不校验 key（任意 tab 参数都硬切）', file: 'vocab',
+    from: "if (!want || !MODES.some((m) => m.key === want)) return;", to: 'if (!want) return;' },
 ];
 
 let mutationOk = 0;

@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, ArrowRight, Notebook, NotebookPen, BookMarked, Plane, GraduationCap, Briefcase, Award, TrendingUp, Trophy, Zap, Library, Layers, Globe, Languages, type LucideIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -942,6 +943,24 @@ export default function DeepVocabularyPage() {
     ? homeWordState.todayLearned.length
     : 0;
   const enterMode = (key: string) => { handleTabChange(key); setImmersed(true); };
+
+  /**
+   * 深链直达某个模式：首页「表达纠偏」横幅带 `?tab=correction` 过来，一步落进该模式
+   * （不用再点一次模式卡），进去后把参数抹掉 —— 留着的话刷新会再抢一次焦点。
+   * 只认 MODES 里的 key；首设向导还没走完时不强进（那时该让用户先把书选了）。
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkedRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkedRef.current) return;
+    deepLinkedRef.current = true;
+    if (!setupDone || showWizard) return;
+    const want = searchParams.get('tab');
+    if (!want || !MODES.some((m) => m.key === want)) return;
+    setSearchParams({}, { replace: true });
+    enterMode(want);
+    // enterMode 每次 render 都重建，所以只靠 deepLinkedRef 保证"一次挂载只进一次"，不把它放进依赖
+  }, [setupDone, showWizard, searchParams, setSearchParams]);
 
   // Word list pagination with configurable page size
   const [wordPage, setWordPage] = useState(0);

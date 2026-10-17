@@ -32,6 +32,8 @@ import { QuickStartGrid } from './QuickStartGrid';
 import { ModuleProgressCard } from './ModuleProgressCard';
 import { HistoryCalendar } from './HistoryCalendar';
 import { ReviewDueCard } from './ReviewDueCard';
+import { NoteDrillCard } from './NoteDrillCard';
+import { useCorrectionNotes } from '@/lib/correction-notes';
 import { WeekGlanceCard } from './WeekGlanceCard';
 import { LEARNING_OPTIONS } from './constants';
 
@@ -49,6 +51,9 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { stats, calendar, loaded } = useLearningStats();
   const dueCount = useGlobalDueCount();
+  // 纠偏本横幅的计数 = 还没重认过的条数（考过就退场，与「今日待复习」同一种语义）
+  const { notes: corrNotes } = useCorrectionNotes();
+  const pendingCorrections = corrNotes.filter((n) => !n.review).length;
   const { addFavorite, isFavorited, favorites, removeFavorite } = useFavorites();
   const tts = useTTS();
   const { isConfigured, chat: aiChat } = useAI();
@@ -316,7 +321,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-10">
       {/* 继续上次学习 + 今日待复习（窄屏堆叠，宽屏并排；都没有时该行不占位） */}
-      {(lastVisit || dueCount > 0) && (
+      {(lastVisit || dueCount > 0 || pendingCorrections > 0) && (
         <div className="grid gap-3 lg:grid-cols-2 lg:items-stretch">
           {lastVisit && (
             <button
@@ -334,6 +339,7 @@ export default function DashboardPage() {
             </button>
           )}
           <ReviewDueCard dueCount={dueCount} onNavigate={navigate} />
+          <NoteDrillCard pendingCount={pendingCorrections} onNavigate={navigate} />
         </div>
       )}
 

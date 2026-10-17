@@ -4,9 +4,11 @@
 
 ## 1. 首页 `/`
 
-无模块 key（不参与 `moduleProgress`）。组成：`HeroCard` + `KpiCard` + `ProgressCard`/`RingProgress` + `ModuleProgressCard` + `QuickStartGrid` + `DailySentenceCard` + `HistoryCalendar`，外加 2026-10-10 新增的 `ReviewDueCard` + `WeekGlanceCard`。
+无模块 key（不参与 `moduleProgress`）。组成：`HeroCard` + `KpiCard` + `ProgressCard`/`RingProgress` + `ModuleProgressCard` + `QuickStartGrid` + `DailySentenceCard` + `HistoryCalendar`，外加 2026-10-10 新增的 `ReviewDueCard` + `WeekGlanceCard`、2026-10-17 新增的 `NoteDrillCard`。
 
-**今日待复习（`ReviewDueCard.tsx`）**：横幅复用侧边栏角标同一数据源 `useGlobalDueCount`（`DashboardPage.tsx:18,51,336` 直扫 SM-2 存储，不挂完整学习状态实例）。**口径：`dueCount <= 0` 时整卡 `return null`（`ReviewDueCard.tsx:17`）**—— 没有复习义务就不渲染"已清零"占位卡；点击进 `/vocabulary`。外层行 gate 是 `(lastVisit || dueCount > 0)`（`DashboardPage.tsx:319`），两卡都空时整行不占位。
+**今日待复习（`ReviewDueCard.tsx`）**：横幅复用侧边栏角标同一数据源 `useGlobalDueCount`（`DashboardPage.tsx:18,51,336` 直扫 SM-2 存储，不挂完整学习状态实例）。**口径：`dueCount <= 0` 时整卡 `return null`（`ReviewDueCard.tsx:17`）**—— 没有复习义务就不渲染"已清零"占位卡；点击进 `/vocabulary`。外层行 gate 现在是三卡版 `(lastVisit || dueCount > 0 || pendingCorrections > 0)`（`DashboardPage.tsx:324`），都空时整行不占位。
+
+**表达纠偏待重考（`NoteDrillCard.tsx`，2026-10-17）**：纠偏本三处自动收集 + 收藏页回看 + 词汇页重考 + 句子拼写是一条完整链路，但**入口原本藏在词汇页九个模式的最后一屏**，用户不会每天去翻，所以首页给一条横幅。计数口径是**还没重考过的条数**（`corrNotes.filter((n) => !n.review).length`，`DashboardPage.tsx:56`）—— 与待复习卡同一种语义：考过就退场，不把已处理的常驻催用户；`pendingCount <= 0` 整卡 `return null`。点击带深链 **`/vocabulary?tab=correction`**，由词汇页一步落进该模式（`DeepVocabularyPage.tsx:946-963`：只认 `MODES` 里的 key、`setupDone`/向导未完时不强进、进去后 `setSearchParams({}, {replace:true})` 抹参数 —— 留着刷新会再抢一次焦点）。**只 `setTab` 不 `setImmersed` 是这模块的老坑**（用户仍停在模式列表），守卫把它钉成"必须走 `enterMode`"。守卫 `npm run verify-dashboard-glance`（25 断言，变异 11 条）。
 
 **本周学习概览（`WeekGlanceCard.tsx`）**：`calendar`（`__nativethink_calendar`，`useLearningStats` 直接暴露）取近 7 个自然日分钟画柱状 + 周合计/打卡天数/达标天数，点击进 `/progress`（`:405` 接线）。**日期一律 `formatDate` 循环生成再按字符串查表（`:26-29`）**—— 不能 `slice(-7)` 取数组尾：calendar 只在跨出 31 天窗口后才 push 新条目，跨天当天没学习时尾部是昨天，柱状会整体错位一天。柱状容器 `h-28` 固定高度（`:69`），标题/柱/星期三层不互压。守卫 `npm run verify-dashboard-glance`（16 断言，变异 5 条）。
 
