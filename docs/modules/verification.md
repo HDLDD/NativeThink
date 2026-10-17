@@ -121,6 +121,10 @@ CDP_PORT=9226 node scripts/device-eval.mjs eval "<表达式>"    # 走查工具�
 
 **当前状态（2026-10-17，AEHD 装好后端到端实测通过）**：`check / avd / start / wait / install / launch / cdp / smoke / stop / status` 全部真跑过。装的是 `NativeThink-emu-x86_64.apk`（`adb install -r -t -g` → Streamed Install Success），冷 boot 到 `sys.boot_completed=1` 十几秒（AEHD 2.2）。`smoke` 凭据：`cssW=393 / cssH=827 / dpr=2.75`（440dpi 的选择与真机 393 对上了）、`isNative=true platform=android`、`SherpaTts` 与 `TextToSpeech` 都在原生注册表里，并且**真发一次 `SherpaTts.status()` 拿到类型化回包**（`{status:"idle",sampleRate:0,cached:0,loadedModels:[],errorByModel:{},espeakFiles:0}`）。从此"只在 APK 成立"的走查与夹具注入都能搬到电脑上（一次性 profile，写数据不碰用户主力机）。
 
+**装机走查搬上模拟器（`scripts/walk-phone.mjs`，2026-10-17）**：四条待验项（收藏页「开始回顾」不崩 / 纠偏重考按类筛选 / 送进句子拼写的「纠偏表达」桶 / 首页「待重认」横幅计数与深链）现在一条命令跑完 —— **32/32 全绿**，夹具是 4 条收藏 + 5 条纠偏（覆盖 5 个错点类别），全程走真实 UI 点击，判据是界面上的文案与计数。两条关键设计：① **正对照**：纠偏桶显示「共 1 句」必须配"切到四级后 6827 句"才算真过滤（同一个数字换个词书就变了），否则"1 句"可能只是页面永远报 1；② 横幅计数从 5 变 4 由**真实答完一题**驱动（不是改存储），把"计数=还没重认过的条数"这条口径在 APK 里钉死。
+
+走查脚本本身的四条测法教训（每一条都曾表现为"产品红、其实是我错了"）：`device-eval` 打印的是 `JSON.stringify(值)`，**只能解析一次**（双解析让 `has()` 恒假，一次报出 20 条假红）；Radix 下拉在 `pointerdown` 上开，合成 `.click()` 打不开（`NOITEM` 的真因）；切书触发器带 `disabled={building||levelLoading}`，预载那几秒点不动 → **重试而不是判失败**；safeStorage 前缀一律**从现有键反推**（真前缀以 `__:` 结尾，手拼 `:` 会让 removeItem 打在空气上，"共 1 句"就变成上一轮残留）。
+
 探针的一条判据教训：第一版 `smoke` 读 `window.Capacitor.plugins.SherpaTts` 判"原生桥在不在"，报 `false` —— 那个对象只在 app 自己 `registerPlugin('SherpaTts')`（懒加载的 `sherpa-tts.ts:100`）之后才填充，首屏读它必然 undefined，**测的是模块加载时机而不是桥**。正解：问 `Capacitor.isPluginAvailable(name)`（查的是原生注册表），再真发一次调用当往返证据。
 
 ## 4. 写守卫的四条硬规矩

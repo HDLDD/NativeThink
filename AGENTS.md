@@ -154,6 +154,7 @@ node scripts/phone-emu.mjs avd               # 本机没有 avdmanager → 手�
 node scripts/phone-emu.mjs start && node scripts/phone-emu.mjs wait
 node scripts/phone-emu.mjs install           # 装 NativeThink-emu-x86_64.apk（-g 一次给齐录音权限）
 node scripts/phone-emu.mjs launch && node scripts/phone-emu.mjs smoke
+node scripts/walk-phone.mjs                # 装机四条走查（4 收藏 + 5 纠偏夹具，含"四级 6827 句 vs 纠偏 1 句"正对照）
 #   smoke 之后走查照旧：CDP_PORT=9226 node scripts/device-eval.mjs eval "<表达式>"
 # ⚠️ 起不来先看 check 的"加速"那行：x86_64 必须有 AEHD/WHPX，没驱动时 emulator 直接拒启
 #    （管理员跑一次 SDK 里现成的 extras/google/Android_Emulator_Hypervisor_Driver/silent_install.bat）
