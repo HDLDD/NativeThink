@@ -86,6 +86,39 @@ node scripts/device-eval.mjs shot .screen.png
 
 纪律（用户要求，见记忆）：**操作用户手机前先报备**；设备段默认跳过（要 `E2E_DEVICE=1`）；走查收尾必须 `force-stop` 归位。另外 `execFileSync(adb, ['shell','cat','/proc/net/unix'])` 会挂住（0 字节输出），别这么读。
 
+## 3.1 模拟器通道（电脑侧 AVD，`scripts/phone-emu.mjs`）
+
+搭它的动机不是替代真机，而是**把装机验证从"手机在手边"解绑**：`d0e47380` 是用户主力机（只读走查 + 经常不在），而有一类缺陷只在 APK 里成立（Capacitor 原生桥、系统语音插件、抽屉导航不关、textZoom、safe-area）。模拟器是真 Android + 真 WebView + 真原生桥，同时又是一次性 profile —— **可以随便灌夹具**，这是主力机给不了的。
+
+```bash
+npm run package:apk:emu                # x86_64 专用包（NT_EMU=1，不烧 versionCode，产物与发布线同名不同文件）
+node scripts/phone-emu.mjs check       # 体检：加速 / 镜像 / AVD / 包 / adb —— 起不来先看这里
+node scripts/phone-emu.mjs avd         # 本机 SDK 没有 cmdline-tools/avdmanager，AVD 是手写 config.ini 生成的
+node scripts/phone-emu.mjs start       # 默认 -no-window；--window 看报错
+node scripts/phone-emu.mjs wait        # adb wait-for-device + 轮询 sys.boot_completed
+node scripts/phone-emu.mjs install     # adb install -r -t -g（-g 一次给齐 RECORD_AUDIO）
+node scripts/phone-emu.mjs launch && node scripts/phone-emu.mjs smoke
+CDP_PORT=9226 node scripts/device-eval.mjs eval "<表达式>"    # 走查工具与真机共用一个（device-eval）
+```
+
+| 项 | 口径 |
+|----|------|
+| 几何 | `1080x2340 @ 440dpi` → CSS 宽 **392.7**，对齐真机实测的 393（AGENTS 那条"别用 428 估算"同源）；`MainActivity` 的 `setTextZoom(120)` 在模拟器同样生效 |
+| 系统 | `android-34 / google_apis / x86_64`（`google_apis` 不是 `google_apis_playstore`：Playstore 镜像不许 root/写属性，调试包更麻烦） |
+| 数据盘 | `ANDROID_AVD_HOME=D:\AndroidAvd`（脚本内注入，不动系统环境变量；userdata 会长到几 GB，不占 C:） |
+| 覆盖 | 原生桥在位与挂死类、WebView 行为、装机后能不能打开某页、localStorage/IndexedDB 持久化、布局几何 |
+| **不覆盖** | 厂商 ROM 的 `INJECT_EVENTS` 限制、厂商 WebView 版本与系统字体缩放的确切倍数（真机实测恰好 ×1.100）、物理状态栏 inset、厂商后台查杀 —— 这些仍只能真机 |
+
+三条实测到的硬门槛（2026-10-17）：① **x86_64 必须带驱动才肯起**：AEHD 未装时 emulator 直接 `ERROR | x86_64 emulation currently requires hardware acceleration!` 退出（AVD 自身校验是过的：`System requirements to run avd are met`），修法就是管理员跑一次 SDK 里现成的 `extras/google/Android_Emulator_Hypervisor_Driver/silent_install.bat`（本机 BIOS 虚拟化 `VirtualizationFirmwareEnabled=True`、`HypervisorPresent=False`，正合 AEHD 的前提）；② 系统镜像**不在 SDK 里**（`system-images/android-36/.../x86_64` 只有一层 `.installer/` 空壳，此前那次下载没完成），现从 `dl.google.com/android/repository/sys-img/google_apis/x86_64-34_r14.zip`（1.49GB → 解包 4.26GB）直取，`repository2`/`sys-img2-3.xml` 里 google_apis 的 x86_64 只到 API 34；③ **发布 APK 装不进模拟器且不报错**：`abiFilters` 只有 arm 两档，装上后 sherpa 的 `.so` 根本不在包里 → 离线朗读静默缺席，看起来像"TTS 又挂了"。所以模拟器走单独一条构建线，脚本收尾从 **APK 自己的 zip 中央目录**读条目自证（x86_64 .so 在、`assets/public/index.html` 与 books/piper/tts 资产在、arm 条目 0 条）—— 实测 `release/NativeThink-emu-x86_64.apk` 795.9 MB 四条全 ✓。
+
+启动方式在这台机器上连撞两次（都已写进 `phone-emu.mjs` 的注释，改的人别再撞）：① `node spawn(..., {detached:true})` —— 父 node 一退出，Git Bash 会把整个进程树连模拟器一起杀掉（日志停在 kernel cmdline、`tasklist` 里没有 emulator.exe，**且不留任何 ERROR**，看起来像"模拟器自己崩了"）；② `powershell Start-Process -PassThru` —— 分离是成功了，但子进程继承了我们的 stdout 句柄，`execFileSync` 等 stdout EOF 于是**启动命令自己挂死**（而模拟器活着，`adb devices` 都看得见）。定型写法：**写一个 `start-emu.bat`（内部重定向日志 + 自带三个 ANDROID_* 环境变量），用 `cmd /c start /MIN` 拉它**，`start` 立刻返回、不占句柄；判活一律 `tasklist` 扫 **`emulator.exe` 与 `qemu-system-x86_64-headless.exe` 两个镜像名**（只认前者会漏掉孤儿 VM），不记 pid。
+
+`start --tcg`（`-accel off` 纯软件模拟）**在本机不是可用的兜底**：实测模拟器进程与 VM 都活着、`adb devices` 认到 `emulator-5554`，但三十多分钟一直停在 `offline`，`getprop` 全部拿不到 —— x86_64 guest 没有硬件虚拟化在这台 AMD 机器上就是起不来。留这个开关只是为了在**有 ARM 镜像的机器**（Apple Silicon / ARM Windows，那里 ARM 镜像是原生速度）上没驱动也能跑；本机要装通道就装 AEHD，别指望 `--tcg`。
+
+顺带三条通道自身的坑（都已写进 `phone-emu.mjs`）：① `adb shell` 打到 `offline` 设备会**无限期挂住**（`execFileSync` 没超时就把脚本钉死，两次都以为是"模拟器起得慢"）→ 所有设备调用带 20s 上限，长操作（install 796MB）单独放宽；② Windows 上 `emulator.exe` 只是启动器，VM 是 `qemu-system-x86_64-headless.exe`，只杀前者会留孤儿 VM **占着 5554/5555 控制台端口**，`adb devices` 于是永远挂一条假的 `offline`，看着像"设备起不来"其实早就是僵尸 → `stop` 两个镜像名都收，必要时无 `adb kill-server`；③ **别把命令接 `| tail`**：`adb wait-for-device` 超时炸掉的那次，通知里报的是 "exit code 0"，因为退出码属于 `tail`（AGENTS/记忆里第 13 条老坑，这次又中一次）——在乎退出码就不要接管道。
+
+**当前状态（2026-10-17）**：构建线 / 镜像 / AVD / `check` / `avd` / `start` / `status` / `stop` 都实测过；`wait → install → launch → cdp → smoke` 的端到端**还没跑通**，唯一缺口就是 AEHD 驱动（一次管理员动作）。在那之前不许把这条通道写进验收清单当"已验证"。
+
 ## 4. 写守卫的四条硬规矩
 
 这几条都是从真实翻车上来的，不是风格偏好：

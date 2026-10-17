@@ -25,13 +25,14 @@ APK 依赖 `dist/client`（`capacitor.config.json:4`），所以顺序不能省�
 
 ## 2. 版本号与产物命名
 
-`android/version.properties` 当前 `versionCode=89` / `versionName=2.0.44`（2026-10-05 文件实况；每次打包自动递增）。`scripts/bump-android-version.cjs:19,24,26`：**两个字段都改** —— code +1，name 只递增 patch（沿用文件里写的 `major.minor`；文件缺省时 code 1→2、name 2.0.0→2.0.1）。
+`android/version.properties` 当前 `versionCode=125` / `versionName=2.0.80`（2026-10-17 文件实况；每次 `package:apk` 自动递增，`package:apk:emu` 不动它）。`scripts/bump-android-version.cjs:19,24,26`：**两个字段都改** —— code +1，name 只递增 patch（沿用文件里写的 `major.minor`；文件缺省时 code 1→2、name 2.0.0→2.0.1）。
 
 `versionCode` 必须每次递增：Android 拒绝非递增的升级安装，会要求先卸载 → **丢本地数据**。
 
 产物命名（`release/` 已被 gitignore）：
 
 - `release/NativeThink-mobile-debug.apk` = **当前版本线**，`package:apk` 每次覆盖它（这正是期望行为）。
+- `release/NativeThink-emu-x86_64.apk` = **模拟器专用产物**（`npm run package:apk:emu` → `scripts/package-apk-emu.cjs`）。与发布线三处刻意的不同：**不自增 versionCode**（不烧发布版本号）、`NT_EMU=1` 把 `abiFilters` 从 arm 两档翻成只打 `x86_64`、**绝不覆盖**规范名那份。它只进 AVD，不是发布物。
 - `release/NativeThink-mobile-debug-<major>.x.apk` = **已冻结的旧版本线**，永不覆盖（现有 `-1.x.apk`）。
 - 切新大版本时：把当时的规范名改名冻结，新线继续占用规范名。
 - 改完必须用 `aapt dump badging` 核验内嵌 `versionCode/versionName`。**注意：仓库里没有任何脚本执行 aapt**，只有文档要求 —— 这一步完全靠人。

@@ -46,7 +46,7 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 存储与学习统计 | [modules/storage-and-stats.md](./docs/modules/storage-and-stats.md) | 四套存储、safeStorage 前缀自愈、`addStudyMinutes` 真实语义、同步边界 |
 | 云同步与账号 | [modules/cloud-sync.md](./docs/modules/cloud-sync.md) | 两条上行口径不同；回声抑制/失败提示/按需补推由 `verify:cloud-sync` 守；下行重读订阅收进 `sync-down.ts`（13 个 hook 已接；三个模块缓存库的重读必须先作废缓存） |
 | 构建与发布 | [modules/build-release.md](./docs/modules/build-release.md) | 脚本地图与重复 bump、**缺资产静默出残包**、APK 版本线与产物命名、产物版本核对走构建期 meta |
-| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 27 条可跑的契约守卫（含元守卫 `verify-guard-shape`：扫守卫自身的恒真断言）+ verify:all 全量跑法 + 无头 Chrome/CDP + 真机通道 + 写守卫四条硬规矩 |
+| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 27 条可跑的契约守卫（含元守卫 `verify-guard-shape`：扫守卫自身的恒真断言）+ verify:all 全量跑法 + 无头 Chrome/CDP + 真机通道 + **电脑侧 AVD 模拟器通道**（`scripts/phone-emu.mjs`）+ 写守卫四条硬规矩 |
 
 ---
 
@@ -87,6 +87,7 @@ npm run build:web          # 产纯 web 包用这个；不要用 package:web（�
 # 桌面 / APK 打包
 npm run package:web
 npm run package:apk
+npm run package:apk:emu    # 电脑侧 x86_64 模拟器专用包（不烧 versionCode，产物 release/NativeThink-emu-x86_64.apk，绝不当发布物）
 npm run package:desktop
 npm run package:all
 
@@ -146,6 +147,16 @@ pwsh -File scripts/gen-app-brand.ps1 -Preview docs/brand-assets-preview.png
 node scripts/device-eval.mjs eval "document.title"
 node scripts/device-eval.mjs tap 400 1630    # 物理像素，自动折算 CSS
 node scripts/device-eval.mjs shot .screen.png
+
+# 电脑侧手机仿真（AVD，安卓 x86_64）—— 不依赖手机、且能验"只在 APK 成立"的那类缺陷
+node scripts/phone-emu.mjs check             # 体检：加速 / 镜像 / AVD / 模拟器包 / adb
+node scripts/phone-emu.mjs avd               # 本机没有 avdmanager → 手写 config.ini（1080x2340@440dpi = CSS 392.7）
+node scripts/phone-emu.mjs start && node scripts/phone-emu.mjs wait
+node scripts/phone-emu.mjs install           # 装 NativeThink-emu-x86_64.apk（-g 一次给齐录音权限）
+node scripts/phone-emu.mjs launch && node scripts/phone-emu.mjs smoke
+#   smoke 之后走查照旧：CDP_PORT=9226 node scripts/device-eval.mjs eval "<表达式>"
+# ⚠️ 起不来先看 check 的"加速"那行：x86_64 必须有 AEHD/WHPX，没驱动时 emulator 直接拒启
+#    （管理员跑一次 SDK 里现成的 extras/google/Android_Emulator_Hypervisor_Driver/silent_install.bat）
 ```
 
 **提交约定**：`npm run typecheck` 通过后再提交。有 pre-commit hook（`npm run lint` = typecheck + eslint 并行），**hook 失败就修根因，不要 `--no-verify`**。手机端数据只进 localStorage / IndexedDB，不写系统目录。
@@ -279,9 +290,11 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 | 手机上"点了没反应／转圈不结束"，网页版一切正常 | **只在 APK 成立的原生桥逻辑**：`async` 函数 `return` 一个 Capacitor 插件对象 → 它是 Proxy、`typeof x.then === 'function'` → Promise 同化把 `then` 当原生方法发出去 → resolve/reject 永不调用 → **永久 pending**（不是抛错，`try/catch` 兜不住）。同类的还有"整屏抽屉导航后不关，新页面被吞点击"（`AppSidebar.tsx:108`） | 插件对象一律装在持有者里返回（`native-tts.ts:51,67-77`），原生桥的每个 await 自带超时；这两条由 `verify-native-tts`(37) 与 `verify-overlay-fit` ⑥ 守，**但真凭据只有真机 CDP**（typecheck 与静态守卫都看不见） |
 | 某个页面一点就「页面出错」，同一个组件在别的页面正常 | **共享组件带了 hook 前置条件**：`useFramerMotion()` 在没有 `<LazyFramerProvider>` 祖先时曾直接 throw（真机 2026-10-17：收藏页「开始回顾」裸渲染 `FavoriteReviewMode`，学习记录页包了 provider 所以那边一直正常）。守卫旧写法"任意一个宿主包了就放行"看不见这种缺线 | 渲染点自己包 provider（`verify-overlay-fit` ⑦ 现在**逐个宿主**点名 + 两处入口分别钉）；hook 侧改成缺 provider 时退化成无动画 + 一次性 `console.warn`（动画前置条件不许能掀翻用户的页面）。同族的另一条：收藏清单读盘不校验形状，`content` 是对象就整页崩 → `use-favorites.sanitizeFavorites` 在读盘边界收掉（守卫 ㉔ 真跑） |
 | 守卫打印「N/N 通过 ✓」但那条断言其实没管事 | ① 条件位写成了**字面量本体** —— `ok(/re/, src, '名字')`（正则对象永远真，跨行写更容易看漏，2026-10-17 真翻过一次，是变异实验抓到的）；② `ts.transpileModule` 不带 `target` 降到 ES5 —— `[...map.entries()]` 被换成只读 `.length` 的 `__spreadArray`，**真跑静默返回空数组** | ①`node scripts/verify-guard-shape.mjs`（AST 全仓扫恒真断言，自带正/反对照与 `inspectedTotal` 防空转）；② 所有转译真跑显式写 `target: ts.ScriptTarget.ES2022`（替身必须忠实于浏览器运行时）；新增/改动断言**必须逐条跑变异**，"改坏了还全绿"就是断言没在管事 |
+| 模拟器"起不来"其实是僵尸设备 | `adb shell` 打到 `offline` 设备会**无限期挂住**（脚本看起来卡死）；而 Windows 上 `emulator.exe` 只是启动器，VM 是 `qemu-system-x86_64-headless.exe` —— 只杀启动器会留孤儿 VM 占着 5554/5555，`adb devices` 从此永挂一条假 `offline` | `phone-emu.mjs` 里所有设备调用带超时、`stop` 两个镜像名都收、必要时 `adb kill-server`；判活/诊断一律 `node scripts/phone-emu.mjs status`（它分进程、adb 设备、boot_completed 三层报） |
 | 顶部内容被一条空条遮住 | 无内容但带 `bg-*` 的 sticky 元素仍占位 | 只在有内容时渲染 |
 | 图表数值压住标题 | 容器高度装不下「值+柱+轴」三层 | 容器高度 ≥ 三层实测高度 |
 | 打出的 APK 里是上一次的 web 产物 | `package:apk` **不重建 web**，只拷 `dist/client` 现成的东西；打包日志与 versionCode 全都正常，看不出来 | `scripts/ensure-web-build.mjs` 已是 `package:apk`/`package:desktop` 前置（源码比产物新、或产物内版本 ≠ version.properties 就自动补跑 `build:web`）；复核靠入口 chunk 的内容哈希比对，见 [build-release.md](./docs/modules/build-release.md) §1 |
+| 把发布 APK 装进 x86_64 模拟器（或反之） | 发布线 `abiFilters` 只有 `arm64-v8a / armeabi-v7a`（`android/app/build.gradle`，为了不带那 42MB 冗余原生库），模拟器要的是 `x86_64` —— 架构不匹配时**装上就静默没有离线朗读**（sherpa 插件的 `.so` 根本不在包里），界面一切正常，很容易误报成"TTS 又挂了" | 模拟器走 `npm run package:apk:emu`（`NT_EMU=1` 翻成只打 x86_64），产物名 `NativeThink-emu-x86_64.apk` 与发布线分开；脚本收尾读 **APK 自己的 zip 中央目录**自证（x86_64 .so 在 / www 与 books、piper、tts 资产在 / arm 为 0 条），不看 gradle 中间产物 |
 | 装 APK 后部分本地数据"消失" | 某些 ROM 上 WebView localStorage 随更新被清 | 重装前用「学习记录 → 导出」备份；重要数据登录走云同步 |
 | 真机上字更大、长词折行，本机仿真不复现 | 真机布局视口是 **393 CSS**（1283 物理px ÷ 3 ≈ 428 是估算、错），且 `MainActivity.java:22` 的 `settings.setTextZoom(120)` 让全站字号再 ×1.2（真机 telecom 实渲 36px、compatible 57.6px —— 长词折行即这两个叠加） | 几何/字号核验用 393×852 + `webkitTextSizeAdjust:'120%'` 仿真（**每次页面导航后必须重施**），别再用 428 估算；仿真值与真机逐项核对，见 [verification.md](./docs/modules/verification.md) §5 第 21 测 |
 
@@ -309,6 +322,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 - [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit 77 · chain-verdict 36 · dashboard-glance 25 · correction-notes **89** · guard-shape **7**；合计 **7,760**，2026-10-17 第 39 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs` + `node scripts/verify-char-hygiene.mjs`（清了坏字符还要递增 `CACHE_VERSION`，否则老缓存挡住修复）
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
+- [ ] 改过 `android/app/build.gradle` 的 `abiFilters` 或任何打包脚本 → 至少跑一次 `npm run package:apk:emu`（它收尾会读 APK 自己的 zip 中央目录自证：x86_64 的 sherpa `.so` 在、www/books/piper/tts 资产在、arm 0 条）；模拟器装机走 `node scripts/phone-emu.mjs check`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`
 - [ ] 改过 `ui/dialog` 基座或设置面板 → `verify-overlay-fit`

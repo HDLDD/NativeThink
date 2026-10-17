@@ -28,6 +28,7 @@
     "books:gen-meta": "node scripts/gen-books-meta.cjs",
     "package:web": "npm run version:apk-bump && node scripts/fetch-android-tts.cjs && npm run build:web",
     "package:apk": "npm run version:apk-bump && node scripts/ensure-web-build.mjs && npm run check:tts-voices && node node_modules/@capacitor/cli/bin/capacitor copy android && node scripts/android-copy-models.cjs && cd android && gradlew.bat assembleDebug && cd .. && node -e \"fs.copyFileSync('android/app/build/outputs/apk/debug/app-debug.apk', 'release/NativeThink-mobile-debug.apk')\"",
+    "package:apk:emu": "node scripts/package-apk-emu.cjs",
     "package:desktop": "node scripts/ensure-web-build.mjs && node scripts/pack-app.mjs --skip-web",
     "package:all": "npm run package:web && concurrently -n apk,desktop -c cyan,magenta \"npm run package:apk\" \"npm run package:desktop\"",
     "verify:vocab-caches": "node scripts/verify-vocab-caches.mjs",
