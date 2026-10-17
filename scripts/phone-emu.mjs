@@ -161,11 +161,13 @@ case 'start': {
   // --tcg：没装 AEHD/WHPX 时的软件模拟兜底（boot 慢到十几分钟，但能把 install/cdp/smoke 这条链先跑通）
   if (argv.includes('--tcg')) args.push('-accel', 'off');
   /**
-   * 启动方式踩了两次坑，定型为"写 .bat + cmd /c start"：
+   * 启动方式在这台机器上连撞三次，定型为"写 .bat + cmd /c start 空标题"：
    *  ① node spawn(detached) —— 父 node 一退出，Git Bash 把整个进程树连模拟器一起杀掉（日志停在 kernel cmdline，无 ERROR）；
    *  ② powershell Start-Process -PassThru —— 分离成功的子进程**继承了我们的 stdout 句柄**，
-   *     execFileSync 等 stdout EOF，于是启动命令自己挂死（模拟器其实活着）。
-   * cmd 的 start 会新建进程并立刻返回，日志由 bat 内部重定向，不占我们的句柄。
+   *     execFileSync 等 stdout EOF，于是启动命令自己挂死（模拟器其实活着）；
+   *  ③ `start NativeThink-EMU /MIN ...` —— start 的**第一个带引号实参是窗口标题**，写成裸词就被当程序名，
+   *     rc=1 直接失败（这条是第一次真跑本函数时抓到的 —— 之前那个"活着的模拟器"来自②那次）。
+   * bat 内部自带日志重定向与三个 ANDROID_* 变量，不占我们的句柄。
    */
   const bat = path.join(AVD_HOME, 'start-emu.bat');
   writeFileSync(bat, [
@@ -176,7 +178,7 @@ case 'start': {
     `"${EMU}" ${args.join(' ')} >> "${logFile}" 2>&1`,
     '',
   ].join('\r\n'), 'utf8');
-  sh('cmd', ['/c', 'start', 'NativeThink-EMU', '/MIN', '"C:\\Windows\\System32\\cmd.exe"', '/c', `"${bat}"`]);
+  sh('cmd', ['/c', 'start', '', '/MIN', bat]);
   sleep(6000);
   if (!emulatorAlive()) { console.log(readLastLines(logFile, 14)); die('模拟器 6 秒内就退出了（上面是日志尾巴）'); }
   console.log(`✓ 模拟器在跑${argv.includes('--tcg') ? '（--tcg 软件模拟：boot 可能要十几分钟）' : ''}；日志 ${logFile}`);
@@ -233,9 +235,25 @@ case 'cdp': case 'smoke': {
   sh(ADB, ['forward', `tcp:${port}`, `localabstract:webview_devtools_remote_${m[1]}`]);
   console.log(`✓ CDP 转发 tcp:${port} → webview_devtools_remote_${m[1]}`);
   if (verb === 'smoke') {
-    const probe = '(function(){var cs=getComputedStyle(document.documentElement);return JSON.stringify({title:document.title,path:location.pathname,cssW:window.innerWidth,cssH:window.innerHeight,dpr:window.devicePixelRatio,zoom:cs.webkitTextSizeAdjust,sherpaPlugin:!!(window.Capacitor&&window.Capacitor.plugins&&window.Capacitor.plugins.SherpaTts),ua:navigator.userAgent.slice(0,54)});})()';
-    console.log(sh(process.execPath, [path.join(ROOT, 'scripts', 'device-eval.mjs'), 'eval', probe], { env: { ...env, CDP_PORT: port } }).trim());
-    console.log('   期望：cssW≈393、dpr 2.75、sherpaPlugin:true（原生桥在位，才谈得上验插件类缺陷）');
+    /**
+     * ⚠️ 探针必须问"桥的真值"，不能问 `window.Capacitor.plugins.X` —— 那个对象只有在 app 自己
+     * 调过 `registerPlugin('SherpaTts')`（懒加载模块 `sherpa-tts.ts:100`）之后才填充，
+     * 首屏读它必然 undefined，测出来是"原生桥没了"的假红灯（本机第一版就这么错过一次）。
+     * 正解：`isPluginAvailable(name)` 查的是原生注册表；再真发一次 `status()` 往返才算证据。
+     */
+    const probe = `(async function(){var C=window.Capacitor||{};var out={title:document.title,path:location.pathname,cssW:window.innerWidth,cssH:window.innerHeight,dpr:window.devicePixelRatio,platform:C.getPlatform?C.getPlatform():null,isNative:C.isNativePlatform?C.isNativePlatform():null,ua:navigator.userAgent.slice(0,54)};try{out.sherpaAvailable=!!(C.isPluginAvailable&&C.isPluginAvailable('SherpaTts'));}catch(e){out.sherpaAvailable='ERR '+e.message;}try{out.sysTtsAvailable=!!(C.isPluginAvailable&&C.isPluginAvailable('TextToSpeech'));}catch(e){out.sysTtsAvailable='ERR '+e.message;}try{var p=C.registerPlugin('SherpaTts');var r=await Promise.race([p.status(),new Promise(function(res,rej){setTimeout(function(){rej(new Error('timeout 3s'));},3500);})]);out.sherpaStatus=JSON.stringify(r).slice(0,150);}catch(e){out.sherpaCall='FAIL '+e.message;}return JSON.stringify(out);})()`;
+    const raw = sh(process.execPath, [path.join(ROOT, 'scripts', 'device-eval.mjs'), 'eval', probe], { env: { ...env, CDP_PORT: port } }).trim();
+    console.log(raw);
+    let j = null;
+    try { j = JSON.parse(JSON.parse(raw)); } catch { /* 原样打出来更好诊断 */ }
+    if (j) {
+      const geo = j.cssW === 393 || (j.cssW >= 390 && j.cssW <= 396);
+      console.log(`${geo ? '✓' : '✗'} 几何 cssW=${j.cssW} dpr=${j.dpr}（真机是 393 / 2.75~3.26）`);
+      console.log(`${j.isNative === true ? '✓' : '✗'} 原生平台 isNative=${j.isNative} platform=${j.platform}`);
+      console.log(`${j.sherpaAvailable === true ? '✓' : '✗'} SherpaTts 在原生注册表里（离线朗读引擎）`);
+      console.log(`${j.sysTtsAvailable === true ? '✓' : '✗'} TextToSpeech 在原生注册表里（系统语音，app 走 native-tts.ts:71 的可用性判定）`);
+      console.log(`${j.sherpaStatus ? `✓ 真发一次 SherpaTts.status() 拿到回包：${j.sherpaStatus}` : `✗ SherpaTts.status() 没走通：${j.sherpaCall || '(未执行)'}`}`);
+    }
   }
   console.log(`   走查：CDP_PORT=${port} node scripts/device-eval.mjs eval "<表达式>"  /  shot .screen-emu.png`);
   process.exit(0);

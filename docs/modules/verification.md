@@ -115,9 +115,13 @@ CDP_PORT=9226 node scripts/device-eval.mjs eval "<表达式>"    # 走查工具�
 
 `start --tcg`（`-accel off` 纯软件模拟）**在本机不是可用的兜底**：实测模拟器进程与 VM 都活着、`adb devices` 认到 `emulator-5554`，但三十多分钟一直停在 `offline`，`getprop` 全部拿不到 —— x86_64 guest 没有硬件虚拟化在这台 AMD 机器上就是起不来。留这个开关只是为了在**有 ARM 镜像的机器**（Apple Silicon / ARM Windows，那里 ARM 镜像是原生速度）上没驱动也能跑；本机要装通道就装 AEHD，别指望 `--tcg`。
 
+顺带一条给 agent 环境的说明：在 Qoder/Codex 这类**给后台任务挂 Windows job object** 的宿主里，`cmd /c start` 起的模拟器仍会随该任务被终止而一起收走（实测：`start` 成功、`wait` 超时被杀之后模拟器就没了，日志里只有正常关机、没有任何 ERROR）。所以在自动化会话里要保住模拟器，得**让模拟器自己占住一个长驻后台任务**（直接前景跑 emulator.exe，另开命令跑 wait/install）；人在终端里用 `start` 没这个问题。
+
 顺带三条通道自身的坑（都已写进 `phone-emu.mjs`）：① `adb shell` 打到 `offline` 设备会**无限期挂住**（`execFileSync` 没超时就把脚本钉死，两次都以为是"模拟器起得慢"）→ 所有设备调用带 20s 上限，长操作（install 796MB）单独放宽；② Windows 上 `emulator.exe` 只是启动器，VM 是 `qemu-system-x86_64-headless.exe`，只杀前者会留孤儿 VM **占着 5554/5555 控制台端口**，`adb devices` 于是永远挂一条假的 `offline`，看着像"设备起不来"其实早就是僵尸 → `stop` 两个镜像名都收，必要时无 `adb kill-server`；③ **别把命令接 `| tail`**：`adb wait-for-device` 超时炸掉的那次，通知里报的是 "exit code 0"，因为退出码属于 `tail`（AGENTS/记忆里第 13 条老坑，这次又中一次）——在乎退出码就不要接管道。
 
-**当前状态（2026-10-17）**：构建线 / 镜像 / AVD / `check` / `avd` / `start` / `status` / `stop` 都实测过；`wait → install → launch → cdp → smoke` 的端到端**还没跑通**，唯一缺口就是 AEHD 驱动（一次管理员动作）。在那之前不许把这条通道写进验收清单当"已验证"。
+**当前状态（2026-10-17，AEHD 装好后端到端实测通过）**：`check / avd / start / wait / install / launch / cdp / smoke / stop / status` 全部真跑过。装的是 `NativeThink-emu-x86_64.apk`（`adb install -r -t -g` → Streamed Install Success），冷 boot 到 `sys.boot_completed=1` 十几秒（AEHD 2.2）。`smoke` 凭据：`cssW=393 / cssH=827 / dpr=2.75`（440dpi 的选择与真机 393 对上了）、`isNative=true platform=android`、`SherpaTts` 与 `TextToSpeech` 都在原生注册表里，并且**真发一次 `SherpaTts.status()` 拿到类型化回包**（`{status:"idle",sampleRate:0,cached:0,loadedModels:[],errorByModel:{},espeakFiles:0}`）。从此"只在 APK 成立"的走查与夹具注入都能搬到电脑上（一次性 profile，写数据不碰用户主力机）。
+
+探针的一条判据教训：第一版 `smoke` 读 `window.Capacitor.plugins.SherpaTts` 判"原生桥在不在"，报 `false` —— 那个对象只在 app 自己 `registerPlugin('SherpaTts')`（懒加载的 `sherpa-tts.ts:100`）之后才填充，首屏读它必然 undefined，**测的是模块加载时机而不是桥**。正解：问 `Capacitor.isPluginAvailable(name)`（查的是原生注册表），再真发一次调用当往返证据。
 
 ## 4. 写守卫的四条硬规矩
 
