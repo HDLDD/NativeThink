@@ -190,6 +190,85 @@ export function orderForDrill(notes: ICorrectionNote[]): ICorrectionNote[] {
   });
 }
 
+/**
+ * 错点归纳：把 AI 写在 note / 表格里的那句"为什么中式"归成有限的几类，
+ * 让人看得见"我老犯哪一类"，而不是一条条孤立地重认。
+ *
+ * 规则是**有序**的、首个命中即定型（一条说明常常同时提到"时态"和"冠词"，
+ * 归给排在前面的那一类是刻意的口径，改顺序就会改统计）。认不出就落 other，
+ * 不硬塞进某个语法桶 —— 错的分类比没分类更误导。
+ */
+export type CorrectionCategory =
+  | 'tense' | 'article' | 'collocation' | 'preposition' | 'literal'
+  | 'number' | 'agreement' | 'wordclass' | 'structure' | 'other';
+
+export const CATEGORY_LABELS: Record<CorrectionCategory, string> = {
+  tense: '时态 / 体',
+  article: '冠词 / 限定词',
+  collocation: '搭配 / 选词',
+  preposition: '介词',
+  literal: '中式直译',
+  number: '单复数 / 可数性',
+  agreement: '主谓一致',
+  wordclass: '词性混用',
+  structure: '句法 / 语序',
+  other: '其它',
+};
+
+/** 每类一句针对性建议（错点面板上直接给，不用再去翻） */
+export const CATEGORY_TIPS: Record<CorrectionCategory, string> = {
+  tense: '中文靠词汇表时间，英语靠动词形态：先问自己"这件事发生在说之前还是之后"。',
+  article: '中文没有冠词：可数名词单数裸奔几乎一定是错的，先定 a / the / 零冠词。',
+  collocation: '别问"能不能这么说"，问"母语者跟哪个词"：动宾、形容词+介词成对记。',
+  preposition: '介词跟着动词和名词走，换不成中文逻辑，只能连同搭配一起背。',
+  literal: '整句按字面翻是最大来源：先想英语里这个意思通常用什么句型开口。',
+  number: '中文名词不分单复数：advice / information / furniture 这类不可数要专门记。',
+  agreement: '第三人称单数的 -s 中文里不存在，写完专门回头扫一遍主语和动词。',
+  wordclass: 'boring / bored、say / tell 这类词性错：把词和它常处的句子位置一起记。',
+  structure: '语序与句型：there be、形式主语 it、疑问句倒装都是中文没有的骨架。',
+  other: '先把这一条重认一遍，攒够同类再归纳。',
+};
+
+const CATEGORY_RULES: Array<[CorrectionCategory, RegExp]> = [
+  ['tense', /时态|过去|完成|进行|现在分词|tense|past\b|perfect|progressive/i],
+  ['article', /冠词|不定冠|定冠|a\/an|articles?\b|限定词|零冠词/i],
+  ['number', /单复数|复数|不可数|可数|plural|uncountable/i],
+  ['agreement', /主谓一致|三单|第三人称|subject-?verb|agreement/i],
+  ['wordclass', /词性|形容词误用|副词误用|名词误用|part of speech|boring\/bored|-ing\b.*-ed|-ed.*-ing/i],
+  ['preposition', /介词|preposition|(?:in|on|at|to)与|搭配介词/i],
+  ['literal', /直译|中式|字面|望文生义|chinglish|literal/i],
+  ['collocation', /搭配|动宾|固定短|collocation|选词|用词|更自然|习惯用语?/i],
+  ['structure', /语序|句型|倒装|形式主语|从句|句式|结构|there be|word order|syntax|sentence structure/i],
+];
+
+/**
+ * 纯函数：单条归类别（守卫真跑）。
+ * **证据有优先级**：先看 AI 的说明列（note），说明为空才退到中文提示列（chineseHint）。
+ * 中文提示翻的是句子内容，里面出现"昨天/已经/完成"很正常，拿它当主证据会把一堆
+ * 好端端的句子归成"时态错误"。
+ */
+export function classifyCorrection(n: Pick<ICorrectionNote, 'wrong' | 'right' | 'note' | 'chineseHint'>): CorrectionCategory {
+  const evidences = [n.note, n.chineseHint]
+    .map((x) => (typeof x === 'string' ? x.trim() : ''))
+    .filter(Boolean);
+  for (const text of evidences) {
+    for (const [cat, re] of CATEGORY_RULES) if (re.test(text)) return cat;
+  }
+  return 'other';
+}
+
+/** 纯函数：按类别汇总（保持首次出现的顺序，数量降序只是展示层的事） */
+export function summarizeCorrections(notes: ICorrectionNote[]): Array<{ category: CorrectionCategory; count: number; ids: string[] }> {
+  const byCat = new Map<CorrectionCategory, string[]>();
+  for (const n of notes) {
+    const cat = classifyCorrection(n);
+    const bucket = byCat.get(cat);
+    if (bucket) bucket.push(n.id);
+    else byCat.set(cat, [n.id]);
+  }
+  return [...byCat.entries()].map(([category, ids]) => ({ category, count: ids.length, ids }));
+}
+
 export function invalidateCorrectionNotesCache(): void {
   _cache = null;
 }

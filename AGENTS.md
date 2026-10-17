@@ -46,7 +46,7 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 存储与学习统计 | [modules/storage-and-stats.md](./docs/modules/storage-and-stats.md) | 四套存储、safeStorage 前缀自愈、`addStudyMinutes` 真实语义、同步边界 |
 | 云同步与账号 | [modules/cloud-sync.md](./docs/modules/cloud-sync.md) | 两条上行口径不同；回声抑制/失败提示/按需补推由 `verify:cloud-sync` 守；下行重读订阅收进 `sync-down.ts`（13 个 hook 已接；三个模块缓存库的重读必须先作废缓存） |
 | 构建与发布 | [modules/build-release.md](./docs/modules/build-release.md) | 脚本地图与重复 bump、**缺资产静默出残包**、APK 版本线与产物命名、产物版本核对走构建期 meta |
-| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 24 条可跑的契约守卫 + verify:all 全量跑法 + 无头 Chrome/CDP + 真机通道 + 写守卫四条硬规矩 |
+| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 27 条可跑的契约守卫（含元守卫 `verify-guard-shape`：扫守卫自身的恒真断言）+ verify:all 全量跑法 + 无头 Chrome/CDP + 真机通道 + 写守卫四条硬规矩 |
 
 ---
 
@@ -118,7 +118,8 @@ node scripts/verify-spelling-resume.mjs           # 24   拼写断点按词书�
 node scripts/verify-chain-verdict.mjs             # 36   语块接龙判定三档（未判定不计分也不判错）
 node scripts/verify-ai-parse.mjs                  # 10   AI 解析约定：25 个解析点判空 + 无贪婪正则（元判据固件自证）
 node scripts/verify-dashboard-glance.mjs            # 25   首页内容扩展：续学标签表穷举（/sentences 漏过）+ 三张横幅 0 义务整卡不渲染（待复习 / 纠偏待重考，行门控含第三张）+ 本周柱状日期与高度 + ?tab= 深链三道门（只认 MODES key / 不强进向导 / 走 enterMode 并抹参数）
-node scripts/verify-correction-notes.mjs            # 67   表达纠偏本：Markdown 表格抽取真跑（三源列序/表头噪声/错=对跳过）+ store 整段真跑（去重/review 记账/删除/只拒不裁/写失败可见）+ orderForDrill 排序真跑 + 三处收集接线 + 收藏页折叠列表 + 第 9 模式接线总闸（MODES 每个 key 必须有 TabsContent）与重考卡面契约（不写 SM-2、零 toast）+ ⑦ 送进句子拼写（correctionToSpellingItem 真跑、两处入口接线、纠偏桶不许走词库加载路、空收藏也要有纠偏本入口）
+node scripts/verify-correction-notes.mjs            # 89   表达纠偏本：Markdown 表格抽取真跑（三源列序/表头噪声/错=对跳过）+ store 整段真跑（去重/review 记账/删除/只拒不裁/写失败可见）+ orderForDrill 排序真跑 + 三处收集接线 + 收藏页折叠列表 + 第 9 模式接线总闸（MODES 每个 key 必须有 TabsContent）与重考卡面契约（不写 SM-2、零 toast、干扰项取自整本）+ ⑦ 送进句子拼写（correctionToSpellingItem 真跑、两处入口接线、纠偏桶不许走词库加载路、空收藏也要有纠偏本入口）+ ⑨ 错点归纳（十类规则各自命中、规则顺序与证据优先级两条口径、计数之和=条目数、两处按类筛选接线）
+node scripts/verify-guard-shape.mjs                 # 7    元守卫：AST 扫全部 verify-*.mjs，抓"恒真断言"（`ok(/re/, src, name)` 这种第一实参是字面量本体的写法）与漏名字的断言；自带双向自证 + inspectedTotal 防空转
 node scripts/verify-app-version.mjs                 # 11   版本号单一载体：meta 注入链路 + 产物一致性（产物段先 build:web）
 node scripts/verify-brand-fonts.mjs                 # 26   品牌资产自托管：字体与 favicon 外链零残留 + woff2 结构自洽 + 生效栈正对照（产物段先 build:web）
 npm run verify:rv-articles                        # 104  复习词汇文章：选词/分篇/覆盖出队/体裁主题/原位重写（含旧 slice(0,10) 正对照）
@@ -277,6 +278,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 | 练习界面一张接一张弹提示 | 评分/翻面/收藏/开关各处都挂 toast，答 30 张就是几十条（用户两次要求静默，最后一条是「不要在练习界面有任何提示」） | 三个练习模式只剩**白名单**：失败/空队列 + 唯一撤销入口；其余反馈交给界面计数（已评 / Flame 连对 / 今天新学 x/y / ★ 实心 / 进度条）。新增提示必须先改守卫 ⑧d 白名单，见 [vocabulary.md](./docs/modules/vocabulary.md) 注意事项 13 |
 | 手机上"点了没反应／转圈不结束"，网页版一切正常 | **只在 APK 成立的原生桥逻辑**：`async` 函数 `return` 一个 Capacitor 插件对象 → 它是 Proxy、`typeof x.then === 'function'` → Promise 同化把 `then` 当原生方法发出去 → resolve/reject 永不调用 → **永久 pending**（不是抛错，`try/catch` 兜不住）。同类的还有"整屏抽屉导航后不关，新页面被吞点击"（`AppSidebar.tsx:108`） | 插件对象一律装在持有者里返回（`native-tts.ts:51,67-77`），原生桥的每个 await 自带超时；这两条由 `verify-native-tts`(37) 与 `verify-overlay-fit` ⑥ 守，**但真凭据只有真机 CDP**（typecheck 与静态守卫都看不见） |
 | 某个页面一点就「页面出错」，同一个组件在别的页面正常 | **共享组件带了 hook 前置条件**：`useFramerMotion()` 在没有 `<LazyFramerProvider>` 祖先时曾直接 throw（真机 2026-10-17：收藏页「开始回顾」裸渲染 `FavoriteReviewMode`，学习记录页包了 provider 所以那边一直正常）。守卫旧写法"任意一个宿主包了就放行"看不见这种缺线 | 渲染点自己包 provider（`verify-overlay-fit` ⑦ 现在**逐个宿主**点名 + 两处入口分别钉）；hook 侧改成缺 provider 时退化成无动画 + 一次性 `console.warn`（动画前置条件不许能掀翻用户的页面）。同族的另一条：收藏清单读盘不校验形状，`content` 是对象就整页崩 → `use-favorites.sanitizeFavorites` 在读盘边界收掉（守卫 ㉔ 真跑） |
+| 守卫打印「N/N 通过 ✓」但那条断言其实没管事 | ① 条件位写成了**字面量本体** —— `ok(/re/, src, '名字')`（正则对象永远真，跨行写更容易看漏，2026-10-17 真翻过一次，是变异实验抓到的）；② `ts.transpileModule` 不带 `target` 降到 ES5 —— `[...map.entries()]` 被换成只读 `.length` 的 `__spreadArray`，**真跑静默返回空数组** | ①`node scripts/verify-guard-shape.mjs`（AST 全仓扫恒真断言，自带正/反对照与 `inspectedTotal` 防空转）；② 所有转译真跑显式写 `target: ts.ScriptTarget.ES2022`（替身必须忠实于浏览器运行时）；新增/改动断言**必须逐条跑变异**，"改坏了还全绿"就是断言没在管事 |
 | 顶部内容被一条空条遮住 | 无内容但带 `bg-*` 的 sticky 元素仍占位 | 只在有内容时渲染 |
 | 图表数值压住标题 | 容器高度装不下「值+柱+轴」三层 | 容器高度 ≥ 三层实测高度 |
 | 打出的 APK 里是上一次的 web 产物 | `package:apk` **不重建 web**，只拷 `dist/client` 现成的东西；打包日志与 versionCode 全都正常，看不出来 | `scripts/ensure-web-build.mjs` 已是 `package:apk`/`package:desktop` 前置（源码比产物新、或产物内版本 ≠ version.properties 就自动补跑 `build:web`）；复核靠入口 chunk 的内容哈希比对，见 [build-release.md](./docs/modules/build-release.md) §1 |
@@ -304,7 +306,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit 77 · chain-verdict 36 · dashboard-glance 25 · correction-notes 67；合计 **7,731**，2026-10-17 第 38 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit 77 · chain-verdict 36 · dashboard-glance 25 · correction-notes **89** · guard-shape **7**；合计 **7,760**，2026-10-17 第 39 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs` + `node scripts/verify-char-hygiene.mjs`（清了坏字符还要递增 `CACHE_VERSION`，否则老缓存挡住修复）
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**

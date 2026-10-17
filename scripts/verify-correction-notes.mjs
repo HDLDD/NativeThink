@@ -7,7 +7,9 @@
  *  ③ 三处收集接线（think detector / writing / conversation analysis 的完成点）与收藏页列表（折叠 6 条 + 删除）；
  *  ④ store **整段转译真跑**：归一化去重、重考记账 review、删除、填满上限只拒不裁、落盘失败可见；
  *  ⑤ orderForDrill 真跑（没考过 → 最久没练 → 错得多，四判据缺一即红）；
- *  ⑥ 词汇页第 9 模式接线（MODES ↔ TabsContent 全量对齐）与重考卡面契约（不写 SM-2、计时、干扰项、零 toast）。
+ *  ⑥ 词汇页第 9 模式接线（MODES ↔ TabsContent 全量对齐）与重考卡面契约（不写 SM-2、计时、干扰项、零 toast）；
+ *  ⑦ 纠偏条目 → 句子拼写的桶（判重单点 + 难度分档 + 拼写页不许走词库那条 preload 路径）；
+ *  ⑨ 错点归纳：十类规则真跑（含规则顺序与"说明列压过中文提示列"两条口径）+ 收藏页/重考页的按类筛选接线。
  * 用法：node scripts/verify-correction-notes.mjs（verify:all 自动发现）
  */
 import fs from 'node:fs';
@@ -38,7 +40,7 @@ const code = stripComments(lib);
       .replace(/\)\s*\{(\s*const out[^=]*=)\s*\[\];/g, '){$1[];');
     const jsSrc = ts.transpileModule(
       seg.replace(/function parseMarkdownTables\(md\)/, 'function parseMarkdownTables(md)') + '\nmodule.exports={parseMarkdownTables,extractDetectorRows,extractWritingRows,extractConversationRows};',
-      { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+      { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } },
     ).outputText;
     const mod = { exports: {} };
     new Function('module', 'exports', jsSrc)(mod, mod.exports);
@@ -105,8 +107,8 @@ const fav = stripComments(read('src/pages/FavoritesPage/FavoritesPage.tsx'));
 ok(/addCorrectionNotes\('think', extractDetectorRows\(full\)\)/.test(think), '思维检测完成点收集（detector Natural Alternatives 表）');
 ok(/addCorrectionNotes\('writing', extractWritingRows\(full\)\)/.test(writing), '写作批改完成点收集（Original|Correction 表）');
 ok(/addCorrectionNotes\('conversation', extractConversationRows\(full\)\)/.test(conv), '对话分析完成点收集（我的表达|中文翻译|更地道 表）');
-ok(/useCorrectionNotes\(\)/.test(fav) && /corrNotes\.slice\(0, 6\)/.test(fav) && /展开查看全部 \(\$\{corrNotes\.length\}\)/.test(fav),
-  '收藏页有纠偏本区块（默认 6 条折叠，长列表不一次铺完）');
+ok(/useCorrectionNotes\(\)/.test(fav) && /shownNotes\.slice\(0, 6\)/.test(fav) && /展开查看全部 \(\$\{shownNotes\.length\}\)/.test(fav),
+  '收藏页有纠偏本区块（默认 6 条折叠，长列表不一次铺完；折叠计数跟着筛选走）');
 ok(/removeNote\(n\.id\)/.test(fav), '纠偏条目可删除（误判条目有出口）');
 ok(/思维检测.*写作批改.*对话分析/s.test(fav), '三处来源在列表里有标签（回忆上下文）');
 
@@ -119,7 +121,7 @@ ok(/思维检测.*写作批改.*对话分析/s.test(fav), '三处来源在列表
     const jsSrc = ts.transpileModule(
       code.slice(start, end)
         + '\nmodule.exports={addCorrectionNotes,removeCorrectionNote,recordCorrectionReview,orderForDrill,MAX_NOTES};',
-      { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+      { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } },
     ).outputText;
     // 替身照抄真实语义：safeStorage.setItem 只返回布尔、不抛错（safe-storage.ts:175）；
     // persistJson = try { return safeStorage.setItem(k, JSON.stringify(v)) } catch { false }
@@ -225,10 +227,11 @@ ok(/思维检测.*写作批改.*对话分析/s.test(fav), '三处来源在列表
     '重考不写 SM-2（句子不是词书词条，写进去会污染「已学单词清单」与到期数）');
   ok(/recordCorrectionReview\(cw\.id, ok\)/.test(drillSrc), '重考记账走纠偏本自己的 review');
   ok(/addStudyMinutes\(0\.2, 'vocabulary'\)/.test(drillSrc), '每答一题计 0.2 分钟（与中译英/闪卡翻面同参）');
-  ok(/const q = orderForDrill\(notes\);\s*\n\s*if \(q\.length === 0\) return;\s*\n\s*setQueue\(q\);/,
-    drillSrc.replace(/\r/g, ''), '起跑时排一次并冻结（答题过程中的写盘广播不许改变本轮顺序）');
-  ok(/queue\.filter\(\(n\) => n\.id !== cw\.id\)\.map\(\(n\) => n\.right\)/.test(drillSrc),
-    '干扰项取自其它条目的地道说法（都是真英文，逼"哪句才对应这个意思"）');
+  ok(/const q = orderForDrill\(drillPool\);\s*\n\s*if \(q\.length === 0\) return;\s*\n\s*setQueue\(q\);/.test(drillSrc.replace(/\r/g, '')),
+    '起跑时排一次并冻结（答题过程中的写盘广播不许改变本轮顺序）');
+  ok(/shuffle\(\[\.\.\.new Set\(notes\.filter\(\(n\) => n\.id !== cw\.id\)\.map\(\(n\) => n\.right\)\)\]\)/.test(drillSrc)
+    && /others\.slice\(0, 3\)/.test(drillSrc),
+    '干扰项取自**整本纠偏本**并去重（按类别限定后某类可能只剩 1 条，从题池取就只剩一个选项、点了必对 —— 2026-10-17 无头实测抓到）');
   ok(/window\.addEventListener\('keydown', onKey, true\)/.test(drillSrc),
     '键盘监听走捕获阶段（Radix 冒泡阶段同步关弹窗，Esc 会连带退出重考）');
   ok(/思维检测[\s\S]{0,40}写作批改[\s\S]{0,40}对话分析/.test(drillSrc),
@@ -245,7 +248,7 @@ ok(/思维检测.*写作批改.*对话分析/s.test(fav), '三处来源在列表
   if (segStart >= 0 && segEnd > segStart) {
     const jsSrc = ts.transpileModule(
       stripped.slice(segStart, segEnd) + '\nmodule.exports={CORRECTION_LEVEL,normSentenceKey,correctionToSpellingItem};',
-      { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+      { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } },
     ).outputText;
     const mod = { exports: {} };
     new Function('module', 'exports', jsSrc)(mod, mod.exports);
@@ -309,6 +312,89 @@ ok(/思维检测.*写作批改.*对话分析/s.test(fav), '三处来源在列表
     ok(/String\(en \?\? ''\)\.trim\(\)\.toLowerCase\(\)\.replace\(\/\\s\+\/g, ' '\)/.test(stripped),
       '正对照：normSentenceKey 体内确实在做归一（这条被抓到才说明上一组"只看调用点"的写法没有把函数体算进去）');
     ok(selfLine.startsWith('export function normSentenceKey'), '正对照：函数签名行被排除在调用点统计之外', selfLine.slice(0, 60));
+  }
+}
+
+/* ── ⑨ 错点归纳：类别规则真跑 + 两处的筛选接线 ── */
+{
+  const segStart = code.indexOf('export type CorrectionCategory');
+  const segEnd = code.indexOf('export function invalidateCorrectionNotesCache');
+  ok(segStart >= 0 && segEnd > segStart, '真跑脚手架：抓到 CorrectionCategory + 规则表 + classify/summarize');
+  if (segStart >= 0 && segEnd > segStart) {
+    // target 必须给到浏览器那一档：ES5 降级会把 `[...map.entries()]` 换成 __spreadArray，
+    // 而它对迭代器只读 `.length`（undefined）→ 循环不跑 → **静默返回空数组**，真跑变成假绿。
+    const jsSrc = ts.transpileModule(code.slice(segStart, segEnd), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const mod = { exports: {} };
+    new Function('module', 'exports', jsSrc)(mod, mod.exports);
+    const { classifyCorrection, summarizeCorrections, CATEGORY_LABELS, CATEGORY_TIPS } = mod.exports;
+
+    // 每个类别各一条样本：删掉/写坏任何一条规则，这个环就断（覆盖自证在下面）
+    const byCat = {
+      tense: { note: '时态搞错了，这件事发生在说之前', chineseHint: '' },
+      article: { note: '冠词缺失，可数名词单数不能裸奔', chineseHint: '' },
+      number: { note: 'advice 是不可数名词', chineseHint: '' },
+      agreement: { note: '第三人称单数少了 -s', chineseHint: '' },
+      wordclass: { note: '词性误用：bored 而不是 boring', chineseHint: '' },
+      preposition: { note: '介词用错，listen 要接 to', chineseHint: '' },
+      literal: { note: '整句字面直译', chineseHint: '' },
+      collocation: { note: '搭配不当，用 make a decision', chineseHint: '' },
+      structure: { note: '语序不对，应该用 there be 句型', chineseHint: '' },
+      other: { note: '', chineseHint: '' },
+    };
+    const wrongCls = Object.entries(byCat).filter(([cat, n]) => classifyCorrection(n) !== cat);
+    ok(wrongCls.length === 0, '真跑：十类规则各自命中（其它类别的规则改不动它）',
+      wrongCls.map(([c, n]) => `${c}→${classifyCorrection(n)}`).join(' | '));
+    ok(Object.keys(CATEGORY_LABELS).length === 10 && Object.keys(CATEGORY_TIPS).length === 10
+      && Object.keys(CATEGORY_LABELS).every((k) => CATEGORY_TIPS[k] && CATEGORY_LABELS[k]),
+      '真跑：每个类别都有中文名与建议（缺一类就会渲染成 undefined 标签）');
+    ok(Object.keys(byCat).length === Object.keys(CATEGORY_LABELS).length,
+      '正对照：样本类别数 = 词汇表类别数（新增类别没样本时这条会红，而不是静默漏测）',
+      `${Object.keys(byCat).length}/${Object.keys(CATEGORY_LABELS).length}`);
+
+    // 两条口径纪律：规则有序（首命中定型）+ 证据有优先级（说明列压过中文提示列）
+    ok(classifyCorrection({ note: '时态和冠词都出了问题', chineseHint: '' }) === 'tense',
+      '真跑：一条说明同时提两类时按规则表顺序归前者（改 CATEGORY_RULES 顺序就会红）');
+    ok(classifyCorrection({ note: '搭配和介词都要换', chineseHint: '' }) === 'preposition',
+      '真跑：介词规则排在搭配前（同一句说明的第二个命中不算数）');
+    ok(classifyCorrection({ note: '冠词缺失', chineseHint: '我昨天完成了作业' }) === 'article',
+      '真跑：说明列优先 —— 中文提示里的"昨天/完成"不许把句子拖进时态桶');
+    ok(classifyCorrection({ note: '', chineseHint: 'advice 不可数' }) === 'number',
+      '真跑：说明列为空时退到中文提示列（对话分析表的原因列有时会空）');
+    ok(classifyCorrection({ note: '这个说法不自然', chineseHint: '我们一起去' }) === 'other',
+      '真跑：认不出就落 other，不硬塞进某个语法桶（错分类比没分类更误导）');
+
+    const mk = (id, note) => ({ id, wrong: `w${id}`, right: `r${id}`, note, chineseHint: '' });
+    const notes = [mk('a', '冠词缺失'), mk('b', 'advice 不可数'), mk('c', '冠词也没了'), mk('d', '')];
+    const before = notes.map((n) => n.id).join(',');
+    const sum = summarizeCorrections(notes);
+    ok(sum.map((s) => `${s.category}:${s.count}:${s.ids.join('+')}`).join(' | ')
+      === 'article:2:a+c | number:1:b | other:1:d',
+      '真跑：汇总按**首次出现顺序**给类别与条数与 id', JSON.stringify(sum));
+    ok(notes.map((n) => n.id).join(',') === before, '真跑：summarize 不改写输入（视图直接喂 notes 才安全）');
+    ok(summarizeCorrections([]).length === 0, '真跑：空本子汇总为空（不渲染归纳行）');
+    ok(sum.every((s) => s.count === s.ids.length) && sum.reduce((a, s) => a + s.count, 0) === notes.length,
+      '真跑：各类计数之和 = 条目数（归纳不会漏算也不会重复算）');
+
+    /* 接线：收藏页归纳行 + 重考前按类限定 + 答后/完成页的类别反馈 */
+    const drillSrc = stripComments(read('src/pages/DeepVocabularyPage/components/CorrectionDrillMode.tsx'));
+    ok(/summarizeCorrections\(corrNotes\)/.test(fav) && /noteSummaries\.length >= 2/.test(fav),
+      '收藏页错点归纳行：类别 ≥2 才出现（一类没什么好筛的）');
+    ok(/corrNotes\.filter\(\(n\) => classifyCorrection\(n\) === noteCat\)/.test(fav),
+      '收藏页的类别筛选真的按 classifyCorrection 过（只显示标签不筛选＝假档位）');
+    ok(/setNoteCat\(\(cur\) => \(cur === s\.category \? null : s\.category\)\)/.test(fav),
+      '收藏页再点同一类别可取消筛选（没有"全部"出口就被自己锁死）');
+    ok(/CATEGORY_TIPS\[noteCat\]/.test(fav) && /CATEGORY_TIPS\[s\.category\]/.test(fav),
+      '收藏页选中类别给一句针对性建议（只报数字不教怎么改，价值砍一半）');
+
+    const pool = /const drillPool = useMemo\(\s*\(\) => \(drillCat === null \? notes : notes\.filter\(\(n\) => classifyCorrection\(n\) === drillCat\)\)/;
+    ok(pool.test(drillSrc.replace(/\r/g, '')), '重考起跑页按类别限定题池（与收藏页同一判据）');
+    ok(/开始重考（\{drillPool\.length\} 题）/.test(drillSrc), '开始按钮的题数用的是**筛后**的池（写 notes.length 就是谎报题量）');
+    const catFeed = drillSrc.slice(drillSrc.indexOf('const cat = classifyCorrection(cw)'));
+    ok(catFeed.length > 40 && /CATEGORY_LABELS\[cat\]/.test(catFeed) && /CATEGORY_TIPS\[cat\]/.test(catFeed),
+      '答完当卡给类别 + 建议（错点归纳要落在答错的那一刻才改得动）', `${catFeed.length}`);
+    ok(/cat === 'other'\) return null/.test(drillSrc), '认不出的类别不硬贴标签（other 的建议是废话）');
+    ok(/summarizeCorrections\(queue\.filter\(\(n, i\) => results\[i\] === false\)\)/.test(drillSrc),
+      '完成页把答错的按类别汇总（"这轮还没认出的是哪一类"）');
   }
 }
 

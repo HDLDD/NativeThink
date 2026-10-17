@@ -18,7 +18,8 @@ import { Wand2, Check, X, ArrowLeft, Lightbulb, Keyboard, ExternalLink } from 'l
 import { Card, CardContent } from '@/components/ui/card';
 import {
   useCorrectionNotes, recordCorrectionReview, orderForDrill,
-  type ICorrectionNote,
+  classifyCorrection, summarizeCorrections, CATEGORY_LABELS, CATEGORY_TIPS,
+  type ICorrectionNote, type CorrectionCategory,
 } from '@/lib/correction-notes';
 import { useSpellingSentences, correctionToSpellingItem, normSentenceKey } from '@/lib/use-spelling-sentences';
 import { sfxTick, sfxComplete } from '@/lib/sfx';
@@ -53,13 +54,20 @@ export default function CorrectionDrillMode() {
   const [chosen, setChosen] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  /** 按错点类别限定重考范围（null = 全部）—— 与「开始重考」按钮联动，进题后固定不变（queue 已冻结） */
+  const [drillCat, setDrillCat] = useState<CorrectionCategory | null>(null);
+  const drillSummaries = useMemo(() => summarizeCorrections(notes), [notes]);
+  const drillPool = useMemo(
+    () => (drillCat === null ? notes : notes.filter((n) => classifyCorrection(n) === drillCat)),
+    [notes, drillCat],
+  );
 
   const cw = queue[idx] ?? null;
   // 这句地道说法是否已经在句子拼写库里（决定卡面上那颗按钮的态；不弹提示）
   const inSpellingLib = !!cw && spellSentences.some((s) => normSentenceKey(s.en) === normSentenceKey(cw.right));
 
   const start = useCallback(() => {
-    const q = orderForDrill(notes);
+    const q = orderForDrill(drillPool);
     if (q.length === 0) return;
     setQueue(q);
     setResults(q.map(() => null));
@@ -68,14 +76,19 @@ export default function CorrectionDrillMode() {
     setRevealed(false);
     setFinished(false);
     setStarted(true);
-  }, [notes]);
+  }, [drillPool]);
 
-  /** 四个选项：本条目的地道说法 + 其它条目抽 3 个真英文当干扰 */
+  /**
+   * 四个选项：本条目的地道说法 + 干扰项。
+   * 干扰项取自**整本纠偏本**而不是本轮题池 —— 按错点类别限定重考时某一类可能只有 1 条，
+   * 只从题池取就会端出一张"只有一个选项、点了必对"的卡（2026-10-17 无头实测抓到）。
+   * 用 Set 去重：不同条目的地道说法可能撞车，四个选项里不许出现两句一样的。
+   */
   const options = useMemo(() => {
     if (!cw) return [];
-    const others = shuffle(queue.filter((n) => n.id !== cw.id).map((n) => n.right));
+    const others = shuffle([...new Set(notes.filter((n) => n.id !== cw.id).map((n) => n.right))]);
     return shuffle([cw.right, ...others.slice(0, 3)]);
-  }, [cw, queue]);
+  }, [cw, notes]);
 
   const submit = useCallback((opt: string) => {
     if (!cw || revealed) return;
@@ -138,28 +151,54 @@ export default function CorrectionDrillMode() {
                   <span><b className="text-foreground text-sm">{notes.length}</b> 条待纠偏</span>
                   <span className="ml-auto">已重考过 {drilled} 条</span>
                 </div>
+                {/* 按错点类别限定重考：一类犯了好几次，就集中把这一类认透 */}
+                {drillSummaries.length >= 2 && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      onClick={() => setDrillCat(null)}
+                      className={cn('px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
+                        drillCat === null ? 'border-orange-400/60 bg-orange-500/10 text-orange-600' : 'border-border text-muted-foreground hover:bg-muted/50')}
+                    >
+                      全部 {notes.length}
+                    </button>
+                    {drillSummaries.map((s) => (
+                      <button
+                        key={s.category}
+                        onClick={() => setDrillCat((cur) => (cur === s.category ? null : s.category))}
+                        className={cn('px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
+                          drillCat === s.category ? 'border-orange-400/60 bg-orange-500/10 text-orange-600' : 'border-border text-muted-foreground hover:bg-muted/50')}
+                        title={CATEGORY_TIPS[s.category]}
+                      >
+                        {CATEGORY_LABELS[s.category]} {s.count}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {drillCat && (
+                  <p className="text-[10px] font-bold text-orange-600 leading-relaxed">{CATEGORY_TIPS[drillCat]}</p>
+                )}
                 <button
                   onClick={start}
                   className="w-full py-3 rounded-2xl bg-orange-500 text-white text-sm font-black shadow-lg shadow-orange-200/50 hover:bg-orange-600 transition-all active:scale-[0.99]"
                 >
-                  开始重考（{notes.length} 题）
+                  开始重考（{drillPool.length} 题）
                 </button>
                 <p className="text-[9px] font-bold text-muted-foreground/60 text-center">
                   没考过的排最前 · 考过的隔最久再出现 · 四选一，不考拼整句
                 </p>
                 <div className="space-y-1.5">
-                  {(showAll ? notes : notes.slice(0, 5)).map((n) => (
+                  {(showAll ? drillPool : drillPool.slice(0, 5)).map((n) => (
                     <div key={n.id} className="px-3 py-2 rounded-xl bg-muted/30 space-y-0.5">
                       <p className="text-[10px] font-bold text-rose-500/80 line-through decoration-rose-300 truncate">{n.wrong}</p>
                       <p className="text-[11px] font-black italic text-emerald-600 truncate">{n.right}</p>
                     </div>
                   ))}
-                  {notes.length > 5 && (
+                  {drillPool.length > 5 && (
                     <button
                       onClick={() => setShowAll((v) => !v)}
                       className="w-full py-1.5 rounded-xl border border-dashed border-border text-[10px] font-black text-muted-foreground hover:bg-muted/40"
                     >
-                      {showAll ? '收起' : `展开全部 (${notes.length})`}
+                      {showAll ? '收起' : `展开全部 (${drillPool.length})`}
                     </button>
                   )}
                 </div>
@@ -176,6 +215,8 @@ export default function CorrectionDrillMode() {
     const total = results.filter((r) => r !== null).length;
     const good = results.filter((r) => r === true).length;
     const rate = total > 0 ? Math.round((good / total) * 100) : 0;
+    // 这轮答错的归成错点类别 —— 比"认对 62%"更有用：下次重考就点那一类
+    const missed = summarizeCorrections(queue.filter((n, i) => results[i] === false));
     return (
       <div className="space-y-4">
         <MotionDiv
@@ -190,6 +231,19 @@ export default function CorrectionDrillMode() {
               <p className="text-2xl font-black italic text-foreground">重考完成！</p>
               <p className="text-xs font-bold text-muted-foreground">共 {total} 题 · 认对 {rate}%</p>
             </div>
+            {missed.length > 0 && (
+              <div className="rounded-2xl border border-orange-200/70 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/5 p-3 space-y-1.5 text-left">
+                <p className="text-[9px] font-black uppercase tracking-wider text-orange-600">这轮还没认出的错点</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {missed.map((s) => (
+                    <span key={s.category} className="px-2 py-0.5 rounded-full bg-orange-500/10 text-[10px] font-black text-orange-600">
+                      {CATEGORY_LABELS[s.category]} ×{s.count}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[10px] font-bold text-muted-foreground leading-relaxed">{CATEGORY_TIPS[missed[0].category]}</p>
+              </div>
+            )}
             <div className="flex items-center justify-center gap-2">
               <button
                 onClick={() => { setStarted(false); setFinished(false); }}
@@ -209,6 +263,9 @@ export default function CorrectionDrillMode() {
                   <p className="text-[11px] font-black italic text-foreground truncate">{n.right}</p>
                   <p className="text-[9px] font-bold text-rose-500/70 line-through truncate">{n.wrong}</p>
                 </div>
+                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-muted text-[8px] font-black text-muted-foreground">
+                  {CATEGORY_LABELS[classifyCorrection(n)]}
+                </span>
               </div>
             ))}
           </div>
@@ -296,6 +353,19 @@ export default function CorrectionDrillMode() {
                     <p className="text-[11px] font-bold text-rose-500/80 line-through decoration-rose-300 pl-6">{cw.wrong}</p>
                     <p className="text-[13px] font-black italic text-emerald-600 pl-6">{cw.right}</p>
                     {cw.note && <p className="text-[10px] text-muted-foreground pl-6 leading-relaxed">{cw.note}</p>}
+                    {/* 错点归类：答完当场告诉用户这条属于哪一类中式错误（认不出类别的不硬贴） */}
+                    {(() => {
+                      const cat = classifyCorrection(cw);
+                      if (cat === 'other') return null;
+                      return (
+                        <div className="pl-6 space-y-1">
+                          <span className="px-2 py-0.5 rounded-full bg-orange-500/10 text-[9px] font-black text-orange-600">
+                            {CATEGORY_LABELS[cat]}
+                          </span>
+                          <p className="text-[10px] font-bold text-muted-foreground leading-relaxed">{CATEGORY_TIPS[cat]}</p>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <button
                     onClick={next}

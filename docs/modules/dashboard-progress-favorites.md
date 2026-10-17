@@ -52,13 +52,15 @@ LEGACY_KEY      = __nativethink_favorites_v2     （裸 localStorage，读一次
 
 ### 表达纠偏本（2026-10-16 新增，`src/lib/correction-notes.ts`）
 
-键 `__nativethink_correction_notes`（上限 200，**appendCapped 只拒绝新增、绝不裁剪** —— 用户练习产物不可重算）。AI 判定"你说得不地道"的表达自动收集，三个完成点各喂各的 Markdown 表格：思维检测 detector（`Chinglish Expression | Natural English | Notes`）、写作批改（`Original | Correction | Explanation`，**错=对的噪声行跳过**）、对话分析（`我的表达 | 中文翻译 | 更地道的说法 | 原因分析` 四列，中文进 `chineseHint`）。共用纯函数 `parseMarkdownTables`（表头/分隔行不进数据、无表返空），守卫 `verify-correction-notes`(46) 转译真跑三源样本 + **store 整段真跑**（去重/记账/删除/填满上限只拒不裁/落盘失败可见）。收藏页顶部区块回看：默认 6 条折叠 + 来源标签 + 逐条删除（误判有出口）；收集路径零 toast。云同步/备份按 `__nativethink_` 前缀整片覆盖，新键零成本继承。写盘失败必须可见（`safeStorage` 配额满返回 false 不抛错，教训见 vocabulary.md 收藏一节）。
+键 `__nativethink_correction_notes`（上限 200，**appendCapped 只拒绝新增、绝不裁剪** —— 用户练习产物不可重算）。AI 判定"你说得不地道"的表达自动收集，三个完成点各喂各的 Markdown 表格：思维检测 detector（`Chinglish Expression | Natural English | Notes`）、写作批改（`Original | Correction | Explanation`，**错=对的噪声行跳过**）、对话分析（`我的表达 | 中文翻译 | 更地道的说法 | 原因分析` 四列，中文进 `chineseHint`）。共用纯函数 `parseMarkdownTables`（表头/分隔行不进数据、无表返空），守卫 `verify-correction-notes`(89) 转译真跑三源样本 + **store 整段真跑**（去重/记账/删除/填满上限只拒不裁/落盘失败可见）+ **错点归纳十类规则真跑**。收藏页顶部区块回看：默认 6 条折叠 + 来源标签 + 错点类别徽标 + 逐条删除（误判有出口）；收集路径零 toast。云同步/备份按 `__nativethink_` 前缀整片覆盖，新键零成本继承。写盘失败必须可见（`safeStorage` 配额满返回 false 不抛错，教训见 vocabulary.md 收藏一节）。
 
-**二期（2026-10-16 已做）**：条目变成主动提取题 —— 词汇页**第 9 模式「纠偏重考」**（`CorrectionDrillMode.tsx`，四选一，题干用 `chineseHint`、答案用 `right`、干扰项取其它条目的 `right`）。条目多一个可选 `review: { lastAt, correct, wrong }`，`recordCorrectionReview` 记账、`orderForDrill` 按「没考过 → 最久没练 → 错得多」排队；**不写 SM-2**（句子不是词书词条），细节与行号见 [词汇深度](./vocabulary.md) 的「纠偏重考」一节。
+**二期（2026-10-16 已做）**：条目变成主动提取题 —— 词汇页**第 9 模式「纠偏重考」**（`CorrectionDrillMode.tsx`，四选一，题干用 `chineseHint`、答案用 `right`、干扰项取**整本**其它条目的 `right`）。条目多一个可选 `review: { lastAt, correct, wrong }`，`recordCorrectionReview` 记账、`orderForDrill` 按「没考过 → 最久没练 → 错得多」排队；**不写 SM-2**（句子不是词书词条），细节与行号见 [词汇深度](./vocabulary.md) 的「纠偏重考」一节。
 
-**区块必须两个分支都渲染（2026-10-17 无头实测抓到并修掉）**：收藏页在 `favorites.length === 0` 时走「收藏本是空的」早退分支，而纠偏区块原先只写在浏览视图里 —— **一条收藏都没有的账号打开收藏页，纠偏本完全没有入口**（同一份夹具在词汇页能看到「3 条待纠偏」，在收藏页却什么都不渲染）。现在区块提成 `correctionBlock`（`FavoritesPage.tsx:106`），空态与浏览态各渲染一次（`:201`、`:244`）；守卫 `verify-correction-notes` ⑦ 钉「≥2 处 `{correctionBlock}`」，变异 M9（撤掉空态那处）验红。
+**区块必须两个分支都渲染（2026-10-17 无头实测抓到并修掉）**：收藏页在 `favorites.length === 0` 时走「收藏本是空的」早退分支，而纠偏区块原先只写在浏览视图里 —— **一条收藏都没有的账号打开收藏页，纠偏本完全没有入口**（同一份夹具在词汇页能看到「3 条待纠偏」，在收藏页却什么都不渲染）。现在区块提成 `correctionBlock`（`FavoritesPage.tsx:114`），空态与浏览态各渲染一次（`:244`、`:287`）；守卫 `verify-correction-notes` ⑦ 钉「≥2 处 `{correctionBlock}`」，变异 M9（撤掉空态那处）验红。
 
-**三期（2026-10-17）＝产出侧出口**：每条右侧的键盘钮把 `right` 送进**句子拼写**的 `correction` 桶（`sendToSpelling` `FavoritesPage.tsx:66` + 按钮 `:130`），到拼写页词库下拉选「纠偏表达」就能逐词拼自己那句地道说法（形状、难度分档与三条硬约束见 [句子拼写](./spelling.md) §2.1、注意事项 15）。四选一证明"认得出"，拼出来才算"写得出"。
+**三期（2026-10-17）＝产出侧出口**：每条右侧的键盘钮把 `right` 送进**句子拼写**的 `correction` 桶（`sendToSpelling` `FavoritesPage.tsx:66` + 按钮 `:173`），到拼写页词库下拉选「纠偏表达」就能逐词拼自己那句地道说法（形状、难度分档与三条硬约束见 [句子拼写](./spelling.md) §2.1、注意事项 15）。四选一证明"认得出"，拼出来才算"写得出"。
+
+**四期（2026-10-17）＝错点归纳**：一条一条重认看不出"我到底老犯哪一类中式思维"，于是把 AI 写的原因说明归进十类（`classifyCorrection` / `summarizeCorrections`，`correction-notes.ts:250-268`；类别名与建议 `:205-230`）。收藏页区块头部是一行类别 chips（`全部 5 · 词性混用 1 · 单复数 1 …`，只在类别 ≥2 时出现 —— 一类没什么好筛的），点某类**只列这一类**（`shownNotes` `FavoritesPage.tsx:107`，折叠计数同源，不另算整本）并直接给一句针对性建议；每条右侧多一枚类别徽标（`:165`）。同一套判据在词汇页重考前限定题池（「只重考这一类」），答完当卡与完成页也都按类回话 —— 见 vocabulary.md「错点归纳与按类重考」。**两条口径是统计的意义所在**：规则**有序、首个命中定型**；证据**先看说明列**，说明为空才退中文提示列（中文提示里出现"昨天/已经/完成"是句子内容，不是错误原因，当主证据会把好句子误判成时态错）。守卫 ⑨ 十类各一条样本 + 这两条口径 + 「计数之和 = 条目数」，变异 M1-M5 验红；认不出的落 `other`，**卡面上连标签都不贴**（错的分类比没分类更误导）。
 
 ## 4. 备份与恢复（`src/lib/backup.ts`）
 

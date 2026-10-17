@@ -13,7 +13,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useFavorites } from '@/lib/use-favorites';
-import { useCorrectionNotes, type ICorrectionNote } from '@/lib/correction-notes';
+import { useCorrectionNotes, type ICorrectionNote, type CorrectionCategory, CATEGORY_LABELS, CATEGORY_TIPS, classifyCorrection, summarizeCorrections } from '@/lib/correction-notes';
 import { useTTS } from '@/lib/use-tts';
 import { cn, cleanText } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
@@ -101,6 +101,14 @@ export default function FavoritesPage() {
     });
   };
 
+  // 错点归纳：类别统计 + 当前筛选的类别（null = 全部）
+  const [noteCat, setNoteCat] = useState<CorrectionCategory | null>(null);
+  const noteSummaries = useMemo(() => summarizeCorrections(corrNotes), [corrNotes]);
+  const shownNotes = useMemo(
+    () => (noteCat === null ? corrNotes : corrNotes.filter((n) => classifyCorrection(n) === noteCat)),
+    [corrNotes, noteCat],
+  );
+
   // 纠偏本区块必须**两个分支都渲染**：一条收藏都没有的账号进收藏页会走「收藏本是空的」早退
   // 分支，原先只把区块写在浏览视图里 → 纠偏本完全没入口（2026-10-17 无头实测抓到）。
   const correctionBlock = corrNotes.length > 0 && (
@@ -111,7 +119,36 @@ export default function FavoritesPage() {
             表达纠偏 · {corrNotes.length} 条（检测/批改/分析里自动收集）
           </span>
         </div>
-        {(showAllNotes ? corrNotes : corrNotes.slice(0, 6)).map((n) => {
+        {/* 错点归纳：AI 那句"为什么中式"归成有限几类，看得见"我老犯哪一类"。
+            只在类别 ≥2 时出现（一类没什么好筛的）。 */}
+        {noteSummaries.length >= 2 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => setNoteCat(null)}
+                className={cn('px-2 py-0.5 rounded-full text-[9px] font-black border transition-all',
+                  noteCat === null ? 'border-orange-400/60 bg-orange-500/10 text-orange-600' : 'border-border text-muted-foreground hover:bg-muted/50')}
+              >
+                全部 {corrNotes.length}
+              </button>
+              {noteSummaries.map((s) => (
+                <button
+                  key={s.category}
+                  onClick={() => setNoteCat((cur) => (cur === s.category ? null : s.category))}
+                  className={cn('px-2 py-0.5 rounded-full text-[9px] font-black border transition-all',
+                    noteCat === s.category ? 'border-orange-400/60 bg-orange-500/10 text-orange-600' : 'border-border text-muted-foreground hover:bg-muted/50')}
+                  title={CATEGORY_TIPS[s.category]}
+                >
+                  {CATEGORY_LABELS[s.category]} {s.count}
+                </button>
+              ))}
+            </div>
+            {noteCat && (
+              <p className="text-[10px] font-bold text-orange-600 leading-relaxed">{CATEGORY_TIPS[noteCat]}</p>
+            )}
+          </div>
+        )}
+        {(showAllNotes ? shownNotes : shownNotes.slice(0, 6)).map((n) => {
           const inSpelling = spellSentences.some((s) => normSentenceKey(s.en) === normSentenceKey(n.right));
           return (
           <div key={n.id} className="rounded-2xl border border-border/60 p-3 space-y-1">
@@ -122,9 +159,15 @@ export default function FavoritesPage() {
                 {n.chineseHint && <p className="text-[10px] text-muted-foreground">{n.chineseHint}</p>}
                 {n.note && <p className="text-[10px] text-muted-foreground/80">{n.note}</p>}
               </div>
-              <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-muted text-[8px] font-black text-muted-foreground">
-                {{ think: '思维检测', writing: '写作批改', conversation: '对话分析' }[n.source] || n.source}
-              </span>
+              {/* 两枚徽标竖着排：真机 393 CSS + textZoom 120% 下横排会把正文挤成一列竖条 */}
+              <div className="shrink-0 flex flex-col items-end gap-1">
+                <span className="px-1.5 py-0.5 rounded-full bg-orange-500/10 text-[8px] font-black text-orange-600">
+                  {CATEGORY_LABELS[classifyCorrection(n)]}
+                </span>
+                <span className="px-1.5 py-0.5 rounded-full bg-muted text-[8px] font-black text-muted-foreground">
+                  {{ think: '思维检测', writing: '写作批改', conversation: '对话分析' }[n.source] || n.source}
+                </span>
+              </div>
               {/* 认出≠写得出：一键把地道说法送进句子拼写（拼写页「纠偏表达」池） */}
               <button
                 onClick={() => sendToSpelling(n)}
@@ -140,12 +183,12 @@ export default function FavoritesPage() {
           </div>
           );
         })}
-        {corrNotes.length > 6 && (
+        {shownNotes.length > 6 && (
           <button
             onClick={() => setShowAllNotes((v) => !v)}
             className="w-full py-1.5 rounded-xl border border-dashed border-border text-[10px] font-black text-muted-foreground hover:bg-muted/40"
           >
-            {showAllNotes ? '收起' : `展开查看全部 (${corrNotes.length})`}
+            {showAllNotes ? '收起' : `展开查看全部 (${shownNotes.length})`}
           </button>
         )}
       </div>
