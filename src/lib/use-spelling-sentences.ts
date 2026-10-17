@@ -21,6 +21,40 @@ const BATCH_COUNTER_KEY = '__nativethink_spelling_batch_counter';
  */
 export const SPELLING_SENTENCE_LIMIT = 1200;
 
+/**
+ * 纠偏本 → 句子拼写（2026-10-17）：把「地道说法」当成一道拼写题 —— 四选一只是"认得出"，
+ * 逐词拼出来才是"写得出"，而这正是这个 App 的立身目标（摆脱中式英语）。
+ *
+ * 这批句子单独占一个 level 桶（拼写页词库下拉里的「纠偏表达」），**不跟词库例句混池**：
+ * 词库桶有几千条例句，自己的错句混进去就再也翻不到，等于白送。
+ * 难度按词数分三档（≤7 / ≤13 / 更多），判定与出题都用拼写页现成的那套。
+ */
+export const CORRECTION_LEVEL = 'correction';
+
+/** 与 addSentence / addSentences 的判重口径同源（守卫直接真跑这条） */
+export function normSentenceKey(en: unknown): string {
+  return String(en ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+export interface ICorrectionSeed {
+  right: string;
+  chineseHint?: string;
+  note?: string;
+}
+
+export function correctionToSpellingItem(n: ICorrectionSeed): Omit<ISpellingSentence, 'id' | 'createdAt'> {
+  const en = String(n?.right ?? '').trim();
+  const wordCount = en.split(/\s+/).filter(Boolean).length;
+  return {
+    en,
+    // 中文提示优先（对话分析表带）；没有就用 AI 的原因说明，再没有就留空由拼写页只给英文提示
+    zh: String(n?.chineseHint || n?.note || '').trim(),
+    source: 'correction',
+    level: CORRECTION_LEVEL,
+    difficulty: wordCount <= 7 ? 'beginner' : wordCount <= 13 ? 'intermediate' : 'advanced',
+  };
+}
+
 function generateId(): string {
   return `spell_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -59,7 +93,7 @@ export function useSpellingSentences() {
   const addSentence = useCallback(
     (sentence: Omit<ISpellingSentence, 'id' | 'createdAt'>): boolean => {
       // Dedup: skip if same English text already exists
-      if (sentences.some((s) => s.en.trim().toLowerCase() === sentence.en.trim().toLowerCase())) {
+      if (sentences.some((s) => normSentenceKey(s.en) === normSentenceKey(sentence.en))) {
         return false;
       }
       if (sentences.length >= SPELLING_SENTENCE_LIMIT) return false;
@@ -77,10 +111,10 @@ export function useSpellingSentences() {
   /** Add multiple sentences at once (batch add, dedup by English text). 到上限只加得进剩下的部分 */
   const addSentences = useCallback(
     (items: Omit<ISpellingSentence, 'id' | 'createdAt'>[]): number => {
-      const existingTexts = new Set(sentences.map((s) => s.en.trim().toLowerCase()));
+      const existingTexts = new Set(sentences.map((s) => normSentenceKey(s.en)));
       const newItems: ISpellingSentence[] = [];
       for (const item of items) {
-        const key = item.en.trim().toLowerCase();
+        const key = normSentenceKey(item.en);
         if (!existingTexts.has(key)) {
           existingTexts.add(key);
           newItems.push({
@@ -104,8 +138,8 @@ export function useSpellingSentences() {
       let changed = 0;
       const updated = [...sentences];
       for (const item of items) {
-        const key = item.en.trim().toLowerCase();
-        const existingIdx = updated.findIndex((s) => s.en.trim().toLowerCase() === key);
+        const key = normSentenceKey(item.en);
+        const existingIdx = updated.findIndex((s) => normSentenceKey(s.en) === key);
         if (existingIdx >= 0) {
           // Update existing: add level field (preserve other fields)
           if (updated[existingIdx].level !== item.level) {

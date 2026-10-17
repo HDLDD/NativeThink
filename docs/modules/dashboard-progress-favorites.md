@@ -54,6 +54,10 @@ LEGACY_KEY      = __nativethink_favorites_v2     （裸 localStorage，读一次
 
 **二期（2026-10-16 已做）**：条目变成主动提取题 —— 词汇页**第 9 模式「纠偏重考」**（`CorrectionDrillMode.tsx`，四选一，题干用 `chineseHint`、答案用 `right`、干扰项取其它条目的 `right`）。条目多一个可选 `review: { lastAt, correct, wrong }`，`recordCorrectionReview` 记账、`orderForDrill` 按「没考过 → 最久没练 → 错得多」排队；**不写 SM-2**（句子不是词书词条），细节与行号见 [词汇深度](./vocabulary.md) 的「纠偏重考」一节。
 
+**区块必须两个分支都渲染（2026-10-17 无头实测抓到并修掉）**：收藏页在 `favorites.length === 0` 时走「收藏本是空的」早退分支，而纠偏区块原先只写在浏览视图里 —— **一条收藏都没有的账号打开收藏页，纠偏本完全没有入口**（同一份夹具在词汇页能看到「3 条待纠偏」，在收藏页却什么都不渲染）。现在区块提成 `correctionBlock`（`FavoritesPage.tsx:106`），空态与浏览态各渲染一次（`:201`、`:244`）；守卫 `verify-correction-notes` ⑦ 钉「≥2 处 `{correctionBlock}`」，变异 M9（撤掉空态那处）验红。
+
+**三期（2026-10-17）＝产出侧出口**：每条右侧的键盘钮把 `right` 送进**句子拼写**的 `correction` 桶（`sendToSpelling` `FavoritesPage.tsx:66` + 按钮 `:130`），到拼写页词库下拉选「纠偏表达」就能逐词拼自己那句地道说法（形状、难度分档与三条硬约束见 [句子拼写](./spelling.md) §2.1、注意事项 15）。四选一证明"认得出"，拼出来才算"写得出"。
+
 ## 4. 备份与恢复（`src/lib/backup.ts`）
 
 `IBackupFile = { app:'NativeThink', version:2, exportedAt, data, idb? }`：

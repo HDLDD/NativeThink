@@ -17,14 +17,17 @@
 
 ## 2. 实现方法
 
-### 2.1 题目来源四条路
+### 2.1 题目来源五条路
 
 | 来源 | `source` | 位置 | 落盘 |
 |------|----------|------|------|
 | 词库例句 | `word_example` | `extractLevelSentences()` `:834-857`，从 `queryWords({level})` 抽 `w.examples`，带 `sourceWord` + `level` | **不落 localStorage**，只进模块级缓存 `_wbCache` / `_wbCacheAll`（`:84-108`），id 由文本哈希 `_wbId()` 生成（`:87-91`，稳定） |
 | 收藏单词 | `favorite` | `importFavoriteWords()` `:912-937`，取 `favorites.filter(type==='word')`，`level: 'favorites'` | 同上 |
 | AI 批量 | `ai_generated` | `use-spelling-sentences.ts:205-213`，带 `batchId` | localStorage `__nativethink_spelling_sentences`（`:11`） |
+| 纠偏本条目 | `correction` | `correctionToSpellingItem()` `use-spelling-sentences.ts:45-56`；两个写入点：收藏页每条的键盘钮（`FavoritesPage.tsx:66`+`:130`）与纠偏重考卡面的「拼写这句」（`CorrectionDrillMode.tsx:310`） | localStorage `__nativethink_spelling_sentences`，`level` 固定 `'correction'`（`:32` 的 `CORRECTION_LEVEL`） |
 | 用户手建 | `user_created` | 类型里有（`types/spelling.ts:7`），**全仓无任何写入点** | — |
+
+**纠偏条目为什么单独占一个桶**：词库桶动辄几千句（实测四级 6,827 句），自己那句错句混进去等于再也翻不到。桶名在词库下拉里叫「纠偏表达」（`SpellingPage.tsx:1286-1297`，标签映射 `:1262`）。**切到这个桶必须绕开词库那条加载路径**（`handleLevelChange` 的早退分支 `:880-891`）—— 否则会去 `preloadLevels('correction')` 并弹「该词库没有例句」这种谎。难度按词数分三档（≤7 / ≤13 / 更多，`use-spelling-sentences.ts:54`）—— 纠偏条目是整句、普遍比词库例句长，套词库那套 `getDifficulty` 会一律落到 intermediate。判重口径单点在 `normSentenceKey()`（`:35-37`，`addSentence` / `addSentences` / `upsertSentences` 三处都走它），别退回各处自己写 `trim().toLowerCase()`。
 
 词库 → 难度映射 `getDifficulty`（`:823-827`）：zhongkao/gaokao/cet4 → beginner，advanced → advanced，其余 intermediate。九个等级常量 `ALL_LEVELS`（`:829`）。
 
@@ -75,3 +78,4 @@
 12. **死代码**：`types/spelling.ts:7` 的 `'user_created'` 无写入点；`use-spelling-sentences.ts:12` 的 `BATCH_COUNTER_KEY` 声明后从未使用。
 13. **`使用攻略.md:60` 与代码不符**：写着「练法有单词拼写、句子拼写、听写、填空」四种，代码是 2 个 mode（dictation/fill）× 2 个音频模式（sentence/word）。
 14. **守卫**：`npm run verify:spelling-resume`（24 断言）覆盖断点分键/迁移/重置枚举/非法下标，`npm run verify:ai-parse` 扫批量加句的解析约定。**仍未被覆盖**：`buildSessionQueue` 的顺序与 `markServed` 副作用、`served` 超 4000 条剪枝、预热与实播的键匹配 —— 改这些仍要手动跑一轮：出一轮题 → 刷新 → 看是否接着上次位置、且不重复刚出过的。
+15. **「纠偏表达」桶的三条硬约束（2026-10-17 新增，`verify-correction-notes` ⑦ 逐条钉 + 变异 10 条验红）**：① 切桶走早退分支，不许 `preloadLevels`/`extractLevelSentences`（不然弹「该词库没有例句」，把能练的池子说成空的）；② 题面必须是条目的 `right`（把用户自己的中式原句当"标准答案"来拼是反的）；③ 中文提示按 `chineseHint → note → ''` 兜底 —— 填空档靠中文给提示，全空就等于没有提示。另外：`source` 加了 `'correction'` 之后，`user_created` 仍是死代码（无写入点），别以为"自定义句子"就是它。约定。**仍未被覆盖**：`buildSessionQueue` 的顺序与 `markServed` 副作用、`served` 超 4000 条剪枝、预热与实播的键匹配 —— 改这些仍要手动跑一轮：出一轮题 → 刷新 → 看是否接着上次位置、且不重复刚出过的。

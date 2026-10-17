@@ -204,7 +204,9 @@ ok(/思维检测.*写作批改.*对话分析/s.test(fav), '三处来源在列表
 /* ── ⑥ 词汇页第 9 模式接线 + 重考卡面契约 ── */
 {
   const page = stripComments(read('src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx'));
-  const drillSrc = read('src/pages/DeepVocabularyPage/components/CorrectionDrillMode.tsx');
+  // 反向断言（"不许出现 toast"）必须看**剥掉注释**的源码 —— 实现里那句"不弹 toast"的注释
+  // 会把断言打红（2026-10-17 真红过一次，属于守卫自己的坑，不是产品缺陷）。
+  const drillSrc = stripComments(read('src/pages/DeepVocabularyPage/components/CorrectionDrillMode.tsx'));
   ok(/import CorrectionDrillMode from '\.\/components\/CorrectionDrillMode'/.test(page),
     '第 9 模式已 import（漏了不会报错，只会静默不显示）');
   ok(/\{ key: 'correction', label: '纠偏重考'/.test(page), 'MODES 里有「纠偏重考」条目（模式列表与顶部标题同源）');
@@ -231,6 +233,83 @@ ok(/思维检测.*写作批改.*对话分析/s.test(fav), '三处来源在列表
     '键盘监听走捕获阶段（Radix 冒泡阶段同步关弹窗，Esc 会连带退出重考）');
   ok(/思维检测[\s\S]{0,40}写作批改[\s\S]{0,40}对话分析/.test(drillSrc),
     '空态有指路（告诉用户三个来源会自动收集，而不是只说"暂无"）');
+}
+
+/* ── ⑦ 纠偏条目 → 句子拼写（产出侧闭环：认出 ≠ 写得出） ── */
+{
+  const spellLib = read('src/lib/use-spelling-sentences.ts');
+  const stripped = stripComments(spellLib);
+  const segStart = stripped.indexOf('export const CORRECTION_LEVEL');
+  const segEnd = stripped.indexOf('function generateId');
+  ok(segStart >= 0 && segEnd > segStart, '真跑脚手架：抓到 CORRECTION_LEVEL + normSentenceKey + correctionToSpellingItem');
+  if (segStart >= 0 && segEnd > segStart) {
+    const jsSrc = ts.transpileModule(
+      stripped.slice(segStart, segEnd) + '\nmodule.exports={CORRECTION_LEVEL,normSentenceKey,correctionToSpellingItem};',
+      { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+    ).outputText;
+    const mod = { exports: {} };
+    new Function('module', 'exports', jsSrc)(mod, mod.exports);
+    const { normSentenceKey, correctionToSpellingItem } = mod.exports;
+
+    ok(normSentenceKey('  Put  THE Stuff Away ') === 'put the stuff away',
+      '真跑：判重口径归一（大小写 + 首尾空格 + 连续空格），三处入库共用一个函数');
+    const short = correctionToSpellingItem({ right: 'He told me.', chineseHint: '他告诉我', note: 'say/tell' });
+    ok(short.en === 'He told me.' && short.zh === '他告诉我' && short.source === 'correction'
+      && short.level === 'correction' && short.difficulty === 'beginner',
+      '真跑：题目用 right（不是自己的错句）、中文优先 chineseHint、落进独立 correction 桶', JSON.stringify(short));
+    ok(correctionToSpellingItem({ right: 'x'.repeat(3), chineseHint: '', note: '程度副词位置' }).zh === '程度副词位置',
+      '真跑：没有中文提示时退到 AI 的原因说明（拼写的填空档靠中文给提示，留空就没法练）');
+    const mid = correctionToSpellingItem({ right: 'one two three four five six seven eight' });
+    const long = correctionToSpellingItem({ right: 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen' });
+    ok(mid.difficulty === 'intermediate' && long.difficulty === 'advanced',
+      '真跑：难度按词数分三档（≤7 / ≤13 / 更多）—— 整句纠偏条目常比词库例句长', `${mid.difficulty}/${long.difficulty}`);
+    // 贴边样本：不卡边界的话，把 ≤7 改成 ≤3 也不会红（M7 第一版就是这么漏的）
+    const at7 = correctionToSpellingItem({ right: 'one two three four five six seven' });
+    const at13 = correctionToSpellingItem({ right: 'one two three four five six seven eight nine ten eleven twelve thirteen' });
+    ok(at7.difficulty === 'beginner' && at13.difficulty === 'intermediate',
+      '真跑：边界值本身（7 词仍是 beginner、13 词仍是 intermediate）', `${at7.difficulty}/${at13.difficulty}`);
+  }
+
+  ok(/addSentence\(correctionToSpellingItem\(/.test(fav), '收藏页有「送进拼写」入口（每条一个按钮）');
+  ok(/onClick=\{\(\) => sendToSpelling\(n\)\}/.test(fav),
+    '收藏页那个按钮真的接到 sendToSpelling（只写函数不接线是静默失效）');
+  const drill = stripComments(read('src/pages/DeepVocabularyPage/components/CorrectionDrillMode.tsx'));
+  ok(/addSentence\(correctionToSpellingItem\(cw\)\)/.test(drill), '重考卡面揭示后有「拼写这句」');
+  ok(/spellSentences\.some\(\(s\) => normSentenceKey\(s\.en\) === normSentenceKey\(cw\.right\)\)/.test(drill),
+    '卡面用同一个归一口径判断"已在库里"（按钮态而不是 toast —— 练习界面零提示口径）');
+  ok(!/toast|sonner/.test(drill), '重考卡面（含送拼写这一步）零提示');
+
+  const spellingPage = stripComments(read('src/pages/SpellingPage/SpellingPage.tsx'));
+  ok(/import \{ useSpellingSentences, SPELLING_SENTENCE_LIMIT, CORRECTION_LEVEL \}/.test(spellingPage),
+    '拼写页导入 correction 桶常量（而不是各处自己写字面量）');
+  ok(/correction:'纠偏表达'/.test(spellingPage), '词库触发器认得 correction → 「纠偏表达」');
+  const branch = spellingPage.slice(spellingPage.indexOf('if (lvl === CORRECTION_LEVEL)'));
+  const branchBody = branch.slice(0, branch.indexOf('return;') + 7);
+  ok(branch.length > 40 && branch.includes('CORRECTION_LEVEL'), '真跑脚手架：抓到纠偏桶的切书分支（抓空会让下面的反向断言真空通过）');
+  ok(/setActiveLevel\(lvl\)[\s\S]{0,120}rebuildSession\(\{ level: lvl \}\)/.test(branchBody),
+    '纠偏桶走"直接重建队列"（句子已经在句子库里，不需要建库）');
+  ok(!/preloadLevels|isLevelReady|extractLevelSentences/.test(branchBody),
+    '纠偏桶不许走词库那条路（会 preload 一个不存在的 level 并误报"该词库没有例句"）');
+  ok((fav.match(/\{correctionBlock\}/g) || []).length >= 2,
+    '纠偏本区块在收藏页两个分支都渲染（0 收藏时走"收藏本是空的"早退分支，原先区块只在浏览视图里 → 完全没入口）');
+  /**
+   * ⑧ 句子库三处判重必须共用 normSentenceKey（单点）。
+   * ⚠️ 元判据自己也要带正对照，否则它就是本轮最大的假绿源：变异实验证明"整段 slice"
+   *    会在 `normSentenceKey` 自己的函数体上真空通过（体内那句 `String(en).trim().toLowerCase()`
+   *    并不是一处判重）。所以只逐行看**调用点**，并用固定长度窗口抓函数体做正对照。
+   */
+  {
+    const callLines = stripped.split('\n').filter((l) => /normSentenceKey\(/.test(l) && !/export function normSentenceKey/.test(l));
+    ok(callLines.length >= 5,
+      `真跑之外再钉调用点：normSentenceKey 在句库里有 ${callLines.length} 行调用（addSentence / addSentences / upsert 三处判重）`,
+      callLines.map((l) => l.trim().slice(0, 58)).join(' | '));
+    const inlineDupes = callLines.filter((l) => /\.trim\(\)\.toLowerCase\(\)/.test(l));
+    ok(inlineDupes.length === 0, '判重不许再写各处自己的 trim().toLowerCase()（口径必须单点）', inlineDupes.join(' | '));
+    const selfLine = stripped.split('\n').find((l) => /export function normSentenceKey/.test(l)) || '';
+    ok(/String\(en \?\? ''\)\.trim\(\)\.toLowerCase\(\)\.replace\(\/\\s\+\/g, ' '\)/.test(stripped),
+      '正对照：normSentenceKey 体内确实在做归一（这条被抓到才说明上一组"只看调用点"的写法没有把函数体算进去）');
+    ok(selfLine.startsWith('export function normSentenceKey'), '正对照：函数签名行被排除在调用点统计之外', selfLine.slice(0, 60));
+  }
 }
 
 let pass = 0, fail = 0, failures = [];

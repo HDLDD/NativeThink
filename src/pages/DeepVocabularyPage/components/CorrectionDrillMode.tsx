@@ -12,13 +12,15 @@
  */
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
-import { Wand2, Check, X, ArrowLeft, Lightbulb } from 'lucide-react';
+import { Wand2, Check, X, ArrowLeft, Lightbulb, Keyboard, ExternalLink } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   useCorrectionNotes, recordCorrectionReview, orderForDrill,
   type ICorrectionNote,
 } from '@/lib/correction-notes';
+import { useSpellingSentences, correctionToSpellingItem, normSentenceKey } from '@/lib/use-spelling-sentences';
 import { sfxTick, sfxComplete } from '@/lib/sfx';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { cn } from '@/lib/utils';
@@ -40,6 +42,8 @@ export default function CorrectionDrillMode() {
   const { LazyMotionDiv: MotionDiv } = useFramerMotion();
   const { notes } = useCorrectionNotes();
   const { addStudyMinutes } = useLearningStats();
+  const navigate = useNavigate();
+  const { sentences: spellSentences, addSentence } = useSpellingSentences();
 
   const [started, setStarted] = useState(false);
   const [finished, setFinished] = useState(false);
@@ -51,6 +55,8 @@ export default function CorrectionDrillMode() {
   const [showAll, setShowAll] = useState(false);
 
   const cw = queue[idx] ?? null;
+  // 这句地道说法是否已经在句子拼写库里（决定卡面上那颗按钮的态；不弹提示）
+  const inSpellingLib = !!cw && spellSentences.some((s) => normSentenceKey(s.en) === normSentenceKey(cw.right));
 
   const start = useCallback(() => {
     const q = orderForDrill(notes);
@@ -297,6 +303,32 @@ export default function CorrectionDrillMode() {
                   >
                     {idx + 1 >= queue.length ? '看结果' : '下一个'}（Enter）
                   </button>
+                  {/* 认出 ≠ 写得出：把这句地道说法送进句子拼写。练习界面零提示口径 ——
+                      反馈挂在按钮自己的态上（在库里就变样），不弹 toast。 */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => addSentence(correctionToSpellingItem(cw))}
+                      disabled={inSpellingLib}
+                      className={cn(
+                        'flex-1 py-2.5 rounded-2xl border-2 text-[11px] font-black transition-all',
+                        inSpellingLib
+                          ? 'border-sky-300/60 bg-sky-50/60 text-sky-600 dark:bg-sky-500/10'
+                          : 'border-border bg-muted/30 hover:border-sky-400/50 hover:bg-sky-500/5',
+                      )}
+                      title={inSpellingLib ? '这句已在句子拼写库里' : '把这句地道说法送进句子拼写（逐词拼出来）'}
+                    >
+                      <Keyboard className="size-3.5 inline mr-1" />
+                      {inSpellingLib ? '已进句子拼写' : '拼写这句'}
+                    </button>
+                    <button
+                      onClick={() => navigate('/spelling')}
+                      className="flex-1 py-2.5 rounded-2xl border-2 border-border bg-muted/30 text-[11px] font-black hover:border-sky-400/50 hover:bg-sky-500/5 transition-all"
+                      title="打开句子拼写（词库下拉里选「纠偏表达」）"
+                    >
+                      <ExternalLink className="size-3.5 inline mr-1" />
+                      去拼写
+                    </button>
+                  </div>
                 </div>
               )}
             </CardContent>

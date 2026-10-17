@@ -24,6 +24,7 @@ import {
   ChevronDown,
   Heart,
   Library,
+  Lightbulb,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -66,7 +67,7 @@ import { useTTS } from '@/lib/use-tts';
 import { sfxCorrect, sfxWrong, sfxComplete } from '@/lib/sfx';
 import { useFavorites } from '@/lib/use-favorites';
 import { useAI } from '@/hooks/use-ai';
-import { useSpellingSentences, SPELLING_SENTENCE_LIMIT } from '@/lib/use-spelling-sentences';
+import { useSpellingSentences, SPELLING_SENTENCE_LIMIT, CORRECTION_LEVEL } from '@/lib/use-spelling-sentences';
 import { useSpellingLearning } from '@/lib/use-spelling-learning';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { toast } from 'sonner';
@@ -875,6 +876,20 @@ export default function SpellingPage() {
   const handleLevelChange = useCallback(
     async (lvl: string) => {
       if (lvl === activeLevel || switchingRef.current) return;
+
+      // 「纠偏表达」不是词库，是句子库里的一个桶（从纠偏本送进来的地道说法）——
+      // 走词库那条路会 preload 一个不存在的 level 并误报"该词库没有例句"。
+      if (lvl === CORRECTION_LEVEL) {
+        switchingRef.current = true;
+        setSubmitted(false);
+        setResults(null);
+        setCompletionShown(false);
+        setActiveLevel(lvl);
+        rebuildSession({ level: lvl });
+        switchingRef.current = false;
+        return;
+      }
+
       switchingRef.current = true;
 
       setLevelLoading(true);
@@ -1244,7 +1259,7 @@ export default function SpellingPage() {
                 title="切换词书"
               >
                 <Library className="size-3.5 text-ink-teal" />
-                {activeLevel === 'all' ? '全部词库' : ({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',cet46freq:'四六级高频',cet46elite:'四六级高分',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[activeLevel] || activeLevel}
+                {activeLevel === 'all' ? '全部词库' : ({correction:'纠偏表达',zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',cet46freq:'四六级高频',cet46elite:'四六级高分',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[activeLevel] || activeLevel}
                 {building || levelLoading
                   ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
                   : <ChevronDown className="size-3.5 text-muted-foreground" />}
@@ -1266,6 +1281,19 @@ export default function SpellingPage() {
               >
                 <BookOpen className="size-3.5 text-muted-foreground" />
                 全部词库
+              </DropdownMenuItem>
+              <div className="h-px bg-border my-1" />
+              {/* 纠偏表达 = 句子库里的一个桶（母语思维/写作批改/对话分析里被判中式的表达，
+                  在收藏页或纠偏重考里点「拼写这句」送进来）。放最前：这是"自己的错句"，
+                  比几千条例句更该练。 */}
+              <DropdownMenuItem
+                onClick={() => handleLevelChange(CORRECTION_LEVEL)}
+                disabled={activeLevel === CORRECTION_LEVEL}
+                className="gap-2 text-xs font-bold"
+              >
+                <Lightbulb className={cn('size-3.5', activeLevel === CORRECTION_LEVEL ? 'text-orange-500' : 'text-orange-400')} />
+                纠偏表达
+                {activeLevel === CORRECTION_LEVEL && <Check className="size-3.5 text-ink-teal ml-auto" />}
               </DropdownMenuItem>
               <div className="h-px bg-border my-1" />
               {(['zhongkao','gaokao','cet4','cet6','cet46freq','cet46elite','ielts','toefl','postgraduate','professional','advanced'] as const).map((lvl) => (

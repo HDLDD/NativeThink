@@ -8,15 +8,17 @@ import {
   ExternalLink,
   Copy,
   Lightbulb,
+  Keyboard,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useFavorites } from '@/lib/use-favorites';
-import { useCorrectionNotes } from '@/lib/correction-notes';
+import { useCorrectionNotes, type ICorrectionNote } from '@/lib/correction-notes';
 import { useTTS } from '@/lib/use-tts';
 import { cn, cleanText } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
 import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
+import { useSpellingSentences, correctionToSpellingItem, normSentenceKey, SPELLING_SENTENCE_LIMIT } from '@/lib/use-spelling-sentences';
 import { toast } from 'sonner';
 import FavoriteReviewMode from '@/pages/ProgressPage/components/FavoriteReviewMode';
 
@@ -59,6 +61,17 @@ export default function FavoritesPage() {
   const { favorites, removeFavorite, addFavorite, loaded } = useFavorites();
   const { notes: corrNotes, remove: removeNote } = useCorrectionNotes();
   const [showAllNotes, setShowAllNotes] = useState(false);
+  // 纠偏条目 → 句子拼写（产出侧闭环）：句子库归拼写模块所有，这里只调它的入库口
+  const { sentences: spellSentences, addSentence } = useSpellingSentences();
+  const sendToSpelling = (n: ICorrectionNote) => {
+    if (addSentence(correctionToSpellingItem(n))) {
+      toast.success('已送进句子拼写 · 在「句子拼写 → 纠偏表达」里逐词拼');
+    } else {
+      // addSentence 对"已存在"和"已到上限"都回 false，按原因分别说实话
+      const exists = spellSentences.some((s) => normSentenceKey(s.en) === normSentenceKey(n.right));
+      toast.message(exists ? '这句已经在句子拼写库里' : `句子库已到 ${SPELLING_SENTENCE_LIMIT} 条上限，先删一些再导入`);
+    }
+  };
   const tts = useTTS();
   const [filterType, setFilterType] = useState<string>('all');
   const [reviewMode, setReviewMode] = useState(false);
@@ -87,6 +100,56 @@ export default function FavoritesPage() {
         : undefined,
     });
   };
+
+  // 纠偏本区块必须**两个分支都渲染**：一条收藏都没有的账号进收藏页会走「收藏本是空的」早退
+  // 分支，原先只把区块写在浏览视图里 → 纠偏本完全没入口（2026-10-17 无头实测抓到）。
+  const correctionBlock = corrNotes.length > 0 && (
+      <div className="rounded-[28px] border-2 border-orange-200/70 dark:border-orange-500/20 bg-card p-4 space-y-2.5 mb-4">
+        <div className="flex items-center gap-2">
+          <Lightbulb className="size-4 text-orange-500" />
+          <span className="text-xs font-black uppercase tracking-wider text-muted-foreground">
+            表达纠偏 · {corrNotes.length} 条（检测/批改/分析里自动收集）
+          </span>
+        </div>
+        {(showAllNotes ? corrNotes : corrNotes.slice(0, 6)).map((n) => {
+          const inSpelling = spellSentences.some((s) => normSentenceKey(s.en) === normSentenceKey(n.right));
+          return (
+          <div key={n.id} className="rounded-2xl border border-border/60 p-3 space-y-1">
+            <div className="flex items-start gap-2">
+              <div className="flex-1 min-w-0 space-y-1">
+                <p className="text-[11px] font-bold text-rose-500 line-through decoration-rose-300">{n.wrong}</p>
+                <p className="text-[12px] font-black italic text-emerald-600">{n.right}</p>
+                {n.chineseHint && <p className="text-[10px] text-muted-foreground">{n.chineseHint}</p>}
+                {n.note && <p className="text-[10px] text-muted-foreground/80">{n.note}</p>}
+              </div>
+              <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-muted text-[8px] font-black text-muted-foreground">
+                {{ think: '思维检测', writing: '写作批改', conversation: '对话分析' }[n.source] || n.source}
+              </span>
+              {/* 认出≠写得出：一键把地道说法送进句子拼写（拼写页「纠偏表达」池） */}
+              <button
+                onClick={() => sendToSpelling(n)}
+                className={cn('shrink-0 p-1', inSpelling ? 'text-sky-500/70' : 'text-muted-foreground/50 hover:text-sky-500')}
+                title={inSpelling ? '这句已在句子拼写库里' : '把这句地道说法送进句子拼写（逐词拼出来）'}
+              >
+                <Keyboard className="size-3.5" />
+              </button>
+              <button onClick={() => removeNote(n.id)} className="shrink-0 p-1 text-muted-foreground/50 hover:text-rose-400" title="移除这条纠偏">
+                <Trash2 className="size-3.5" />
+              </button>
+            </div>
+          </div>
+          );
+        })}
+        {corrNotes.length > 6 && (
+          <button
+            onClick={() => setShowAllNotes((v) => !v)}
+            className="w-full py-1.5 rounded-xl border border-dashed border-border text-[10px] font-black text-muted-foreground hover:bg-muted/40"
+          >
+            {showAllNotes ? '收起' : `展开查看全部 (${corrNotes.length})`}
+          </button>
+        )}
+      </div>
+  );
 
   // ── Review mode ──
   if (reviewMode) {
@@ -135,6 +198,7 @@ export default function FavoritesPage() {
           title="收藏本是空的"
           description={<>在词汇学习、搭配学习、文章阅读等页面，点击 <Heart className="size-3.5 inline text-rose-500 fill-current mx-0.5" /> 图标即可收藏你喜欢的表达</>}
         />
+        {correctionBlock}
         <div className="flex items-center justify-center gap-3 pb-12 text-[10px] font-bold text-muted-foreground/60">
           <span>💡 单词可收藏</span>
           <span>📝 例句可收藏</span>
@@ -177,43 +241,7 @@ export default function FavoritesPage() {
       </div>
 
 
-      {/* 表达纠偏本：AI 判定中式/出错的表达自动收集（思维检测 / 写作批改 / 对话分析） */}
-      {corrNotes.length > 0 && (
-        <div className="rounded-[28px] border-2 border-orange-200/70 dark:border-orange-500/20 bg-card p-4 space-y-2.5 mb-4">
-          <div className="flex items-center gap-2">
-            <Lightbulb className="size-4 text-orange-500" />
-            <span className="text-xs font-black uppercase tracking-wider text-muted-foreground">
-              表达纠偏 · {corrNotes.length} 条（检测/批改/分析里自动收集）
-            </span>
-          </div>
-          {(showAllNotes ? corrNotes : corrNotes.slice(0, 6)).map((n) => (
-            <div key={n.id} className="rounded-2xl border border-border/60 p-3 space-y-1">
-              <div className="flex items-start gap-2">
-                <div className="flex-1 min-w-0 space-y-1">
-                  <p className="text-[11px] font-bold text-rose-500 line-through decoration-rose-300">{n.wrong}</p>
-                  <p className="text-[12px] font-black italic text-emerald-600">{n.right}</p>
-                  {n.chineseHint && <p className="text-[10px] text-muted-foreground">{n.chineseHint}</p>}
-                  {n.note && <p className="text-[10px] text-muted-foreground/80">{n.note}</p>}
-                </div>
-                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-muted text-[8px] font-black text-muted-foreground">
-                  {{ think: '思维检测', writing: '写作批改', conversation: '对话分析' }[n.source] || n.source}
-                </span>
-                <button onClick={() => removeNote(n.id)} className="shrink-0 p-1 text-muted-foreground/50 hover:text-rose-400" title="移除这条纠偏">
-                  <Trash2 className="size-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
-          {corrNotes.length > 6 && (
-            <button
-              onClick={() => setShowAllNotes((v) => !v)}
-              className="w-full py-1.5 rounded-xl border border-dashed border-border text-[10px] font-black text-muted-foreground hover:bg-muted/40"
-            >
-              {showAllNotes ? '收起' : `展开查看全部 (${corrNotes.length})`}
-            </button>
-          )}
-        </div>
-      )}
+      {correctionBlock}
       {/* Empty filtered state */}
       {filteredFavorites.length === 0 ? (
         <EmptyState icon={Heart} size="sm" title="该分类暂无收藏内容" className="py-12" />
