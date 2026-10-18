@@ -167,6 +167,27 @@ export function parseSubtitle(text: string): { list: IVideoSentence[]; format: s
   return { list: normalize(list), format };
 }
 
+/**
+ * 导入时的文件分类 —— 拖拽与"选文件"共用一份口径（两份实现必然漂移，先防住）。
+ *
+ * 媒体看 MIME，退到扩展名（不少 WebView 给 Blob 的 type 是空串）；字幕同理。
+ * 一次拖进来多个同类文件只取第一个，其余算 extra（界面要如实说"还有 N 个没导"）。
+ */
+export interface IImportFile { name: string; type?: string; size?: number }
+export interface IImportSplit { media: IImportFile | null; subs: IImportFile | null; extra: number }
+const MEDIA_EXT = /\.(mp4|m4v|mov|webm|mkv|avi|mp3|m4a|m4b|aac|wav|flac|ogg|opus)$/i;
+const SUB_EXT = /\.(srt|vtt|ass|ssa|json|txt)$/i;
+
+export function splitImportFiles(files: IImportFile[]): IImportSplit {
+  const isMedia = (f: IImportFile) => /^(video|audio)\//.test(f.type || '') || MEDIA_EXT.test(f.name);
+  const isSubs = (f: IImportFile) => !isMedia(f) && (/(text|json|subrip|webvtt)/.test(f.type || '') || SUB_EXT.test(f.name));
+  const picked = (arr: IImportFile[]) => (arr.length ? arr[0] : null);
+  const media = picked(files.filter(isMedia));
+  const rest = files.filter((f) => f !== media);
+  const subs = picked(rest.filter(isSubs));
+  return { media, subs, extra: rest.filter((f) => f !== subs).length };
+}
+
 /** 稳定 id：同一份字幕+同一时长重复导入只有一条（换电脑重进不会堆一堆重复课程） */
 export function lessonId(title: string, duration: number, bytes: number): string {
   const src = `${String(title || '').toLowerCase().replace(/\s+/g, ' ').trim()}|${round(duration)}|${bytes}`;

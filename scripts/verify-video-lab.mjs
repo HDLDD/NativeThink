@@ -41,7 +41,7 @@ const lib = strip(libRaw)
   .replace(/export const videoStore[\s\S]*?\}\);\s*/g, '');
 
 /* ── 载入被测模块（整段转译真跑，不抄第二份实现） ── */
-const js = ts.transpileModule(lib + '\nmodule.exports={INDEX_KEY,parseTimestamp,stripCueTags,parseSrt,parseVtt,parseDshJson,detectSubtitleFormat,parseSubtitle,lessonId,guessLang,createVideoStore,mergeProgress,tokenizeSpeech,scoreSpeech,runBatchTranslation};',
+const js = ts.transpileModule(lib + '\nmodule.exports={INDEX_KEY,parseTimestamp,stripCueTags,parseSrt,parseVtt,parseDshJson,detectSubtitleFormat,parseSubtitle,lessonId,guessLang,createVideoStore,mergeProgress,tokenizeSpeech,scoreSpeech,runBatchTranslation,splitImportFiles};',
   { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const mod = { exports: {} };
 new Function('module', 'exports', js)(mod, mod.exports);
@@ -456,6 +456,84 @@ ok(typeof M.parseSrt === 'function' && typeof M.createVideoStore === 'function',
         ok(zero.batches === 19 && zero.filled.size === 19,
           '正对照：batchSize/concurrency 传 0 会被夹成 1（不能除零或起 0 个 worker 而一句不翻）', `${zero.batches}/${zero.filled.size}`);
       }
+    }
+
+    /* ⑨ 导入分类真跑：拖拽与"选文件"共用这一份口径（两份实现必然漂移） */
+    {
+      const S = M.splitImportFiles;
+      ok(typeof S === 'function', '真跑脚手架：splitImportFiles 已导出');
+      const f = (name, type) => ({ name, type });
+      const both = S([f('lecture.mp4', 'video/mp4'), f('lecture.srt', '')]);
+      ok(both.media?.name === 'lecture.mp4' && both.subs?.name === 'lecture.srt' && both.extra === 0,
+        '真跑：一次拖进"视频 + 字幕"两个文件 → 各自归位，没有剩余', JSON.stringify([both.media?.name, both.subs?.name, both.extra]));
+      const subOnly = S([f('daily.srt', 'application/x-subrip')]);
+      ok(subOnly.media === null && subOnly.subs?.name === 'daily.srt',
+        '真跑：只拖字幕是合法形态（媒体可选，界面据此走"仅字幕课程"）');
+      const noMime = S([f('clip.M4A', '')]);
+      ok(noMime.media?.name === 'clip.M4A' && noMime.subs === null,
+        '真跑：安卓 WebView 常给空 MIME —— 大小写混排的扩展名必须兜住（否则音频被当成"没认出的文件"）',
+        JSON.stringify([noMime.media?.name, noMime.subs]));
+      const transcript = S([f('b1-shopping-chat.json', 'application/json')]);
+      ok(transcript.media === null && transcript.subs?.name === 'b1-shopping-chat.json',
+        '真跑：转录伴侣的 JSON 归字幕，不归媒体（它里面虽然有 video 字段，但那是文件名）');
+      const twoSubs = S([f('a.mp4', 'video/mp4'), f('first.srt', ''), f('second.vtt', '')]);
+      ok(twoSubs.subs?.name === 'first.srt' && twoSubs.extra === 1,
+        '真跑：多份字幕取第一份，剩下的计进 extra（界面要如实说"另外 N 个没导"，不许静默丢）',
+        JSON.stringify([twoSubs.subs?.name, twoSubs.extra]));
+      const trick = S([f('concert.srt.mp4', 'video/mp4')]);
+      ok(trick.media?.name === 'concert.srt.mp4' && trick.subs === null,
+        '正对照：文件名里带 .srt 的真视频不许被认成字幕', JSON.stringify([trick.media?.name, trick.subs]));
+      const second = S([f('a.mp4', 'video/mp4'), f('b.txt', 'video/mp4')]);
+      ok(second.media?.name === 'a.mp4' && second.subs === null,
+        '真跑：第二个媒体文件（名字像 .txt 也不算字幕）—— 媒体先挑走，剩下的才轮到字幕，两份媒体不许被当成"视频 + 字幕"',
+        JSON.stringify([second.media?.name, second.subs?.name]));
+      const junk = S([f('截图.png', 'image/png')]);
+      ok(junk.media === null && junk.subs === null && junk.extra === 1,
+        '真跑：完全不认的文件 → subs 为 null（页面据此提示"没认出手上的文件"，而不是导出一份空课）');
+      const txt = S([f('transcript.txt', 'text/plain')]);
+      ok(txt.subs?.name === 'transcript.txt', '真跑：纯文本转录（.txt）也在支持的格式里');
+    }
+
+    /* ⑩ 用户视角的六处行为契约（删课确认 / 进度清干净 / 选视频反馈 / 拖拽 / 课表展开 / 点了要有反应） */
+    {
+      const page = strip(read('src/pages/VideoLabPage/VideoLabPage.tsx'));
+      ok(/onDrop=\{\(e\) => \{\s*e\.preventDefault\(\);\s*setDragOver\(false\);[\s\S]{0,140}importFiles\(fs\)/.test(page),
+        '导入框真的接住拖拽（空态文案承诺了"拖进来"，没有 drop 处理就是撒谎）');
+      ok(/pendingMedia\.current = f \|\| null;\s*setPendingName\(f \? f\.name : ''\)/.test(page),
+        '系统选择器里点"取消"要清掉上一次的媒体 —— 不清就会把上一段视频悄悄绑进下一课');
+      ok(/已选视频：\{pendingName\}[\s\S]{0,220}pendingMedia\.current = null; setPendingName\(''\)/.test(page),
+        '选了视频要在界面上写明是哪一份，并给反悔入口（原来只又弹一个选择器，用户不知道发生了什么）');
+      ok(/if \(confirmDel !== m\.id\) \{\s*setConfirmDel\(m\.id\);[\s\S]{0,160}6000\);[\s\S]{0,80}return;/.test(page),
+        '删课两段式确认（一次点击就带走整课媒体+字幕+译文太危险），并且 6 秒自己收回确认态');
+      ok(/再点一次删除/.test(page), '确认态是界面文案（练习界面零提示口径：不弹 toast）');
+      ok(/delete all\[id\];\s*persistJson\(PROGRESS_KEY, all\)/.test(page),
+        '删课把这一课的进度记录一起清掉：否则重导入同一份字幕跳回老位置，看着像"没删干净"');
+      ok(/\(showAllList \? list : list\.slice\(0, 12\)\)/.test(page) && /展开全部 \$\{list\.length\} 课/.test(page),
+        '课表折叠必须配「展开全部 N 课」入口（>12 课以前点不到，属削弱用户入口）');
+      ok(/onClick=\{replayCur\}/.test(page) && /const replayCur = useCallback\(\(\) => \{[\s\S]{0,320}if \(el\.paused\)[\s\S]{0,24}el\.play\(\)/.test(page),
+        '「重播本句」在暂停态点了要真的播起来（只设 currentTime 就是"点了没反应"）');
+      ok(/lookupRef\.current\?\.scrollIntoView\(\{ block: 'nearest' \}\)/.test(page),
+        '点词后把释义卡带进视野（手机上播放器占大半屏，卡片落在视口外就等于"查词没反应"）');
+      ok(/已听 \{Math\.min\(listened, sentences\.length\)\}\/\{sentences\.length\} 句/.test(page) && /这一课都听到了/.test(page),
+        '给出"已听 x/y 句"与听完的反馈（只有计数时听到最后一句没有任何信号）');
+      ok(/空格 播放\/暂停 · ↑ ↓ 上\/下一句/.test(page),
+        '快捷键在界面上写一行（只放 title 等于手机上根本没有）');
+      ok(/onDrop=|importFiles/.test(page) && /void onSubtitle\(f, media\)/.test(page),
+        '选文件与拖拽汇到同一条导入路（两份分类实现必然漂移）');
+      /* 时长口径：转录伴侣的 JSON 里 duration 记的是**整条原片**（素材包 01 那课是 6024 秒），
+         课程时长必须取自字幕末秒，否则界面上"0:00 / 100:24"这种谎报就回来了 */
+      ok(/duration: durationOf\(parsed\)/.test(page),
+        '课程时长取自字幕末秒（durationOf(parsed)），不取 JSON/容器记的整片时长');
+      ok(/lessonId\(media\?\.name \|\| file\.name, durationOf\(parsed\), media\?\.size \|\| 0\)/.test(page),
+        '课程 id 用同一个 durationOf 口径：重导同一份字幕要命中同一课，否则进度与"删课清进度"都对不上');
+      /* 单句循环 ↔ A-B 互斥：两个都开着时循环判定里 A-B 优先，界面却还亮着"单句" */
+      ok(/const toggleLoop = useCallback\(\(\) => \{\s*if \(!loopOne\)\s*setAb\(null\);[\s\S]{0,80}setLoopOne\(\(v\) => !v\)/.test(page),
+        '开「单句循环」要撤掉 A-B 区间（互斥只写一半，另一边状态照样骗人）');
+      ok(/const toggleAb = useCallback[\s\S]{0,200}setLoopOne\(false\);\s*setAb\(\{ a: cur\.t0, b: cur\.t1 \}\)/.test(page),
+        '开 A-B 复读要关掉单句循环（反向互斥）');
+      /* 学习时长：按课分键去重 —— 按全局句序号去重的话，换一课的同序号句子永远不再计时长 */
+      ok(/reachedRef\.current\.get\(lesson\.meta\.id\)[\s\S]{0,240}if \(!seen\.has\(i\)\) \{\s*seen\.add\(i\);\s*addStudyMinutes\(0\.2, ["']video["']\)/.test(page),
+        '学习时长按「课」分键去重（换课同序号要能再计，重看同句不许刷时长）');
     }
 
     let pass = 0, fail = 0, names = [];

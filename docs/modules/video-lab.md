@@ -9,15 +9,16 @@
 
 | 能力 | 入口 | 落在哪 |
 |------|------|--------|
-| 逐句跳转 / 单句循环 / A-B 复读 / 倍速 | 卡面按钮（`:593-608`）+ 快捷键（`:472-484`） | 时间轴由 `timeupdate` 驱动 |
-| 字幕清单 | 默认只渲染活动句前后 40 条，「展开全部」给整本（`:43`、窗口 `:462`、按钮 `:738-740`） | — |
-| 点词查词 | 词面 span（`:631-636`） | 释义来自词库 `queryWords` |
-| 加进生词本 | 查词卡按钮（`:706-713`） | `addCustomWord` → **进 SM-2 复习队列** |
-| 收藏句 / 收藏词 | 心形按钮（`:642-646`、写点 `:320-332`、`:334-342`） | `useFavorites`，句用 `type:'video'` |
-| 朗读本句 | `tts.speak`（`:609-613`） | 全站 TTS 降级链 |
-| 跟读比对 | Mic 按钮（`:615-620`，判定 `shadowThis` `:347-389`） | `SpeechRecognition` + `scoreSpeech` |
-| 听写这句 | 键盘按钮（`:647-650`） | 句子拼写的 `video` 桶 |
-| 双语字幕 | 「翻译字幕」（`:398-459`） | AI 批量翻译 → IDB `z:` 分键 |
+| 逐句跳转 / 单句循环 / A-B 复读 / 倍速 | 卡面按钮（`:714-730`）+ 快捷键 effect（`:540-560`） | 时间轴由 `timeupdate` 驱动 |
+| 字幕清单 | 默认只渲染活动句前后 40 条，「展开全部」给整本（窗口常量 `:44`、取窗口 `:528`、按钮 `:878-881`） | — |
+| 点词查词 | 词面 span（`:762-770`） | 释义来自词库 `queryWords` |
+| 加进生词本 | 查词卡按钮（`:847-852`） | `addCustomWord` → **进 SM-2 复习队列** |
+| 收藏句 / 收藏词 | 心形按钮（句 `:771-775`、词 `:853-860`；写点 `toggleFavSentence :400-412`、`toggleFavWord :386-399`） | `useFavorites`，句用 `type:'video'` |
+| 朗读本句 | `tts.speak`（`:734-736`） | 全站 TTS 降级链 |
+| 跟读比对 | Mic 按钮（`:741-744`，判定 `shadowThis :413-460`） | `SpeechRecognition` + `scoreSpeech` |
+| 听写这句 | 键盘按钮（`:776-778`） | 句子拼写的 `video` 桶 |
+| 双语字幕 | 「翻译字幕」（按钮 `:746-749`，调度 `:464-520`） | AI 批量翻译 → IDB `z:` 分键 |
+| 没有原声时怎么办 | `toggle` / `replayCur`（`:358-371`）没有 `<video>` 就退化成朗读本句；播放器位置写「仅字幕课程」（`:700-703`） | — |
 
 ## 2. 为什么是"导入"，不是内置转录（架构决定，别翻烧饼）
 
@@ -31,7 +32,7 @@
 
 ## 3. 实现方法
 
-### 3.1 字幕解析（`video-lab.ts:62-191`）
+### 3.1 字幕解析与导入分类（`video-lab.ts:58-210`）
 
 | 函数 | 行 | 干什么 |
 |------|----|--------|
@@ -40,9 +41,10 @@
 | `parseSrt` / `parseVtt` / `parseDshJson` | `:100` / `:117` / `:129` | 三种格式；VTT 的 `NOTE` 块跳过；JSON 带词级时间戳 |
 | `detectSubtitleFormat` / `parseSubtitle` | `:152` / `:160` | **按内容**判格式，判不出按 SRT 兜一次（很多导出文件没有头部） |
 | `normalize` | `:85` | 丢无效时间与空文本 → 按 `t0` 排序 → **重新连续编号 `i`** → `t1 ≥ t0` |
-| `lessonId` | `:171` | 文件名 + 时长 + 字节的哈希，重复导入同一份只有一条 |
+| `splitImportFiles` | `:181` | 一次拖进多个文件（视频 + 字幕）的分类**唯一口径**：先看 MIME，再按扩展名兜；`.srt.mp4` 归媒体、`{name:'b.txt',type:'video/mp4'}` 归媒体 |
+| `lessonId` | `:192` | 文件名 + 时长 + 字节的哈希，重复导入同一份只有一条 |
 
-### 3.2 存储：三键分片 + 索引封顶（`video-lab.ts:193-281`）
+### 3.2 存储：三键分片 + 索引封顶（`video-lab.ts:223-300`）
 
 一个 object store（`idb.ts:14` 的 `MEDIA_STORE='media'`），三条键：
 
@@ -55,71 +57,90 @@ s:<id> / z:<id>      → { sentences } / { zh[] }          字幕与译文分开
 六条不显然的规定：
 
 1. **`media` 必须独立成表**（`idb.ts:12` 的 `DB_VERSION=2` 加表）。`idbClear()` 只清 `wordbank`，词库重建/换代绝不允许顺手把用户的视频删掉。
-2. `save()` 任何一步写失败**返回 false 且不写索引**（`:215-229`）—— 不留半条课程。
+2. `save()` 任何一步写失败**返回 false 且不写索引**（`:236-250`）—— 不留半条课程。
 3. 索引记录的键名字面量由 `INDEX_KEY`（`:58`）单点提供，守卫**用码点拼出期望值**钉住它：这个值一度是三个星号，功能完全正常（它只是个唯一键名），所以真跑断言与走查一路全绿 —— 直到探针把 `getAllKeys()` 原样打出来才看见。改键名会让已存在的索引记录变孤儿，本模块刚上线、无真实用户数据才敢直接改。
-4. 索引 50 条封顶，淘汰旧条目时**连 `m:`/`s:`/`z:` 一起删**（`:221-227`）。只删索引会留下几百 MB 孤儿 blob。
-5. 译文分键回写（`saveZh` `:253-260`）：AI 翻译不重存 blob，只写 `z:`；写失败如实返回 false，界面显示"这次只显示、下次要重翻"。
-6. `load()`（`:232-251`）把 blob 换成 object URL 前判 `instanceof Blob` 并 try/catch —— 记录被写坏时退化成"无原声"，不许把页面掀翻。
+4. 索引 50 条封顶，淘汰旧条目时**连 `m:`/`s:`/`z:` 一起删**（`:243-249`）。只删索引会留下几百 MB 孤儿 blob。
+5. 译文分键回写（`saveZh` `:274-281`）：AI 翻译不重存 blob，只写 `z:`；写失败如实返回 false，界面显示"这次只显示、下次要重翻"。
+6. `load()`（`:253-272`）把 blob 换成 object URL 前判 `instanceof Blob` 并 try/catch —— 记录被写坏时退化成"无原声"，不许把页面掀翻。
 
-`withStore` 的 resolve 挂在 `tx.oncomplete`（`idb.ts:48-70`）而不是 `request.onsuccess`：配额满的失败是**事务级**的，只看 request 会把没落盘的写当成成功。
+`withStore` 的 resolve 挂在 `tx.oncomplete`（`idb.ts:48-62`，`tx.oncomplete` 在 `:58`）而不是 `request.onsuccess`：配额满的失败是**事务级**的，只看 request 会把没落盘的写当成成功。
 
 ### 3.3 播放、计时与断点
 
-- 活动句：`activeIndexOf`（页面 `:53`）线性扫，`timeupdate` 驱动（`:215-241`）。单句循环与 A-B 都在这一个回调里，避免两套时间判定。
-- **计时按课去重**：`addStudyMinutes(0.2,'video')` 只在"第一次推进到这句"时给（`:104`、`:226-228`）。往回拖再看一遍会反复进入同一句，不去重就成了刷时长。`verify-study-credit` 第 ④ 节钉这条。
-- 进度：`mergeProgress`（`video-lab.ts:283-300`）封顶 80 课，经 `persistJson` 写 `__nativethink_video_progress`（页面 `:240-246`）→ 自动进云同步与备份。
-- 断点：`__nativethink_video_last_open`（`:41`、`:140`、恢复 effect `:144-151`）。切 tab 会重挂载组件（`Layout.tsx` 的 `key={location.pathname}`），回来必须接着上次那一课；主动点返回箭头要清掉这个键（`:441`），否则下次进来又被拽回课程、看不到导入入口。
+- 活动句：`activeIndexOf`（页面 `:74`）线性扫，`timeupdate` 驱动（`:275-297`）。单句循环与 A-B 都在这一个回调里，避免两套时间判定。
+- **课时一律取字幕末秒，不取容器/JSON 的时长**：`durationOf(parsed)`（`:83`）同时喂给 `lessonId`（`:222`）与 `meta.duration`（`:224`）。为什么：转录伴侣导出的 JSON 里 `duration` 记的是**整条原片**（01 那课是 6024 秒 ≈ 100 分钟，`video-lab.ts:144` 会原样带出来），而素材包里的媒体只是其中 344 秒那一段；`parseSubtitle` 的返回值里那个 `duration` 页面**不许直接用**，否则界面顶上就是「0:00 / 100:24」，播放器一路空转、句子还停在最后一句 —— 用户读到的是"时间线自己乱跳"（守卫与探针各钉一条）。
+- **计时按课去重**：`reachedRef` 是 `Map<课 id, Set<句序号>>`（`:130`、`:287-290`），`addStudyMinutes(0.2,'video')` 只在"这一课第一次推进到这一句"时给。两个方向都不能错：只按句序号去重（全局一份 Set）的话，换一课的同序号句子永远不再计时长；不去重的话往回拖一遍就刷一遍。`verify-study-credit` 钉"到新句才计 + 本地动作不套闸门"，`probe-real-media` 第 ⑭ 测用真原声跑出 `0.2 → 0.3 → 0.3`（认新句加、同句来回拖不加）。
+- 进度：`mergeProgress`（`video-lab.ts:304`）封顶 80 课，经 `persistJson` 写 `__nativethink_video_progress`（键名 `:40`，落盘 effect `:301-310`）→ 自动进云同步与备份。删课要连这条记录一起删（`:194-200`）。
+- 断点：`__nativethink_video_last_open`（键名 `:42`、写入 `:178`、恢复 effect `:183-188`）。切 tab 会重挂载组件（`Layout.tsx` 的 `key={location.pathname}`），回来必须接着上次那一课；主动点返回箭头要清掉这个键（`removeLesson` 与返回列表处），否则下次进来又被拽回课程、看不到导入入口 —— **`nav` 是整页重载，走查里要从课程视图点回列表才谈得上"回到空态"**。
 
 ### 3.4 点词 / 收藏 / 跟读 / 听写 / 翻译
 
-- **词面必须两种形态都能点**：JSON 字幕带词级时间戳，普通 SRT 没有 —— 没有时按空白把整句切成词 span（`:525-533`）。早期版本把整句当一个 span，结果"点词查词"在最常见的那种字幕上退化成"点整句"（2026-10-18 走查抓到，守卫第 ⑤ 节钉住）。逐词高亮只在真有词级时间戳时点亮，否则整条一起下划线没有意义。
-- 查词：先 `queryWords({search, limit:1})`，**查不到先 `preloadCoreOnly` 预热再查一次**（`:267-277`），否则核心层没预热时会假报"词库里没有这个词"。
-- 收藏句：`type:'video'`，`example` 存 `起始–结束` 时间区间（`:293-301`）。判重必须 `isFavorited(content,'video')` **看两 type**（与全站口径一致，见 dashboard-progress-favorites.md）。收藏页三处已认得这一型：标签 `FavoritesPage.tsx:38`、配色 `:51`、筛选 `:56`。
-- 跟读评分：`scoreSpeech`（`video-lab.ts:322-344`）用 **LCS 按词序**算命中比例并列出漏读词。不许用集合交集 —— `"the book is on the table"` 里 `the` 出现两次，只读对一次不该算两次。**通道判定不能只看对象存在**：模拟器 APK 实测 `window.webkitSpeechRecognition` **存在**（`sr:true`），但 `start()` 之后 onresult/onerror/onend 一个都不回 —— 所以除了 `!API` 那条"这台设备没有语音识别通道"的实话文案，还要 **try/catch 兜 `start()` 当场抛**、再加 **9 秒看门狗**（`rec.start()` 后无回应就收摊并说明"识别服务没有回应"，同时撤按钮的"正在听…"态）。三者缺一个就是 AGENTS 那条"点了没反应／转圈不结束"（2026-10-18 装机走查抓到：改之前正是卡在"正在听…"）。卸载时 `recRef.current?.abort()` + 撤看门狗（`:119-122`）。绝不允许显示一个假分数。
-- 听写这句：`videoToSpellingItem`（`use-spelling-sentences.ts:74-76`）是单一口径，与纠偏桶共用 `sentenceItem`（`:58-71`，判难 ≤7 / ≤13 / 更多）。拼写页里 `video` 是**句子库的桶**、不是词库：`handleLevelChange` 与纠偏桶共用同一条早退分支（`SpellingPage.tsx:883`），否则会 `preloadLevels('video')` 并弹「该词库没有例句」。桶名在词库下拉 `:1299-1306`，标签映射 `:1262`。按钮"这句已经在听写本里"用 `normSentenceKey` 判（页面 `:109`、`:536`），是界面状态不是 toast。
+- **词面必须两种形态都能点**：JSON 字幕带词级时间戳，普通 SRT 没有 —— 没有时按空白把整句切成词 span（`:762-770`）。早期版本把整句当一个 span，结果"点词查词"在最常见的那种字幕上退化成"点整句"（2026-10-18 走查抓到，守卫第 ⑤ 节钉住）。逐词高亮只在真有词级时间戳时点亮，否则整条一起下划线没有意义。
+- 查词：先 `queryWords({search, limit:1})`，**查不到先 `preloadCoreOnly` 预热再查一次**（`:374-384`），否则核心层没预热时会假报"词库里没有这个词"。
+- 收藏句：`type:'video'`，`example` 存 `起始–结束` 时间区间（`:400-412`）。判重必须 `isFavorited(content,'video')` **看两 type**（与全站口径一致，见 dashboard-progress-favorites.md）。收藏页三处已认得这一型：标签 `FavoritesPage.tsx:38`、配色 `:51`、筛选 `:56`。
+- 跟读评分：`scoreSpeech`（`video-lab.ts:343`）用 **LCS 按词序**算命中比例并列出漏读词。不许用集合交集 —— `"the book is on the table"` 里 `the` 出现两次，只读对一次不该算两次。**通道判定不能只看对象存在**：模拟器 APK 实测 `window.webkitSpeechRecognition` **存在**（`sr:true`），但 `start()` 之后 onresult/onerror/onend 一个都不回 —— 所以除了 `!API` 那条"这台设备没有语音识别通道"的实话文案，还要 **try/catch 兜 `start()` 当场抛**、再加 **9 秒看门狗**（`rec.start()` 后无回应就收摊并说明"识别服务没有回应"，同时撤按钮的"正在听…"态）。三者缺一个就是 AGENTS 那条"点了没反应／转圈不结束"（2026-10-18 装机走查抓到：改之前正是卡在"正在听…"）。卸载时 `recRef.current?.abort()`（`:154`）+ 撤看门狗（`:437` 那个 9 秒）。绝不允许显示一个假分数。
+- 听写这句：`videoToSpellingItem`（`use-spelling-sentences.ts:74-76`）是单一口径，与纠偏桶共用 `sentenceItem`（`:58-71`，判难 ≤7 / ≤13 / 更多）。拼写页里 `video` 是**句子库的桶**、不是词库：`handleLevelChange` 与纠偏桶共用同一条早退分支（`SpellingPage.tsx:883`），否则会 `preloadLevels('video')` 并弹「该词库没有例句」。桶名在词库下拉 `:1299-1306`，标签映射 `:1262`。按钮"这句已经在听写本里"用 `normSentenceKey` 判（页面 `:138`、渲染 `:776-778`），是界面状态不是 toast。
 - **素材必须有画面，而且媒体由出包工具统一压一遍**（用户硬要求："导入的素材必须要有画面"、"画质不需要太好"）：`make-video-lab-packs.mjs` 先 `ffprobe` 源媒体，**没有画面轨直接拒绝出包**（加 `--allow-audio` 才放行），有画面的那份再走 ffmpeg —— **scale 到 ≤480p + H.264(`libx264`) + `yuv420p` + `+faststart` + AAC 96k，并 `-t 字幕末秒+2` 裁到字幕覆盖的区间**。B 站"听力号"类上传常见两种坑：① 只给音频流（`bestaudio`）→ 播放器整块黑；② 480p 给的是 **AV1** → WebView 不保证解得动，所以选流时就限定 `vcodec^=avc1`，转码这一步再兜一层。为什么必须在工具里做：手机要把整份媒体塞进 IndexedDB，那条 1080p / 4.9 分钟的新闻原片 35MB，压完是个位数 MB；那条 100 分钟的合集也是裁到 344 秒才对得上 69 句字幕。**已经有画面轨的成品媒体会被沿用**（手工裁好的那份不会被音频源覆盖，拒绝出包时也只删本次新写的文件，不动已有课包）。App 侧也补了实话：`el.videoWidth === 0 && el.videoHeight === 0` 时在播放器下写"只有音频轨、没有画面，黑屏属正常"。
 - **真机看画面要用 `adb exec-out screencap -p`，不要用 `device-eval shot`**：后者走 CDP `Page.captureScreenshot`，**抓不到视频硬表面**，播得好好的也会截成一块黑（本轮差点据此误报"没有画面"）。量化对照：源文件抽帧平均亮度 51.9，设备截屏播放器区域 53.3 / 256 级灰阶，而 CDP 截图那块是全黑。
-- **假时长要说破**：流媒体站给的 m4a 常见"容器头写 100 分钟、实际只有 5 分钟"（截断下载；实测 B 站那条头 6024s / 真语音 343s）。`onLoadedMetadata={checkDuration}`（`:515`）用**双向比值**判（`got/expect > 1.6 || < 0.6`，不只判 NaN），命中就在播放器下方一行写清"播放器报多少、字幕只到多少，跳转/复读按字幕时间走"（渲染 `:523`；换课时 `setNote('')` 清掉，见 `:131`）。素材侧另用 `ffmpeg -t <字幕末尾秒+1> -c:a aac` 重编，`ffprobe` 复核 duration 才算修好。
-- 双语字幕（用户 2026-10-18 反馈「翻译字幕功能很慢」后重做）：**调度在 `runBatchTranslation`（`video-lab.ts:390`），页面只喂通道（`VideoLabPage.tsx:398-459`）**。参数：一次最多 `TRANSLATE_LIMIT=120` 句（整课一次覆盖，不再要用户点三次）、每批 `TRANSLATE_BATCH=8` 句、串行 `concurrency: 1`、每批看门狗 `TRANSLATE_TIMEOUT_MS=25000`（`:46/:53/:55`）。
+- **假时长要说破**：流媒体站给的 m4a 常见"容器头写 100 分钟、实际只有 5 分钟"（截断下载；实测 B 站那条头 6024s / 真语音 343s）。`onLoadedMetadata={checkDuration}`（`:515`）用**双向比值**判（`got/expect > 1.6 || < 0.6`，不只判 NaN），命中就在播放器下方一行写清"播放器报多少、字幕只到多少，跳转/复读按字幕时间走"（渲染 `:631-636`；换课时 `setNote('')` 清掉，见 `:165`）。素材侧另用 `ffmpeg -t <字幕末尾秒+1> -c:a aac` 重编，`ffprobe` 复核 duration 才算修好。
+- 双语字幕（用户 2026-10-18 反馈「翻译字幕功能很慢」后重做）：**调度在 `runBatchTranslation`（`video-lab.ts:390` 起），页面只喂通道（`VideoLabPage.tsx:464-520`）**。参数：一次最多 `TRANSLATE_LIMIT=120` 句（整课一次覆盖，不再要用户点三次）、每批 `TRANSLATE_BATCH=8` 句、串行 `concurrency: 1`、每批看门狗 `TRANSLATE_TIMEOUT_MS=25000`（`:47/:54/:56`）。
   - **实测数据（本机 → Pages 中继 → 智谱免费档，同一段 69 句）**：串行每批 3.2–4.5 秒；**起 3 路并发后每批拖到 8–30 秒，并且遇到过一整路永不回包**。`functions/api/ai/chat.js:46` 写着「免费档并发仅 1」，所以并发不是可用的加速手段 —— 抢并发只会把总时长从 10 秒拖成 60 秒。指定翻译任务档（`task:'translate'` → glm-4.7-flash）实测单批 23s/62s，更慢，也就不用（整书翻译那条后台链路才值那个准确度）。
-  - 因此"快"只能来自**边翻边上屏**：每批完成立刻回调 → `setLesson` 增量上屏 + `saveZh` 落盘（`:429-443`，落盘走串行队列写最新快照，避免并发覆盖）。旧写法是整轮 `for` 串行、最后一次性 `setLesson`，实测 30 句要 10 秒且这 10 秒里界面一动不动。
+  - 因此"快"只能来自**边翻边上屏**：每批完成立刻回调 → `setLesson` 增量上屏 + `saveZh` 落盘（`:495-505`，落盘走串行队列写最新快照，避免并发覆盖）。旧写法是整轮 `for` 串行、最后一次性 `setLesson`，实测 30 句要 10 秒且这 10 秒里界面一动不动。
   - **走查实测的凭据**（`walk-video.mjs` 第 ⑧ 节）：点下去按钮立刻变成「开始翻译 45 句…」并禁用 → 中途按钮还写着"翻译中"时界面已经出现一部分中文行（`带中文的字幕行 0 → 40`）→ 结束时回报「已翻译 45/45 句」，**一次点击覆盖整课**（旧写法 69 句要点三次、每次 10 秒全程无反馈）。
   - **每批必须有超时**：AI 请求挂住不会抛错（`use-ai.ts` 把失败收成 `''`，挂住则连 reject 都没有），没有这道看门狗按钮就永久停在"翻译中"——与跟读那条「接口存在≠通道可用」同族。
   - 坏批处理：单批拿不到内容**退回队尾重试一次**（`video-lab.ts:407-412`），**连着两批坏才整轮收摊**（先判收摊、再谈重试，顺序反了就变成无限重排 —— 守卫用变异钉住）。已翻好的落 `z:` 不动，剩下的算进 `missed`，文案写"再点一次重试剩下的"。三档降级各有实话：未配 Key / 一句都没回来（含超时）/ 部分没回来。
-  - 在途锁 `translateRunning` 是**模块级**（`:57`）而不是 ref：组件每次导航都重挂载会重置 ref，而模块级的一份才拦得住"两课同时翻"。锁在 `finally` 里连同按钮态一起释放，早退（换课）也解。
-  - 换课/卸载：`shownIdRef` + `activeRef` 让旧轮次停止取新活，但已经在途的那批回来仍写回**它自己那一课**的 `z:`（`:428`）；`openLesson` 清掉上一课的"翻译中/结果文案"（`:150-152`）。
+  - 在途锁 `translateRunning` 是**模块级**（`:58`）而不是 ref：组件每次导航都重挂载会重置 ref，而模块级的一份才拦得住"两课同时翻"。锁在 `finally` 里连同按钮态一起释放，早退（换课）也解。
+  - 换课/卸载：`shownIdRef` + `activeRef` 让旧轮次停止取新活，但已经在途的那批回来仍写回**它自己那一课**的 `z:`（`:499`；`stopped()` 在 `:494`/`:501`，`shownIdRef` 在 `:132-133`）；`openLesson` 清掉上一课的"翻译中/结果文案"（`:166-167`）。
   - 编号 JSON 的解析**复用整书翻译的 `parseBatchTranslation`**（`data/book-translation.ts:196`），不另写一份正则；`ask` 的第二实参必须是**该批自己的句数**（页面用它算 `maxTokens`，传成整课句数会把上限放大到 3800）。
 
 ### 3.5 六件套接线（漏了会静默不显示）
 
 | 处 | 位置 |
 |----|------|
-| 路由 + lazy + ErrorBoundary | `src/app.tsx:18`、`:59` |
-| 侧边栏预取表 + NAV_ITEMS | `src/components/AppSidebar.tsx:45`、`:62` |
-| 首页进度环 MODULES + 快捷入口 | `DashboardPage/constants.ts:108`、`:67` |
+| 路由 + lazy + ErrorBoundary | `src/app.tsx:67`（lazy 声明在 `:18` 一带） |
+| 侧边栏预取表 + NAV_ITEMS | `src/components/AppSidebar.tsx:45`（预取）、`:62`（NAV_ITEMS） |
+| 首页进度环 MODULES + 快捷入口 | `DashboardPage/constants.ts:116`（`MODULES` 起 `:111`）、快捷入口 `:67` |
 | `moduleProgress` 类型与默认值 | `use-learning-stats.ts:28`、`:56` |
-| `MODULE_PROGRESS_KEYS` 白名单 | `use-learning-stats.ts:82`（漏了被 `mergeStats` 丢弃） |
-| ProgressCharts 颜色与名称 | `ProgressCharts.tsx:42`、`:49` |
+| `MODULE_PROGRESS_KEYS` 白名单 | `use-learning-stats.ts:82`（`video` 在列；漏了被 `mergeStats` 丢弃） |
+| ProgressCharts 颜色与名称 | `ProgressCharts.tsx:42`（色）、`:49`（名） |
 | 首页「续学」标签表 | `DashboardPage.tsx:294` |
 
-## 4. 注意事项
+## 4. 注意事项（用户视角的六条，2026-10-19 那轮加的）
 
-1. **object URL 必须 revoke**：换课与卸载两处（`:133`、`:119-122`）。几十 MB 的 blob 泄漏比缓存贵。
+| 处 | 位置 | 为什么要这样 |
+|----|------|-------------|
+| 删课两段式确认 | 列表项垃圾桶 `:643-657`，第一次只进确认态 + 6 秒自动收回 | 一次点击就带走整课（媒体 + 字幕 + 译文 + 进度），手机上 14px 图标误触率不低 |
+| 删课连进度一起清 | `removeLesson` `:191-208` | 不清的话"删掉再导入同一份字幕"会跳回上次那句，用户读到的是"没删干净"（课的 id 由文件名+时长+字节决定，重导一定命中同一课） |
+| 选视频要有反馈 + 可反悔 | `pendingName` `:112`、`已选视频：… / 不要了` `:623-629`、媒体输入 onChange `:593-602` | 原来选完视频只是又弹一个字幕选择器，用户不知道系统记住了什么；而且**在系统选择器里点取消会留下残值**，下一次「只导字幕」会把上一段视频悄悄绑进新课 |
+| 拖拽导入真的接 | 导入框 `onDragOver/onDrop` `:577-583` → `importFiles` `:264-273` | 空态文案一直写着"拖进来"，没有 drop 处理就是撒谎；分类只有 `splitImportFiles` 一份（`video-lab.ts` 尾部），选文件与拖拽汇到同一条路 |
+| 课表折叠必须有展开入口 | `(showAllList ? list : list.slice(0, 12))` `:637` + `展开全部 N 课` `:669` | 原来硬切 12 课，第 13 课以后看不见也点不到（AGENTS「长列表」那条口径） |
+| 「重播本句」要真播 | `replayCur` `:365-371`（渲染挂点 `onClick={replayCur}`） | 暂停态只设 `currentTime` 画面不动 = 又一个"点了没反应"；只导字幕的课里没有 `<video>`，这时退化成朗读本句 |
+| 单句循环 ↔ A-B 互斥 | `toggleLoop` `:347-350`、`toggleAb` `:351-356` | 两个都开着时循环判定里 A-B 优先，界面上"单句"却还亮着 —— 用户以为在循环这一句，实际在循环上一次的区间。**两个方向都要写**，只写一半等于没写 |
+| 点词后释义卡进视野 | `lookupRef` + `scrollIntoView` `:536-540` | 手机上播放器占大半屏，卡片落在视口外，用户读到的是"点了词没反应" |
+| 听完要有反馈 | `已听 x/y 句` `:784` + 进度条 + `这一课都听到了` `:790`（当前句卡内） | 原来只有 `13/45` 计数；`listened` 早就存进进度了却不上屏，学到最后一句没有任何信号 |
+| 快捷键写在地面上 | 按钮组下方一行 `:751-754`（`hidden sm:block`） | 快捷键本来只在 `title` 里，触屏没有 hover |
+
+## 5. 注意事项
+
+1. **object URL 必须 revoke**：卸载 effect（`:153`）、换课（`:163`）、删课（`:202`）、主动返回列表（`:687`）——四处都撤，少一处就是几十 MB 的 blob 泄漏。几十 MB 的 blob 泄漏比缓存贵。
 2. **字幕列表必须开窗**，但「展开全部」不许削弱（守卫 `verify-list-scaling` 同款口径；`verify-video-lab` 第 ④ 节钉窗口常量）。
-3. **无媒体是合法形态**：只导字幕时播放器位置显示"仅字幕课程 · 用朗读本句"（`:476-481`），不是坏掉的 `<video>`。
+3. **无媒体是合法形态**：只导字幕时播放器位置显示"仅字幕课程 · 用朗读本句"（`:700-703`），不是坏掉的 `<video>`。
 4. 卡面大量动作是**图标 + title**（收藏这句、送进句子拼写）。自动化按 title 精确匹配，按 innerText 找不到（walk-video 的 `clickTitle`，与真机走查同一条教训）。
-5. 快捷键监听用**捕获阶段**（`:388`），否则 Radix 冒泡阶段同步关弹窗会把 Esc 连带退出流程。
+5. 快捷键监听用**捕获阶段**（`:556`），否则 Radix 冒泡阶段同步关弹窗会把 Esc 连带退出流程。
 6. 本页**零 toast**：所有反馈走界面文案（查词卡、跟读块、译文进度行）。新增提示必须先改守卫的零提示断言。
 7. `accept="video/*,audio/*"` 这个属性里的"斜杠星"会**骗过任何用正则剥注释的静态检查** —— 从那里一路吃到后面真正的注释结尾，一次吞掉 9KB 源码，接线断言全变成"这段代码不存在"的假红。`verify-video-lab.mjs:26-32` 因此把剥注释交给 TS 转译器（`removeComments`），并自带一条脚手架自证。
+8. **改守卫/走查前先用 grep 核对磁盘上到底是什么实现**。本轮（2026-10-19）栽了两次：编辑器把**上一会话的文件文本**当现状返回（页面里那个 `claimCredit` + `creditedRef` 版本、走查里那节"⑫–⑰"都不在磁盘上），于是照着不存在的代码写断言、还报告"改动成功"。真实现是 `reachedRef: Map<课 id, Set<句>>`（`:130`）。判据只有一个：`grep -c`/`git diff` 看磁盘，别看工具回显。
+9. **素材的时长对齐要靠工具，不要靠手工记忆**：出包时媒体按 `-t 字幕末秒+2` 裁（`make-video-lab-packs.mjs:208`），事后用 `check-video-lab-packs.mjs` 逐课实测复核 —— 六课的"媒体末秒 − 字幕末秒"全是 2 秒。**别再凭读到的数字改代码**：本轮一度以为"媒体 3:38 / 字幕 5:28"是素材坏了，据此写了裁剪+平移 cue 的改动，实测下来那份素材根本没问题，改动反而会把已裁好的课包弄成不同步（媒体不动、字幕平移）。
 
-## 5. 验证
+## 6. 验证
 
-- `node scripts/verify-video-lab.mjs` —— 119 条：三种字幕真跑解析、假 IDB 真跑整段存储层（索引封顶连媒体一起删、写失败不谎报、译文分键、`load` 合并中文）、`scoreSpeech` 真跑（含"重复词只扣一次"的正对照）、**批次翻译调度 `runBatchTranslation` 真跑**（批次切分与编号正文、并发受控、串行也要一批一回调、坏批退队尾重试一次、连着两批坏才收摊、`stopped()` 停止取新活、0 档位夹底）、六件套与页面接线。
-- `node scripts/probe-real-media.mjs [--media … --subs … --short-subs …]` —— 26 条**带真实原声**那条路径（默认拿 04 课的媒体配它自己的字幕做正对照，再配 02 那份只覆盖 30 秒的字幕做负对照；素材由脚本自己拷进 `dist/client/__probe__/`，期望时长用 ffprobe 现读、句数与"该在什么时候看逐词高亮"都从那份 JSON 现算 —— 早先版本把 `b1-shopping-chat.m4a` / `1/69` / 硬编码区间写死，换一课就整条测不起来，而 04 课开头有约 20 秒无人说话，固定在 12 秒找高亮必然假失败）：`File → IDB blob → createObjectURL → <video> 解码（readyState=4）→ timeupdate 逐词高亮 → 切走再回来从 IDB 读回 → 删除把 m:/s:/z: 一起收掉`。两遍正/负对照：正常媒体不许报"时长元数据不可靠"、截断媒体必须报。前置：把两份媒体 + 一份 JSON 放进 `dist/client/__probe__/`（构建产物目录，不进 git），Chrome 要带 `--autoplay-policy=no-user-gesture-required`。
+- `node scripts/verify-video-lab.mjs` —— 146 条：三种字幕真跑解析、假 IDB 真跑整段存储层（索引封顶连媒体一起删、写失败不谎报、译文分键、`load` 合并中文）、`scoreSpeech` 真跑（含"重复词只扣一次"的正对照）、**批次翻译调度 `runBatchTranslation` 真跑**（批次切分与编号正文、并发受控、串行也要一批一回调、坏批退队尾重试一次、连着两批坏才收摊、`stopped()` 停止取新活、0 档位夹底）、**拖拽文件分类 `splitImportFiles` 真跑**（媒体/字幕各自认，`concert.srt.mp4` 这类"字幕名带扩展坑"归媒体，正对照 `{name:'b.txt',type:'video/mp4'}` 归媒体）、六件套与页面接线、第 ⑩ 节把上面那张用户视角表逐条钉住（含**课时取自 `durationOf(parsed)`**、单句/A-B 双向互斥、学习时长按课分键）。
+- `node scripts/probe-real-media.mjs [--media … --subs … --short-subs …]` —— **38 条**（两遍 ×19）带真实原声那条路径（默认拿 04 课的媒体配它自己的字幕做正对照，再配 02 那份只覆盖 30 秒的字幕做负对照；素材由脚本自己拷进 `dist/client/__probe__/`，期望时长用 ffprobe 现读、句数与"该在什么时候看逐词高亮"都从那份 JSON 现算 —— 早先版本把 `b1-shopping-chat.m4a` / `1/69` / 硬编码区间写死，换一课就整条测不起来，而 04 课开头有约 20 秒无人说话，固定在 12 秒找高亮必然假失败）：`File → IDB blob → createObjectURL → <video> 解码（readyState=4）→ timeupdate 逐词高亮 → 停在中段时当前句正是那一句（不是钉在最后一句）→ A-B 越过出点真回跳 → 单句循环与 A-B 互斥（正反两向）→ 学习时长 0.2→0.3→0.3（认新句才计）→ 切走再回来从 IDB 读回 → 两段式删除把 m:/s:/z: 一起收掉`。两遍正/负对照：正常媒体不许报"时长元数据不可靠"、截断媒体必须报。前置：`npm run build:web` + `node scripts/serve.cjs 8001` + Chrome 带 `--autoplay-policy=no-user-gesture-required`。
+- `node scripts/check-video-lab-packs.mjs [目录名关键字]` —— 逐课**实测**素材包能不能用：ffprobe 读画面轨/音轨/媒体末秒，读那份 JSON 拿字幕末秒与句数，ffmpeg `volumedetect` 拿峰值 dB。判红的四条：没有画面轨（用户的硬要求）、没有音轨或峰值 < −60 dB、字幕比媒体长（播放器空转）、媒体比字幕长 >3 秒（片尾空白会被当成"时间线乱跳"）。负对照跑过三种：把字幕砍到只剩两句 → 报"媒体比字幕长 21s"；用一份合成的纯静音无画面 m4a → 三条一起报；删掉媒体 → 报缺文件。当前六课全绿，"媒体末秒 − 字幕末秒"全为 2 秒。
 - 出包前先确认转录伴侣在跑（`127.0.0.1:8848`，媒体库在 `B:/dshzmd`）。两条本机踩坑：
   **① 别用 `run.ps1` 起服务** —— 这份 .ps1 里有中文，Windows PowerShell 5.1 按 GBK 解 UTF-8 会把脚本解析炸掉（报 `MissingArrayIndexExpression`），直接 `PORT=8848 ASR_MODEL=base HF_ENDPOINT=https://hf-mirror.com HF_HUB_DISABLE_XET=1 python app/server.py` 就行。
   **② 自己跑 yt-dlp 时别指 `data/_cookies_ytdlp.txt`** —— 那是工具给 yt-dlp 用的**副本**（服务起来时会被重写成空文件），要用就拷一份自己的（`webstream.py:99-155` 解释了为什么不能拿用户原文件当耗材：yt-dlp 收到 Set-Cookie 会重写传入的文件并丢掉会话条目）。
   选流要限定 `vcodec^=avc1`（B 站 480p 常常只给 AV1）：`-f "bv*[height<=480][vcodec^=avc1]+ba[ext=m4a]/b[height<=480][vcodec^=avc1]" --merge-output-format mp4`。
 - `node scripts/make-video-lab-packs.mjs [--add 关键字] [--model small] [--keep-original] [--max-height 480]` —— 把转录伴侣的产物做成可直接导入的课包（媒体 + .srt + 词级 .json + 说明.txt），输出 `B:/nt-materials/video-lab/`，内置六课（01 B1 购物闲聊 / 02 32 秒示范 / 03 外刊短文 The Future 中级 / 04 短文听写 The Birthday Gift 初级 / 05 每日听力课 Day1 英音 12.5 分钟 / 06 英文新闻 诺贝尔化学奖），难度从"读两遍＋中文夹译"排到"新闻播报"。媒体按上一条统一转码裁区间。每份字幕都用同一个 `parseSubtitle` 真跑一遍，说明里带**质检数字**（重复句 / 夹非英文 / 碎句）—— 那条 B1 听力本来就是"英文读两遍 + 中文夹译"的练习结构，重复句 30/69 写进说明，不装作没看见。
-- `node scripts/walk-video.mjs` —— 35 条真界面走查（无头 Chrome，`--port 9222 --base http://127.0.0.1:8001`）：灌 45 句 SRT → 落 IDB → 点句跳转 → 点词查词 → 加生词本 → 收藏句 → 收藏页看到「视频精听」→ 拼写页视频桶起会话 → AI 翻译真跑到「已翻译 45/45 句」（并验"起点无译文 → 按钮先变进行中 → 中途已有部分中文行 → 结束回报句数"这条增量链路）→ 跟读不崩 → 删除后 `media` 表只剩索引一条。APK 侧复用同一脚本：`--port 9226 --base https://localhost`。
-- 变异记录（改坏必须红）：`scoreSpeech` 换成集合交集 → ⑦「重复词只扣一次」红；撤 `disabled={inSpellingBook}`、把 `onClick={shadowThis}` 接空、把 `saveZh` 换成 `const saved = true` → 各自那条红；把 `strip` 退回裸正则 → 脚手架自证红。
+- `node scripts/walk-video.mjs` —— **53 条**真界面走查（无头 Chrome，`--port 9222 --base http://127.0.0.1:8001`）：灌 45 句 SRT → 落 IDB → 点句跳转 → 点词查词（**词面按空白切、剥标点**）→ 加生词本 → 收藏句 → 收藏页看到「视频精听」→ 拼写页视频桶起会话 → AI 翻译真跑到「已翻译 45/45 句」（并验"起点无译文 → 按钮先变进行中并禁用 → 中途已有部分中文行 → 结束回报句数"这条增量链路）→ 跟读不崩且不卡"正在听…"→ 两段式删除（第一次只进确认态、6 秒自己收回、第二次才真删）后 `media` 表只剩索引一条 → 第 ⑩ 节把用户视角那批逐个过一遍：**媒体+字幕一起拖进导入框真的建课**、拖进来的媒体真挂上 `<video>`、**暂停态点「重播本句」真的调了 `play()` 并回到句首**（用替身记一次调用）、点词后释义卡落在视口内、快捷键那行在 DOM 里、`已听 x/y 句`、选完视频写明是哪一份、`不要了` 清得掉残值（正对照：待绑媒体不许跟进下一课）、跳到最后一句给"这一课都听到了"、**删课后重导同一份字幕必须从第 1 句重新开始**。APK 侧复用同一脚本：`--port 9226 --base https://localhost`。
+- 变异记录（改坏必须红）：`scoreSpeech` 换成集合交集 → ⑦「重复词只扣一次」红；撤 `disabled={inSpellingBook}`、把 `onClick={shadowThis}` 接空、把 `saveZh` 换成 `const saved = true` → 各自那条红；把 `strip` 退回裸正则 → 脚手架自证红；**本轮新五条**：`duration` 改成取 `parsed` 上不存在的字段 / `lessonId` 的时长参数改成 0 / 开单句不撤 A-B / 开 A-B 不关单句 / 去重键从 `lesson.meta.id` 退化成 `'ALL'` → 各自点名红。

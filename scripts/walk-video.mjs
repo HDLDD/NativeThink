@@ -215,11 +215,119 @@ sleep(1600);
 ok(String(back) === 'ok' && has('已导入 1 课'), '⑨ 课程视图能退回列表，列表记住这一课', String(back));
 const lastKey = ev(`(()=>{const k=Object.keys(localStorage).find(x=>x.endsWith('__nativethink_video_last_open'));return k?localStorage.getItem(k):'CLEARED';})()`);
 ok(String(lastKey) === 'CLEARED', '⑨ 主动返回列表会清掉"上次开着的那课"（否则下次进来又被拽回课程，看不到导入入口）', String(lastKey));
-const del = ev(`(()=>{const s=[...document.querySelectorAll('span')].find(e=>e.offsetParent&&e.querySelector('svg[class*="trash"]'));if(s){s.click();return 'ok';}return 'NOTRASH';})()`);
-sleep(1800);
-ok(String(del) === 'ok' && has('还没有导入的课程'), '⑨ 删除后回到空态（不许留一条点不开的幽灵课程）', String(del));
+const trashOnce = () => ev(`(()=>{const s=[...document.querySelectorAll('span[role="button"]')].find(e=>e.offsetParent&&e.querySelector('svg[class*="trash"]'));if(s){s.click();return 'ok';}return 'NOTRASH';})()`);
+const del1 = trashOnce();
+sleep(700);
+ok(String(del1) === 'ok' && has('再点一次删除') && has('已导入 1 课'),
+  '⑨ 第一次点垃圾桶只进确认态，不许直接删（误触一次就带走整课太重了）', String(del1));
+sleep(6000);   // 确认态要自己收回
+ok(!has('再点一次删除') && has('已导入 1 课'), '⑨ 正对照：6 秒不点第二下就自动收回确认态（课还在）', '');
+const del2 = trashOnce();
+sleep(500);
+ok(String(trashOnce()) === 'ok' && has('还没有导入的课程'), '⑨ 第二次点才真删，回到空态（不许留一条点不开的幽灵课程）', String(del2));
 const idbLeft = ev(`(async()=>{const req=indexedDB.open('nativethink-wordbank');await new Promise(r=>req.onsuccess=r);const db=req.result;const tx=db.transaction('media','readonly');const c=tx.objectStore('media').count();return await new Promise(r=>{c.onsuccess=()=>r(c.result);c.onerror=()=>r(-1);});})()`);
 ok(Number(idbLeft) === 1, '⑨ 删除把 m:/s:/z: 三条一起收掉，media 表只剩索引那一条', `键数 ${idbLeft}`);
+
+/* ── 10. 用户视角新增行为：拖拽导入 / 反悔不清残值 / 删课清进度 / 重播真播 / 释义卡在视野里 ── */
+nav('/video');
+sleep(1800);
+/** a. 一次拖进"视频 + 字幕"两个文件 —— 分类、建课、<video> 挂上，全走用户那条路 */
+const dropPair = ev(`(()=>{const dt=new DataTransfer();
+  dt.items.add(new File(['fake-bytes-not-a-real-mp4'],'wanted-video.mp4',{type:'video/mp4'}));
+  dt.items.add(new File([${JSON.stringify(srtFixture())}],'dropped-lesson.srt',{type:'application/x-subrip'}));
+  const box=document.querySelector('input[accept^=".srt"]');const zone=box&&box.closest('div[class*="dashed"]');
+  if(!zone)return 'NODROPZONE';
+  zone.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));
+  zone.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));
+  return 'dropped';})()`);
+sleep(4500);
+ok(String(dropPair) === 'dropped' && has('wanted-video') && has('1/45'),
+  '⑩ 把"视频 + 字幕"两个文件一起拖进导入框真的建了课（文案一直写着"拖进来"）', String(dropPair));
+ok(truthy(ev(`(()=>!!document.querySelector('video'))()`)),
+  '⑩ 拖进来的媒体真的挂上了 <video>（不是只存了个名字）', '');
+/** b. 重播本句：暂停态点了要真的调 play()（用替身记一次调用，别指望假字节能解码） */
+const rp = ev(`(()=>{const el=document.querySelector('video');if(!el)return 'NOVIDEO';
+  window.__played=0; const op=el.play.bind(el); el.play=()=>{window.__played++;return Promise.resolve();};
+  el.pause(); el.currentTime=30;
+  const b=[...document.querySelectorAll('button')].find(e=>(e.title||'').includes('重播本句'));if(!b)return 'NOBTN';
+  b.click();return 'clicked';})()`);
+sleep(900);
+/** 这份夹具的第一句从 0:10 起（不是 0:00），所以"回到句首"要看到的正是 10 */
+const rpState = ev(`(()=>{const el=document.querySelector('video');return JSON.stringify({played:window.__played||0,t:el?Math.round(el.currentTime):-2});})()`);
+ok(String(rp) === 'clicked' && /"played":[1-9]/.test(String(rpState)) && /"t":10/.test(String(rpState)),
+  '⑩ 暂停态点「重播本句」会真的调 play() 并回到本句起点（只设 currentTime 就是"点了没反应"）', String(rpState));
+/** c. 点词后释义卡要落在视口内（查词要先预热词库，给足时间再判定，别把竞态当缺陷） */
+/** 先把当前句钉回第 1 句：上一步为了验重播把 currentTime 拨到 30，卡片此刻显示的是别的句 */
+ev(`(()=>{const b=[...document.querySelectorAll('ol li button')].find(e=>/How do you feel/.test(e.innerText||''));if(b)b.click();return 1;})()`);
+sleep(900);
+const inView = ev(`(()=>{const p=[...document.querySelectorAll('p')].find(e=>/How do you feel/.test(e.innerText||''));
+  const s=p?[...p.querySelectorAll('span')].find(e=>(e.innerText||'').trim().toLowerCase().startsWith('result')):null;
+  if(!s)return 'NOWORD'; s.click();return 'ok';})()`);
+let box2 = 'NOCARD';
+for (let k = 0; k < 12; k++) {
+  sleep(800);
+  /** 认「收藏这个词 / 词库里没有这个词」：命中且已在生词本时按钮写的是「已在生词本」，按加进生词本找会假阴性 */
+  box2 = String(ev(`(()=>{const c=[...document.querySelectorAll('div')].filter(e=>/收藏这个词|词库里没有这个词/.test(e.innerText||'')&&e.getBoundingClientRect().height>0).pop();
+    if(!c)return 'NOCARD';const r=c.getBoundingClientRect();return JSON.stringify({inView:r.top<innerHeight&&r.bottom>0});})()`));
+  if (box2 !== 'NOCARD') break;
+}
+ok(String(inView) === 'ok' && /"inView":true/.test(String(box2)),
+  '⑩ 点词后释义卡在视口内（手机上播放器占大半屏，卡片跑到屏幕外就等于"查词没反应"）', `点词=${String(inView)} · ${String(box2)}`);
+/** d. 快捷键写在地面上（title 在触屏不可达；窄视口下这行是隐藏的，所以查 DOM 而不是查可见文案） */
+ok(truthy(ev(`(()=>document.body.innerHTML.includes('空格 播放/暂停'))()`)),
+  '⑩ 快捷键有一行明说（原来只放在 title 里；窄视口故意藏起来，但键盘用户在电脑上要看得见）', '');
+ok(/已听 \d+\/\d+ 句/.test(String(ev(`(()=>{const m=(document.body.innerText||'').replace(/\\s+/g,' ').match(/已听 \\d+\\/\\d+ 句/);return m?m[0]:'NOMATCH';})()`))),
+  '⑩ 界面上写明"已听 x/y 句"（原来只有 13/45 那种计数，不知道自己听到了哪儿）',
+  String(ev(`(()=>{const m=(document.body.innerText||'').replace(/\\s+/g,' ').match(/已听 \\d+\\/\\d+ 句/);return m?m[0]:'NOMATCH';})()`)));
+/** e. 选了视频又反悔：清掉残值，之后只导字幕不该把那段视频悄悄带上 */
+/** nav 是整页重载，会把"上次开着的那课"恢复回来 —— 先按返回键回列表，才谈得上空态 */
+const backToList = () => {
+  const b = ev(`(()=>{const x=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&e.querySelector('svg[class*="chevron-left"]'));if(!x)return 'NOBACK';x.click();return 'ok';})()`);
+  sleep(1400); return b;
+};
+nav('/video'); sleep(1400);
+backToList();
+trashOnce(); sleep(500); trashOnce(); sleep(2200);
+ok(has('还没有导入的课程'), '⑩ 起点回到空态（下面要验"反悔"这条路径）',
+  String(ev(`(()=>{const m=(document.body.innerText||'').replace(/\\s+/g,'').match(/已导入\\d+课/);return m?m[0]:'空态';})()`)));
+const pick = ev(`(()=>{const dt=new DataTransfer();dt.items.add(new File(['xx'],'wanted-video.mp4',{type:'video/mp4'}));
+  const i=document.querySelector('input[accept^="video/"]');i.files=dt.files;i.dispatchEvent(new Event('change',{bubbles:true}));return 'ok';})()`);
+sleep(1400);
+ok(has('已选视频：wanted-video.mp4'),
+  '⑩ 选完视频界面上写明是哪一份（原来只又弹一个选择器，用户不知道系统记住了什么）', String(pick));
+const un = clickText('不要了');
+sleep(700);
+ok(/^clicked/.test(String(un)) && !has('已选视频'), '⑩ 反悔入口点得动（"不要了"把待绑媒体清掉，界面上那行跟着消失）', String(un));
+const dropSub = ev(`(()=>{const dt=new DataTransfer();dt.items.add(new File([${JSON.stringify(srtFixture())}],'only-subs.srt',{type:'application/x-subrip'}));
+  const zone=document.querySelector('input[accept^=".srt"]').closest('div[class*="dashed"]');
+  if(!zone)return 'NOZONE';
+  zone.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));
+  zone.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));return 'ok';})()`);
+sleep(4500);
+ok(String(dropSub) === 'ok' && has('仅字幕课程') && !truthy(ev(`(()=>!!document.querySelector('video'))()`)),
+  '⑩ 正对照：待绑的媒体不会悄悄跟着下一次导入（这一课确实只有字幕）', `drop=${String(dropSub)} · 标题=${ev(`(()=>((document.body.innerText||'').match(/only-subs/)||['?'])[0])()`)}`);
+/** f. 听完要给出"这一课都听到了"，删课后这条要跟着清零（同一处反馈也当进度清理的正对照） */
+ev(`(()=>{const b=[...document.querySelectorAll('ol li button')].find(e=>/put it off/.test(e.innerText||''));if(b)b.click();return 1;})()`);
+sleep(1400);
+/** 窗口只铺 40 条，要跳到"最后一句"得先展开（不然测的是窗口最后一行，不是课的最后一句） */
+clickText('展开全部');
+sleep(1200);
+const lastJump = ev(`(()=>{const ls=[...document.querySelectorAll('ol li button')];const b=ls[ls.length-1];if(b)b.click();return ls.length;})()`);
+sleep(1800);
+ok(Number(lastJump) >= 45 && has('这一课都听到了'),
+  '⑩ 跳到最后一句会给出"这一课都听到了"（只有 x/y 计数的话，学到头没有任何信号）',
+  `条目 ${String(lastJump)} · ${String(ev(`(()=>{const m=(document.body.innerText||'').replace(/\\s+/g,' ').match(/已听 \\d+\\/\\d+ 句/);return m?m[0]:'NOMATCH';})()`))}`);
+nav('/video'); sleep(1400);
+backToList();
+trashOnce(); sleep(500); trashOnce(); sleep(2200);
+const readd = ev(`(()=>{const dt=new DataTransfer();dt.items.add(new File([${JSON.stringify(srtFixture())}],'only-subs.srt',{type:'application/x-subrip'}));
+  const zone=document.querySelector('input[accept^=".srt"]').closest('div[class*="dashed"]');
+  zone.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));return 'ok';})()`);
+sleep(4500);
+const startAt = ev(`(()=>{const m=(document.body.innerText||'').replace(/\\s+/g,'').match(/(\\d+)\\/(\\d+)/);return m?m[1]:'?';})()`);
+ok(String(readd) === 'ok' && String(startAt) === '1' && !has('这一课都听到了'),
+  '⑩ 删课把这一课的进度一起清掉：重导入同一份字幕从第 1 句开始、"都听到了"也跟着归零（不是跳回上次那句）',
+  `起点 ${String(startAt)} · 残留反馈=${has('这一课都听到了')}`);
 
 console.log('');
 let pass = 0; const fails = [];

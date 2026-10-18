@@ -33,6 +33,7 @@ import { useAI } from '@/hooks/use-ai';
 import { parseBatchTranslation } from '@/data/book-translation';
 import {
   videoStore, parseSubtitle, lessonId, guessLang, mergeProgress, scoreSpeech, runBatchTranslation,
+  splitImportFiles,
   type IVideoMeta, type IVideoLesson, type IVideoSentence, type IVideoProgress, type ISpeechScore,
 } from '@/lib/video-lab';
 
@@ -78,6 +79,9 @@ function activeIndexOf(sentences: IVideoSentence[], t: number): number {
   return i;
 }
 
+/** 这一课有多长 = 字幕覆盖到的最后一秒（只导字幕时这就是唯一可信的时长，媒体容器那个数不可信） */
+const durationOf = (parsed: { t1: number }[]) => parsed.reduce((m, s) => Math.max(m, s.t1 || 0), 0);
+
 export default function VideoLabPage() {
   const tts = useTTS();
   const { addFavorite, isFavorited, isWordFavorited, favorites, removeFavorite } = useFavorites();
@@ -104,8 +108,19 @@ export default function VideoLabPage() {
   const [zhBusy, setZhBusy] = useState('');
   const [noPicture, setNoPicture] = useState(false);
   const [zhNote, setZhNote] = useState('');
+  /** 选了视频要先让用户看见"选的是哪个文件"，并留着反悔的入口（原来只弹字幕框，界面无反馈） */
+  const [pendingName, setPendingName] = useState('');
+  const [dragOver, setDragOver] = useState(false);
+  /** 课表折叠 + 展开入口（超过 12 课不许点不到） */
+  const [showAllList, setShowAllList] = useState(false);
+  /** 删除要两段式确认：手机上一根手指点中 14px 的垃圾桶就永久没了 */
+  const [confirmDel, setConfirmDel] = useState('');
+  /** 这一课"到达过"的最远句（换课/重进都从进度里读回来，用来给"听完了"的反馈） */
+  const [listened, setListened] = useState(0);
 
   const mediaRef = useRef<HTMLVideoElement | null>(null);
+  /** 点词后的释义卡（手机上播放器占掉大半屏，卡片很可能在视口外 —— 说了"点词查词"就得让人看见结果） */
+  const lookupRef = useRef<HTMLDivElement | null>(null);
   const urlRef = useRef<string | null>(null);
   const subInputRef = useRef<HTMLInputElement | null>(null);
   const mediaInputRef = useRef<HTMLInputElement | null>(null);
@@ -157,6 +172,7 @@ export default function VideoLabPage() {
       try { return JSON.parse(safeStorage.getItem(PROGRESS_KEY) || '{}'); } catch { return {}; }
     })();
     setIdx(Math.min(prog[id]?.lastI || 0, Math.max(0, l.sentences.length - 1)));
+    setListened(Math.max(0, Math.min(prog[id]?.listened || 0, l.sentences.length)));
     setAb(prog[id]?.ab || null);
     setRate(prog[id]?.rate || 1);
     safeStorage.setItem(LAST_OPEN_KEY, id);
@@ -171,19 +187,28 @@ export default function VideoLabPage() {
     if (last && last !== lesson?.meta.id && list.some((m) => m.id === last)) openLesson(last);
   }, [list, lesson, openLesson]);
 
+  /** 删课要把这一课的进度记录一起收掉：否则删完重导入同一份字幕，直接跳回上次的句子，像"没删干净" */
   const removeLesson = useCallback(async (id: string) => {
     await videoStore.remove(id);
     if (safeStorage.getItem(LAST_OPEN_KEY) === id) safeStorage.removeItem(LAST_OPEN_KEY);
+    try {
+      const all: Record<string, IVideoProgress> = JSON.parse(safeStorage.getItem(PROGRESS_KEY) || '{}');
+      if (all[id]) {
+        delete all[id];
+        persistJson(PROGRESS_KEY, all);
+      }
+    } catch { /* 进度本身读不出来的话，删不掉它也不该拦住删课 */ }
     if (lesson?.meta.id === id) {
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
       urlRef.current = null;
       setLesson(null);
+      setListened(0);
     }
     setList(await videoStore.list());
   }, [lesson]);
 
-  /* ── 导入：字幕（必需）+ 媒体（可选） ── */
-  const onSubtitle = useCallback(async (file: File) => {
+  /* ── 导入：字幕（必需）+ 媒体（可选）；选文件与拖拽共用这一条路 ── */
+  const onSubtitle = useCallback(async (file: File, media?: File | null) => {
     setBusy('解析字幕…');
     try {
       const text = await file.text();
@@ -193,12 +218,10 @@ export default function VideoLabPage() {
         setBusy('');
         return;
       }
-      const media = pendingMedia.current;
-      const duration = Math.max(parsed[parsed.length - 1].t1, media ? 0 : 0);
       const meta: IVideoMeta = {
-        id: lessonId(media?.name || file.name, duration, media?.size || 0),
+        id: lessonId(media?.name || file.name, durationOf(parsed), media?.size || 0),
         title: (media?.name || file.name).replace(/\.[^.]+$/, ''),
-        duration,
+        duration: durationOf(parsed),
         lang: guessLang(parsed.slice(0, 12).map((s) => s.text).join(' ')),
         bytes: media?.size || 0,
         mime: media?.type || '',
@@ -223,6 +246,7 @@ export default function VideoLabPage() {
         }
       }
       pendingMedia.current = null;
+      setPendingName('');
       setNote('');
       setList(await videoStore.list());
       setBusy('');
@@ -232,6 +256,21 @@ export default function VideoLabPage() {
       setBusy('');
     }
   }, [openLesson]);
+
+  /**
+   * 一次拖进多个文件（视频 + 字幕）也认；分类只有一份口径（`splitImportFiles`）。
+   * 没有字幕就不能进课 —— 光有媒体的话时间轴没有，逐句功能全都无从谈起，要说清楚。
+   */
+  const importFiles = useCallback((files: File[]) => {
+    const { media, subs, extra } = splitImportFiles(files);
+    if (!subs) {
+      setNote(media ? `只看到媒体「${media.name}」，没有字幕文件 —— 逐句跳转靠字幕时间轴，请再选一份 .srt / .vtt / 转录伴侣的 JSON`
+        : '没认出手上的文件是字幕 —— 支持 .srt / .vtt / .ass / 转录伴侣的 JSON / .txt');
+      return;
+    }
+    void onSubtitle(subs as File, media as File | null);
+    if (extra > 0) setNote(`一次拖进了多个文件，只导了「${subs.name}」${media ? ' + ' + media.name : ''}，另外 ${extra} 个没动`);
+  }, [onSubtitle]);
 
   /* ── 播放：timeupdate 驱动活动句、单句循环、A-B 复读 ── */
   useEffect(() => {
@@ -248,6 +287,7 @@ export default function VideoLabPage() {
         const seen = reachedRef.current.get(lesson.meta.id)
           || (() => { const s = new Set<number>(); reachedRef.current.set(lesson.meta.id, s); return s; })();
         if (!seen.has(i)) { seen.add(i); addStudyMinutes(0.2, 'video'); }
+        setListened((v) => Math.max(v, i + 1));
       }
       if (ab && t >= ab.b) el.currentTime = ab.a;
       else if (loopOne && cur && t >= cur.t1) el.currentTime = cur.t0;
@@ -261,11 +301,13 @@ export default function VideoLabPage() {
   /** 进度落盘（小记录，走 safeStorage → 自动进云同步与备份） */
   useEffect(() => {
     if (!lesson) return;
+    const far = Math.max(listened, idx + 1);
+    if (far !== listened) setListened(far);
     try {
       const all: Record<string, IVideoProgress> = JSON.parse(safeStorage.getItem(PROGRESS_KEY) || '{}');
-      persistJson(PROGRESS_KEY, mergeProgress(all, lesson.meta.id, { lastI: idx, listened: Math.max(all[lesson.meta.id]?.listened || 0, idx + 1), ab, rate }));
+      persistJson(PROGRESS_KEY, mergeProgress(all, lesson.meta.id, { lastI: idx, listened: Math.max(all[lesson.meta.id]?.listened || 0, far), ab, rate }));
     } catch { /* 进度写失败不影响学习，界面上也不弹（练习界面零提示口径） */ }
-  }, [idx, lesson, ab, rate]);
+  }, [idx, lesson, ab, rate, listened]);
 
   const seekTo = useCallback((i: number, autoplay = true) => {
     const s = sentences[i];
@@ -298,10 +340,34 @@ export default function VideoLabPage() {
     }
   }, [lesson]);
 
+  /**
+   * 单句循环与 A-B 复读互斥：两个都开着时循环判定里 A-B 优先，界面上"单句"却还亮着 ——
+   * 用户以为在循环这一句，实际在循环上一次的区间。开一个就把另一个关掉。
+   */
+  const toggleLoop = useCallback(() => {
+    if (!loopOne) setAb(null);   // 只在"打开单句"时撤掉 A-B；setState updater 必须保持纯（StrictMode 会双调用）
+    setLoopOne((v) => !v);
+  }, [loopOne]);
+  const toggleAb = useCallback(() => {
+    if (!cur) return;
+    if (ab?.a === cur.t0) { setAb(null); return; }
+    setLoopOne(false);
+    setAb({ a: cur.t0, b: cur.t1 });
+  }, [ab, cur]);
+
   const toggle = useCallback(() => {
     const el = mediaRef.current;
     if (!el) { if (cur) tts.speak(cur.text); return; }
     if (el.paused) el.play().catch(() => {}); else el.pause();
+  }, [cur, tts]);
+
+  /** 「重播本句」要真的播起来：暂停态只设 currentTime 的话，画面不动，用户读到的是"点了没反应" */
+  const replayCur = useCallback(() => {
+    const el = mediaRef.current;
+    if (!cur) return;
+    if (!el) { tts.speak(cur.text); return; }
+    el.currentTime = cur.t0;
+    if (el.paused) el.play().catch(() => { /* 自动播放被拦是常态，不提示 */ });
   }, [cur, tts]);
 
   /* ── 点词查词 ── */
@@ -466,8 +532,14 @@ export default function VideoLabPage() {
     return sentences.slice(from, to).map((s, k) => ({ s, i: from + k }));
   }, [sentences, idx, showAll]);
 
-  /* ── 快捷键（弹窗开着时不劫持；Radix 冒泡阶段同步关弹窗，所以用捕获阶段） ── */
+  /* ── 点词之后把释义卡带进视野：手机上播放器占掉大半屏，卡片经常落在视口外 ── */
   useEffect(() => {
+    if (!lookup?.word) return;
+    const t = setTimeout(() => lookupRef.current?.scrollIntoView({ block: 'nearest' }), 80);
+    return () => clearTimeout(t);
+  }, [lookup?.word]);
+
+  /* ── 快捷键（弹窗开着时不劫持；Radix 冒泡阶段同步关弹窗，所以用捕获阶段） ── */  useEffect(() => {
     if (!lesson) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement | null)?.isContentEditable) return;
@@ -478,12 +550,12 @@ export default function VideoLabPage() {
       else if (e.key === 'ArrowLeft') { if (el) el.currentTime = Math.max(0, el.currentTime - 5); }
       else if (e.key === 'ArrowDown') { e.preventDefault(); seekTo(Math.min(sentences.length - 1, idx + 1)); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); seekTo(Math.max(0, idx - 1)); }
-      else if (e.key === 'Enter') { if (el && cur) { el.currentTime = cur.t0; el.play().catch(() => {}); } }
-      else if (e.key.toLowerCase() === 'f') setLoopOne((v) => !v);
+      else if (e.key === 'Enter') replayCur();   // 与卡面那颗按钮同一个动作（仅字幕课时要能退化成朗读）
+      else if (e.key.toLowerCase() === 'f') toggleLoop();
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [lesson, idx, sentences.length, cur, toggle, seekTo]);
+  }, [lesson, idx, sentences.length, cur, toggle, seekTo, replayCur, toggleLoop]);
 
   /* ── 渲染 ── */
   if (!lesson) {
@@ -501,17 +573,42 @@ export default function VideoLabPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-dashed border-border p-4 space-y-3">
-              <p className="text-[11px] font-black text-foreground">导入一课</p>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault(); setDragOver(false);
+                const fs = Array.from(e.dataTransfer?.files || []);
+                if (fs.length) importFiles(fs);
+              }}
+              className={cn('rounded-2xl border border-dashed p-4 space-y-3 transition-colors',
+                dragOver ? 'border-teal-400/70 bg-teal-50/60 dark:bg-teal-500/10' : 'border-border')}>
+              <p className="text-[11px] font-black text-foreground">导入一课 {dragOver && <span className="text-teal-600">· 松手就导</span>}</p>
               <p className="text-[10px] font-medium text-muted-foreground leading-relaxed">
                 字幕支持 SRT / VTT，以及本地转录伴侣（dshzmd）导出的 JSON —— 带词级时间戳就能逐词高亮。
                 视频/音频可选：只导字幕也能学，原声缺席时用朗读代替。
+                <span className="font-black text-foreground">也可以把两个文件一起拖进这个框</span>。
               </p>
               <div className="flex flex-wrap gap-2">
                 <input ref={mediaInputRef} type="file" accept="video/*,audio/*" className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) { pendingMedia.current = f; subInputRef.current?.click(); } e.target.value = ''; }} />
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    // 用户在系统选择器里点取消时 files 是空的 —— 必须把上一次选的清掉，
+                    // 否则下一次「只导字幕」会把那段视频悄悄绑进新课
+                    pendingMedia.current = f || null;
+                    setPendingName(f ? f.name : '');
+                    e.target.value = '';
+                    if (f) subInputRef.current?.click();
+                  }} />
                 <input ref={subInputRef} type="file" accept=".srt,.vtt,.ass,.json,.txt" className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) onSubtitle(f); e.target.value = ''; }} />
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!f) { pendingMedia.current = null; setPendingName(''); return; }   // 取消了就别留着
+                    const media = pendingMedia.current;
+                    pendingMedia.current = null; setPendingName('');
+                    void onSubtitle(f, media);
+                  }} />
                 <Button size="sm" variant="outline" className="rounded-2xl text-[11px] font-black" disabled={!!busy}
                   onClick={() => mediaInputRef.current?.click()}>
                   {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
@@ -522,6 +619,14 @@ export default function VideoLabPage() {
                   <FileText className="size-3.5" /> 只导字幕
                 </Button>
               </div>
+              {/* 选了视频要说清"是哪一份、还能反悔"，否则用户只看到又弹了一个选择器 */}
+              {pendingName && (
+                <div className="flex items-center gap-2 rounded-xl bg-muted/40 px-2.5 py-1.5">
+                  <span className="text-[10px] font-black text-foreground truncate flex-1">已选视频：{pendingName}</span>
+                  <button onClick={() => { pendingMedia.current = null; setPendingName(''); }}
+                    className="text-[9px] font-black text-muted-foreground hover:text-rose-400">不要了</button>
+                </div>
+              )}
               {busy && <p className="text-[10px] font-bold text-teal-600">{busy}</p>}
               {note && <p className="text-[10px] font-bold text-amber-600 leading-relaxed">{note}</p>}
             </div>
@@ -529,20 +634,41 @@ export default function VideoLabPage() {
             {list.length > 0 && (
               <div className="space-y-2">
                 <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">已导入 {list.length} 课</p>
-                {list.slice(0, 12).map((m) => (
-                  <button key={m.id} onClick={() => openLesson(m.id)}
+                {(showAllList ? list : list.slice(0, 12)).map((m) => (
+                  <button key={m.id} onClick={() => { setConfirmDel(''); openLesson(m.id); }}
                     className="w-full text-left px-3 py-2.5 rounded-2xl border border-border/60 bg-muted/20 hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-2">
                       <span className="text-[12px] font-black text-foreground truncate flex-1">{m.title}</span>
                       <span className="text-[9px] font-bold text-muted-foreground tabular-nums shrink-0">{fmt(m.duration)}</span>
-                      <span onClick={(e) => { e.stopPropagation(); removeLesson(m.id); }}
-                        className="shrink-0 p-1 text-muted-foreground/50 hover:text-rose-400"><Trash2 className="size-3.5" /></span>
+                      {/* 两段式确认：误触一次不会把整课（媒体 + 字幕 + 译文 + 进度）带走 */}
+                      <span role="button" tabIndex={-1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirmDel !== m.id) {
+                            setConfirmDel(m.id);
+                            setTimeout(() => setConfirmDel((v) => (v === m.id ? '' : v)), 6000);
+                            return;
+                          }
+                          setConfirmDel('');
+                          void removeLesson(m.id);
+                        }}
+                        className={cn('shrink-0 px-1.5 py-1 rounded-lg text-[9px] font-black flex items-center gap-1',
+                          confirmDel === m.id ? 'text-rose-500 border border-rose-300/70' : 'text-muted-foreground/50 hover:text-rose-400')}>
+                        <Trash2 className="size-3.5" />{confirmDel === m.id ? '再点一次删除' : ''}
+                      </span>
                     </div>
                     <p className="text-[9px] font-bold text-muted-foreground mt-0.5">
                       {m.sentenceCount} 句 · {m.hasWords ? '逐词时间戳' : '句级时间戳'} · {m.bytes ? `${(m.bytes / 2 ** 20).toFixed(0)} MB 原声` : '仅字幕'}{m.hasZh ? ' · 已翻译' : ''}
                     </p>
                   </button>
                 ))}
+                {/* 折叠必须有展开入口（AGENTS「长列表」那条口径，不许切成看不见的 12 课） */}
+                {list.length > 12 && (
+                  <button onClick={() => setShowAllList((v) => !v)}
+                    className="text-[10px] font-bold text-teal-600 hover:underline">
+                    {showAllList ? '收回前 12 课' : `展开全部 ${list.length} 课`}
+                  </button>
+                )}
               </div>
             )}
           </CardContent>
@@ -590,13 +716,12 @@ export default function VideoLabPage() {
                 {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
               </button>
               <span className="text-[10px] font-black text-muted-foreground tabular-nums w-20 shrink-0">{fmt(time)} / {fmt(lesson.meta.duration)}</span>
-              <button onClick={() => setLoopOne((v) => !v)} title="单句循环（F）"
+              <button onClick={toggleLoop} title="单句循环（F，与 A-B 互斥）"
                 className={cn('px-2 py-1 rounded-xl text-[10px] font-black border shrink-0',
                   loopOne ? 'border-teal-400/60 bg-teal-500/10 text-teal-600' : 'border-border text-muted-foreground')}>
                 <Repeat className="size-3 inline mr-0.5" />单句
               </button>
-              <button onClick={() => { if (!cur) return; setAb(ab?.a === cur.t0 ? null : { a: cur.t0, b: cur.t1 }); }}
-                title="A-B 复读当前句区间"
+              <button onClick={toggleAb} title="A-B 复读当前句区间（与单句循环互斥）"
                 className={cn('px-2 py-1 rounded-xl text-[10px] font-black border shrink-0',
                   ab ? 'border-teal-400/60 bg-teal-500/10 text-teal-600' : 'border-border text-muted-foreground')}>
                 A-B {ab ? `${fmt(ab.a)}–${fmt(ab.b)}` : ''}
@@ -623,6 +748,10 @@ export default function VideoLabPage() {
                 <Sparkles className="size-3 inline mr-0.5" />{zhBusy || '翻译字幕'}
               </button>
             </div>
+            {/* 快捷键只写在 title 里等于手机上没有；键盘用户值得有一行明说 */}
+            <p className="hidden sm:block text-[9px] font-bold text-muted-foreground/70">
+              空格 播放/暂停 · ↑ ↓ 上/下一句 · ← → 快退/快进 5 秒 · F 单句循环 · Enter 重播本句
+            </p>
             {cur && (
               <div className="rounded-2xl bg-muted/40 p-3 space-y-1.5">
                 <p className="text-[14px] font-black leading-relaxed text-foreground">
@@ -647,9 +776,19 @@ export default function VideoLabPage() {
                     disabled={inSpellingBook}
                     title={inSpellingBook ? '这句已经在听写本里' : '送进句子拼写（听写这句）'}
                     className={cn('p-1', inSpellingBook ? 'text-sky-500' : 'text-muted-foreground/50 hover:text-sky-500')}><Keyboard className="size-3.5" /></button>
-                  <button onClick={() => { if (mediaRef.current) { mediaRef.current.currentTime = cur.t0; } }}
-                    title="重播本句（Enter）" className="p-1 text-muted-foreground/50 hover:text-teal-600"><Play className="size-3.5" /></button>
+                  <button onClick={replayCur} title="重播本句（Enter）" className="p-1 text-muted-foreground/50 hover:text-teal-600"><Play className="size-3.5" /></button>
                   <span className="ml-auto text-[9px] font-bold text-muted-foreground/70 tabular-nums">{fmt(cur.t0)}–{fmt(cur.t1)}</span>
+                </div>
+                {/* 已听到第几句 + 听完的反馈：只有 x/y 计数时，听到最后一句是没有任何"这课完事了"的信号 */}
+                <div className="flex items-center gap-2 pt-0.5">
+                  <span className="text-[9px] font-black text-muted-foreground tabular-nums shrink-0">已听 {Math.min(listened, sentences.length)}/{sentences.length} 句</span>
+                  <span className="flex-1 min-w-0 h-1 rounded-full bg-muted overflow-hidden">
+                    <span className="block h-full rounded-full bg-teal-500"
+                      style={{ width: `${Math.min(100, Math.round(listened / Math.max(1, sentences.length) * 100))}%` }} />
+                  </span>
+                  {sentences.length > 1 && listened >= sentences.length && (
+                    <span className="text-[9px] font-black text-teal-600 shrink-0">这一课都听到了 · 「翻译字幕」补中文 / 左上角换课</span>
+                  )}
                 </div>
                 {/* 跟读比对结果就显示在卡里（练习界面零提示口径：不弹 toast） */}
                 {(score || micNote) && (
@@ -686,6 +825,7 @@ export default function VideoLabPage() {
       </Card>
 
       {lookup && (
+        <div ref={lookupRef}>
         <Card className="rounded-[24px] border-teal-200/70 dark:border-teal-500/20 shadow-sm">
           <CardContent className="p-3.5 space-y-2">
             <div className="flex items-center gap-2">
@@ -727,6 +867,7 @@ export default function VideoLabPage() {
             )}
           </CardContent>
         </Card>
+        </div>
       )}
 
       <Card className="rounded-[28px] border-border shadow-sm">

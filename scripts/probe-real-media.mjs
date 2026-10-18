@@ -60,6 +60,7 @@ const subsInfo = (name) => {
     句: list.length,
     末秒: Math.round(list.reduce((m, x) => Math.max(m, x.t1 || 0), 0)),
     点: w ? Number(((w.t0 + w.t1) / 2).toFixed(2)) : 12,
+    表: list,
   };
 };
 const A = subsInfo(SUBS_NAME);
@@ -70,6 +71,12 @@ const ok = (c, n, d = '') => { results.push({ c, n }); console.log(`${c ? '✓' 
 const truthy = (v) => v === true || v === 'true';
 const has = (t) => truthy(ev(`(()=>{const n=(s)=>(s||'').replace(/\\s+/g,'');return n(document.body.innerText).includes(n(${JSON.stringify(t)}));})()`));
 const nav = (p) => { ev(`(()=>{location.href='${BASE}${p}';return 'go';})()`); sleep(2800); };
+/** 图标/短文案按钮一律按 title 点（这一页大量动作是 title，按文案点不到 —— walk-video 同一条教训） */
+const clickTitle = (t) => ev(`(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&(e.title||'').includes(${JSON.stringify(t)}));if(!b)return 'NOBTN';if(b.disabled)return 'DISABLED';b.click();return 'ok';})()`);
+/** 激活态的口径：这一页的"开着"就是 teal 底色（单句循环 / A-B 复读共用） */
+const btnOn = (t) => truthy(ev(`(()=>{const b=[...document.querySelectorAll('button')].find(e=>(e.title||'').includes(${JSON.stringify(t)}));return /teal-500/.test(b?b.className:'');})()`));
+/** 学习时长记账实况（safeStorage 前缀会变，按后缀找键） */
+const videoMinutes = () => Number(ev(`(()=>{const k=Object.keys(localStorage).find(x=>x.endsWith('__nativethink_learning_stats'));if(!k)return 0;const j=JSON.parse(localStorage.getItem(k)||'{}');return (j.moduleProgress||{}).video||0;})()`));
 
 const readKeys = () => ev(`(async()=>{
   const db = await new Promise((res, rej) => { const r = indexedDB.open('nativethink-wordbank'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
@@ -138,27 +145,79 @@ function runOnce(tag, subsName, expectDur, wantWarn) {
   }
   ok(/"lit":[1-9]/.test(hl), `${tag} ⑨ 播放中真有词被点亮（词级时间戳生效，不只是解析出来）`, hl);
 
+  /* ⑩ 当前句必须正是"这一时刻在说的那一句"：时长/时间换算一错，界面就一路钉在最后一句（先暂停再 seek，别让播放中读） */
+  const info = subsInfo(subsName);
+  const wantI = info.表.findIndex((x) => info.点 >= x.t0 && info.点 < x.t1) + 1;
+  ev(`(()=>{const v=document.querySelector('video'); if(v){v.pause(); v.currentTime=${info.点};}return 1;})()`);
+  sleep(1400);
+  const counter = String(ev(`(()=>{const s=[...document.querySelectorAll('span')].find(e=>/^\\d+\\/\\d+$/.test((e.innerText||'').trim()));return s?s.innerText.trim():'NOCOUNTER';})()`));
+  const shown = Number(String(counter).split('/')[0]);
+  ok(wantI > 0 && shown === wantI,
+    `${tag} ⑩ 停在 ${info.点}s 时当前句是第 ${wantI} 句（不是跳到最后一句）`, `计数 ${counter} · 该是 ${wantI} · 共 ${info.句}`);
+
+  /** ⑪ A-B 复读：越过出点必须回跳到入点 —— 精听最核心的动作，光有静态断言不算 */
+  const sAb = info.表[Math.max(0, wantI - 1)] || info.表[0];
+  ok(String(clickTitle('A-B 复读')) === 'ok', `${tag} ⑪ A-B 复读按钮在真媒体上点得到`, '');
+  sleep(900);
+  ev(`(()=>{const v=document.querySelector('video'); if(v) v.currentTime=${(sAb.t1 + 0.4).toFixed(2)}; return 1;})()`);
+  let abBack = -1;
+  for (let k = 0; k < 10; k++) {
+    sleep(600);
+    abBack = Number(ev(`(()=>{const v=document.querySelector('video');return v?v.currentTime:-1;})()`));
+    if (Math.abs(abBack - sAb.t0) <= 0.6) break;
+  }
+  ok(Math.abs(abBack - sAb.t0) <= 0.6,
+    `${tag} ⑫ 越过出点(${Math.round(sAb.t1 * 10) / 10}s)自己回到入点(${Math.round(sAb.t0 * 10) / 10}s)`, 'currentTime=' + Math.round(abBack * 10) / 10);
+
+  /* ⑬ 单句循环与 A-B 互斥：两个都开着时循环判定里 A-B 优先，界面上"单句"还亮着就是骗人 */
+  clickTitle('单句循环'); sleep(900);
+  const onlyLoop = btnOn('单句循环') && !btnOn('A-B 复读');
+  clickTitle('A-B 复读'); sleep(900);
+  const onlyAb = btnOn('A-B 复读') && !btnOn('单句循环');
+  ok(onlyLoop && onlyAb, `${tag} ⑬ 单句循环与 A-B 互斥（开一个必须关另一个，正反两个方向都过一遍）`, `单句独亮=${onlyLoop} · A-B 独亮=${onlyAb}`);
+  clickTitle('A-B 复读'); sleep(700);   // 收掉，别把复读状态带进下面几测
+
+  /* ⑭ 学习时长按句去重：认新句加 0.2 分钟，同一句里来回拖不许刷时长 */
+  const sNew = info.表[Math.max(1, Math.min(info.表.length - 1, 12))];
+  const inSelf = (off) => (sNew.t0 + Math.min(off, (sNew.t1 - sNew.t0) * 0.4)).toFixed(2);
+  const M0 = videoMinutes();
+  ev(`(()=>{const v=document.querySelector('video'); if(v){v.pause(); v.currentTime=${inSelf(0.2)};}return 1;})()`);
+  sleep(1600);
+  const M1 = videoMinutes();
+  ev(`(()=>{const v=document.querySelector('video'); if(v) v.currentTime=${inSelf(0.6)}; return 1;})()`);
+  sleep(900);
+  ev(`(()=>{const v=document.querySelector('video'); if(v) v.currentTime=${inSelf(0.2)}; return 1;})()`);
+  sleep(1400);
+  const M2 = videoMinutes();
+  ok(M1 > M0 && M2 === M1,
+    `${tag} ⑭ 学习时长：认到新句才计，同一句来回拖不刷（本地动作、按课分键）`, `${M0} → ${M1} → ${M2}`);
+
   /* 换页再回来：blob 从 IDB 读回 */
   nav('/spelling'); sleep(1500);
   nav('/video'); sleep(7000);
   const vid2 = ev(`(()=>{const v=document.querySelector('video');
     return v?JSON.stringify({dur:Math.round(v.duration||0),blob:/^blob:/.test(v.currentSrc||'')}):'NO_VIDEO';})()`);
-  ok(/"blob":true/.test(String(vid2)), `${tag} ⑩ 切走再回来，原声从 IndexedDB 的 blob 读回（不是内存残留）`, String(vid2));
+  ok(/"blob":true/.test(String(vid2)), `${tag} ⑮ 切走再回来，原声从 IndexedDB 的 blob 读回（不是内存残留）`, String(vid2));
 
   /* 存储实况：media 表里应当只有 index + 这一课的 m: / s: */
   const keys = String(readKeys());
-  ok(/"m:/.test(keys) && /"s:/.test(keys), `${tag} ⑪ media 表里确有这一课的 m: 与 s: 两条键`, keys.slice(0, 130));
+  ok(/"m:/.test(keys) && /"s:/.test(keys), `${tag} ⑯ media 表里确有这一课的 m: 与 s: 两条键`, keys.slice(0, 130));
 
-  /* 删除连媒体一起清 */
+  /* 删除连媒体一起清 —— 现在是两段式确认，一次点击只进确认态 */
   ev(`(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&e.querySelector('svg[class*="chevron-left"]'));if(b)b.click();return 1;})()`);
   sleep(1800);
-  const del = ev(`(()=>{const s=[...document.querySelectorAll('span')].find(e=>e.offsetParent&&e.querySelector('svg[class*="trash"]'));if(s){s.click();return 'ok';}return 'NOTRASH';})()`);
+  const trash = () => ev(`(()=>{const s=[...document.querySelectorAll('span')].find(e=>e.offsetParent&&e.querySelector('svg[class*="trash"]'));if(s){s.click();return 'ok';}return 'NOTRASH';})()`);
+  const t1 = trash();
+  sleep(600);
+  const armed = has('再点一次删除');
+  const t2 = trash();
   sleep(2500);
-  ok(String(del) === 'ok' && has('还没有导入的课程'), `${tag} ⑫ 删除后回到空态`, String(del));
+  ok(String(t1) === 'ok' && armed, `${tag} ⑰ 第一次点垃圾桶只进确认态（媒体+字幕+译文一起没太重了）`, String(t1));
+  ok(String(t2) === 'ok' && has('还没有导入的课程'), `${tag} ⑱ 第二次点才真删，回到空态`, String(t2));
   const keys2 = String(readKeys());
   const clean2 = keys2.replace(/["\\\s\[\]]/g, '');
   ok(/video-index/.test(clean2) && !/m:/.test(clean2) && !/s:/.test(clean2) && !/z:/.test(clean2),
-    `${tag} ⑬ 删除把 m:/s:/z: 一起收掉，media 表只剩索引那一条`, 'raw=' + JSON.stringify(keys2).slice(0, 140));
+    `${tag} ⑲ 删除把 m:/s:/z: 一起收掉，media 表只剩索引那一条`, 'raw=' + JSON.stringify(keys2).slice(0, 140));
 }
 
 runOnce('A 匹配的媒体+字幕', SUBS_NAME, ffdur, false);
