@@ -172,17 +172,26 @@ ok(String(trans).startsWith('clicked'), '⑧ 「翻译字幕」按钮点得到',
 let zhState = '';
 for (let t = 0; t < 24; t++) {
   sleep(2500);
-  zhState = String(ev(`(()=>{const n=(s)=>(s||'').replace(/\\s+/g,'');const t=n(document.body.innerText);const m=t.match(/(翻译中[^]{0,8}|还没配AI Key[^]{0,26}|已翻译[^]{0,16}|AI 这次没返回内容[^]{0,18}|AI 返回的编号[^]{0,18})/);return m?m[0]:'';})()`));
+  zhState = String(ev(`(()=>{const n=(s)=>(s||'').replace(/\\s+/g,'');const t=n(document.body.innerText);const m=t.match(/(翻译中[^]{0,8}|还没配AIKey[^]{0,26}|已翻译[^]{0,16}|AI这次没返回内容[^]{0,18}|AI返回的编号[^]{0,18}|存不下来[^]{0,20})/);return m?m[0]:'';})()`));
   if (/已翻译|还没配|没返回|编号/.test(zhState)) break;
 }
-ok(/已翻译|还没配 AI Key|没返回内容|编号对不上|存不下来/.test(zhState),
+ok(/已翻译|还没配AIKey|没返回内容|编号对不上|存不下来/.test(zhState),
   '⑧ 翻译要么回报句数、要么给出具体的失败原因（不许静默；额度被限流时这一支就是失败原因）', zhState || '60 秒内界面无任何反馈');
 ok(!crash(), '⑧ 翻译后页面仍活着', '');
 clickText('跟读');
 sleep(2000);
 ok(!crash(), '⑧ 点跟读不崩（这台设备有/无识别通道都要活着）', '');
-ok(has('没有语音识别通道') || has('识别到') || has('没听到声音') || has('没识别出来') || has('麦克风权限'),
-  '⑧ 跟读给的是界面文案，不是静默失败', '');
+/** 有的 WebView 是"对象能构造、start() 当场抛"或 onerror/onend 一个都不回 —— 那会卡在"正在听…"，就是"点了没反应" */
+let micState = '';
+for (let t = 0; t < 8; t++) {
+  micState = String(ev(`(()=>{const n=(s)=>(s||'').replace(/\\s+/g,'');const t=n(document.body.innerText);
+    const b=[...document.querySelectorAll('button')].find(e=>(e.title||'').includes('跟读'));
+    return JSON.stringify({stuck: !!b && n(b.innerText).includes('正在听'), said: /没有语音识别通道|识别到|没听到声音|没识别出来|麦克风权限|没有回应|start\(\) 就失败/.test(t)});})()`));
+  if (/stuck":false.*said":true/.test(micState)) break;
+  sleep(2000);
+}
+ok(/"stuck":false/.test(micState) && /"said":true/.test(micState),
+  '⑧ 跟读要么给分数要么给原因，而且不许卡在"正在听…"（点了没反应 = 原生桥那族缺陷）', micState);
 
 /* ── 9. 回列表 → 删除这一课（连媒体与译文键一起清） ── */
 const back = ev(`(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&e.querySelector('svg[class*="chevron-left"]'));if(b){b.click();return 'ok';}return 'NOBACK';})()`);

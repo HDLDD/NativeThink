@@ -267,6 +267,10 @@ ok(typeof M.parseSrt === 'function' && typeof M.createVideoStore === 'function',
       ok(/onClick=\{shadowThis\}/.test(page) && /scoreSpeech\(cur\.text, t\)/.test(page),
         '跟读按钮接到识别，评分用 scoreSpeech 这一个口径');
       ok(/没有语音识别通道/.test(page), '无 SpeechRecognition 时明说用不了 + 给替代路（安卓 WebView 常见，不许假装能打的分）');
+      ok(/let watch[\s\S]{0,1400}rec\.start\(\);\s*\}\s*catch/.test(page),
+        '跟读：start() 抛错有兜底（WebView 往往是"对象能构造、start() 当场抛 NotSupportedError"，不兜就卡在"正在听…"= 点了没反应）');
+      ok(/, 9000\)/.test(page) && /clearTimeout\(watch\)/.test(page),
+        '跟读：有 9 秒看门狗且拿到结果就撤（onerror/onend 一个都不回的那种设备不许永久挂死）');
       ok(/rec\.start\(\)/.test(page) && /recRef\.current\?\.abort\(\)/.test(page),
         '识别有起点也有终点（卸载时 abort，否则切走页面还在听）');
       ok(/aiChat\(\[/.test(page) && /parseBatchTranslation\(raw, batch\.length\)/.test(page),

@@ -307,29 +307,50 @@ export default function VideoLabPage() {
     if (!cur) return;
     const API = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!API) {
-      // 安卓 WebView 基本不带 SpeechRecognition —— 说实话并给替代路，不假装能打的分
+      // 说实话并给替代路，不假装能打的分（注意：安卓 WebView 实测**有**这个对象但服务不在，
+      // 那种情况由下面的看门狗兜，不要以为"存在就能用"）
       setScore(null); setSpoken('');
       setMicNote('这台设备没有语音识别通道，跟读评分用不了；可以先「朗读」听原句，再点「听写这句」用拼写检验');
       return;
     }
     if (recording) { recRef.current?.stop(); return; }
     setMicNote(''); setSpoken(''); setScore(null); setRecording(true);
-    const rec = new API();
-    rec.lang = lesson?.meta.lang === 'zh' ? 'zh-CN' : lesson?.meta.lang === 'ja' ? 'ja-JP' : 'en-US';
-    rec.continuous = false; rec.interimResults = false; rec.maxAlternatives = 1;
-    rec.onresult = (e: any) => {
-      const t = String(e?.results?.[0]?.[0]?.transcript || '');
-      setSpoken(t);
-      setScore(scoreSpeech(cur.text, t));
-    };
-    rec.onerror = (e: any) => setMicNote(
-      e?.error === 'not-allowed' || e?.error === 'service-not-allowed'
-        ? '麦克风权限被拒绝 —— 允许后再点一次'
-        : e?.error === 'no-speech' ? '没听到声音，再试一次' : '这一次没识别出来，再点一次试试',
-    );
-    rec.onend = () => setRecording(false);
-    recRef.current = rec;
-    rec.start();
+    /**
+     * WebView 常常是"对象能构造、start() 当场抛"（无语音服务时 NotSupportedError），
+     * 也可能 onerror/onend 一个都不回 —— 这两种都会把按钮卡在"正在听…"，
+     * 就是 AGENTS 那条"点了没反应／转圈不结束"。所以：try/catch + 看门狗各自兜一层。
+     */
+    let got = false;
+    let rec: any;
+    const stopWatch = () => { if (watch) { clearTimeout(watch); watch = null; } };
+    let watch: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      if (!got) setMicNote('识别服务没有回应（这台设备的 WebView 多半不带语音识别服务）；可以先「朗读」听原句，再点「听写这句」用拼写检验');
+      try { rec?.stop(); } catch { /* 已经自己死了 */ }
+      setRecording(false);
+    }, 9000);
+    try {
+      rec = new API();
+      rec.lang = lesson?.meta.lang === 'zh' ? 'zh-CN' : lesson?.meta.lang === 'ja' ? 'ja-JP' : 'en-US';
+      rec.continuous = false; rec.interimResults = false; rec.maxAlternatives = 1;
+      rec.onresult = (e: any) => {
+        got = true; stopWatch();
+        const t = String(e?.results?.[0]?.[0]?.transcript || '');
+        setSpoken(t);
+        setScore(scoreSpeech(cur.text, t));
+      };
+      rec.onerror = (e: any) => setMicNote(
+        e?.error === 'not-allowed' || e?.error === 'service-not-allowed'
+          ? '麦克风权限被拒绝 —— 允许后再点一次'
+          : e?.error === 'no-speech' ? '没听到声音，再试一次' : `这一次没识别出来（${e?.error || '未知原因'}），再点一次试试`,
+      );
+      rec.onend = () => { stopWatch(); setRecording(false); };
+      recRef.current = rec;
+      rec.start();
+    } catch (e) {
+      stopWatch();
+      setRecording(false);
+      setMicNote(`这台设备 start() 就失败了（${(e as Error).name || '未知原因'}）—— 跟读评分用不了，可以点「听写这句」用拼写检验`);
+    }
   }, [cur, recording, lesson]);
 
   /* ── 双语字幕：按编号批量翻，翻完分键存回 IDB ── */

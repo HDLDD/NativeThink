@@ -1,7 +1,7 @@
 # 视频精听（`/video`）
 
 > 模块 key `video`。页面 `src/pages/VideoLabPage/VideoLabPage.tsx`（665 行）+ 数据层 `src/lib/video-lab.ts`（344 行）。
-> 媒体与字幕在 **IndexedDB 独立的 `media` 表**，进度与"上次开着哪一课"在 `safeStorage`。守卫 `scripts/verify-video-lab.mjs`（82 条），真界面走查 `scripts/walk-video.mjs`（35 条）。
+> 媒体与字幕在 **IndexedDB 独立的 `media` 表**，进度与"上次开着哪一课"在 `safeStorage`。守卫 `scripts/verify-video-lab.mjs`（84 条），真界面走查 `scripts/walk-video.mjs`（35 条）。
 
 ## 1. 功能
 
@@ -74,7 +74,7 @@ s:<id> / z:<id>      → { sentences } / { zh[] }          字幕与译文分开
 - **词面必须两种形态都能点**：JSON 字幕带词级时间戳，普通 SRT 没有 —— 没有时按空白把整句切成词 span（`:525-533`）。早期版本把整句当一个 span，结果"点词查词"在最常见的那种字幕上退化成"点整句"（2026-10-18 走查抓到，守卫第 ⑤ 节钉住）。逐词高亮只在真有词级时间戳时点亮，否则整条一起下划线没有意义。
 - 查词：先 `queryWords({search, limit:1})`，**查不到先 `preloadCoreOnly` 预热再查一次**（`:267-277`），否则核心层没预热时会假报"词库里没有这个词"。
 - 收藏句：`type:'video'`，`example` 存 `起始–结束` 时间区间（`:293-301`）。判重必须 `isFavorited(content,'video')` **看两 type**（与全站口径一致，见 dashboard-progress-favorites.md）。收藏页三处已认得这一型：标签 `FavoritesPage.tsx:38`、配色 `:51`、筛选 `:56`。
-- 跟读评分：`scoreSpeech`（`video-lab.ts:322-344`）用 **LCS 按词序**算命中比例并列出漏读词。不许用集合交集 —— `"the book is on the table"` 里 `the` 出现两次，只读对一次不该算两次。`SpeechRecognition` 不存在（安卓 WebView 常态）时**界面直说用不了并给替代路**（页面 `:306-313`），绝不允许显示一个假分数。卸载时 `recRef.current?.abort()`（`:119-122`）。
+- 跟读评分：`scoreSpeech`（`video-lab.ts:322-344`）用 **LCS 按词序**算命中比例并列出漏读词。不许用集合交集 —— `"the book is on the table"` 里 `the` 出现两次，只读对一次不该算两次。**通道判定不能只看对象存在**：模拟器 APK 实测 `window.webkitSpeechRecognition` **存在**（`sr:true`），但 `start()` 之后 onresult/onerror/onend 一个都不回 —— 所以除了 `!API` 那条"这台设备没有语音识别通道"的实话文案，还要 **try/catch 兜 `start()` 当场抛**、再加 **9 秒看门狗**（`rec.start()` 后无回应就收摊并说明"识别服务没有回应"，同时撤按钮的"正在听…"态）。三者缺一个就是 AGENTS 那条"点了没反应／转圈不结束"（2026-10-18 装机走查抓到：改之前正是卡在"正在听…"）。卸载时 `recRef.current?.abort()` + 撤看门狗（`:119-122`）。绝不允许显示一个假分数。
 - 听写这句：`videoToSpellingItem`（`use-spelling-sentences.ts:74-76`）是单一口径，与纠偏桶共用 `sentenceItem`（`:58-71`，判难 ≤7 / ≤13 / 更多）。拼写页里 `video` 是**句子库的桶**、不是词库：`handleLevelChange` 与纠偏桶共用同一条早退分支（`SpellingPage.tsx:883`），否则会 `preloadLevels('video')` 并弹「该词库没有例句」。桶名在词库下拉 `:1299-1306`，标签映射 `:1262`。按钮"这句已经在听写本里"用 `normSentenceKey` 判（页面 `:109`、`:536`），是界面状态不是 toast。
 - 双语字幕：一次最多 `TRANSLATE_LIMIT=30` 句、每批 10 句（`:46-47`），长视频要再点一次 —— 不许一口气打爆额度。编号 JSON 的解析**复用整书翻译的 `parseBatchTranslation`**（`data/book-translation.ts:196`），不另写一份正则。三档降级各有实话：未配 Key / 返回空 / 编号对不上（`:336-362`）。
 
@@ -102,6 +102,6 @@ s:<id> / z:<id>      → { sentences } / { zh[] }          字幕与译文分开
 
 ## 5. 验证
 
-- `node scripts/verify-video-lab.mjs` —— 82 条：三种字幕真跑解析、假 IDB 真跑整段存储层（索引封顶连媒体一起删、写失败不谎报、译文分键、`load` 合并中文）、`scoreSpeech` 真跑（含"重复词只扣一次"的正对照）、六件套与页面接线。
+- `node scripts/verify-video-lab.mjs` —— 84 条：三种字幕真跑解析、假 IDB 真跑整段存储层（索引封顶连媒体一起删、写失败不谎报、译文分键、`load` 合并中文）、`scoreSpeech` 真跑（含"重复词只扣一次"的正对照）、六件套与页面接线。
 - `node scripts/walk-video.mjs` —— 35 条真界面走查（无头 Chrome，`--port 9222 --base http://127.0.0.1:8001`）：灌 45 句 SRT → 落 IDB → 点句跳转 → 点词查词 → 加生词本 → 收藏句 → 收藏页看到「视频精听」→ 拼写页视频桶起会话 → AI 翻译真跑到「已翻译 30/45 句」→ 跟读不崩 → 删除后 `media` 表只剩索引一条。APK 侧复用同一脚本：`--port 9226 --base https://localhost`。
 - 变异记录（改坏必须红）：`scoreSpeech` 换成集合交集 → ⑦「重复词只扣一次」红；撤 `disabled={inSpellingBook}`、把 `onClick={shadowThis}` 接空、把 `saveZh` 换成 `const saved = true` → 各自那条红；把 `strip` 退回裸正则 → 脚手架自证红。
