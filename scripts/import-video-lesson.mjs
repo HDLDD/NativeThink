@@ -103,7 +103,17 @@ const setFiles = async (selector, name, type, bytesVar) => ev(`(()=>{
 
 await prep('__subsB64', '__subsBytes');
 if (MEDIA) {
-  console.log('① 先走媒体（App 的处理器会顺带弹出系统选择器 —— 之后在手机上点一下取消，不影响导入）');
+  /**
+   * App 的媒体 onChange 会顺带 `subInputRef.click()` 弹系统选择器 —— 真机上这一弹是**模态**的，
+   * 连灌几课就要人在手机上点几次取消（而点错文件反而会灌进别的东西）。字幕我们自己注入，
+   * 所以 --no-saf 时把那个 click 接掉：只撤"弹面板"这一步，pendingMedia→onChange→存库全都照原样真跑。
+   */
+  if (argv.includes('--no-saf')) {
+    console.log('· 先把字幕选择器的自动弹出接掉（--no-saf，免得每课都要在手机上点取消）');
+    console.log('  ', await ev(`(()=>{const i=document.querySelector('input[accept^=".srt"]');if(!i)return 'NO_INPUT';
+      Object.defineProperty(i,'click',{value:()=>{},configurable:true});return 'stubbed';})()`));
+  }
+  console.log('① 先走媒体' + (argv.includes('--no-saf') ? '（不会再弹系统选择器）' : '（App 的处理器会顺带弹出系统选择器 —— 之后在手机上点一下取消，不影响导入）'));
   await prep('__mediaB64', '__mediaBytes');
   console.log('  ', await setFiles('input[accept^="video/"]', mediaName, 'audio/mp4', '__mediaBytes'));
 }
