@@ -128,6 +128,7 @@ export default function VideoLabPage() {
     if (!l) { setNote('这一课的记录读不出来了，重新导入一份字幕即可'); return; }
     if (urlRef.current) URL.revokeObjectURL(urlRef.current);
     urlRef.current = l.url;
+    setNote('');           // 上一课的"时长元数据不可靠"之类提示不许跟着带到这一课
     setLesson(l);
     setShowAll(false);
     setLookup(null);
@@ -256,6 +257,23 @@ export default function VideoLabPage() {
       if (autoplay && el.paused) el.play().catch(() => { /* 自动播放被拦是常态，不提示 */ });
     }
   }, [sentences]);
+
+  /**
+   * 流媒体下载站给的 m4a 常见"头写 100 分钟、实际只有 5 分钟"（截断下载，moov 里声明的时长没改）。
+   * 原生控件会照显示那个假时长，用户看到进度条对不上就以为功能坏了 —— 所以把它说破：
+   * 跳转/复读/A-B 全部按字幕时间走，不受元素时长影响。
+   */
+  const checkDuration = useCallback(() => {
+    const el = mediaRef.current;
+    if (!el) return;
+    const expect = lesson?.meta.duration || 0;
+    const got = el.duration;
+    if (!Number.isFinite(got) || (expect > 1 && (got / expect > 1.6 || got / expect < 0.6))) {
+      setNote(`这段媒体自带的时长元数据不可靠（播放器报 ${fmt(got || 0)}，字幕只到 ${fmt(expect)}）—— 大概是下载被截断。点句跳转、单句循环、A-B 复读都按字幕时间走，不受它影响`);
+    } else if (expect > 1) {
+      setNote('');
+    }
+  }, [lesson]);
 
   const toggle = useCallback(() => {
     const el = mediaRef.current;
@@ -494,13 +512,15 @@ export default function VideoLabPage() {
         <CardContent className="p-0">
           {lesson.url ? (
             <video ref={mediaRef} src={lesson.url} controls playsInline className="w-full max-h-[46vh] bg-black"
-              onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} />
+              onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onLoadedMetadata={checkDuration} />
           ) : (
             <div className="w-full h-24 bg-muted/40 flex items-center justify-center gap-2">
               <Volume2 className="size-4 text-muted-foreground" />
               <span className="text-[10px] font-bold text-muted-foreground">仅字幕课程 · 用「朗读本句」听 NativeThink 的语音</span>
             </div>
           )}
+          {/* 媒体自带的时长元数据不可靠时（截断下载的 m4a 常报 100 分钟），把话说破在播放器下面 */}
+          {note && <p className="px-3 pt-2 text-[10px] font-bold text-amber-600 leading-relaxed">{note}</p>}
           <div className="p-3 space-y-2.5">
             <div className="flex items-center gap-1.5 flex-wrap">
               <button onClick={toggle} className="size-9 rounded-2xl bg-teal-500 text-white flex items-center justify-center shrink-0"

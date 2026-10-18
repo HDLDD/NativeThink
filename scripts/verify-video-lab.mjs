@@ -47,6 +47,8 @@ const mod = { exports: {} };
 new Function('module', 'exports', js)(mod, mod.exports);
 const M = mod.exports;
 const IDX = M.INDEX_KEY; // 守卫不许硬编码键名：写死一次，改了常量的断言就会悄悄真空通过
+const WANT_INDEX = String.fromCharCode(118,105,100,101,111,45,105,110,100,101,120);
+ok(IDX === WANT_INDEX, '索引键名是那个可读的字面量（曾经一路是星号串，真跑断言也照样绿）', `实际 ${JSON.stringify(IDX)}`);
 ok(typeof M.parseSrt === 'function' && typeof M.createVideoStore === 'function', '真跑脚手架：video-lab 整段转译可加载');
 
 /* ── ① 解析 ── */
@@ -243,6 +245,16 @@ ok(typeof M.parseSrt === 'function' && typeof M.createVideoStore === 'function',
       ok(/currentTime\s*=/.test(page) && /t0/.test(page), '点句跳转真的写 video.currentTime');
       ok(/loop|单句循环/.test(page), '单句循环有实现入口');
       ok(/revokeObjectURL/.test(page), 'blob URL 用完 revoke（泄漏比缓存贵）');
+      /**
+       * 截断下载的 m4a 会把容器时长写成 100 分钟（实测 B 站流：头 6024s / 真语音 343s），
+       * 原生控件照显示假时长 —— 必须说破，并且要说破在**课程视图**里（note 过去只在导入屏渲染）。
+       */
+      ok(/onLoadedMetadata=\{checkDuration\}/.test(page) && /时长元数据不可靠/.test(page),
+        '媒体自带时长与字幕对不上时有实话文案（不许让用户对着 100:24 的进度条猜为什么）');
+      ok(/got \/ expect > 1\.6 \|\| got \/ expect < 0\.6/.test(page),
+        '假时长的判定是双向比值（超量与不足都要抓，不只是 NaN）');
+      ok(/note && <p className="px-3 pt-2/.test(page) && /setNote\(''\);\s*setLesson\(l\)/.test(page),
+        '这条提示渲染在课程视图，且换课时清掉（不跟着带到下一课）');
       ok(!/toast/.test(page) || /toast\.(error|message)/.test(page), '精听界面零提示口径（只允许失败/空态）');
 
       /* ⑤ P0-c：查词 / 收藏 / 朗读 / 听写 */

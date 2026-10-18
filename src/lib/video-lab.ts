@@ -55,7 +55,7 @@ export interface IVideoMeta {
 
 export interface IVideoLesson { meta: IVideoMeta; sentences: IVideoSentence[]; url: string | null }
 
-export const INDEX_KEY = '***';
+export const INDEX_KEY = 'video-index';
 
 const round = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 1000) / 1000;
 
