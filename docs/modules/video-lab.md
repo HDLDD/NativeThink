@@ -1,7 +1,7 @@
 # 视频精听（`/video`）
 
 > 模块 key `video`。页面 `src/pages/VideoLabPage/VideoLabPage.tsx`（665 行）+ 数据层 `src/lib/video-lab.ts`（344 行）。
-> 媒体与字幕在 **IndexedDB 独立的 `media` 表**，进度与"上次开着哪一课"在 `safeStorage`。守卫 `scripts/verify-video-lab.mjs`（88 条）· 真界面走查 `scripts/walk-video.mjs`（35 条）· 真媒体探针 `scripts/probe-real-media.mjs`（26 条，两遍正/负对照）· 素材工具 `scripts/make-video-lab-packs.mjs`。
+> 媒体与字幕在 **IndexedDB 独立的 `media` 表**，进度与"上次开着哪一课"在 `safeStorage`。守卫 `scripts/verify-video-lab.mjs`（89 条）· 真界面走查 `scripts/walk-video.mjs`（35 条）· 真媒体探针 `scripts/probe-real-media.mjs`（26 条，两遍正/负对照）· 素材工具 `scripts/make-video-lab-packs.mjs`。
 
 ## 1. 功能
 
@@ -77,6 +77,8 @@ s:<id> / z:<id>      → { sentences } / { zh[] }          字幕与译文分开
 - 收藏句：`type:'video'`，`example` 存 `起始–结束` 时间区间（`:293-301`）。判重必须 `isFavorited(content,'video')` **看两 type**（与全站口径一致，见 dashboard-progress-favorites.md）。收藏页三处已认得这一型：标签 `FavoritesPage.tsx:38`、配色 `:51`、筛选 `:56`。
 - 跟读评分：`scoreSpeech`（`video-lab.ts:322-344`）用 **LCS 按词序**算命中比例并列出漏读词。不许用集合交集 —— `"the book is on the table"` 里 `the` 出现两次，只读对一次不该算两次。**通道判定不能只看对象存在**：模拟器 APK 实测 `window.webkitSpeechRecognition` **存在**（`sr:true`），但 `start()` 之后 onresult/onerror/onend 一个都不回 —— 所以除了 `!API` 那条"这台设备没有语音识别通道"的实话文案，还要 **try/catch 兜 `start()` 当场抛**、再加 **9 秒看门狗**（`rec.start()` 后无回应就收摊并说明"识别服务没有回应"，同时撤按钮的"正在听…"态）。三者缺一个就是 AGENTS 那条"点了没反应／转圈不结束"（2026-10-18 装机走查抓到：改之前正是卡在"正在听…"）。卸载时 `recRef.current?.abort()` + 撤看门狗（`:119-122`）。绝不允许显示一个假分数。
 - 听写这句：`videoToSpellingItem`（`use-spelling-sentences.ts:74-76`）是单一口径，与纠偏桶共用 `sentenceItem`（`:58-71`，判难 ≤7 / ≤13 / 更多）。拼写页里 `video` 是**句子库的桶**、不是词库：`handleLevelChange` 与纠偏桶共用同一条早退分支（`SpellingPage.tsx:883`），否则会 `preloadLevels('video')` 并弹「该词库没有例句」。桶名在词库下拉 `:1299-1306`，标签映射 `:1262`。按钮"这句已经在听写本里"用 `normSentenceKey` 判（页面 `:109`、`:536`），是界面状态不是 toast。
+- **素材必须有画面**（用户硬要求）：`make-video-lab-packs.mjs` 会 `ffprobe` 一遍，**没有画面轨直接拒绝出包**（加 `--allow-audio` 才放行）。B 站"听力号"类上传常见两种坑：① 只给音频流（`bestaudio`）→ 播放器整块黑；② 480p 给的是 **AV1** → WebView 不保证解得动。素材侧统一转 **H.264 + yuv420p + faststart**，并**裁到字幕覆盖的区间**（那条 100 分钟的合集裁成 344 秒，才对得上 69 句字幕）。App 侧也补了实话：`el.videoWidth === 0 && el.videoHeight === 0` 时在播放器下写"只有音频轨、没有画面，黑屏属正常"。
+- **真机看画面要用 `adb exec-out screencap -p`，不要用 `device-eval shot`**：后者走 CDP `Page.captureScreenshot`，**抓不到视频硬表面**，播得好好的也会截成一块黑（本轮差点据此误报"没有画面"）。量化对照：源文件抽帧平均亮度 51.9，设备截屏播放器区域 53.3 / 256 级灰阶，而 CDP 截图那块是全黑。
 - **假时长要说破**：流媒体站给的 m4a 常见"容器头写 100 分钟、实际只有 5 分钟"（截断下载；实测 B 站那条头 6024s / 真语音 343s）。`onLoadedMetadata={checkDuration}`（`:515`）用**双向比值**判（`got/expect > 1.6 || < 0.6`，不只判 NaN），命中就在播放器下方一行写清"播放器报多少、字幕只到多少，跳转/复读按字幕时间走"（渲染 `:523`；换课时 `setNote('')` 清掉，见 `:131`）。素材侧另用 `ffmpeg -t <字幕末尾秒+1> -c:a aac` 重编，`ffprobe` 复核 duration 才算修好。
 - 双语字幕：一次最多 `TRANSLATE_LIMIT=30` 句、每批 10 句（`:46-47`），长视频要再点一次 —— 不许一口气打爆额度。编号 JSON 的解析**复用整书翻译的 `parseBatchTranslation`**（`data/book-translation.ts:196`），不另写一份正则。三档降级各有实话：未配 Key / 返回空 / 编号对不上（`:336-362`）。
 

@@ -92,6 +92,7 @@ export default function VideoLabPage() {
   const [score, setScore] = useState<ISpeechScore | null>(null);
   const [micNote, setMicNote] = useState('');
   const [zhBusy, setZhBusy] = useState('');
+  const [noPicture, setNoPicture] = useState(false);
   const [zhNote, setZhNote] = useState('');
 
   const mediaRef = useRef<HTMLVideoElement | null>(null);
@@ -268,6 +269,8 @@ export default function VideoLabPage() {
     if (!el) return;
     const expect = lesson?.meta.duration || 0;
     const got = el.duration;
+    // 纯音频媒体（B 站听力号常见）在 <video> 里就是一片黑，看着像播放器坏了 —— 说破它
+    setNoPicture(el.videoWidth === 0 && el.videoHeight === 0);
     if (!Number.isFinite(got) || (expect > 1 && (got / expect > 1.6 || got / expect < 0.6))) {
       setNote(`这段媒体自带的时长元数据不可靠（播放器报 ${fmt(got || 0)}，字幕只到 ${fmt(expect)}）—— 大概是下载被截断。点句跳转、单句循环、A-B 复读都按字幕时间走，不受它影响`);
     } else if (expect > 1) {
@@ -519,7 +522,12 @@ export default function VideoLabPage() {
               <span className="text-[10px] font-bold text-muted-foreground">仅字幕课程 · 用「朗读本句」听 NativeThink 的语音</span>
             </div>
           )}
-          {/* 媒体自带的时长元数据不可靠时（截断下载的 m4a 常报 100 分钟），把话说破在播放器下面 */}
+          {/* 两件事都在播放器下面说破：媒体没有画面轨（黑屏不是坏了）、时长元数据不可靠（截断下载常报 100 分钟） */}
+          {noPicture && !note && (
+            <p className="px-3 pt-2 text-[10px] font-bold text-muted-foreground leading-relaxed">
+              这个文件只有音频轨、没有画面，所以播放器是黑的 —— 声音与逐句功能都正常；想要画面请导带视频的 mp4
+            </p>
+          )}
           {note && <p className="px-3 pt-2 text-[10px] font-bold text-amber-600 leading-relaxed">{note}</p>}
           <div className="p-3 space-y-2.5">
             <div className="flex items-center gap-1.5 flex-wrap">

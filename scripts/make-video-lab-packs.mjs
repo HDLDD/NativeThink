@@ -10,10 +10,12 @@
  *   node scripts/make-video-lab-packs.mjs                    # 内置两课
  *   node scripts/make-video-lab-packs.mjs --add BV1ppah      # 按名字模糊匹配转录伴侣里的任意媒体
  *   node scripts/make-video-lab-packs.mjs --add "data/uploads/x.mp4" --model small
+ * 媒体**没有画面轨就拒绝出包**（用户的硬要求：素材必须有画面）；真要发音频课才加 --allow-audio。
  * 没转录过的会自动提交转录并等完（轮询任务快照；挂 SSE 的话客户端一断开服务就取消任务）。
  * 环境变量：NT_DSH_BASE / NT_DSH_ROOT / NT_OUT
  * 输出在仓库外（默认 B:/nt-materials/video-lab）—— 几十 MB 的媒体不许进 git。
  */
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,6 +33,7 @@ const arg = (name, dflt) => {
 };
 const add = arg('add', '');
 const model = arg('model', 'base');
+const allowAudio = argv.includes('--allow-audio');
 
 /** 内置两课（转录伴侣里已存在）。note 里说清素材结构，别让人以为字幕坏了 */
 const BUILTIN = [
@@ -75,6 +78,20 @@ const stamp = (s) => {
 const toSrt = (list) => list.map((s, i) => (i + 1) + '\n' + stamp(s.t0) + ' --> ' + stamp(s.t1) + '\n' + s.text + '\n').join('\n');
 const CJK = new RegExp('[\\u3040-\\u30ff\\u4e00-\\u9fff]');
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9' ]/g, ' ').replace(/\s+/g, ' ').trim();
+
+
+/** 用 ffprobe 看媒体到底有没有画面轨（用户硬要求：素材必须有画面；AV1 也一并点出来） */
+const probeMedia = (file) => {
+  try {
+    const out = execFileSync('ffprobe', ['-v', 'error', '-show_entries',
+      'format=duration:stream=codec_type,codec_name,width,height', '-of', 'json', file],
+      { encoding: 'utf8', timeout: 60000 });
+    const j = JSON.parse(out);
+    const v = (j.streams || []).find((x) => x.codec_type === 'video') || null;
+    const a = (j.streams || []).find((x) => x.codec_type === 'audio') || null;
+    return { 秒: Math.round(Number(j.format && j.format.duration) || 0), 画面轨: v ? v.codec_name + ' ' + v.width + 'x' + v.height : null, 音频轨: a ? a.codec_name : null };
+  } catch (e) { return { 秒: 0, 画面轨: null, 音频轨: null, 错误: String(e.message).slice(0, 60) }; }
+};
 
 const api = async (p, init) => {
   const r = await fetch(BASE + p, init);
@@ -137,6 +154,17 @@ for (const w of targets) {
     result: { video: mediaName, video_name: mediaName, language: r.language, duration: r.duration, model: r.model, sentences },
   }), 'utf8');
 
+  /* ── 硬要求：必须有画面轨（AV1 解不动就是黑屏只有声音，一并点出来） ── */
+  const pr = probeMedia(path.join(dir, mediaName));
+  const subsEnd = Math.round(sentences.reduce((m, x) => Math.max(m, x.t1 || 0), 0));
+  if (!allowAudio && !pr.画面轨) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    report.push({ 课: w.dir, 状态: '媒体没有画面轨 ' + JSON.stringify(pr) + ' —— 已拒绝出包；确实要发音频课才加 --allow-audio' });
+    continue;
+  }
+  const 时长告警 = pr.秒 && subsEnd && (pr.秒 / subsEnd > 1.6 || pr.秒 / subsEnd < 0.6)
+    ? '⚠️ 媒体 ' + pr.秒 + 's 与字幕覆盖 ' + subsEnd + 's 差太多（截断下载或没裁到同区间），要么裁媒体要么补转录' : '';
+
   /* ── 质检数字（不是形容词） ── */
   const seen = new Set();
   let dup = 0;
@@ -145,10 +173,14 @@ for (const w of targets) {
   const frags = sentences.filter((s) => norm(s.text).split(' ').filter(Boolean).length <= 2).length;
   const longest = sentences.reduce((a, s) => (s.text.length > (a ? a.text.length : 0) ? s : a), sentences[0]);
   const words = sentences.reduce((a, x) => a + ((x.words || []).length), 0);
-  const qc = '句数 ' + sentences.length + ' · 时长 ' + Math.round(r.duration || 0) + ' 秒 · 词级时间戳 ' + words + ' 个\n'
-    + '重复句 ' + dup + '（占 ' + Math.round((dup / sentences.length) * 100) + '%）· 夹非英文 ' + mixed + ' 句 · 碎句(≤2 词) ' + frags + ' 句\n'
-    + '最长句 ' + longest.text.length + ' 字符：' + longest.text.slice(0, 60) + '\n'
-    + '转录：faster-whisper ' + (r.model || model) + '，语种 ' + (r.language || 'en') + '\n';
+  const NL = String.fromCharCode(10);   // 说明.txt 的行分隔（别在字符串里裸写反斜杠 n）
+  const qc = '媒体：' + mediaName + ' · ' + (pr.画面轨 || '无画面轨') + ' + ' + (pr.音频轨 || '?') + ' · ' + pr.秒 + ' 秒' + NL
+    + '字幕：' + sentences.length + ' 句 · 覆盖 0:00–' + Math.floor(subsEnd / 60) + ':' + String(subsEnd % 60).padStart(2, '0') + ' · 词级时间戳 ' + words + ' 个' + NL
+    + (时长告警 ? '  ' + 时长告警 + NL : '')
+    + '重复句 ' + dup + '（占 ' + Math.round((dup / sentences.length) * 100) + '%）· 夹非英文 ' + mixed + ' 句 · 碎句(≤2 词) ' + frags + ' 句' + NL
+    + '最长句 ' + longest.text.length + ' 字符：' + longest.text.slice(0, 60) + NL
+    + '转录：faster-whisper ' + (r.model || model) + '，语种 ' + (r.language || 'en')
+    + '；转录伴侣记的整条原片时长 ' + Math.round(r.duration || 0) + ' 秒' + NL;
 
   fs.writeFileSync(path.join(dir, '说明.txt'),
     w.note + '\n\n' + qc + '\n导入「视频精听」（先选媒体再选字幕，顺序反了也行）：\n'
@@ -159,7 +191,7 @@ for (const w of targets) {
     + '进去可以：点句跳转 · 单句循环(F) · A-B 复读 · 倍速 · 点词查词加生词本 · 收藏句 · 送进句子拼写当听写 · 「翻译字幕」出中文\n', 'utf8');
 
   /* ── 真跑验证：两份字幕都要被 App 的解析器吃进去 ── */
-  const out = { 课: w.dir, 媒体: mediaName, MB: +(fs.statSync(path.join(dir, mediaName)).size / 1e6).toFixed(1), 重复句: dup, 夹非英文: mixed, 碎句: frags };
+  const out = { 课: w.dir, 媒体: mediaName, 画面: pr.画面轨 || '无', 媒体秒: pr.秒, 字幕秒: subsEnd, 时长告警: 时长告警 || '一致', MB: +(fs.statSync(path.join(dir, mediaName)).size / 1e6).toFixed(1), 重复句: dup, 夹非英文: mixed, 碎句: frags };
   for (const f of [srtName, jsonName]) {
     const res = parseSubtitle(fs.readFileSync(path.join(dir, f), 'utf8'));
     out[f] = {

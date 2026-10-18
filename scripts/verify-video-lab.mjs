@@ -253,6 +253,8 @@ ok(typeof M.parseSrt === 'function' && typeof M.createVideoStore === 'function',
         '媒体自带时长与字幕对不上时有实话文案（不许让用户对着 100:24 的进度条猜为什么）');
       ok(/got \/ expect > 1\.6 \|\| got \/ expect < 0\.6/.test(page),
         '假时长的判定是双向比值（超量与不足都要抓，不只是 NaN）');
+      ok(/el\.videoWidth === 0 && el\.videoHeight === 0/.test(page) && /只有音频轨、没有画面/.test(page),
+        '纯音频媒体要说破"播放器是黑的属正常"（不让人把黑屏当成坏了 —— 2026-10-18 真机差点误报）');
       ok(/note && <p className="px-3 pt-2/.test(page) && /setNote\(''\);\s*setLesson\(l\)/.test(page),
         '这条提示渲染在课程视图，且换课时清掉（不跟着带到下一课）');
       ok(!/toast/.test(page) || /toast\.(error|message)/.test(page), '精听界面零提示口径（只允许失败/空态）');
