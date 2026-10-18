@@ -1,15 +1,18 @@
 /**
  * 一次性探针：把**真实媒体**灌进 /video，验"带原声"这条路径（walk-video 只测过「仅字幕」）。
  * 两遍对照：
- *   A 遍用修好的 m4a（容器时长 344s）→ 不该出现"时长元数据不可靠"；
- *   B 遍用原始的截断 m4a（头声明 6024s、真语音 343s）→ 必须出现那句实话。
+ *   A 遍用课包里裁好的媒体 + 它自己的字幕 → 解码真跑、逐词高亮真点亮、不该出现"时长元数据不可靠"；
+ *   B 遍用同一段媒体配**只覆盖一小段的字幕** → 播放器报的时长与字幕区间差太多，必须出现那句实话。
+ *   （负对照故意用"媒体与字幕不匹配"来做，而不是把媒体按字节砍断 —— 后者对 faststart 的 mp4 无效：
+ *    moov 在文件头，砍掉尾巴后头部声明的时长仍然等于字幕末秒，触发不了那条判定。）
  * 前置：npm run build:web && node scripts/serve.cjs 8001 &&
- *       mkdir -p dist/client/__probe__ 后把两媒体一字幕拷进去（构建产物目录，不进 git），例如
- *       cp "B:/nt-materials/video-lab/01-B1听力-购物闲聊/b1-shopping-chat.m4a" dist/client/__probe__/
- *       cp /b/dshzmd/data/web/BV1ppah66EaW*.m4a dist/client/__probe__/truncated.m4a
- *       chrome --headless=new --remote-debugging-port=9222 --user-data-dir=B:/tmp/nt-walk-chrome
+ *       chrome --headless=new --remote-debugging-port=9222 --user-data-dir=B:/tmp/nt-probe-chrome
  *       --autoplay-policy=no-user-gesture-required
- * 用法：node scripts/probe-real-media.mjs [--good 名字] [--broken 名字] [--subs 名字]
+ * 用法（媒体/字幕会**自动拷进** dist/client/__probe__/，不用手工 staging）：
+ *   node scripts/probe-real-media.mjs
+ *   node scripts/probe-real-media.mjs --media "B:/nt-materials/video-lab/04-…/birthday-gift.mp4" \
+ *       --subs "B:/nt-materials/video-lab/04-…/birthday-gift.json" --short-subs "B:/…/02-…/daily-listening-demo.json"
+ * 期望时长与句数都从**传进来的文件本身**现算（ffprobe + 读 JSON），不再硬编码 344s / 69 句。
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -29,9 +32,38 @@ const ev = (expr) => {
 const sleep = (ms) => execFileSync(process.execPath, ['-e', `setTimeout(()=>{}, ${ms})`], { cwd: ROOT });
 const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf('--' + n); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
-const GOOD = arg('good', 'b1-shopping-chat.m4a');      // dist/client/__probe__/ 里修好的媒体
-const BROKEN = arg('broken', 'truncated.m4a');          // 同目录里那份截断媒体（头写 6024s）
-const SUBS = arg('subs', 'b1-shopping-chat.json');      // 词级转录 JSON
+const MAT = 'B:/nt-materials/video-lab';
+const MEDIA = arg('media', MAT + '/04-短文听写-初级-The-Birthday-Gift/birthday-gift.mp4');
+const SUBS_SRC = arg('subs', MAT + '/04-短文听写-初级-The-Birthday-Gift/birthday-gift.json');
+const SHORT_SRC = arg('short-subs', MAT + '/02-每日听力示范/daily-listening-demo.json');   // 只覆盖 30 秒，配长媒体就触发假时长实话
+/** 把素材拷进构建产物目录（不进 git），返回页面里用的文件名 */
+const STAGE = path.join(ROOT, 'dist', 'client', '__probe__');
+fs.mkdirSync(STAGE, { recursive: true });
+for (const f of [MEDIA, SUBS_SRC, SHORT_SRC]) {
+  if (!fs.existsSync(f)) { console.log('素材不在：' + f + '（先跑 make-video-lab-packs.mjs）'); process.exit(1); }
+  fs.copyFileSync(f, path.join(STAGE, path.basename(f)));
+}
+const MEDIA_NAME = path.basename(MEDIA);
+const SUBS_NAME = path.basename(SUBS_SRC);
+const SHORT_NAME = path.basename(SHORT_SRC);
+/** 期望值现算：媒体时长用 ffprobe 读容器，句数/字幕末秒读那份 JSON */
+const ffdur = Math.round(Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0',
+  path.join(STAGE, MEDIA_NAME)], { encoding: 'utf8', timeout: 60000 }).trim()) || 0);
+const subsInfo = (name) => {
+  const j = JSON.parse(fs.readFileSync(path.join(STAGE, name), 'utf8'));
+  const r = j.result || j;
+  const list = r.sentences || [];
+  /** 逐词高亮那一测要落在"真的有人在说话"的时刻：挑第一句有 ≥3 个词的，取第二个词的中点 */
+  const rich = list.find((x) => (x.words || []).length >= 3);
+  const w = rich ? rich.words[1] : null;
+  return {
+    句: list.length,
+    末秒: Math.round(list.reduce((m, x) => Math.max(m, x.t1 || 0), 0)),
+    点: w ? Number(((w.t0 + w.t1) / 2).toFixed(2)) : 12,
+  };
+};
+const A = subsInfo(SUBS_NAME);
+const B = subsInfo(SHORT_NAME);
 
 const results = [];
 const ok = (c, n, d = '') => { results.push({ c, n }); console.log(`${c ? '✓' : '✗'} ${n}${d ? '  — ' + String(d).slice(0, 140) : ''}`); };
@@ -48,8 +80,8 @@ const readKeys = () => ev(`(async()=>{
 })()`);
 
 /** 一遍完整导入 + 播放 + 换页重开 */
-function runOnce(tag, mediaFile, expectDurRange, wantWarn) {
-  console.log('\n── ' + tag + '（媒体 ' + mediaFile + '）──');
+function runOnce(tag, subsName, expectDur, wantWarn) {
+  console.log('\n── ' + tag + '（媒体 ' + MEDIA_NAME + ' · 字幕 ' + subsName + '）──');
   nav('/video');
   ev(`(()=>{localStorage.clear();indexedDB.deleteDatabase('nativethink-wordbank');return 1;})()`);
   sleep(1500);
@@ -57,8 +89,8 @@ function runOnce(tag, mediaFile, expectDurRange, wantWarn) {
   sleep(1500);
 
   const s1 = ev(`(async()=>{
-    const b = await (await fetch('${BASE}/__probe__/${mediaFile}')).blob();
-    const dt = new DataTransfer(); dt.items.add(new File([b], '${mediaFile}', { type: 'audio/mp4' }));
+    const b = await (await fetch('${BASE}/__probe__/${MEDIA_NAME}')).blob();
+    const dt = new DataTransfer(); dt.items.add(new File([b], '${MEDIA_NAME}', { type: 'video/mp4' }));
     const inp = document.querySelector('input[accept^="video/"]');
     if (!inp) return 'NO_MEDIA_INPUT';
     inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true }));
@@ -68,8 +100,8 @@ function runOnce(tag, mediaFile, expectDurRange, wantWarn) {
   sleep(2500);
 
   const s2 = ev(`(async()=>{
-    const t = await (await fetch('${BASE}/__probe__/${SUBS}')).text();
-    const dt = new DataTransfer(); dt.items.add(new File([t], '${SUBS}', { type: 'application/json' }));
+    const t = await (await fetch('${BASE}/__probe__/${subsName}')).text();
+    const dt = new DataTransfer(); dt.items.add(new File([t], '${subsName}', { type: 'application/json' }));
     const inp = document.querySelector('input[accept^=".srt"]');
     if (!inp) return 'NO_SUB_INPUT';
     inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true }));
@@ -80,12 +112,13 @@ function runOnce(tag, mediaFile, expectDurRange, wantWarn) {
 
   ok(!has('页面出错'), `${tag} ③ 带原声导入不崩`, '');
   ok(!has('仅字幕课程'), `${tag} ④ 有媒体时不许显示「仅字幕课程」`, '');
-  ok(has('1/69'), `${tag} ⑤ 69 句全部进来`, String(ev(`(()=>{const m=document.body.innerText.match(/\\d+\\/69/);return m?m[0]:'NOMATCH';})()`)));
+  const N = subsInfo(subsName).句;
+  ok(has('1/' + N), `${tag} ⑤ ${N} 句全部进来`, String(ev(`(()=>{const m=document.body.innerText.match(/(\\d+)\\s*\\/\\s*${N}/);return m?m[0]:'NOMATCH';})()`)));
 
   const vid = ev(`(()=>{const v=document.querySelector('video');
     return v?JSON.stringify({dur:Math.round(v.duration||0),rs:v.readyState,src:(v.currentSrc||'').slice(0,20),err:v.error?String(v.error.code):null}):'NO_VIDEO';})()`);
   const dur = Number(String(vid).match(/"dur":(-?[\d.]+)/)?.[1] ?? -1);
-  ok(dur >= expectDurRange[0] && dur <= expectDurRange[1], `${tag} ⑥ <video> 报出的时长落在预期区间 ${expectDurRange.join('-')}`, String(vid));
+  ok(dur >= Math.round(expectDur * 0.85) && dur <= Math.round(expectDur * 1.15), `${tag} ⑥ <video> 报出的时长 ≈ 容器时长 ${expectDur}s（容差 ±15%）`, String(vid));
   ok(String(vid).includes('"rs":4') || String(vid).includes('"rs":3'), `${tag} ⑦ 元数据/数据已就绪（readyState ≥ 3）`, String(vid));
   ok(wantWarn === has('时长元数据不可靠'),
     `${tag} ⑧ ${wantWarn ? '截断媒体必须说破假时长' : '正常媒体不许乱报"时长元数据不可靠"'}（正/负对照）`,
@@ -94,7 +127,7 @@ function runOnce(tag, mediaFile, expectDurRange, wantWarn) {
   /* 播放 → 逐词高亮：先点一次页面上的播放键（给足用户激活），再轮询几秒，别把竞态当成缺陷 */
   ev(`(()=>{const b=[...document.querySelectorAll('button')].find(e=>(e.title||'')==='播放'||(e.title||'')==='暂停');if(b)b.click();return 1;})()`);
   sleep(600);
-  ev(`(()=>{const v=document.querySelector('video'); if(v){v.currentTime=12.0;}return 1;})()`);
+  ev(`(()=>{const v=document.querySelector('video'); if(v){v.currentTime=${subsInfo(subsName).点};}return 1;})()`);
   let hl = '';
   for (let k = 0; k < 8; k++) {
     sleep(1200);
@@ -128,10 +161,10 @@ function runOnce(tag, mediaFile, expectDurRange, wantWarn) {
     `${tag} ⑬ 删除把 m:/s:/z: 一起收掉，media 表只剩索引那一条`, 'raw=' + JSON.stringify(keys2).slice(0, 140));
 }
 
-const broken = fs.existsSync(path.join(ROOT, 'dist/client/__probe__/truncated.m4a'));
-runOnce('A 修好的媒体', 'b1-shopping-chat.m4a', [330, 360], false);
-if (broken) runOnce('B 截断的媒体', 'truncated.m4a', [5500, 6500], true);
-else console.log('\n（跳过 B 遍：dist/client/__probe__/truncated.m4a 不在）');
+runOnce('A 匹配的媒体+字幕', SUBS_NAME, ffdur, false);
+/* B 遍：同一段媒体配一份只覆盖一小段的字幕 → 播放器时长与字幕区间差 >1.6× 就必须说破 */
+if (B.句 > 0 && ffdur / Math.max(1, B.末秒) > 1.6) runOnce('B 媒体比字幕长得多', SHORT_NAME, ffdur, true);
+else console.log('\n（跳过 B 遍：换 --short-subs 指一份短得多的字幕才做得出负对照）');
 
 console.log('');
 const fails = results.filter((r) => !r.c).map((r) => r.n);

@@ -1,16 +1,19 @@
 /**
  * 给 NativeThink「视频精听」准备可直接导入的素材包。
  *
- * 转录伴侣(dshzmd) 的转录结果 → 每课一个目录：媒体 + .srt + .json（词级）+ 说明.txt。两条硬要求：
+ * 转录伴侣(dshzmd) 的转录结果 → 每课一个目录：媒体 + .srt + .json（词级）+ 说明.txt。三条硬要求：
  *  1. 每份字幕都用 **NativeThink 自己的解析器真跑**验证（与 verify-* 守卫同一套转译做法），不是"应该能解析"；
  *  2. 说明.txt 带**质检数字**（重复句 / 夹非英文 / 碎句 / 最长句）—— 素材哪里不理想要写明白，
  *     不许交一份看着挺干净、实际开头一句误听的东西给用户当示范。
+ *  3. **必须有画面轨，而且统一压成 WebView 一定解得动的形态**（H.264 + yuv420p + faststart，默认 ≤480p），
+ *     并**裁到字幕覆盖的区间** —— 手机要把整份媒体塞进 IndexedDB，1080p 十分钟的片子进去就是几百 MB。
  *
  * 用法：
- *   node scripts/make-video-lab-packs.mjs                    # 内置两课
+ *   node scripts/make-video-lab-packs.mjs                    # 内置课程
  *   node scripts/make-video-lab-packs.mjs --add BV1ppah      # 按名字模糊匹配转录伴侣里的任意媒体
  *   node scripts/make-video-lab-packs.mjs --add "data/uploads/x.mp4" --model small
- * 媒体**没有画面轨就拒绝出包**（用户的硬要求：素材必须有画面）；真要发音频课才加 --allow-audio。
+ * 已经有画面轨的成品媒体会被**沿用**（手工裁好的那份不会被音频源覆盖）；
+ * 真要原样不转码才加 --keep-original，真要发音频课才加 --allow-audio。
  * 没转录过的会自动提交转录并等完（轮询任务快照；挂 SSE 的话客户端一断开服务就取消任务）。
  * 环境变量：NT_DSH_BASE / NT_DSH_ROOT / NT_OUT
  * 输出在仓库外（默认 B:/nt-materials/video-lab）—— 几十 MB 的媒体不许进 git。
@@ -34,18 +37,44 @@ const arg = (name, dflt) => {
 const add = arg('add', '');
 const model = arg('model', 'base');
 const allowAudio = argv.includes('--allow-audio');
+const keepOriginal = argv.includes('--keep-original');
+const MAX_H = Number(arg('max-height', 480));
 
-/** 内置两课（转录伴侣里已存在）。note 里说清素材结构，别让人以为字幕坏了 */
+/** 内置课程（转录伴侣里已存在的媒体）。note 里说清素材结构，别让人以为字幕坏了 */
 const BUILTIN = [
   {
-    dir: '01-B1听力-购物闲聊', stem: 'b1-shopping-chat', pick: 'BV1ppah66EaW',
+    dir: '01-B1听力-购物闲聊', title: 'B1 听力 · 购物闲聊', stem: 'b1-shopping-chat', pick: 'BV1ppah66EaW',
     note: 'B1 英文听力训练：老朋友逛街、等结果、突然变天躲进店里继续花钱（购物英文 · 朋友闲聊口语）。\n'
       + '这类素材的结构就是**每句英文读两遍、中间夹一句中文翻译**，所以字幕里出现成对重复句是正常的，不是转录坏了 —— 重复正是盲听/跟读的抓手。\n'
       + '已知不足：开头旁白被 base 模型误听成一句不通的英文（就是字幕第 1 条），第一句可以跳过不看。',
   },
   {
-    dir: '02-每日听力示范', stem: 'daily-listening-demo', pick: 'assets/listening_demo.mp4', exact: true,
+    dir: '02-每日听力示范', title: '每日听力 · 32 秒示范', stem: 'daily-listening-demo', pick: 'assets/listening_demo.mp4', exact: true,
     note: '32 秒示范片段：每日听力开场白（5 句、语速稳、无重复、无中文夹译），适合第一次体验逐句精听 + 逐词高亮。',
+  },
+  {
+    dir: '03-外刊短文-中级-The-Future', title: '外刊短文 · The Future（中级）', stem: 'the-future', pick: 'data/uploads/nt-the-future.mp4', exact: true,
+    note: '「每天听一篇短文」中级篇 The Future（6.4 分钟，114 句，发音词典 fydict 那份）—— 独白式外刊朗读，语速中等。\n'
+      + '**这套的结构是每句读两遍**：质检重复句 79/114（69%）不是转录坏了，第二遍就是跟读/复述那一遍。\n'
+      + '比对话类素材好逐词高亮（说话人只有一个）；最长句 120 字符（说明里带原文），精听时可以只按句循环。',
+  },
+  {
+    dir: '04-短文听写-初级-The-Birthday-Gift', title: '短文听写 · The Birthday Gift（初级）', stem: 'birthday-gift', pick: 'data/uploads/nt-birthday-gift.mp4', exact: true,
+    note: '「英语短文听写·初级」The Birthday Gift 01（6.7 分钟，54 句，故事体）—— 这套本来就是给**听写/默写**用的：句子短、用词基础、有情节。\n'
+      + '重复句 37/54（69%）同 03：每句读两遍，是结构不是故障；碎句 0 条，是全 set 里最"整句"的一课。\n'
+      + '和 App 的「听写这句」（送进句子拼写）最搭：一句一句听，拼不出来再回精听。',
+  },
+  {
+    dir: '05-每日听力课程-Day1', title: '每日听力课 · Day 1（英音）', stem: 'daily-shadowing-day1', pick: 'data/uploads/nt-daily-shadowing.mp4', exact: true,
+    note: '「B站最棒的英语听力课程」p01 day1（12.5 分钟，145 句，英音）—— 六课里**最长**的一课，适合一次坐下来精听；'
+      + '界面默认只渲染活动句前后 40 条，后面用「展开全部」。\n'
+      + '重复句 81/145（56%）＝每句读两遍的结构；碎句 6 条、夹中文 1 句（数字都在说明里，不装作没看见）。\n'
+      + '同一课程还有 day2…day29 与"短对话"系列（餐厅 / 机场 / 图书馆等 200–600 秒的短课），想加课就在 B 站搜这套的分 P 再跑本脚本。',
+  },
+  {
+    dir: '06-英文新闻-诺贝尔化学奖', title: '英文新闻 · 诺贝尔化学奖', stem: 'nobel-chem-2026', pick: 'data/uploads/nobel-chem-2026.mp4', exact: true,
+    note: '英文新闻短片（4.9 分钟，画面是新闻素材）——**新闻播报语速最快、专有名词多**，跟前面几课拉开难度梯度。\n'
+      + '注意：源文件是 1080p，出包时统一压到 480p（手机里那份是压缩后的，别拿仓库外的原始文件当交付物）。',
   },
 ];
 
@@ -78,6 +107,7 @@ const stamp = (s) => {
 const toSrt = (list) => list.map((s, i) => (i + 1) + '\n' + stamp(s.t0) + ' --> ' + stamp(s.t1) + '\n' + s.text + '\n').join('\n');
 const CJK = new RegExp('[\\u3040-\\u30ff\\u4e00-\\u9fff]');
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9' ]/g, ' ').replace(/\s+/g, ' ').trim();
+const MB = (n) => +(n / 1e6).toFixed(1);
 
 
 /** 用 ffprobe 看媒体到底有没有画面轨（用户硬要求：素材必须有画面；AV1 也一并点出来） */
@@ -145,21 +175,56 @@ for (const w of targets) {
 
   const dir = path.join(OUT, w.dir);
   fs.mkdirSync(dir, { recursive: true });
-  const mediaName = w.stem + path.extname(item.path);
-  fs.copyFileSync(path.join(DSH, item.path), path.join(dir, mediaName));
+  const mediaName = w.stem + '.mp4';
   const srtName = w.stem + '.srt';
   const jsonName = w.stem + '.json';
   fs.writeFileSync(path.join(dir, srtName), toSrt(sentences), 'utf8');
   fs.writeFileSync(path.join(dir, jsonName), JSON.stringify({
-    result: { video: mediaName, video_name: mediaName, language: r.language, duration: r.duration, model: r.model, sentences },
+    result: { video: mediaName, video_name: w.title || mediaName, language: r.language, duration: r.duration, model: r.model, sentences },
   }), 'utf8');
 
-  /* ── 硬要求：必须有画面轨（AV1 解不动就是黑屏只有声音，一并点出来） ── */
-  const pr = probeMedia(path.join(dir, mediaName));
+  /* ── 媒体：沿用已裁好的成品，或从源文件统一压一遍（H.264 + yuv420p + faststart，裁到字幕区间） ── */
   const subsEnd = Math.round(sentences.reduce((m, x) => Math.max(m, x.t1 || 0), 0));
+  const dest = path.join(dir, mediaName);
+  const src = path.join(DSH, item.path);
+  const madeNew = !fs.existsSync(dest);
+  let how = '';
+  if (!keepOriginal && fs.existsSync(dest)) {
+    const had = probeMedia(dest);
+    if (had.画面轨 && /^h264/.test(had.画面轨)) {
+      how = '沿用已裁好的媒体（源文件不覆盖它）';
+    }
+  }
+  if (!how) {
+    const ps = probeMedia(src);
+    if (!ps.画面轨) {
+      report.push({ 课: w.dir, 状态: '源媒体没有画面轨 ' + JSON.stringify(ps) + ' —— 拒绝出包；确实要发音频课才加 --allow-audio（已有成品媒体不动）' });
+      continue;
+    }
+    if (keepOriginal) {
+      fs.copyFileSync(src, dest);
+      how = '原样拷贝（--keep-original）';
+    } else {
+      const t = Math.max(1, Math.min(ps.秒 || subsEnd + 2, subsEnd + 2));
+      try {
+        execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', src, '-t', String(t),
+          /** 用单引号包住表达式（ffmpeg 自己剥），别写 `min(480\,ih)` —— JS 字符串里 '\,' 的反斜杠会被吃掉，逗号又变成滤镜分隔符 */
+          '-vf', "scale=-2:'min(" + MAX_H + ",ih)'", '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28',
+          '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '96k', '-ac', '2', dest],
+          { timeout: 1500000, stdio: ['ignore', 'ignore', 'pipe'] });
+        how = '统一转码 H.264 ≤' + MAX_H + 'p + AAC，裁到 ' + Math.round(t) + ' 秒';
+      } catch (e) {
+        report.push({ 课: w.dir, 状态: '转码失败：' + String(e.message || e).slice(0, 120) });
+        continue;
+      }
+    }
+  }
+
+  /* ── 硬要求：成品必须有画面轨（AV1 解不动就是黑屏只有声音，一并点出来） ── */
+  const pr = probeMedia(dest);
   if (!allowAudio && !pr.画面轨) {
-    fs.rmSync(dir, { recursive: true, force: true });
-    report.push({ 课: w.dir, 状态: '媒体没有画面轨 ' + JSON.stringify(pr) + ' —— 已拒绝出包；确实要发音频课才加 --allow-audio' });
+    if (madeNew) fs.rmSync(dest, { force: true });
+    report.push({ 课: w.dir, 状态: '成品媒体没有画面轨 ' + JSON.stringify(pr) + ' —— 已拒绝出包' });
     continue;
   }
   const 时长告警 = pr.秒 && subsEnd && (pr.秒 / subsEnd > 1.6 || pr.秒 / subsEnd < 0.6)
@@ -174,7 +239,8 @@ for (const w of targets) {
   const longest = sentences.reduce((a, s) => (s.text.length > (a ? a.text.length : 0) ? s : a), sentences[0]);
   const words = sentences.reduce((a, x) => a + ((x.words || []).length), 0);
   const NL = String.fromCharCode(10);   // 说明.txt 的行分隔（别在字符串里裸写反斜杠 n）
-  const qc = '媒体：' + mediaName + ' · ' + (pr.画面轨 || '无画面轨') + ' + ' + (pr.音频轨 || '?') + ' · ' + pr.秒 + ' 秒' + NL
+  const qc = '媒体：' + mediaName + ' · ' + (pr.画面轨 || '无画面轨') + ' + ' + (pr.音频轨 || '?') + ' · ' + pr.秒 + ' 秒 · '
+    + MB(fs.statSync(dest).size) + 'MB（' + how + '）' + NL
     + '字幕：' + sentences.length + ' 句 · 覆盖 0:00–' + Math.floor(subsEnd / 60) + ':' + String(subsEnd % 60).padStart(2, '0') + ' · 词级时间戳 ' + words + ' 个' + NL
     + (时长告警 ? '  ' + 时长告警 + NL : '')
     + '重复句 ' + dup + '（占 ' + Math.round((dup / sentences.length) * 100) + '%）· 夹非英文 ' + mixed + ' 句 · 碎句(≤2 词) ' + frags + ' 句' + NL
@@ -183,15 +249,16 @@ for (const w of targets) {
     + '；转录伴侣记的整条原片时长 ' + Math.round(r.duration || 0) + ' 秒' + NL;
 
   fs.writeFileSync(path.join(dir, '说明.txt'),
-    w.note + '\n\n' + qc + '\n导入「视频精听」（先选媒体再选字幕，顺序反了也行）：\n'
-    + '  手机：把 ' + mediaName + ' 与字幕拷进手机 → 侧边栏「视频精听」→「选视频（含音频）」选 ' + mediaName + ' → 再选 ' + srtName + '\n'
-    + '  电脑：网页版 nativethink.pages.dev 或本机 dist 都一样，两步选文件\n'
-    + '  想逐词高亮选 ' + jsonName + '（带词级时间戳）；选 ' + srtName + ' 则按空白切词面，一样能点词查词\n'
-    + '  只有字幕也能学（「只导字幕」），原声缺席时用卡面「朗读」代替\n'
-    + '进去可以：点句跳转 · 单句循环(F) · A-B 复读 · 倍速 · 点词查词加生词本 · 收藏句 · 送进句子拼写当听写 · 「翻译字幕」出中文\n', 'utf8');
+    w.note + NL + NL + qc + NL
+    + '导入「视频精听」（先选媒体再选字幕，顺序反了也行）：' + NL
+    + '  手机：把 ' + mediaName + ' 与字幕拷进手机 → 侧边栏「视频精听」→「选视频（含音频）」选 ' + mediaName + ' → 再选 ' + jsonName + NL
+    + '  电脑：网页版 nativethink.pages.dev 或本机 dist 都一样，两步选文件' + NL
+    + '想逐词高亮选 ' + jsonName + '（带词级时间戳）；选 ' + srtName + ' 则按空白切词面，一样能点词查词' + NL
+    + '只有字幕也能学（「只导字幕」），原声缺席时用卡面「朗读」代替' + NL
+    + '进去可以：点句跳转 · 单句循环(F) · A-B 复读 · 倍速 · 点词查词加生词本 · 收藏句 · 送进句子拼写当听写 · 「翻译字幕」出中文' + NL, 'utf8');
 
   /* ── 真跑验证：两份字幕都要被 App 的解析器吃进去 ── */
-  const out = { 课: w.dir, 媒体: mediaName, 画面: pr.画面轨 || '无', 媒体秒: pr.秒, 字幕秒: subsEnd, 时长告警: 时长告警 || '一致', MB: +(fs.statSync(path.join(dir, mediaName)).size / 1e6).toFixed(1), 重复句: dup, 夹非英文: mixed, 碎句: frags };
+  const out = { 课: w.dir, 媒体: mediaName, 画面: pr.画面轨 || '无', 秒: pr.秒, 字幕末秒: subsEnd, MB: MB(fs.statSync(dest).size), 时长: 时长告警 || '一致', 重复句: dup, 夹非英文: mixed, 碎句: frags };
   for (const f of [srtName, jsonName]) {
     const res = parseSubtitle(fs.readFileSync(path.join(dir, f), 'utf8'));
     out[f] = {

@@ -158,8 +158,8 @@ node scripts/phone-emu.mjs install           # 装 NativeThink-emu-x86_64.apk（
 node scripts/phone-emu.mjs launch && node scripts/phone-emu.mjs smoke
 node scripts/walk-phone.mjs                # 装机四条走查（4 收藏 + 5 纠偏夹具，含"四级 6827 句 vs 纠偏 1 句"正对照）
 node scripts/walk-video.mjs --port 9226 --base https://localhost   # 视频精听 39 条走查在 APK 上重跑（本机版：--port 9222 --base http://127.0.0.1:8001）
-node scripts/probe-real-media.mjs                                  # 视频精听 26 条：真媒体（blob→IDB→<video> 解码→逐词高亮→换页读回→删除清干净）+ 假时长正/负对照
-node scripts/make-video-lab-packs.mjs [--add 名字关键字] [--model small]   # 把转录伴侣的产物做成可导入的素材包（**无画面轨直接拒绝出包** + 质检数字），输出 B:/nt-materials/video-lab
+node scripts/probe-real-media.mjs [--media 路径 --subs 路径 --short-subs 路径]   # 视频精听 26 条：真媒体（blob→IDB→<video> 解码→逐词高亮→换页读回→删除清干净）+ 负对照（同一段媒体配一份短得多的字幕 → 必须说破假时长）；素材自动拷进 dist/client/__probe__/，期望时长与句数现算
+node scripts/make-video-lab-packs.mjs [--add 名字关键字] [--model small]   # 把转录伴侣的产物做成可导入的素材包（**无画面轨直接拒绝出包**；有画面的统一压到 ≤480p H.264 + faststart 并裁到字幕区间；已裁好的成品媒体会被沿用；+ 质检数字），输出 B:/nt-materials/video-lab
 node scripts/import-video-lesson.mjs --port 9223 --media x.mp4 --subs x.json   # 真机导入：SAF 打不动、setFileInputFiles 被 WebView 拒，只能分块注入字节走 App 自己的 onChange
 #   smoke 之后走查照旧：CDP_PORT=9226 node scripts/device-eval.mjs eval "<表达式>"
 # ⚠️ 起不来先看 check 的"加速"那行：x86_64 必须有 AEHD/WHPX，没驱动时 emulator 直接拒启
