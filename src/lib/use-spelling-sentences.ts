@@ -31,6 +31,12 @@ export const SPELLING_SENTENCE_LIMIT = 1200;
  */
 export const CORRECTION_LEVEL = 'correction';
 
+/**
+ * 视频精听 → 句子拼写：字幕里收藏/学过的那句同样单独占一个桶，理由和「纠偏表达」一样 ——
+ * 混进几千条词库例句就再也翻不到自己看中的那句。
+ */
+export const VIDEO_LEVEL = 'video';
+
 /** 与 addSentence / addSentences 的判重口径同源（守卫直接真跑这条） */
 export function normSentenceKey(en: unknown): string {
   return String(en ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -42,17 +48,31 @@ export interface ICorrectionSeed {
   note?: string;
 }
 
-export function correctionToSpellingItem(n: ICorrectionSeed): Omit<ISpellingSentence, 'id' | 'createdAt'> {
-  const en = String(n?.right ?? '').trim();
+/** 视频精听的一句字幕（zh 可能还没翻译，留空由拼写页只给英文提示） */
+export interface IVideoSeed {
+  en: string;
+  zh?: string;
+}
+
+/** 判难与建条目的单一口径（纠偏本与视频精听两个桶共用，别再各写一份） */
+function sentenceItem(en: string, zh: string, level: string, source: SpellingSentenceSource): Omit<ISpellingSentence, 'id' | 'createdAt'> {
   const wordCount = en.split(/\s+/).filter(Boolean).length;
   return {
     en,
-    // 中文提示优先（对话分析表带）；没有就用 AI 的原因说明，再没有就留空由拼写页只给英文提示
-    zh: String(n?.chineseHint || n?.note || '').trim(),
-    source: 'correction',
-    level: CORRECTION_LEVEL,
+    zh,
+    source,
+    level,
     difficulty: wordCount <= 7 ? 'beginner' : wordCount <= 13 ? 'intermediate' : 'advanced',
   };
+}
+
+export function correctionToSpellingItem(n: ICorrectionSeed): Omit<ISpellingSentence, 'id' | 'createdAt'> {
+  // 中文提示优先（对话分析表带）；没有就用 AI 的原因说明，再没有就留空由拼写页只给英文提示
+  return sentenceItem(String(n?.right ?? '').trim(), String(n?.chineseHint || n?.note || '').trim(), CORRECTION_LEVEL, 'correction');
+}
+
+export function videoToSpellingItem(s: IVideoSeed): Omit<ISpellingSentence, 'id' | 'createdAt'> {
+  return sentenceItem(String(s?.en ?? '').trim(), String(s?.zh ?? '').trim(), VIDEO_LEVEL, 'video');
 }
 
 function generateId(): string {

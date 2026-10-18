@@ -39,12 +39,14 @@ const MODULE_COLORS: Record<string, string> = {
   writing: '#8B5CF6',
   articles: '#0EA5E9',
   spelling: '#F43F5E',
+  video: '#14B8A6',
   sentences: '#F59E0B',
 };
 const MODULE_NAMES: Record<string, string> = {
   vocabulary: '词汇深度',
   articles: '文章阅读',
   spelling: '句子拼写',
+  video: '视频精听',
   think: '思维训练',
   chunks: '语块训练',
   conversation: '对话练习',

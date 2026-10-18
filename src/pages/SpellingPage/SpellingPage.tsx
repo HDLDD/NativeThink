@@ -25,6 +25,7 @@ import {
   Heart,
   Library,
   Lightbulb,
+  Film,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -67,7 +68,7 @@ import { useTTS } from '@/lib/use-tts';
 import { sfxCorrect, sfxWrong, sfxComplete } from '@/lib/sfx';
 import { useFavorites } from '@/lib/use-favorites';
 import { useAI } from '@/hooks/use-ai';
-import { useSpellingSentences, SPELLING_SENTENCE_LIMIT, CORRECTION_LEVEL } from '@/lib/use-spelling-sentences';
+import { useSpellingSentences, SPELLING_SENTENCE_LIMIT, CORRECTION_LEVEL, VIDEO_LEVEL } from '@/lib/use-spelling-sentences';
 import { useSpellingLearning } from '@/lib/use-spelling-learning';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { toast } from 'sonner';
@@ -877,9 +878,9 @@ export default function SpellingPage() {
     async (lvl: string) => {
       if (lvl === activeLevel || switchingRef.current) return;
 
-      // 「纠偏表达」不是词库，是句子库里的一个桶（从纠偏本送进来的地道说法）——
+      // 「纠偏表达」「视频精听」都不是词库，是句子库里的一个桶（分别由纠偏本 / 精听页送进来）——
       // 走词库那条路会 preload 一个不存在的 level 并误报"该词库没有例句"。
-      if (lvl === CORRECTION_LEVEL) {
+      if (lvl === CORRECTION_LEVEL || lvl === VIDEO_LEVEL) {
         switchingRef.current = true;
         setSubmitted(false);
         setResults(null);
@@ -1259,7 +1260,7 @@ export default function SpellingPage() {
                 title="切换词书"
               >
                 <Library className="size-3.5 text-ink-teal" />
-                {activeLevel === 'all' ? '全部词库' : ({correction:'纠偏表达',zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',cet46freq:'四六级高频',cet46elite:'四六级高分',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[activeLevel] || activeLevel}
+                {activeLevel === 'all' ? '全部词库' : ({correction:'纠偏表达',video:'视频精听',zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',cet46freq:'四六级高频',cet46elite:'四六级高分',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[activeLevel] || activeLevel}
                 {building || levelLoading
                   ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
                   : <ChevronDown className="size-3.5 text-muted-foreground" />}
@@ -1294,6 +1295,16 @@ export default function SpellingPage() {
                 <Lightbulb className={cn('size-3.5', activeLevel === CORRECTION_LEVEL ? 'text-orange-500' : 'text-orange-400')} />
                 纠偏表达
                 {activeLevel === CORRECTION_LEVEL && <Check className="size-3.5 text-ink-teal ml-auto" />}
+              </DropdownMenuItem>
+              {/* 视频精听 = 同一个桶制：精听页字幕卡上点「听写这句」送进来的原句 */}
+              <DropdownMenuItem
+                onClick={() => handleLevelChange(VIDEO_LEVEL)}
+                disabled={activeLevel === VIDEO_LEVEL}
+                className="gap-2 text-xs font-bold"
+              >
+                <Film className={cn('size-3.5', activeLevel === VIDEO_LEVEL ? 'text-teal-600' : 'text-teal-400')} />
+                视频精听
+                {activeLevel === VIDEO_LEVEL && <Check className="size-3.5 text-ink-teal ml-auto" />}
               </DropdownMenuItem>
               <div className="h-px bg-border my-1" />
               {(['zhongkao','gaokao','cet4','cet6','cet46freq','cet46elite','ielts','toefl','postgraduate','professional','advanced'] as const).map((lvl) => (

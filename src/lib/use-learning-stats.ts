@@ -25,6 +25,7 @@ export interface ILearningStats {
     articles: number;
     /** 句子拼写 */
     spelling: number;
+    video: number;
     /** 句子学习（拆句/句型/造句） */
     sentences: number;
   };
@@ -52,6 +53,7 @@ const DEFAULT_STATS: ILearningStats = {
     writing: 0,
     articles: 0,
     spelling: 0,
+    video: 0,
     sentences: 0,
   },
   totalDays: 0,
@@ -77,6 +79,7 @@ const MODULE_PROGRESS_KEYS = [
   'writing',
   'articles',
   'spelling',
+  'video',
   'sentences',
 ] as const;
 

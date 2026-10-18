@@ -4,7 +4,7 @@
  */
 
 /** 句子来源 */
-export type SpellingSentenceSource = 'word_example' | 'ai_generated' | 'user_created' | 'favorite' | 'correction';
+export type SpellingSentenceSource = 'word_example' | 'ai_generated' | 'user_created' | 'favorite' | 'correction' | 'video';
 
 /** 拼写模式 */
 export type SpellingMode = 'dictation' | 'fill';

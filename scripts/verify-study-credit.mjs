@@ -175,6 +175,14 @@ function fnBody(src, name) {
     '短语闪卡翻面：直计时 0.2 分（内容域=短语，与语块复习打分同口径）');
   check(!/creditOnce/.test(pfm), '短语闪卡：全文件不走闸门（本地动作，套上就会"翻过再翻不计"）');
 
+  // 视频精听：进度条每**推进到一句新位置**计 0.2 分。这是本地动作（不许套闸门），
+  // 但按句重复拖回去看会反复触发，所以必须自己按键去重 —— 与短语闪卡"每张只计一次"同口径。
+  const video = readFileSync(join(ROOT, 'src/pages/VideoLabPage/VideoLabPage.tsx'), 'utf8');
+  check(/addStudyMinutes\(0\.2, 'video'\)/.test(video), '视频精听：到新句计 0.2 分（模块键与首页进度环一致）');
+  check(/if \(!seen\.has\(i\)\) \{ seen\.add\(i\); addStudyMinutes/.test(video),
+    '视频精听：同一句只计一次（往回拖重看不许刷时长）');
+  check(!/creditOnce/.test(video), '视频精听：本地动作不许套闸门（闸门是按 key 拉黑的，重听同一句会被永久拒计）');
+
   // 句子学习的独立造句是**另一种口径**（拿到反馈才计，AI 反馈就是这次练习的产物），
   // 这里钉住"口径不同"本身 —— 谁把它顺手统一成按动作计，同样算回归。
   const build = readFileSync(join(ROOT, 'src/pages/SentenceLabPage/components/BuildPractice.tsx'), 'utf8');

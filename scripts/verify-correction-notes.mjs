@@ -283,12 +283,14 @@ ok(/思维检测.*写作批改.*对话分析/s.test(fav), '三处来源在列表
   ok(!/toast|sonner/.test(drill), '重考卡面（含送拼写这一步）零提示');
 
   const spellingPage = stripComments(read('src/pages/SpellingPage/SpellingPage.tsx'));
-  ok(/import \{ useSpellingSentences, SPELLING_SENTENCE_LIMIT, CORRECTION_LEVEL \}/.test(spellingPage),
+  ok(/import \{ useSpellingSentences, SPELLING_SENTENCE_LIMIT, CORRECTION_LEVEL[^}]*\}/.test(spellingPage),
     '拼写页导入 correction 桶常量（而不是各处自己写字面量）');
   ok(/correction:'纠偏表达'/.test(spellingPage), '词库触发器认得 correction → 「纠偏表达」');
-  const branch = spellingPage.slice(spellingPage.indexOf('if (lvl === CORRECTION_LEVEL)'));
+  const branch = spellingPage.slice(spellingPage.indexOf('if (lvl === CORRECTION_LEVEL'));
   const branchBody = branch.slice(0, branch.indexOf('return;') + 7);
   ok(branch.length > 40 && branch.includes('CORRECTION_LEVEL'), '真跑脚手架：抓到纠偏桶的切书分支（抓空会让下面的反向断言真空通过）');
+  ok(/if \(lvl === CORRECTION_LEVEL(?: \|\| lvl === VIDEO_LEVEL)?\)/.test(branch),
+    '句子库桶（纠偏 / 视频精听）共用一条早退分支 —— 新增桶不许各自写一份，漏一条就走去 preload 一个不存在的 level');
   ok(/setActiveLevel\(lvl\)[\s\S]{0,120}rebuildSession\(\{ level: lvl \}\)/.test(branchBody),
     '纠偏桶走"直接重建队列"（句子已经在句子库里，不需要建库）');
   ok(!/preloadLevels|isLevelReady|extractLevelSentences/.test(branchBody),

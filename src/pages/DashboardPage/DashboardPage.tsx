@@ -291,6 +291,7 @@ export default function DashboardPage() {
         '/favorites': '我的收藏',
         '/writing': 'AI 写作练习',
         '/spelling': '句子拼写',
+        '/video': '视频精听',
         '/cet': '四六级备考',
         '/progress': '学习记录',
       };

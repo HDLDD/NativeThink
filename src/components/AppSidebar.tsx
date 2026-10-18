@@ -11,7 +11,7 @@ import {
   BarChart3,
   Sparkles,
   PenLine,
-  SpellCheck,
+  SpellCheck, Film,
   GraduationCap,
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -42,6 +42,7 @@ const ROUTE_PREFETCH: Record<string, () => Promise<unknown>> = {
   '/writing': () => import('@/pages/WritingPage/WritingPage'),
   '/progress': () => import('@/pages/ProgressPage/ProgressPage'),
   '/spelling': () => import('@/pages/SpellingPage/SpellingPage'),
+  '/video': () => import('@/pages/VideoLabPage/VideoLabPage'),
   '/sentences': () => import('@/pages/SentenceLabPage/SentenceLabPage'),
   '/cet': () => import('@/pages/CetExamPage/CetExamPage'),
 };
@@ -58,6 +59,7 @@ const NAV_ITEMS = [
   { path: '/writing', label: 'AI 写作练习', icon: PenLine },
   { path: '/sentences', label: '句子学习', icon: MessagesSquare },
   { path: '/spelling', label: '句子拼写', icon: SpellCheck },
+  { path: '/video', label: '视频精听', icon: Film },
   { path: '/cet', label: '四六级 App', icon: GraduationCap },
   { path: '/progress', label: '学习记录', icon: BarChart3 },
 ];

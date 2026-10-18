@@ -35,6 +35,7 @@ const TYPE_LABELS: Record<string, string> = {
   word: '单词',
   spelling: '句子拼写',
   writing_prompt: '写作提示',
+  video: '视频精听',
 };
 
 const TYPE_COLORS: Record<string, { bg: string; badge: string }> = {
@@ -47,11 +48,12 @@ const TYPE_COLORS: Record<string, { bg: string; badge: string }> = {
   word:       { bg: 'bg-slate-50 dark:bg-slate-500/10',    badge: 'bg-slate-100 dark:bg-slate-500/20 text-slate-600' },
   spelling:   { bg: 'bg-purple-50 dark:bg-purple-500/10',   badge: 'bg-purple-100 dark:bg-purple-500/20 text-purple-600' },
   writing_prompt: { bg: 'bg-fuchsia-50 dark:bg-fuchsia-500/10', badge: 'bg-fuchsia-100 dark:bg-fuchsia-500/20 text-fuchsia-600' },
+  video:        { bg: 'bg-teal-50 dark:bg-teal-500/10',         badge: 'bg-teal-100 dark:bg-teal-500/20 text-teal-600' },
 };
 
 // 'word' 是「快速闪卡/词库」里收藏的单词，'writing_prompt' 是写作页收藏的提示 ——
 // 标签配色齐全，只进过滤列表；此前漏了导致只能从「全部」里翻。
-const FILTER_TYPES = ['all', 'vocabulary', 'word', 'chunk', 'expression', 'think', 'shadowing', 'article', 'spelling', 'writing_prompt'] as const;
+const FILTER_TYPES = ['all', 'vocabulary', 'word', 'chunk', 'expression', 'think', 'shadowing', 'article', 'spelling', 'writing_prompt', 'video'] as const;
 
 // ============================================================
 // Component

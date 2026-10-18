@@ -7,7 +7,7 @@ import {
   BookOpen,
   PenLine,
   BookMarked,
-  SpellCheck,
+  SpellCheck, Film,
   MessagesSquare,
   GraduationCap,
 } from 'lucide-react';
@@ -64,6 +64,14 @@ export const QUICK_ENTRIES = [
     desc: '句子/单词拼写',
   },
   {
+    path: '/video',
+    label: '视频精听',
+    icon: Film,
+    color: 'from-[#14B8A6] to-teal-400',
+    bg: 'bg-teal-50 dark:bg-teal-500/15',
+    desc: '导入字幕 · 逐句复读',
+  },
+  {
     path: '/shadowing',
     label: '影子跟读',
     icon: Mic,
@@ -105,6 +113,7 @@ export const MODULES = [
   { key: 'vocabulary', label: '词汇深度', icon: BookOpen, color: '#EC4899' },
   { key: 'articles', label: '文章阅读', icon: BookMarked, color: '#0EA5E9' },
   { key: 'spelling', label: '句子拼写', icon: SpellCheck, color: '#F43F5E' },
+  { key: 'video', label: '视频精听', icon: Film, color: '#14B8A6' },
   { key: 'think', label: '思维训练', icon: Brain, color: '#00B894' },
   { key: 'chunks', label: '语块训练', icon: Puzzle, color: '#1F2937' },
   { key: 'conversation', label: '对话练习', icon: MessageSquare, color: '#6366F1' },

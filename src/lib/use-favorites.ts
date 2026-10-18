@@ -9,7 +9,7 @@ const FAVORITES_LEGACY_KEY = '__nativethink_favorites_v2';
 
 export interface IFavoriteItem {
   id: string;
-  type: 'chunk' | 'expression' | 'vocabulary' | 'think' | 'shadowing' | 'word' | 'article' | 'writing_prompt' | 'spelling';
+  type: 'chunk' | 'expression' | 'vocabulary' | 'think' | 'shadowing' | 'word' | 'article' | 'writing_prompt' | 'spelling' | 'video';
   content: string;
   meaning: string;
   example?: string;

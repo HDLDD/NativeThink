@@ -40,7 +40,8 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 影子跟读 `/shadowing` | [modules/shadowing.md](./docs/modules/shadowing.md) | 连播/循环/录音评分；完成标记按**合并索引**存，索引换算单点在 `shadowing-progress.ts` |
 | 写作 `/writing` | [modules/writing.md](./docs/modules/writing.md) | 100 题 + AI 批改（Markdown 不是 JSON）；默认折叠 12 张 |
 | 句子学习 `/sentences` | [modules/sentence-lab.md](./docs/modules/sentence-lab.md) | 158 句语料、意群运行时定位；主干候选与评分**同一来源**（`verify:sentence-lab` 守） |
-| 句子拼写 `/spelling` | [modules/spelling.md](./docs/modules/spelling.md) | 2×2 玩法、**五条题目来源**（含纠偏本的 `correction` 桶）、断点按 level 分键（`spelling-resume.ts`） |
+| 句子拼写 `/spelling` | [modules/spelling.md](./docs/modules/spelling.md) | 2×2 玩法、**五条题目来源**（含纠偏本 / 精听页两个句子库桶）、断点按 level 分键（`spelling-resume.ts`） |
+| 视频精听 `/video` | [modules/video-lab.md](./docs/modules/video-lab.md) | 导入字幕（+可选媒体）逐句学：SRT/VTT/转录 JSON 三解析、IDB `media` 独立表三键分片、索引封顶连媒体一起删、点词查词、跟读用 LCS 且**无识别通道时不许假分数**、AI 双语三档降级、**三形态统一走导入（不接本机转录服务）** |
 | 首页 / 记录 / 收藏 / 备份 | [modules/dashboard-progress-favorites.md](./docs/modules/dashboard-progress-favorites.md) | 每日一句、分项重置、收藏判重口径、三张首页横幅（待复习 / 纠偏待重考 + `?tab=` 深链）；整书译文随备份导出由 `verify:backup-idb` 守 |
 | 外壳与导航 | [modules/shell-and-navigation.md](./docs/modules/shell-and-navigation.md) | 启动顺序、双层 ErrorBoundary、预取时机、**新增页面实际是六处** |
 | 存储与学习统计 | [modules/storage-and-stats.md](./docs/modules/storage-and-stats.md) | 四套存储、safeStorage 前缀自愈、`addStudyMinutes` 真实语义、同步边界 |
@@ -116,15 +117,16 @@ node scripts/verify-backup-idb.mjs                # 16   导出学习数据真�
 node scripts/verify-cloud-sync-hygiene.mjs        # 70   云同步：下行回声/失败可见/按需补推 + 13 订阅者逐个点名 + 缓存作废静态与真跑（正对照）
 node scripts/verify-sentence-lab.mjs              # 16   拆句训练主干判定索引同源（真转译跑出分歧）
 node scripts/verify-spelling-resume.mjs           # 24   拼写断点按词书分键 + 迁移 + 重置枚举
+node scripts/verify-video-lab.mjs                 # 82   视频精听：字幕三解析真跑 + 假 IDB 真跑存储层（封顶连媒体删/写失败不谎报/译文分键）+ LCS 跟读比对真跑 + 六件套与页面接线（⚠️ 剥注释走转译器，正则会被 accept="video/*" 骗到）
 node scripts/verify-chain-verdict.mjs             # 36   语块接龙判定三档（未判定不计分也不判错）
 node scripts/verify-ai-parse.mjs                  # 10   AI 解析约定：25 个解析点判空 + 无贪婪正则（元判据固件自证）
 node scripts/verify-dashboard-glance.mjs            # 25   首页内容扩展：续学标签表穷举（/sentences 漏过）+ 三张横幅 0 义务整卡不渲染（待复习 / 纠偏待重考，行门控含第三张）+ 本周柱状日期与高度 + ?tab= 深链三道门（只认 MODES key / 不强进向导 / 走 enterMode 并抹参数）
-node scripts/verify-correction-notes.mjs            # 89   表达纠偏本：Markdown 表格抽取真跑（三源列序/表头噪声/错=对跳过）+ store 整段真跑（去重/review 记账/删除/只拒不裁/写失败可见）+ orderForDrill 排序真跑 + 三处收集接线 + 收藏页折叠列表 + 第 9 模式接线总闸（MODES 每个 key 必须有 TabsContent）与重考卡面契约（不写 SM-2、零 toast、干扰项取自整本）+ ⑦ 送进句子拼写（correctionToSpellingItem 真跑、两处入口接线、纠偏桶不许走词库加载路、空收藏也要有纠偏本入口）+ ⑨ 错点归纳（十类规则各自命中、规则顺序与证据优先级两条口径、计数之和=条目数、两处按类筛选接线）
+node scripts/verify-correction-notes.mjs            # 90   表达纠偏本：Markdown 表格抽取真跑（三源列序/表头噪声/错=对跳过）+ store 整段真跑（去重/review 记账/删除/只拒不裁/写失败可见）+ orderForDrill 排序真跑 + 三处收集接线 + 收藏页折叠列表 + 第 9 模式接线总闸（MODES 每个 key 必须有 TabsContent）与重考卡面契约（不写 SM-2、零 toast、干扰项取自整本）+ ⑦ 送进句子拼写（correctionToSpellingItem 真跑、两处入口接线、纠偏桶不许走词库加载路、空收藏也要有纠偏本入口）+ ⑨ 错点归纳（十类规则各自命中、规则顺序与证据优先级两条口径、计数之和=条目数、两处按类筛选接线）
 node scripts/verify-guard-shape.mjs                 # 7    元守卫：AST 扫全部 verify-*.mjs，抓"恒真断言"（`ok(/re/, src, name)` 这种第一实参是字面量本体的写法）与漏名字的断言；自带双向自证 + inspectedTotal 防空转
 node scripts/verify-app-version.mjs                 # 11   版本号单一载体：meta 注入链路 + 产物一致性（产物段先 build:web）
 node scripts/verify-brand-fonts.mjs                 # 26   品牌资产自托管：字体与 favicon 外链零残留 + woff2 结构自洽 + 生效栈正对照（产物段先 build:web）
 npm run verify:rv-articles                        # 104  复习词汇文章：选词/分篇/覆盖出队/体裁主题/原位重写（含旧 slice(0,10) 正对照）
-npm run verify:study-credit                       # 77   学习时长记账：闸门真跑 + 七个提交点接线 + 口径双向锁（本地动作不许套闸门，含短语闪卡翻面直计时）
+npm run verify:study-credit                       # 80   学习时长记账：闸门真跑 + 提交点接线（含精听按课去重）+ 口径双向锁（本地动作不许套闸门，含短语闪卡翻面直计时）
 npm run verify:all                                # —    收尾必跑：typecheck + 全部 verify-*（自动发现，新增守卫不用登记）
 ```
 
@@ -155,6 +157,7 @@ node scripts/phone-emu.mjs start && node scripts/phone-emu.mjs wait
 node scripts/phone-emu.mjs install           # 装 NativeThink-emu-x86_64.apk（-g 一次给齐录音权限）
 node scripts/phone-emu.mjs launch && node scripts/phone-emu.mjs smoke
 node scripts/walk-phone.mjs                # 装机四条走查（4 收藏 + 5 纠偏夹具，含"四级 6827 句 vs 纠偏 1 句"正对照）
+node scripts/walk-video.mjs --port 9226 --base https://localhost   # 视频精听 35 条走查在 APK 上重跑（本机版：--port 9222 --base http://127.0.0.1:8001）
 #   smoke 之后走查照旧：CDP_PORT=9226 node scripts/device-eval.mjs eval "<表达式>"
 # ⚠️ 起不来先看 check 的"加速"那行：x86_64 必须有 AEHD/WHPX，没驱动时 emulator 直接拒启
 #    （管理员跑一次 SDK 里现成的 extras/google/Android_Emulator_Hypervisor_Driver/silent_install.bat）
@@ -179,6 +182,7 @@ node scripts/walk-phone.mjs                # 装机四条走查（4 收藏 + 5 �
 | `/writing` | `WritingPage` | `writing` | writing |
 | `/sentences` | `SentenceLabPage` | `sentences` | sentence-lab |
 | `/spelling` | `SpellingPage` | `spelling` | spelling |
+| `/video` | `VideoLabPage` | `video` | video-lab |
 | `/cet` | `CetExamPage`（外链 CetThink，不在包内） | — | — |
 | `/progress` | `ProgressPage` | — | dashboard-progress-favorites |
 
@@ -216,6 +220,7 @@ src/
 │   ├── vocab-swipe.ts          # 滑动手势决策表
 │   ├── custom-words.ts         # 生词本（level='custom'）
 │   ├── correction-notes.ts     # 表达纠偏本（AI 反馈里的错句→地道说法，自动收集 + 重考记账/排序）
+│   ├── video-lab.ts            # 视频精听：字幕三格式解析 + IDB `media` 三键分片（索引封顶连媒体删）+ LCS 跟读比对
 │   ├── word-notes.ts           # 每词助记
 │   ├── reader-highlight.ts     # 阅读器复习词高亮
 │   ├── use-stable-shuffle.ts   # 稳定洗牌（洗牌列表 + 下标定位当前题必须用它）
@@ -320,7 +325,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit 77 · chain-verdict 36 · dashboard-glance 25 · correction-notes **89** · guard-shape **7**；合计 **7,760**，2026-10-17 第 39 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · **video-lab 82** · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit **80** · chain-verdict 36 · dashboard-glance 25 · correction-notes **90** · guard-shape **7**；合计 **7,846**，2026-10-18 第 40 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs` + `node scripts/verify-char-hygiene.mjs`（清了坏字符还要递增 `CACHE_VERSION`，否则老缓存挡住修复）
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过 `android/app/build.gradle` 的 `abiFilters` 或任何打包脚本 → 至少跑一次 `npm run package:apk:emu`（它收尾会读 APK 自己的 zip 中央目录自证：x86_64 的 sherpa `.so` 在、www/books/piper/tts 资产在、arm 0 条）；模拟器装机走 `node scripts/phone-emu.mjs check`
