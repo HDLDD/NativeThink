@@ -342,3 +342,83 @@ export function scoreSpeech(target: string, spoken: string): ISpeechScore {
   a.forEach((w, k) => { if (!matched[k] && !seen.has(w)) { seen.add(w); missed.push(w); } });
   return { accuracy: (dp[0][0] || 0) / a.length, targetWords: a, missed, spokenWords: b };
 }
+
+/**
+ * 字幕批量翻译的调度层 —— 页面只负责喂 ask/parse，并发、批次、增量回调都收在这里，
+ * 因为只有这一层能被守卫真跑（页面里的 setState 看不见摸不着）。
+ */
+export interface IBatchTranslateInput {
+  /** 待翻条目：k 是它在整课里的下标（译文要落回原位） */
+  items: { k: number; text: string }[];
+  /** 每批句数，默认 8 */
+  batchSize?: number;
+  /** 并发批数，默认 3（出厂免费档上游只允许 1 路，页面据此传 1） */
+  concurrency?: number;
+  /** 发一批出去，拿回原始文本；通道坏了/超时就在 resolve 里给空串 */
+  ask: (numberedBody: string, count: number) => Promise<string>;
+  /** 把原始文本收成「批内序号 → 译文」（整书翻译那套编号 JSON 口径） */
+  parse: (raw: string, count: number) => Map<number, string>;
+  /** 每批完成就回调，带的是到目前为止攒下的全部译文（k → zh） */
+  onBatch: (filled: ReadonlyMap<number, string>) => void;
+  /** 每批取活前问一次：课程已换走 / 页面已卸载就别再往下打 */
+  stopped?: () => boolean;
+  /** 拿不到内容的批次退回队尾重试一次（默认开）；连坏两批才整轮收摊 */
+  retryFailed?: boolean;
+}
+export interface IBatchTranslateResult {
+  filled: Map<number, string>;
+  /** 这一轮排了多少批 */
+  batches: number;
+  /** 实际发出的请求数（含重试；比 batches 大＝有批被重试过） */
+  attempted: number;
+  /** 退回队尾重试过的批数 */
+  retried: number;
+  /** items 里最终没拿到译文的句数 */
+  missed: number;
+  /** 是否因为连着两批拿不到内容而提前结束 */
+  haltedEarly: boolean;
+}
+
+/**
+ * 编号 JSON 的批次翻译调度：小批 + 每批增量回调。四条规定都是实测换来的：
+ * 1. 每批完成立刻 onBatch，调用方据此上屏落盘 —— 让用户几十秒里一直等最后一个字节是不可接受的；
+ * 2. 单批拿不到内容（服务不可用 / 被限流 / 超时不回包，实测真遇到过）退回队尾重试一次，
+ *    一次抖动不该把整轮几十句一起废掉；连着两批都坏才收摊，别把额度打在死通道上；
+ * 3. stopped() 为真就不再取新活，已经在途的那批回来照样收下（译文属于它自己那一课）；
+ * 4. 并发由调用方给：上游免费档只允许 1 路，抢并发只会把每批从 4 秒拖成 30 秒。
+ */
+export async function runBatchTranslation(o: IBatchTranslateInput): Promise<IBatchTranslateResult> {
+  const size = Math.max(1, Math.floor(o.batchSize ?? 8));
+  const queue: { lines: { k: number; text: string }[]; fresh: boolean }[] = [];
+  for (let i = 0; i < o.items.length; i += size) queue.push({ lines: o.items.slice(i, i + size), fresh: true });
+  const filled = new Map<number, string>();
+  const batches = queue.length;
+  let haltedEarly = false;
+  let attempted = 0;
+  let retried = 0;
+  let consecutiveBad = 0;
+  const worker = async () => {
+    while (!haltedEarly && !o.stopped?.()) {
+      const task = queue.shift();
+      if (!task) return;
+      attempted++;
+      const raw = await o.ask(task.lines.map((x, i) => `[${i + 1}] ${x.text}`).join('\n'), task.lines.length);
+      const parsed = o.parse(String(raw || ''), task.lines.length);
+      if (!parsed.size) {
+        consecutiveBad++;
+        /** 先判收摊再谈重试：连着两批拿不到内容就说明通道此刻是坏的/被限流，继续发只会白烧额度 */
+        if (consecutiveBad >= 2) { haltedEarly = true; return; }
+        if (task.fresh && o.retryFailed !== false) { task.fresh = false; queue.push(task); retried++; }
+        continue;   // 只坏过一次的批记进 missed，后面的照常翻
+      }
+      consecutiveBad = 0;
+      parsed.forEach((zh, idx) => {
+        const hit = task.lines[idx];
+        if (hit && zh) filled.set(hit.k, zh);
+      });
+      o.onBatch(filled);
+    }
+  };
+  await Promise.allSettled(Array.from({ length: Math.min(Math.max(1, o.concurrency ?? 3), queue.length) }, () => worker()));
+  return { filled, batches, attempted, retried, missed: o.items.filter((x) => !filled.has(x.k)).length, haltedEarly };
+}

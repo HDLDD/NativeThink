@@ -167,16 +167,32 @@ ok(String(bucket) !== 'NOMATCH' && !crash(), '⑦ 选中视频桶后会话能起
 /* ── 8. P2 双语字幕 + P1 跟读 ── */
 nav('/video');
 sleep(2000);
+const zhBefore = Number(ev(`(()=>[...document.querySelectorAll('ol li p')].filter(e=>/[\\u4e00-\\u9fa5]{2,}/.test(e.innerText||'')).length)()`));
+ok(zhBefore === 0, '⑧ 起点：这一课的 45 句都还没有译文（有残留的话下面那条"边翻边上屏"就不算真凭据）', String(zhBefore));
 const trans = clickText('翻译字幕');
 ok(String(trans).startsWith('clicked'), '⑧ 「翻译字幕」按钮点得到', String(trans));
-let zhState = '';
-for (let t = 0; t < 24; t++) {
+/** 点下去立刻有进行中态 —— 旧写法要等整轮翻完才第一次上屏，那几十秒里界面看着像坏了 */
+const busyNow = String(ev(`(()=>{const b=[...document.querySelectorAll('button')].find(e=>/翻译/.test(e.innerText||''));return b?(b.innerText||'').replace(/\\s+/g,'')+(b.disabled?'|禁用':'|可点'):'NOBTN';})()`));
+ok(/^开始翻译\d+句…\|禁用$/.test(busyNow), '⑧ 点下去按钮就换成「开始翻译 N 句…」并禁用（重复点击不许另起一轮）', busyNow);
+let label = busyNow, zhNow = 0, note = '', grewWhileBusy = false;
+for (let t = 0; t < 120; t++) {
   sleep(2500);
-  zhState = String(ev(`(()=>{const n=(s)=>(s||'').replace(/\\s+/g,'');const t=n(document.body.innerText);const m=t.match(/(翻译中[^]{0,8}|还没配AIKey[^]{0,26}|已翻译[^]{0,16}|AI这次没返回内容[^]{0,18}|AI返回的编号[^]{0,18}|存不下来[^]{0,20})/);return m?m[0]:'';})()`));
-  if (/已翻译|还没配|没返回|编号/.test(zhState)) break;
+  const s = String(ev(`(()=>{const n=(x)=>(x||'').replace(/\\s+/g,'');
+    const b=[...document.querySelectorAll('button')].find(e=>/翻译/.test(e.innerText||''));
+    const zh=[...document.querySelectorAll('ol li p')].filter(e=>/[\\u4e00-\\u9fa5]{2,}/.test(e.innerText||'')).length;
+    const body=n(document.body.innerText);
+    return JSON.stringify({label:b?n(b.innerText):'NOBTN',zh,note:(body.match(/(已翻译[^§]{0,30}|一句都没[^§]{0,44}|还没配AIKey[^§]{0,34}|存不下来[^§]{0,26})/)||[''])[0]});})()`));
+  let st; try { st = JSON.parse(s); } catch { st = { label: '', zh: 0, note: '' }; }
+  label = st.label; zhNow = st.zh; note = st.note;
+  /** 只认"还没翻完就已经有几行（但不足 45 行）"这一种形态，这才叫增量上屏 */
+  if (/翻译中/.test(label) && st.zh > 0 && st.zh < 45) grewWhileBusy = true;
+  if (st.note) break;
 }
-ok(/已翻译|还没配AIKey|没返回内容|编号对不上|存不下来/.test(zhState),
-  '⑧ 翻译要么回报句数、要么给出具体的失败原因（不许静默；额度被限流时这一支就是失败原因）', zhState || '60 秒内界面无任何反馈');
+ok(grewWhileBusy, '⑧ 正对照：译文"边翻边上屏"（按钮还写着翻译中，界面已出现一部分中文行）',
+  `带中文的字幕行 ${zhBefore} → ${zhNow}，按钮 ${label}`);
+ok(/已翻译|还没配AIKey|一句都没|存不下来/.test(note),
+  '⑧ 翻译要么回报句数、要么给出具体的失败原因（不许静默；被限流时这一支就是失败原因）', `${note || '5 分钟无反馈'}｜按钮 ${label}`);
+ok(zhNow > zhBefore, '⑧ 一轮跑完确实有句子带上译文（不是只弹个提示）', `${zhBefore} → ${zhNow}`);
 ok(!crash(), '⑧ 翻译后页面仍活着', '');
 clickText('跟读');
 sleep(2000);

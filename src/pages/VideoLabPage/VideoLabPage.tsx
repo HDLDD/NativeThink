@@ -32,7 +32,7 @@ import { persistJson } from '@/lib/capped-cache';
 import { useAI } from '@/hooks/use-ai';
 import { parseBatchTranslation } from '@/data/book-translation';
 import {
-  videoStore, parseSubtitle, lessonId, guessLang, mergeProgress, scoreSpeech,
+  videoStore, parseSubtitle, lessonId, guessLang, mergeProgress, scoreSpeech, runBatchTranslation,
   type IVideoMeta, type IVideoLesson, type IVideoSentence, type IVideoProgress, type ISpeechScore,
 } from '@/lib/video-lab';
 
@@ -43,8 +43,18 @@ const LAST_OPEN_KEY = '__nativethink_video_last_open';
 const WINDOW = 40;
 const RATES = [0.5, 0.75, 1, 1.25, 1.5];
 /** 一次点「翻译本课」最多翻这么多句（剩下再点一次），免得长视频一口气打爆额度 */
-const TRANSLATE_LIMIT = 30;
-const TRANSLATE_BATCH = 10;
+const TRANSLATE_LIMIT = 120;
+/**
+ * 一批 8 句、串行（不抢并发）。实测同一通道同一模型：串行每批 3.2–4.5 秒，
+ * 起 3 路并发后每批拖到 8–30 秒、还有一路永不回包 —— functions/api/ai/chat.js 里写着
+ * 「智谱免费档并发仅 1」。所以慢的部分只能靠「每批完成即上屏」摊开，而不是靠并发。
+ * 指定翻译任务档（4.7-flash）更慢（单批 23s/62s）：精听是即时阅读场景，不值那 6 倍等待。
+ */
+const TRANSLATE_BATCH = 8;
+/** 一批最多等 25 秒 —— 实测碰到过请求永不回包，没有这道看门狗按钮就永久停在"翻译中" */
+const TRANSLATE_TIMEOUT_MS = 25000;
+/** 模块级：组件重挂载会重置 ref，但同一浏览器里两课并发翻会把额度打重，这里钉住全局一份 */
+let translateRunning = false;
 /** 与整书翻译同一套编号 JSON 口径，解析复用 parseBatchTranslation */
 const TRANSLATE_SYSTEM = [
   '你是英译中译者，负责把英文字幕逐句翻译成自然流畅、符合中文母语习惯的简体中文。',
@@ -103,6 +113,9 @@ export default function VideoLabPage() {
   const recRef = useRef<{ stop: () => void; abort: () => void } | null>(null);
   /** 每课"已经计过时的句子"—— 只在这次会话里有效，容量被索引封顶（50 课）钉住 */
   const reachedRef = useRef<Map<string, Set<number>>>(new Map());
+  /** 当前屏幕上这一课的 id —— 翻译一轮跑几十秒，用户中途换课后旧轮的进度/提示不许跟到新课上 */
+  const shownIdRef = useRef<string | null>(null);
+  useEffect(() => { shownIdRef.current = lesson?.meta.id ?? null; }, [lesson]);
 
   const sentences = lesson?.sentences || [];
   const cur = sentences[idx] || null;
@@ -116,10 +129,15 @@ export default function VideoLabPage() {
     return () => { alive = false; };
   }, []);
 
-  /* ── 卸载时释放 object URL（泄漏比缓存贵），并收掉还在听的识别 ── */
-  useEffect(() => () => {
-    if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-    try { recRef.current?.abort(); } catch { /* 已经自己结束了 */ }
+  /* ── 卸载时释放 object URL（泄漏比缓存贵），收掉还在听的识别，并让翻译轮次收摊 ── */
+  const activeRef = useRef(true);
+  useEffect(() => {
+    activeRef.current = true;
+    return () => {
+      activeRef.current = false;
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+      try { recRef.current?.abort(); } catch { /* 已经自己结束了 */ }
+    };
   }, []);
 
   const openLesson = useCallback(async (id: string) => {
@@ -130,6 +148,8 @@ export default function VideoLabPage() {
     if (urlRef.current) URL.revokeObjectURL(urlRef.current);
     urlRef.current = l.url;
     setNote('');           // 上一课的"时长元数据不可靠"之类提示不许跟着带到这一课
+    setZhBusy('');
+    setZhNote('');
     setLesson(l);
     setShowAll(false);
     setLookup(null);
@@ -374,34 +394,68 @@ export default function VideoLabPage() {
     }
   }, [cur, recording, lesson]);
 
-  /* ── 双语字幕：按编号批量翻，翻完分键存回 IDB ── */
+  /* ── 双语字幕：小批串行 + 每批完成即上屏落盘（调度在 runBatchTranslation，页面只喂通道） ── */
   const translateLesson = useCallback(async () => {
-    if (!lesson) return;
+    if (!lesson || translateRunning) return;
     const sents = lesson.sentences;
-    const todo = sents.map((s, k) => ({ s, k })).filter((x) => !x.s.zh);
+    const todo = sents.map((s, k) => ({ k, text: s.text })).filter((x) => !sents[x.k].zh);
     if (!todo.length) return;
     if (!aiReady) { setZhNote('还没配 AI Key，翻不出译文 —— 逐句跳转、复读、查词、朗读都不受影响'); return; }
+    const lessonId = lesson.meta.id;
     const zhArr: (string | undefined)[] = sents.map((s) => s.zh || undefined);
     const part = todo.slice(0, TRANSLATE_LIMIT);
-    let stopped = '';
-    for (let k = 0; k < part.length; k += TRANSLATE_BATCH) {
-      const batch = part.slice(k, k + TRANSLATE_BATCH);
-      setZhBusy(`翻译中 ${k}/${part.length}…`);
-      const raw = await aiChat([
+    let saveFailed = false;
+    let persist = Promise.resolve();
+    /** 每批自带看门狗：实测遇到过请求永不回包，没有它按钮就永久停在"翻译中"（跟读那条坑的 AI 版本） */
+    const ask = (body: string, count: number) => new Promise<string>((res) => {
+      const timer = setTimeout(() => res(''), TRANSLATE_TIMEOUT_MS);
+      const off = (v: string) => { clearTimeout(timer); res(v); };
+      aiChat([
         { role: 'system', content: TRANSLATE_SYSTEM },
-        { role: 'user', content: batch.map((x, i) => `[${i + 1}] ${x.s.text}`).join('\n') },
-      ]);
-      if (!String(raw).trim()) { stopped = 'AI 这次没返回内容（服务不可用或额度用完），已翻好的先留下'; break; }
-      const parsed = parseBatchTranslation(raw, batch.length);
-      if (parsed.size === 0) { stopped = 'AI 返回的编号对不上，已翻好的先留下，再点一次重试剩下的'; break; }
-      parsed.forEach((zh, idx) => { const hit = batch[idx]; if (hit && zh) zhArr[hit.k] = zh; });
+        { role: 'user', content: body },
+      ], { temperature: 0.3, maxTokens: count * 200 }).then((r) => off(String(r || '')), () => off(''));
+    });
+    /** 立刻把按钮换成进行中：这一轮要翻多少句先说清楚，真进度由每批回调报回来 */
+    setZhBusy(`开始翻译 ${part.length} 句…`);
+    translateRunning = true;
+    try {
+      const { missed, haltedEarly } = await runBatchTranslation({
+        items: part,
+        batchSize: TRANSLATE_BATCH,
+        concurrency: 1,
+        ask,
+        parse: (raw, count) => parseBatchTranslation(raw, count),
+        stopped: () => !activeRef.current || shownIdRef.current !== lessonId,
+        onBatch: (filled) => {
+          filled.forEach((zh, k) => { zhArr[k] = zh; });
+          /** 落盘串行排队、写最新快照；换课了也要把译文落回它自己那一课，一句都不白翻 */
+          persist = persist
+            .then(() => videoStore.saveZh(lessonId, zhArr.slice()))
+            .then((ok) => { if (!ok) saveFailed = true; }, () => { saveFailed = true; });
+          if (!activeRef.current || shownIdRef.current !== lessonId) return;
+          setLesson((prev) => (prev && prev.meta.id === lessonId
+            ? { ...prev, sentences: prev.sentences.map((s, k) => (zhArr[k] ? { ...s, zh: zhArr[k] } : s)) }
+            : prev));
+          setZhBusy(`翻译中 ${part.filter((x) => zhArr[x.k]).length}/${part.length}…`);
+        },
+      });
+      await persist;
+      if (!activeRef.current || shownIdRef.current !== lessonId) return;
+      const done = zhArr.filter(Boolean).length;
+      const rest = todo.length - part.length;
+      let note = saveFailed
+        ? `译文存不下来（本机存储可能满了），这次只显示、下次要重翻（已翻 ${done} 句）`
+        : done
+          ? `已翻译 ${done}/${sents.length} 句${rest > 0 ? `（本轮只翻 ${part.length} 句，再点一次接着翻）` : ''}`
+          : '这次一句都没翻出来（AI 服务不可用、被限流，或这一批超时没回话）—— 逐句跳转、复读、查词、朗读都不受影响';
+      if (!saveFailed && done > 0 && missed > 0) {
+        note += `；另有 ${missed} 句这次没返回${haltedEarly ? '（连着两批都没回话，通道这会儿多半被限流或断了）' : ''}，再点一次重试剩下的`;
+      }
+      setZhNote(note);
+    } finally {
+      translateRunning = false;
+      setZhBusy('');
     }
-    setLesson({ ...lesson, sentences: sents.map((s, k) => ({ ...s, zh: zhArr[k] })) });
-    const saved = await videoStore.saveZh(lesson.meta.id, zhArr);
-    const done = zhArr.filter(Boolean).length;
-    setZhNote(!saved ? `译文存不下来（本机存储可能满了），这次只显示、下次要重翻（已翻 ${done} 句）`
-      : stopped || `已翻译 ${done}/${sents.length} 句${todo.length > part.length ? `（本轮只翻 ${part.length} 句，再点一次接着翻）` : ''}`);
-    setZhBusy('');
   }, [lesson, aiReady, aiChat]);
 
   /* ── 字幕窗口（长列表不一次铺完） ── */

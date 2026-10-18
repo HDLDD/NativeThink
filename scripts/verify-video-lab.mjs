@@ -41,7 +41,7 @@ const lib = strip(libRaw)
   .replace(/export const videoStore[\s\S]*?\}\);\s*/g, '');
 
 /* ── 载入被测模块（整段转译真跑，不抄第二份实现） ── */
-const js = ts.transpileModule(lib + '\nmodule.exports={INDEX_KEY,parseTimestamp,stripCueTags,parseSrt,parseVtt,parseDshJson,detectSubtitleFormat,parseSubtitle,lessonId,guessLang,createVideoStore,mergeProgress,tokenizeSpeech,scoreSpeech};',
+const js = ts.transpileModule(lib + '\nmodule.exports={INDEX_KEY,parseTimestamp,stripCueTags,parseSrt,parseVtt,parseDshJson,detectSubtitleFormat,parseSubtitle,lessonId,guessLang,createVideoStore,mergeProgress,tokenizeSpeech,scoreSpeech,runBatchTranslation};',
   { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const mod = { exports: {} };
 new Function('module', 'exports', js)(mod, mod.exports);
@@ -255,8 +255,8 @@ ok(typeof M.parseSrt === 'function' && typeof M.createVideoStore === 'function',
         '假时长的判定是双向比值（超量与不足都要抓，不只是 NaN）');
       ok(/el\.videoWidth === 0 && el\.videoHeight === 0/.test(page) && /只有音频轨、没有画面/.test(page),
         '纯音频媒体要说破"播放器是黑的属正常"（不让人把黑屏当成坏了 —— 2026-10-18 真机差点误报）');
-      ok(/note && <p className="px-3 pt-2/.test(page) && /setNote\(''\);\s*setLesson\(l\)/.test(page),
-        '这条提示渲染在课程视图，且换课时清掉（不跟着带到下一课）');
+      ok(/note && <p className="px-3 pt-2/.test(page) && /setNote\(''\);\s*setZhBusy\(''\);\s*setZhNote\(''\);\s*setLesson\(l\)/.test(page),
+        '这条提示渲染在课程视图，且换课时连同翻译的进行中态/结果文案一起清掉（都不许跟着带到下一课）');
       ok(!/toast/.test(page) || /toast\.(error|message)/.test(page), '精听界面零提示口径（只允许失败/空态）');
 
       /* ⑤ P0-c：查词 / 收藏 / 朗读 / 听写 */
@@ -287,13 +287,28 @@ ok(typeof M.parseSrt === 'function' && typeof M.createVideoStore === 'function',
         '跟读：有 9 秒看门狗且拿到结果就撤（onerror/onend 一个都不回的那种设备不许永久挂死）');
       ok(/rec\.start\(\)/.test(page) && /recRef\.current\?\.abort\(\)/.test(page),
         '识别有起点也有终点（卸载时 abort，否则切走页面还在听）');
-      ok(/aiChat\(\[/.test(page) && /parseBatchTranslation\(raw, batch\.length\)/.test(page),
+      ok(/aiChat\(\[/.test(page) && /parse: \(raw, count\) => parseBatchTranslation\(raw, count\)/.test(page),
         '译文复用整书翻译那个编号 JSON 解析器（不另写一份正则）');
-      ok(/videoStore\.saveZh\(lesson\.meta\.id, zhArr\)/.test(page), '译文分键存回 IDB（回写不许重存 blob）');
+      ok(/runBatchTranslation\(\{[\s\S]{0,400}batchSize: TRANSLATE_BATCH,\s*concurrency: 1,/.test(page),
+        '页面把批次交给调度层，并且钉住串行 1 路（上游免费档并发只有 1，实测抢 3 路会把每批从 4 秒拖成 8–30 秒）');
+      ok(/const TRANSLATE_TIMEOUT_MS = 25000;\s*let translateRunning = false;/.test(page),
+        '在途锁是模块级的一份（组件重挂载会重置 ref，但同一页面里两课同时翻会把额度打重）');
+      ok(/if \(!lesson \|\| translateRunning\)\s*return;/.test(page),
+        '翻译入口先看在途锁：重复点击不许再起一轮');
+      ok(/finally \{\s*translateRunning = false;\s*setZhBusy\(''\);/.test(page),
+        '锁与按钮态一起在 finally 里释放（出错/提前返回都不许把按钮永久留在"翻译中"）');
+      ok(/onBatch: \(filled\)[\s\S]{0,600}videoStore\.saveZh\(lessonId, zhArr\.slice\(\)\)/.test(page),
+        '每批完成就落盘（不许等整轮翻完才写第一次 —— 中途换课/关掉页面也不该丢已经翻好的）');
+      ok(/setZhBusy\(`开始翻译 \$\{part\.length\} 句…`\);[\s\S]{0,120}await runBatchTranslation/.test(page),
+        '点下去先给进行中态：按钮立刻禁用（重复点击不许再多打一轮），第一句译文回来就换成真实计数');
+      ok(/stopped: \(\) => !activeRef\.current \|\| shownIdRef\.current !== lessonId/.test(page),
+        '换课或离开页面就停止取新活（旧轮次的进度/提示不许跟到新课上，也不许继续烧额度）');
+      ok(/TRANSLATE_TIMEOUT_MS = 25000/.test(page) && /setTimeout\(\(\) => res\(''\), TRANSLATE_TIMEOUT_MS\)/.test(page),
+        '每批自带 30 秒看门狗：实测遇到过请求永不回包，没有它按钮就永久停在"翻译中"（跟读那条坑的 AI 版本）');
       ok(/TRANSLATE_LIMIT/.test(page) && /todo\.slice\(0, TRANSLATE_LIMIT\)/.test(page),
         '一次只翻固定句数（长视频不许一口气打爆额度），剩下的提示再点一次');
-      ok(/还没配 AI Key/.test(page) && /AI 这次没返回内容/.test(page),
-        'AI 未配置 / 返回空 / 编号对不上三档降级各有实话（不把失败说成成功）');
+      ok(/还没配 AI Key/.test(page) && /AI 服务不可用、被限流，或这一批超时没回话/.test(page) && /另有 \$\{missed\} 句这次没返回/.test(page),
+        'AI 未配置 / 一句都没回来 / 部分没回来 三档降级各有实话（不把失败说成成功，也不谎报"已翻译"）');
       ok(/zhNote && <p/.test(page) && /micNote && <p/.test(page), '降级说明显示在卡内文案（练习界面零提示口径）');
     }
 
@@ -316,6 +331,131 @@ ok(typeof M.parseSrt === 'function' && typeof M.createVideoStore === 'function',
       ok(S("Don't go!", 'dont go').accuracy === 1, '正对照：大小写、标点、缩写撇号都在比对前归一（识别引擎加不加撇号不该影响得分）');
       ok(M.tokenizeSpeech("Hello, world! it's").join('|') === 'hello|world|its',
         '真跑：分词剥标点与撇号（it\'s → its）', M.tokenizeSpeech("Hello, world! it's").join('|'));
+    }
+
+    /* ⑧ 字幕翻译调度真跑：小批 + 并发 + 每批增量回调 + 坏了收摊（页面只喂通道，所以这段才是真凭据） */
+    {
+      const R = M.runBatchTranslation;
+      ok(typeof R === 'function', '真跑脚手架：runBatchTranslation 已导出');
+      const items = Array.from({ length: 19 }, (_, i) => ({ k: i * 2, text: `S${i}` }));
+      /** 假通道：按批返回编号 JSON，同时记录在飞峰值、每批正文与 ask 收到的句数 */
+      const mk = (opts = {}) => {
+        const st = { inflight: 0, peak: 0, bodies: [], counts: [] };
+        st.ask = (body, count) => {
+          st.inflight++; st.peak = Math.max(st.peak, st.inflight); st.bodies.push(body); st.counts.push(count);
+          const n = body.split('\n').length;
+          const fail = (opts.failFrom && st.bodies.length >= opts.failFrom) || (opts.failAt && opts.failAt.includes(st.bodies.length));
+          const cut = opts.cutTo ? Math.max(1, Math.min(n, opts.cutTo)) : n;
+          return new Promise((res) => setTimeout(() => {
+            st.inflight--;
+            res(fail ? '' : JSON.stringify({ t: Array.from({ length: cut }, (_, i) => ({ i: i + 1, zh: `译${i + 1}` })) }));
+          }, 8));
+        };
+        st.parse = (raw) => {
+          const m = new Map();
+          try { JSON.parse(raw).t.forEach((x) => m.set(x.i - 1, x.zh)); } catch { /* 空/坏 JSON 一律当没拿到 */ }
+          return m;
+        };
+        return st;
+      };
+
+      /* a. 批次切分 + 下标映射 + 每批增量回调（串行也要增量，这才是"边翻边上屏"的真凭据） */
+      {
+        const st = mk();
+        const seen = [];
+        const r = await R({ items, batchSize: 8, concurrency: 3, ask: st.ask, parse: st.parse, onBatch: (f) => seen.push(f.size) });
+        ok(r.batches === 3 && st.bodies.length === 3, '真跑：19 句按 8 句一批切成 3 批（批数与请求数都对得上）', `${r.batches} / ${st.bodies.length}`);
+        ok(st.bodies[0] === Array.from({ length: 8 }, (_, i) => `[${i + 1}] S${i}`).join('\n'),
+          '真跑：发给 AI 的正文是 [1]..[8] 编号行（编号从 1、顺序与输入一致）', st.bodies[0].replace(/\n/g, '\\n').slice(0, 60));
+        ok(st.counts.join(',') === '8,8,3',
+          '真跑：ask 的 count 是这一批自己的句数（页面用它算 maxTokens，写成整课句数就会把上限放大到 3800）', st.counts.join(','));
+        ok(r.filled.size === 19 && r.missed === 0 && r.haltedEarly === false, '真跑：19 句全部收下，missed 归零');
+        ok(r.filled.get(0) === '译1' && r.filled.get(36) === '译3',
+          '真跑：译文按 items 的原下标落回（第三批的 [1][2][3] 要落到 k=32/34/36，批内编号不许当成全局位置）', `${r.filled.get(0)} / ${r.filled.get(36)}`);
+        ok(seen.length === 3 && seen[0] === 8 && seen[2] === 19,
+          '真跑：并发下每批完成就回调一次，第一笔只有 8 句', seen.join(','));
+        ok(st.peak > 1, '真跑：并发档位能起来（峰值在飞 >1）', `peak=${st.peak}`);
+        const one = mk();
+        const seenOne = [];
+        await R({ items, batchSize: 8, concurrency: 1, ask: one.ask, parse: one.parse, onBatch: (f) => seenOne.push(f.size) });
+        ok(one.peak === 1, '正对照：并发档位真的受控 —— concurrency=1 时峰值回到 1', `peak=${one.peak}`);
+        ok(seenOne.join(',') === '8,16,19',
+          '真跑：串行同样要一批一回调（页面默认就是串行 1 路；攒到最后才给的话这里会是 8,16,19 变成只有一个 19）', seenOne.join(','));
+      }
+
+      /* b. 通道持续坏了：连着两批拿不到内容就整轮收摊 */
+      {
+        const st = mk({ failFrom: 3 });
+        const seen = [];
+        const r = await R({ items: Array.from({ length: 40 }, (_, i) => ({ k: i, text: `S${i}` })), batchSize: 8, concurrency: 1, ask: st.ask, parse: st.parse, onBatch: (f) => seen.push(f.size) });
+        ok(r.attempted === 4 && st.bodies.length === 4,
+          '真跑：连着两批拿不到就收摊（第 3 批坏→退回队尾，第 4 批又坏→停），剩下的第 5 批不该再发出去', `attempted=${r.attempted}`);
+        ok(r.retried === 1, '真跑：坏掉的那一批被退回队尾重试过一次', `retried=${r.retried}`);
+        ok(r.filled.size === 16 && r.missed === 24 && r.haltedEarly === true,
+          '真跑：收摊时已翻好的 16 句保留、24 句记为没返回（提示据此写"再点一次重试剩下的"）', `${r.filled.size}/${r.missed}/${r.haltedEarly}`);
+        ok(seen.length === 2, '真跑：空批不回调（没有新译文就别惊动上屏与落盘）', `onBatch ${seen.length} 次`);
+      }
+
+      /* g. 同一批最多重试一次：反复坏的那批不该把整轮拖成无休止重排 */
+      {
+        const st = mk({ failAt: [2, 4] });
+        const r = await R({ items: Array.from({ length: 24 }, (_, i) => ({ k: i, text: `S${i}` })), batchSize: 8, concurrency: 1, ask: st.ask, parse: st.parse, onBatch: () => {} });
+        ok(r.attempted === 4 && r.retried === 1 && r.haltedEarly === false,
+          '真跑：坏批只排回队尾一次；第二次再坏就当它没翻出来（不该无限重排，也不该因此把整轮判成通道坏了）',
+          `attempted=${r.attempted} retried=${r.retried} halted=${r.haltedEarly}`);
+        ok(r.filled.size === 16 && r.missed === 8, '真跑：那 8 句记进 missed，其余 16 句留住（再点一次只补这 8 句）', `${r.filled.size}/${r.missed}`);
+      }
+
+      /* f. 只是一次抖动：坏批排队尾，其余照翻，最后补翻它 */
+      {
+        const st = mk({ failAt: [1] });
+        const r = await R({ items: Array.from({ length: 24 }, (_, i) => ({ k: i, text: `S${i}` })), batchSize: 8, concurrency: 1, ask: st.ask, parse: st.parse, onBatch: () => {} });
+        ok(r.attempted === 4 && r.retried === 1 && r.filled.size === 24 && r.missed === 0 && r.haltedEarly === false,
+          '真跑：单批抖动（超时/一次 429）不该把整轮几十句一起废掉——退回队尾、后面的照常翻、末尾补翻它',
+          `attempted=${r.attempted} filled=${r.filled.size} missed=${r.missed}`);
+        const no = mk({ failAt: [1] });
+        const r2 = await R({ items: Array.from({ length: 24 }, (_, i) => ({ k: i, text: `S${i}` })), batchSize: 8, concurrency: 1, ask: no.ask, parse: no.parse, onBatch: () => {}, retryFailed: false });
+        ok(r2.attempted === 3 && r2.retried === 0 && r2.filled.size === 16 && r2.missed === 8,
+          '正对照：关掉 retryFailed 就只发 3 批，坏那批的 8 句记进 missed（重试这道开关是真的在管事）',
+          `attempted=${r2.attempted} filled=${r2.filled.size}`);
+      }
+
+      /* c. 只回一部分：编号对不上的那些算没翻，不许静默当成功 */
+      {
+        const st = mk({ cutTo: 5 });
+        const r = await R({ items, batchSize: 8, concurrency: 1, ask: st.ask, parse: st.parse, onBatch: () => {} });
+        ok(r.filled.size === 13 && r.missed === 6 && r.haltedEarly === false,
+          '真跑：一批只回 5 条就只算 5 条（8+8+3 三批 → 5+5+3），剩下的计入 missed，不是按整批成功', `${r.filled.size}/${r.missed}`);
+      }
+
+      /* d. 换课/卸载：停止取新活，但已经在途的那批回来照样收下 */
+      {
+        const st = mk();
+        let flips = 0;
+        const seen = [];
+        const r = await R({
+          items: Array.from({ length: 40 }, (_, i) => ({ k: i, text: `S${i}` })),
+          batchSize: 8, concurrency: 1, ask: st.ask, parse: st.parse,
+          stopped: () => flips >= 2,
+          onBatch: (f) => { flips++; seen.push(f.size); },
+        });
+        ok(r.attempted === 2 && st.bodies.length === 2,
+          '真跑：stopped() 转真后立刻停止取新活（换课之后不该继续为旧课发请求）', `attempted=${r.attempted}`);
+        ok(r.filled.size === 16 && r.missed === 24,
+          '真跑：提前停下的那轮，已拿到的 16 句仍然收下（落盘由调用方在回调里做，一句都不白翻）', `${r.filled.size}`);
+      }
+
+      /* e. 边界：空输入不起 worker，batchSize 非法不炸 */
+      {
+        const st = mk();
+        let called = 0;
+        const empty = await R({ items: [], batchSize: 8, concurrency: 3, ask: st.ask, parse: st.parse, onBatch: () => { called++; } });
+        ok(empty.batches === 0 && st.bodies.length === 0 && called === 0 && empty.missed === 0,
+          '真跑：没有待翻句子时一个请求都不发（"全部已翻译"再点一次不许烧额度）');
+        const zero = await R({ items, batchSize: 0, concurrency: 0, ask: mk().ask, parse: mk().parse, onBatch: () => {} });
+        ok(zero.batches === 19 && zero.filled.size === 19,
+          '正对照：batchSize/concurrency 传 0 会被夹成 1（不能除零或起 0 个 worker 而一句不翻）', `${zero.batches}/${zero.filled.size}`);
+      }
     }
 
     let pass = 0, fail = 0, names = [];

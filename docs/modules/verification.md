@@ -13,7 +13,7 @@
 | `verify-backup-idb.mjs` | 16 | 「导出学习数据」真的含整书译文：IDB 替身真跑 `dumpBookTranslationCache`（有/无缓存、超上限、跨书隔离）+ 旧枚举方式的正对照 + backup.ts 接线 | 改 `backup.ts` / `book-translation.ts` 缓存层 |
 | `verify-sentence-lab.mjs` | 16 | 拆句训练主干判定**索引同源**：真转译 `sentence-parse.ts` 跑出 `stdParts` 与 `segments` 的分歧（缩约形式跨意群那个真实例子）、坏数据不再产生假成功；守 ChunkDrill 候选来自 resolved、reveal 在 grade 之前拦 | 改 `sentence-parse.ts` / `ChunkDrill.tsx` |
 | `verify-spelling-resume.mjs` | 24 | 拼写断点**按词书分键**：注入替身真跑 persist/读/迁移/清理，含「旧全局单键只剩最后一本」的正对照；守页面与重置流程都走同一模块 | 改 `spelling-resume.ts` / `SpellingPage` 断点 / 拼写重置 |
-| `verify-video-lab.mjs` | 89 | 视频精听数据层与页面契约：SRT/VTT/转录 JSON **解析真跑**（BOM、CRLF、多行 cue、乱序时间轴、内联标记、无效时间丢条）；假 IDB 替身**真跑整段 `createVideoStore`**（索引封顶淘汰连 `m:`/`s:`/`z:` 一起删、任一步写失败不谎报也不留半课、译文分键回写不重存 blob、`load` 遇坏记录退化成无原声而不抛）；`scoreSpeech` 用 LCS 真跑（含"重复词只扣一次"与"多说不压分"两条正对照）；六件套 + 点词/收藏/听写/翻译接线。⚠️ 剥注释必须走转译器（`removeComments`），裸正则会被 `accept="video/*,audio/*"` 骗掉 9KB —— 自带一条脚手架自证 | 改 `video-lab.ts` / `VideoLabPage` / `idb.ts` 的 `media` 表 |
+| `verify-video-lab.mjs` | 119 | 视频精听数据层与页面契约：SRT/VTT/转录 JSON **解析真跑**（BOM、CRLF、多行 cue、乱序时间轴、内联标记、无效时间丢条）；假 IDB 替身**真跑整段 `createVideoStore`**（索引封顶淘汰连 `m:`/`s:`/`z:` 一起删、任一步写失败不谎报也不留半课、译文分键回写不重存 blob、`load` 遇坏记录退化成无原声而不抛）；`scoreSpeech` 用 LCS 真跑（含"重复词只扣一次"与"多说不压分"两条正对照）；**批次翻译调度 `runBatchTranslation` 真跑**（编号正文 / 该批句数当 maxTokens 依据 / 并发档位受控 / 串行也要一批一回调 / 坏批退队尾只重试一次 / 连着两批坏才收摊 / `stopped()` 停止取新活 / 0 档位夹底）；六件套 + 点词/收藏/听写/翻译接线。⚠️ 剥注释必须走转译器（`removeComments`），裸正则会被 `accept="video/*,audio/*"` 骗掉 9KB —— 自带一条脚手架自证 | 改 `video-lab.ts` / `VideoLabPage` / `idb.ts` 的 `media` 表 |
 | `verify-correction-notes.mjs` | 90 | 表达纠偏本：Markdown 表格抽取真跑（三源列序 / 表头噪声 / 错=对跳过）+ store 整段真跑（去重、review 记账、删除、只拒不裁、写失败可见）+ 三处收集接线 + 收藏页折叠列表 + 第 9 模式接线总闸与重考卡面契约（不写 SM-2、零 toast、干扰项取自整本）+ 送进拼写（`correctionToSpellingItem` 真跑、纠偏桶不许走词库加载路）+ 错点归纳（十类规则各自命中、规则顺序与证据优先级、计数之和=条目数） | 改 `correction-notes.ts` / 纠偏重考 / 收藏页纠偏区 |
 | `verify-guard-shape.mjs` | 7 | **元守卫**：AST 扫全部 `verify-*.mjs`，抓"恒真断言"（`ok(/re/, src, name)` 这种第一实参是字面量本体）与漏名字的断言；逐文件识别记录器、形状表不含布尔、自带双向自证 + `inspectedTotal` 防空转 | 新增/改动任何守卫的断言写法 |
 | `verify-ai-parse.mjs` | 10 | AI 解析约定全仓扫：每个 `extractJson` 调用点前必须有 `.trim()` 判空、不许残留贪婪 `match(/…[\s\S]*…/)`；**注释行不参与判定**，并用三段固件自证检查器本身有效 | 新增/改动任何 AI 调用点 |
@@ -58,7 +58,7 @@ node scripts/verify-app-version.mjs   # 产物段同样依赖 build:web（缺 di
 - 路由烟测（12/12 条路由能进、DOM 里关键文本在）
 - 首屏长任务与下载量测量（`PerformanceObserver` 注册**一次**，写在路由循环里会把重复值算进去）
 - 词汇向导 A/B/C/D 四段路径真点一遍（23 项行为断言）
-- **`scripts/walk-video.mjs`（35 条）**：视频精听的整条链在真界面跑一遍 —— 用 `DataTransfer` 把 45 句 SRT 灌进 `input[type=file]`（React 的 `onChange` 认这个原生 `change`），落 IDB 后读回来建 object URL，再点句跳转、点词查词、加生词本、收藏句、送进拼写桶、AI 翻译真跑到「已翻译 30/45 句」、删除后验证 `media` 表只剩索引一条。**APK 侧复用同一脚本**：`--port 9226 --base https://localhost`。两条通用测法教训：图标按钮**按 `title` 精确匹配**（innerText 是空的），Radix 下拉要用 `pointerdown`+`pointerup` 才打得开。
+- **`scripts/walk-video.mjs`（39 条）**：视频精听的整条链在真界面跑一遍 —— 用 `DataTransfer` 把 45 句 SRT 灌进 `input[type=file]`（React 的 `onChange` 认这个原生 `change`），落 IDB 后读回来建 object URL，再点句跳转、点词查词、加生词本、收藏句、送进拼写桶、AI 翻译真跑到「已翻译 45/45 句」，并四步钉住增量链路（起点无译文 → 按钮立刻「开始翻译 45 句…」且 disabled → 按钮还写"翻译中"时界面已出现一部分中文行 → 结束回报句数）、删除后验证 `media` 表只剩索引一条。**APK 侧复用同一脚本**：`--port 9226 --base https://localhost`。两条通用测法教训：图标按钮**按 `title` 精确匹配**（innerText 是空的），Radix 下拉要用 `pointerdown`+`pointerup` 才打得开。
 
 坑：Windows Git Bash 下 MSYS 会把 `/,/vocabulary,/articles` 这类参数改写成 `C:/Program Files/Git/…`，导致「Cannot navigate to invalid URL」。加 `MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'`。同类：`/tmp` 在 Node 里会解析成 `B:\tmp`（用 `%TEMP%`），模板字符串会把 `\s` 吃掉（用 `String.raw`）。
 
@@ -246,6 +246,19 @@ npm run verify:all        # scripts/verify-all.mjs：typecheck + 全部 verify-*
 ④ **再补一遍：只有"带真实媒体"才能照出来的东西**（`scripts/probe-real-media.mjs`，26 条，两遍正/负对照）。此前 walk-video 只走「仅字幕」，于是 `File → IDB blob → createObjectURL → <video> 解码 → timeupdate 逐词高亮 → 换页后从 IDB 读回 → 删除连 `m:` 一起清` 这一整段从来没真跑过。补跑抓到两处：**a) 索引键名的字面量早先被我写成了星号串**（`INDEX_KEY`），功能完全正常 —— 它只是个唯一键名，所以守卫与走查一路全绿，直到探针把 `getAllKeys()` 的返回值原样打出来才看见；守卫现在用码点拼出期望值钉住它（避开同一类"值被替换还照样绿"），注意**改键名会让已存在的那条索引记录变成孤儿**，本模块刚上线、无真实用户数据才敢直接改。**b) 截断下载的 m4a**：B 站流媒体容器头声明 6024 秒、实际语音 343 秒，`<video>` 照显示 100:24 的假进度条 —— 界面补一句实话（播放器下方，说明"跳转/复读按字幕时间走"），判定用**双向比值**（>1.6× 或 <0.6× 都算不可靠，不只是判 NaN）；素材侧则用 ffmpeg 重编出 344 秒的干净文件（`ffprobe` 复核 duration=344.0）。两遍对照跑完：正常媒体不报错、截断媒体必须报错，`dist/client/__probe__/`  staging 那两个文件（构建产物目录，不进 git）。另附素材工具 `scripts/make-video-lab-packs.mjs`：把转录伴侣的产物做成可直接导入的课包，并在说明里带**质检数字**（重复句 / 夹非英文 / 碎句）—— 那条 B1 听力本来就是"英文读两遍 + 中文夹译"的练习结构，重复句 30/69 写在说明里而不是装作没看见。⑤ **装机后新增的两条真机教训**（`scripts/import-video-lesson.mjs`）：**a) 往真机 WebView 塞文件，`DOM.setFileInputFiles` 是拒的**（`files.length` 恒 0，`/sdcard/Android/data/<pkg>/files` 与 `chmod 644` 都一样），而 SAF 选择器又点不动（INJECT_EVENTS 被拒）—— 唯一可行是把字节**分块注入页面**再走 App 自己的 `onChange`（这样 parseSubtitle / videoStore.save / 配额回退全都真跑，不是往 IndexedDB 塞假记录）。顺带一条引擎差异：桌面 Chrome 上 `new DataTransfer(); dt.items.add(File)` 有效，第一次在 WebView 上却抛 `dt.files[0] undefined`，脚本里留了 `Object.defineProperty(inp,'files')` 兜底。**b) 看画面必须用 `adb exec-out screencap -p`** —— `device-eval shot` 走 CDP 截图，**抓不到视频硬表面**，把正在放画面的播放器截成全黑，差点误报成"素材没有画面"（量化：源帧亮度 51.9 / 设备截屏 53.3 / CDP 截图 0）。
 
 typecheck + eslint + 全量守卫 **28 项全绿**，断言合计 **7,853**。
+
+2026-10-18 第 41 测（精听「翻译字幕很慢」：**先量时间线再动手，量出来推翻了自己的第一个假设**）：用户报慢，我没有直接改并发，而是在页面里挂 `fetch` 探针（记每批 t0/t1/状态/字数 + 在飞数），同时每 0.5 秒打一次界面状态点。
+
+① **量到的三段事实**（同一段 69 句素材：本机 → Pages 中继 → 智谱免费档）：**(a)** 旧实现是 10 句一批**串行**、`for` 跑完才第一次 `setLesson` —— 30 句 10 秒，而这 10 秒界面一动不动，"慢"里有一半其实是"没有反馈"；**(b)** 照 `book-translation.ts` 起 3 路并发之后，**每批从 3.2–4.5 秒拖到 8–30 秒，并且有一路永不回包**（`functions/api/ai/chat.js:46` 本来就写着"免费档并发仅 1"，我没读它就动手）；**(c)** 显式传 `task:'translate'`（glm-4.7-flash）单批 23s/62s —— 那档准确度是给整书翻译这种后台任务用的，即时阅读场景不值 6 倍等待。结论：**并发不是这条链路的加速手段**，能改的是"每批完成就上屏 + 一次点击覆盖整课 + 坏批不拖死整轮"。
+
+② **新形态与断言**：调度抽成 `runBatchTranslation`（`video-lab.ts:390`），页面只喂 `ask`/`parse`（`VideoLabPage.tsx:398-459`）—— 批次切分、增量回调、重试与收摊因此**全部可被守卫真跑**（页面里的 setState 看不见摸不着）。`verify-video-lab` 89→**119**：新增第 ⑧ 节逐条真跑编号正文 `[1]..[8]`、`ask` 的 `count` 必须是**该批自己的句数**（页面用它算 maxTokens）、并发档位受控、**串行也要一批一回调**（攒到最后才给一次的那种写法在这里红）、坏批退队尾**只重试一次**、连着两批坏才收摊、`stopped()` 转真后停止取新活、`batchSize/concurrency` 传 0 要夹成 1。**11 条变异逐条验**：全部被抓到；其中"重试没有上限"在**先判收摊**的顺序下与原实现完全等价（守卫 119/119 照样绿）→ 换成"retried 计数漏报"才红。教训两条：**变异要先问它改变了哪个可观测行为**，否则"全绿"会被误读成"断言没管事"；而把"退回队尾重试"写在"连着两批坏就收摊"**之前**，坏通道会被反复重排 —— 这条是守卫的 attempted/retried 当场照出来的我自己写反的顺序。
+
+③ **又一例"接口存在≠通道可用"**：AI 请求挂住时 `use-ai.ts` 不会抛（失败收成 `''`），挂住则**连 reject 都没有**，`await` 永不返回 → 按钮永久停在"翻译中"。现在每批一个 25 秒看门狗（`TRANSLATE_TIMEOUT_MS`），到点当空批处理，走"重试一次 / 连坏两批收摊"那条路；另加**模块级**在途锁 `translateRunning`（组件重挂载会重置 ref，模块级那份才拦得住两课同时翻）。
+
+④ **交付物是窗口，不是接口**：`walk-video` 35→**39**，第 ⑧ 节按四步钉住增量链路 —— 起点 45 句都还没有译文（有残留就不算凭据）→ 点下去按钮立刻是「开始翻译 45 句…」且 disabled → **按钮还写着"翻译中"时界面已出现一部分中文行**（实测 0→40）→ 结束回报「已翻译 45/45 句」（**一次点击覆盖整课**，旧写法 69 句要点三次）。顺带两条测量侧自己的坑：`serve.cjs` 服务 `dist/client`，**改完源码不重建就是在测旧包**（我一度据此误报"永久翻译中"）；用 `body.innerText` 正则找"翻译中 x/y"会把**按钮文案**当成结果计数（把进度读成"只翻了 12 句"），要数的是译文行 `ol li p`。
+
+typecheck + eslint + `npm run verify:all` **28 项全绿**，断言合计 **7,883**（= 7,853 + 30，video-lab 89→119）。
+
 
 ## 6. 静态检查的已知弱度
 - **`npm run typecheck` 是弱守卫**：`tsconfig.app.json` 从 `node_modules/@lark-apaas/coding-presets-react/lib/tsconfig/tsconfig.app.json` 继承了 `strict: false`、`noImplicitAny: false`、`noUnusedLocals: false`、`noUnusedParameters: false`。所以"类型过了"不等于"类型检查过了"。

@@ -1,7 +1,7 @@
 # 视频精听（`/video`）
 
 > 模块 key `video`。页面 `src/pages/VideoLabPage/VideoLabPage.tsx`（665 行）+ 数据层 `src/lib/video-lab.ts`（344 行）。
-> 媒体与字幕在 **IndexedDB 独立的 `media` 表**，进度与"上次开着哪一课"在 `safeStorage`。守卫 `scripts/verify-video-lab.mjs`（89 条）· 真界面走查 `scripts/walk-video.mjs`（35 条）· 真媒体探针 `scripts/probe-real-media.mjs`（26 条，两遍正/负对照）· 素材工具 `scripts/make-video-lab-packs.mjs`。
+> 媒体与字幕在 **IndexedDB 独立的 `media` 表**，进度与"上次开着哪一课"在 `safeStorage`。守卫 `scripts/verify-video-lab.mjs`（119 条）· 真界面走查 `scripts/walk-video.mjs`（39 条）· 真媒体探针 `scripts/probe-real-media.mjs`（26 条，两遍正/负对照）· 素材工具 `scripts/make-video-lab-packs.mjs`。
 
 ## 1. 功能
 
@@ -9,15 +9,15 @@
 
 | 能力 | 入口 | 落在哪 |
 |------|------|--------|
-| 逐句跳转 / 单句循环 / A-B 复读 / 倍速 | 卡面按钮 + 快捷键（`:373-390`） | 时间轴由 `timeupdate` 驱动 |
-| 字幕清单 | 默认只渲染活动句前后 40 条，「展开全部」给整本（`:43`、`:366-371`） | — |
-| 点词查词 | 词面 span（`:525-535`） | 释义来自词库 `queryWords` |
-| 加进生词本 | 查词卡按钮（`:604-608`） | `addCustomWord` → **进 SM-2 复习队列** |
-| 收藏句 / 收藏词 | 心形按钮（`:539-541`、写点 `:279-291`、`:293-301`） | `useFavorites`，句用 `type:'video'` |
-| 朗读本句 | `tts.speak`（`:506-510`） | 全站 TTS 降级链 |
-| 跟读比对 | Mic 按钮（`:306-334`） | `SpeechRecognition` + `scoreSpeech` |
-| 听写这句 | 键盘按钮（`:544-546`） | 句子拼写的 `video` 桶 |
-| 双语字幕 | 「翻译字幕」（`:336-362`） | AI 批量翻译 → IDB `z:` 分键 |
+| 逐句跳转 / 单句循环 / A-B 复读 / 倍速 | 卡面按钮（`:593-608`）+ 快捷键（`:472-484`） | 时间轴由 `timeupdate` 驱动 |
+| 字幕清单 | 默认只渲染活动句前后 40 条，「展开全部」给整本（`:43`、窗口 `:462`、按钮 `:738-740`） | — |
+| 点词查词 | 词面 span（`:631-636`） | 释义来自词库 `queryWords` |
+| 加进生词本 | 查词卡按钮（`:706-713`） | `addCustomWord` → **进 SM-2 复习队列** |
+| 收藏句 / 收藏词 | 心形按钮（`:642-646`、写点 `:320-332`、`:334-342`） | `useFavorites`，句用 `type:'video'` |
+| 朗读本句 | `tts.speak`（`:609-613`） | 全站 TTS 降级链 |
+| 跟读比对 | Mic 按钮（`:615-620`，判定 `shadowThis` `:347-389`） | `SpeechRecognition` + `scoreSpeech` |
+| 听写这句 | 键盘按钮（`:647-650`） | 句子拼写的 `video` 桶 |
+| 双语字幕 | 「翻译字幕」（`:398-459`） | AI 批量翻译 → IDB `z:` 分键 |
 
 ## 2. 为什么是"导入"，不是内置转录（架构决定，别翻烧饼）
 
@@ -80,7 +80,15 @@ s:<id> / z:<id>      → { sentences } / { zh[] }          字幕与译文分开
 - **素材必须有画面**（用户硬要求）：`make-video-lab-packs.mjs` 会 `ffprobe` 一遍，**没有画面轨直接拒绝出包**（加 `--allow-audio` 才放行）。B 站"听力号"类上传常见两种坑：① 只给音频流（`bestaudio`）→ 播放器整块黑；② 480p 给的是 **AV1** → WebView 不保证解得动。素材侧统一转 **H.264 + yuv420p + faststart**，并**裁到字幕覆盖的区间**（那条 100 分钟的合集裁成 344 秒，才对得上 69 句字幕）。App 侧也补了实话：`el.videoWidth === 0 && el.videoHeight === 0` 时在播放器下写"只有音频轨、没有画面，黑屏属正常"。
 - **真机看画面要用 `adb exec-out screencap -p`，不要用 `device-eval shot`**：后者走 CDP `Page.captureScreenshot`，**抓不到视频硬表面**，播得好好的也会截成一块黑（本轮差点据此误报"没有画面"）。量化对照：源文件抽帧平均亮度 51.9，设备截屏播放器区域 53.3 / 256 级灰阶，而 CDP 截图那块是全黑。
 - **假时长要说破**：流媒体站给的 m4a 常见"容器头写 100 分钟、实际只有 5 分钟"（截断下载；实测 B 站那条头 6024s / 真语音 343s）。`onLoadedMetadata={checkDuration}`（`:515`）用**双向比值**判（`got/expect > 1.6 || < 0.6`，不只判 NaN），命中就在播放器下方一行写清"播放器报多少、字幕只到多少，跳转/复读按字幕时间走"（渲染 `:523`；换课时 `setNote('')` 清掉，见 `:131`）。素材侧另用 `ffmpeg -t <字幕末尾秒+1> -c:a aac` 重编，`ffprobe` 复核 duration 才算修好。
-- 双语字幕：一次最多 `TRANSLATE_LIMIT=30` 句、每批 10 句（`:46-47`），长视频要再点一次 —— 不许一口气打爆额度。编号 JSON 的解析**复用整书翻译的 `parseBatchTranslation`**（`data/book-translation.ts:196`），不另写一份正则。三档降级各有实话：未配 Key / 返回空 / 编号对不上（`:336-362`）。
+- 双语字幕（用户 2026-10-18 反馈「翻译字幕功能很慢」后重做）：**调度在 `runBatchTranslation`（`video-lab.ts:390`），页面只喂通道（`VideoLabPage.tsx:398-459`）**。参数：一次最多 `TRANSLATE_LIMIT=120` 句（整课一次覆盖，不再要用户点三次）、每批 `TRANSLATE_BATCH=8` 句、串行 `concurrency: 1`、每批看门狗 `TRANSLATE_TIMEOUT_MS=25000`（`:46/:53/:55`）。
+  - **实测数据（本机 → Pages 中继 → 智谱免费档，同一段 69 句）**：串行每批 3.2–4.5 秒；**起 3 路并发后每批拖到 8–30 秒，并且遇到过一整路永不回包**。`functions/api/ai/chat.js:46` 写着「免费档并发仅 1」，所以并发不是可用的加速手段 —— 抢并发只会把总时长从 10 秒拖成 60 秒。指定翻译任务档（`task:'translate'` → glm-4.7-flash）实测单批 23s/62s，更慢，也就不用（整书翻译那条后台链路才值那个准确度）。
+  - 因此"快"只能来自**边翻边上屏**：每批完成立刻回调 → `setLesson` 增量上屏 + `saveZh` 落盘（`:429-443`，落盘走串行队列写最新快照，避免并发覆盖）。旧写法是整轮 `for` 串行、最后一次性 `setLesson`，实测 30 句要 10 秒且这 10 秒里界面一动不动。
+  - **走查实测的凭据**（`walk-video.mjs` 第 ⑧ 节）：点下去按钮立刻变成「开始翻译 45 句…」并禁用 → 中途按钮还写着"翻译中"时界面已经出现一部分中文行（`带中文的字幕行 0 → 40`）→ 结束时回报「已翻译 45/45 句」，**一次点击覆盖整课**（旧写法 69 句要点三次、每次 10 秒全程无反馈）。
+  - **每批必须有超时**：AI 请求挂住不会抛错（`use-ai.ts` 把失败收成 `''`，挂住则连 reject 都没有），没有这道看门狗按钮就永久停在"翻译中"——与跟读那条「接口存在≠通道可用」同族。
+  - 坏批处理：单批拿不到内容**退回队尾重试一次**（`video-lab.ts:407-412`），**连着两批坏才整轮收摊**（先判收摊、再谈重试，顺序反了就变成无限重排 —— 守卫用变异钉住）。已翻好的落 `z:` 不动，剩下的算进 `missed`，文案写"再点一次重试剩下的"。三档降级各有实话：未配 Key / 一句都没回来（含超时）/ 部分没回来。
+  - 在途锁 `translateRunning` 是**模块级**（`:57`）而不是 ref：组件每次导航都重挂载会重置 ref，而模块级的一份才拦得住"两课同时翻"。锁在 `finally` 里连同按钮态一起释放，早退（换课）也解。
+  - 换课/卸载：`shownIdRef` + `activeRef` 让旧轮次停止取新活，但已经在途的那批回来仍写回**它自己那一课**的 `z:`（`:428`）；`openLesson` 清掉上一课的"翻译中/结果文案"（`:150-152`）。
+  - 编号 JSON 的解析**复用整书翻译的 `parseBatchTranslation`**（`data/book-translation.ts:196`），不另写一份正则；`ask` 的第二实参必须是**该批自己的句数**（页面用它算 `maxTokens`，传成整课句数会把上限放大到 3800）。
 
 ### 3.5 六件套接线（漏了会静默不显示）
 
@@ -106,8 +114,8 @@ s:<id> / z:<id>      → { sentences } / { zh[] }          字幕与译文分开
 
 ## 5. 验证
 
-- `node scripts/verify-video-lab.mjs` —— 84 条：三种字幕真跑解析、假 IDB 真跑整段存储层（索引封顶连媒体一起删、写失败不谎报、译文分键、`load` 合并中文）、`scoreSpeech` 真跑（含"重复词只扣一次"的正对照）、六件套与页面接线。
+- `node scripts/verify-video-lab.mjs` —— 119 条：三种字幕真跑解析、假 IDB 真跑整段存储层（索引封顶连媒体一起删、写失败不谎报、译文分键、`load` 合并中文）、`scoreSpeech` 真跑（含"重复词只扣一次"的正对照）、**批次翻译调度 `runBatchTranslation` 真跑**（批次切分与编号正文、并发受控、串行也要一批一回调、坏批退队尾重试一次、连着两批坏才收摊、`stopped()` 停止取新活、0 档位夹底）、六件套与页面接线。
 - `node scripts/probe-real-media.mjs` —— 26 条**带真实原声**那条路径：`File → IDB blob → createObjectURL → <video> 解码（readyState=4）→ timeupdate 逐词高亮 → 切走再回来从 IDB 读回 → 删除把 m:/s:/z: 一起收掉`。两遍正/负对照：正常媒体不许报"时长元数据不可靠"、截断媒体必须报。前置：把两份媒体 + 一份 JSON 放进 `dist/client/__probe__/`（构建产物目录，不进 git），Chrome 要带 `--autoplay-policy=no-user-gesture-required`。
 - `node scripts/make-video-lab-packs.mjs [--add 关键字] [--model small]` —— 把转录伴侣的产物做成可直接导入的课包（媒体 + .srt + 词级 .json + 说明.txt），输出 `B:/nt-materials/video-lab/`。每份字幕都用同一个 `parseSubtitle` 真跑一遍，说明里带**质检数字**（重复句 / 夹非英文 / 碎句）—— 那条 B1 听力本来就是"英文读两遍 + 中文夹译"的练习结构，重复句 30/69 写进说明，不装作没看见。
-- `node scripts/walk-video.mjs` —— 35 条真界面走查（无头 Chrome，`--port 9222 --base http://127.0.0.1:8001`）：灌 45 句 SRT → 落 IDB → 点句跳转 → 点词查词 → 加生词本 → 收藏句 → 收藏页看到「视频精听」→ 拼写页视频桶起会话 → AI 翻译真跑到「已翻译 30/45 句」→ 跟读不崩 → 删除后 `media` 表只剩索引一条。APK 侧复用同一脚本：`--port 9226 --base https://localhost`。
+- `node scripts/walk-video.mjs` —— 35 条真界面走查（无头 Chrome，`--port 9222 --base http://127.0.0.1:8001`）：灌 45 句 SRT → 落 IDB → 点句跳转 → 点词查词 → 加生词本 → 收藏句 → 收藏页看到「视频精听」→ 拼写页视频桶起会话 → AI 翻译真跑到「已翻译 45/45 句」（并验"起点无译文 → 按钮先变进行中 → 中途已有部分中文行 → 结束回报句数"这条增量链路）→ 跟读不崩 → 删除后 `media` 表只剩索引一条。APK 侧复用同一脚本：`--port 9226 --base https://localhost`。
 - 变异记录（改坏必须红）：`scoreSpeech` 换成集合交集 → ⑦「重复词只扣一次」红；撤 `disabled={inSpellingBook}`、把 `onClick={shadowThis}` 接空、把 `saveZh` 换成 `const saved = true` → 各自那条红；把 `strip` 退回裸正则 → 脚手架自证红。
