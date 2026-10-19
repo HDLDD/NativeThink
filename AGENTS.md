@@ -162,7 +162,7 @@ node scripts/probe-real-media.mjs [--media 路径 --subs 路径 --short-subs 路
 node scripts/check-video-lab-packs.mjs [目录名关键字]   # 逐课**实测**素材包能不能用：ffprobe 读画面轨/音轨/媒体末秒 + 那份 JSON 的字幕末秒与句数 + ffmpeg volumedetect 峰值。判红四条：没画面轨（用户硬要求）、没音轨或峰值< -60dB、字幕比媒体长（播放器空转）、媒体比字幕长 >3s（片尾空白会被当成"时间线乱跳"）。当前十六课全绿（07-16 为真实新闻/演讲/对话/纪录片/长访谈），差值 0–2 秒
 node scripts/make-video-lab-packs.mjs [--add 名字关键字 [--dir 目录 --title 标题 --note 说明]] [--model small]   # 把转录伴侣的产物做成可导入的素材包（**无画面轨直接拒绝出包**；有画面的统一压到 ≤480p H.264 + faststart 并裁到字幕区间；已裁好的成品媒体会被沿用；+ 质检数字），输出 B:/nt-materials/video-lab
 node scripts/import-video-lesson.mjs --port 9223 --media x.mp4 --subs x.json --no-saf   # 真机导入：SAF 打不动、setFileInputFiles 被 WebView 拒，只能分块注入字节走 App 自己的 onChange（--no-saf 把「选完媒体顺手弹系统选择器」接掉，连灌几课才不用在手机上点取消；pendingMedia→onChange→存库全都照原样真跑）
-node scripts/check-video-on-phone.mjs <课名关键字>   # 真机侧 8 条行为核验（在**自己导入的那一课**上跑，不碰用户原有课）：blob 读回 <video> 真解码 + videoWidth>0 有画面 + 已听 x/y + 暂停态点重播真的播起来 + 点词后释义卡整卡在屏内 + 单句/A-B 互斥按钮态 + IDB 里 m:/s: 条数对得上
+node scripts/check-video-on-phone.mjs <课名关键字>   # 真机侧 8 条行为核验（在**自己导入的那一课**上跑，不碰用户原有课）：blob 读回 <video> 真解码 + videoWidth>0 有画面 + 已听 x/y + **暂停态点重播：钩 play() 数调用次数**（别靠固定延时读 paused，真机会假红）+ 点词后释义卡整卡在屏内 + 单句/A-B 互斥按钮态 + IDB 里 m:/s: 条数按索引记录推（别写死数字）
 #   smoke 之后走查照旧：CDP_PORT=9226 node scripts/device-eval.mjs eval "<表达式>"
 # ⚠️ 起不来先看 check 的"加速"那行：x86_64 必须有 AEHD/WHPX，没驱动时 emulator 直接拒启
 #    （管理员跑一次 SDK 里现成的 extras/google/Android_Emulator_Hypervisor_Driver/silent_install.bat）

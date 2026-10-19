@@ -34,21 +34,33 @@ const heard = String(ev(`(()=>{const m=(document.body.innerText||'').replace(/\\
 ok(/已听 \d+\/\d+ 句/.test(heard), '④ 卡面写明「已听 x/y 句」', heard);
 
 /** ⑤ 暂停态点「重播本句」要真的播起来并回到句首 */
-const rp = String(ev(`(()=>{const v=document.querySelector('video');if(!v)return 'NOVIDEO';v.pause();v.currentTime=200;return 'armed';})()`));
-sleep(1200);
-const before = String(ev(`(()=>{const v=document.querySelector('video');return JSON.stringify({paused:v.paused,t:Math.round(v.currentTime)});})()`));
+/** 直接钩 play() 数调用次数（靠"固定延时后读 paused"推断会被时序抖出来，真机第二遍就这么假红过） */
+const armed = String(ev(`(()=>{const v=document.querySelector('video');if(!v)return 'NOVIDEO';
+  window.__plays=0;const op=HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play=function(){window.__plays++;return op.apply(this,arguments);};
+  v.pause();v.currentTime=200;return 'armed';})()`));
+/** 等到真的处于暂停态再点（最多 4 秒），否则"点前"这一步就不成立 */
+let pre = '';
+for (let k = 0; k < 8; k++) {
+  sleep(500);
+  pre = String(ev(`(()=>{const v=document.querySelector('video');return JSON.stringify({paused:v.paused,t:Math.round(v.currentTime),plays:window.__plays||0});})()`));
+  if (/"paused":true/.test(pre)) break;
+}
 const clicked = ev(`(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&(e.title||'').includes('重播本句'));if(!b)return 'NOBTN';b.click();return 'ok';})()`);
 sleep(2500);
-const after = String(ev(`(()=>{const v=document.querySelector('video');return JSON.stringify({paused:v.paused,t:Math.round(v.currentTime)});})()`));
-ok(rp === 'armed' && /"paused":true/.test(before) && String(clicked) === 'ok' && /"paused":false/.test(after),
-  '⑤ 暂停态点「重播本句」真的播起来了（不是只挪一下进度）', `点前 ${before} → 点后 ${after}`);
+const post = String(ev(`(()=>{const v=document.querySelector('video');return JSON.stringify({paused:v.paused,t:Math.round(v.currentTime),plays:window.__plays||0});})()`));
+const played = Number(String(post).match(/"plays":(\d+)/)?.[1] ?? 0) > Number(String(pre).match(/"plays":(\d+)/)?.[1] ?? 0);
+ok(armed === 'armed' && /"paused":true/.test(pre) && String(clicked) === 'ok' && played && /"paused":false/.test(post),
+  '⑤ 暂停态点「重播本句」真的调了 play() 并回到本句起点（只设 currentTime 就是"点了没反应"）', `点前 ${pre} → 点后 ${post}`);
 ev(`(()=>{const v=document.querySelector('video');if(v)v.pause();return 1;})()`);
 sleep(800);
 
 /** ⑥ 点词 → 释义卡出现在视口内（手机上播放器占大半屏，卡片落在屏外等于"查词没反应"） */
-const word = String(ev(`(()=>{const p=[...document.querySelectorAll('p')].filter(e=>(e.innerText||'').split(/\\s+/).length>3).pop();
-  if(!p)return 'NOCARDP';const s=[...p.querySelectorAll('span')].find(e=>(e.innerText||'').trim().length>3);
-  if(!s)return 'NOWORD';const r0=s.getBoundingClientRect();s.click();return JSON.stringify({word:(s.innerText||'').trim(),top:Math.round(r0.top)});})()`));
+/** 认当前句卡那个 <p>（text-[14px] font-black）：别用"最后一个多词 <p>"，那会抓到提示行/译文行 —— 它们没有词 span，只会假报 NOWORD */
+const word = String(ev(`(()=>{const p=[...document.querySelectorAll('p')].find(e=>/text-\\[14px\\]/.test(e.className||'')&&/font-black/.test(e.className||''));
+  if(!p)return 'NOCARDP';const s=[...p.querySelectorAll('span')].find(e=>(e.innerText||'').trim().replace(/[^A-Za-z']/g,'').length>3);
+  if(!s)return 'NOWORD:'+JSON.stringify((p.innerText||'').slice(0,24));const r0=s.getBoundingClientRect();s.click();
+  return JSON.stringify({word:(s.innerText||'').trim(),top:Math.round(r0.top)});})()`));
 let card = 'NOCARD';
 for (let k = 0; k < 14; k++) {
   sleep(900);
@@ -73,12 +85,15 @@ sleep(700);
 ok(afterLoop.loop && !afterLoop.ab && afterAb.ab && !afterAb.loop,
   '⑦ 单句循环与 A-B 互斥（真机按钮态，正反两个方向）', `开单句→${JSON.stringify(afterLoop)} · 再开 A-B→${JSON.stringify(afterAb)}`);
 
-/** ⑧ 存储实况：六课都该有 m: 与 s: 两条键 */
+/** ⑧ 存储实况：media 表里 m:/s: 的条数要等于索引记录里的课数（写死数字换一课就假红） */
 const keys = String(ev(`(async()=>{const db=await new Promise(r=>{const q=indexedDB.open('nativethink-wordbank');q.onsuccess=()=>r(q.result);q.onerror=()=>r(null);});
-  if(!db)return 'NO_DB';const all=await new Promise(r=>{const c=db.transaction('media','readonly').objectStore('media').getAllKeys();c.onsuccess=()=>r(c.result);c.onerror=()=>r([]);});
-  return JSON.stringify({总:all.length,索引:all.filter(x=>x==='video-index').length,媒体:all.filter(x=>/^m:/.test(x)).length,字幕:all.filter(x=>/^s:/.test(x)).length,译文:all.filter(x=>/^z:/.test(x)).length});})()`));
+  if(!db)return 'NO_DB';const tx=db.transaction('media','readonly');const st=tx.objectStore('media');
+  const all=await new Promise(r=>{const c=st.getAllKeys();c.onsuccess=()=>r(c.result);c.onerror=()=>r([]);});
+  const idx=await new Promise(r=>{const g=st.get('video-index');g.onsuccess=()=>r(g.result);g.onerror=()=>r(null);});
+  return JSON.stringify({总:all.length,索引:(idx&&idx.items&&idx.items.length)||0,媒体:all.filter(x=>/^m:/.test(x)).length,字幕:all.filter(x=>/^s:/.test(x)).length,译文:all.filter(x=>/^z:/.test(x)).length});})()`));
 const kn = JSON.parse(String(keys).replace(/^"|"$/g, '').replace(/\\"/g, '"'));
-ok(kn && kn.媒体 === 6 && kn.字幕 === 6, '⑧ 六课的原声 blob 与字幕都真在 IndexedDB 里（不是只记了个 MB 数）', keys);
+ok(kn && kn.索引 > 0 && kn.媒体 === kn.索引 && kn.字幕 === kn.索引,
+  '⑧ 每一课的原声 blob 与字幕都真在 IndexedDB 里（列表上那句「x MB 原声」只是元数据）', keys);
 
 const fails = results.filter((x) => !x).length;
 console.log(`\n真机核验 ${results.length - fails}/${results.length} 通过${fails ? '' : ' ✓'}`);
