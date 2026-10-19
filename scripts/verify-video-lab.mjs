@@ -281,8 +281,15 @@ ok(typeof M.parseSrt === 'function' && typeof M.createVideoStore === 'function',
       ok(/onClick=\{shadowThis\}/.test(page) && /scoreSpeech\(cur\.text, t\)/.test(page),
         '跟读按钮接到识别，评分用 scoreSpeech 这一个口径');
       ok(/没有语音识别通道/.test(page), '无 SpeechRecognition 时明说用不了 + 给替代路（安卓 WebView 常见，不许假装能打的分）');
-      ok(/let watch[\s\S]{0,1400}rec\.start\(\);\s*\}\s*catch/.test(page),
+      ok(/rec\.start\(\);\s*\}\s*catch \(/.test(page),
         '跟读：start() 抛错有兜底（WebView 往往是"对象能构造、start() 当场抛 NotSupportedError"，不兜就卡在"正在听…"= 点了没反应）');
+      /** 第四种形状：start() 成功、既不给 result 也不给 error，直接 end —— 界面当时一个字都没变（2026-10-19 假通道复现） */
+      ok(/rec\.onend = \(\) => \{[\s\S]{0,400}if \(!got && !errored\)/.test(page),
+        '跟读：直接 end（无结果无报错）也要写一行原因；且判据带 errored —— 不许覆盖 onerror 已经报过的更准原因');
+      /** 第五种形状（2026-10-19 真机 Redmi）：没人说话时通道凭空回一句中文 → 被当成"你读得差"的 0 分 */
+      ok(/const recLang = lesson\?\.meta\.lang[\s\S]{0,140}rec\.lang = recLang;/.test(page) &&
+         /if \(recLang === ['"]en-US['"] && !\/\[A-Za-z\]\/\.test\(t\)\) \{[\s\S]{0,120}setSpoken\(''\);[\s\S]{0,60}setScore\(null\);/.test(page),
+        '跟读：英文课里"回报没有一个英文字母"的识别结果不计分（设备幻觉/空回报不许打成学习者的 0%），且语言判定与 rec.lang 同源');
       ok(/, 9000\)/.test(page) && /clearTimeout\(watch\)/.test(page),
         '跟读：有 9 秒看门狗且拿到结果就撤（onerror/onend 一个都不回的那种设备不许永久挂死）');
       ok(/rec\.start\(\)/.test(page) && /recRef\.current\?\.abort\(\)/.test(page),

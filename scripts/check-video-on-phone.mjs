@@ -23,6 +23,21 @@ const truthy = (v) => v === true || v === 'true';
 const results = [];
 const ok = (c, n, d = '') => { results.push(c); console.log(`${c ? '✓' : '✗'} ${n}${d ? '  — ' + String(d).slice(0, 150) : ''}`); };
 
+/** App 重启后 /video 会**自动续开上次那一课**（`LAST_OPEN_KEY`），这时页面根本不在列表上：
+ *  「展开全部」找不到、课行也找不到，① 就变成 `NOROW` 假红（而 `<video>` 明明在）。
+ *  先按返回键回到列表 —— 顺带把"上次开着的那课"清掉，后面每次跑都从同一个起点开始。 */
+const atList = ev(`(()=>{const v=document.querySelector('video');if(!v)return 'LIST';
+  const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&e.querySelector('svg[class*="chevron-left"]'));
+  if(b){b.click();return 'BACK';}return 'NOBACK';})()`);
+if (String(atList) !== 'LIST') sleep(2500);
+
+/** 课表默认只铺前 12 课（>12 要人点「展开全部」）—— 先展开，否则第 13 行以后根本点不到 */
+const grew = ev(`(()=>{const n=(s)=>(s||'').replace(/\s+/g,'');const before=n(document.body.innerText).length;
+  const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&/展开全部/.test(n(e.innerText)));
+  if(!b)return 'NOEXPAND';b.click();return 'expanded:'+(n(document.body.innerText).length>before);})()`);
+sleep(1500);
+if (String(grew) !== 'NOEXPAND') console.log('· 已点「展开全部」（' + grew + '）');
+
 /** ① 从列表点开这一课 */
 const opened = ev(`(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&(e.innerText||'').includes(${JSON.stringify(KEYWORD)}));if(!b)return 'NOROW';b.click();return 'ok';})()`);
 sleep(6000);
@@ -108,22 +123,47 @@ const rect = () => String(ev(`(()=>{const w=document.querySelector('div.sticky')
   const doc=document.scrollingElement;
   return JSON.stringify({top:Math.round(W.top-B.top),vh:Math.round(V.height),st:Math.round(b.scrollTop),
     h:Math.round(b.scrollHeight-b.clientHeight),docScroll:Math.round(Math.max(0,doc.scrollHeight-doc.clientHeight)),
+    docAt:Math.round(doc.scrollTop),
     fits:B.bottom<=innerHeight+2,vidIn:V.bottom>B.top+2&&V.top<B.bottom-2,olIn:O?(O.bottom>B.top+2&&O.top<B.bottom-2):false,
     ih:innerHeight});})()`));
 const setScroll = (px) => { ev(`(()=>{const b=${boxExpr};if(b)b.scrollTop=${px};return 1;})()`); sleep(1400); };
-const p0 = JSON.parse(rect().replace(/^"|"$/g, '').replace(/\\"/g, '"'));
+/** 读不到几何就报红，别抛异常把后面几测一起带走（NO_STICKY 曾经直接崩脚本） */
+const J = (x) => { try { return JSON.parse(String(x).replace(/^"|"$/g, '').replace(/\\"/g, '"')); } catch { return { err: String(x).slice(0, 40) }; } };
+/** 必须先归零再拍"原位"：前面⑥点词会把框滚下去，直接读 rect() 会把已吸住的状态当基准，
+ *  于是 ⑨ 那条"比原位至少高 20px"天然为假（真机第一次跑就是这么假红的）。 */
+setScroll(0);
+const p0 = J(rect());
 setScroll(Math.round((p0.h || 0) * 0.55));
-const pa = JSON.parse(rect().replace(/^"|"$/g, '').replace(/\\"/g, '"'));
+const pa = J(rect());
 setScroll(Math.round((p0.h || 0) * 0.85));
-const pb = JSON.parse(rect().replace(/^"|"$/g, '').replace(/\\"/g, '"'));
+const pb = J(rect());
 ok(pa.top !== undefined && Math.abs(pa.top - pb.top) <= 3 && pa.top < p0.top - 20 && pa.vidIn && (pa.olIn || pb.olIn),
   '⑨ 真机往下滑：播放器钉在滚动框顶上不动，画面与字幕同时在（"能同时查找字幕和视频"）',
   `原位 ${p0.top} · ${pa.st}px→${pa.top} · ${pb.st}px→${pb.top} · 字幕可见 ${pa.olIn}/${pb.olIn} · 视口 ${p0.ih}`);
 setScroll(0);
-const pc = JSON.parse(rect().replace(/^"|"$/g, '').replace(/\\"/g, '"'));
-ok(Math.abs(pc.top - p0.top) <= 3 && pc.vh === p0.vh && p0.docScroll <= 2 && p0.fits,
-  '⑩ 真机滑回顶部恢复原样（位置与画面尺寸都回到吸住之前；整页收在一屏内、文档不跟着滚）',
-  `top ${p0.top}→${pc.top} · 高 ${p0.vh}→${pc.vh} · 文档可滚 ${p0.docScroll} · 框底在屏内 ${p0.fits}`);
+const pc = J(rect());
+/** 文档可滚高度在这台 ROM 上天生是 47px（safe-area-top 叠 min-h-screen，与这一屏无关），
+ *  所以钉的是"文档 scrollTop 始终是 0"—— 真在滚的必须是自己那个框，
+ *  否则 sticky 的约束根被文档抢回去，吸顶就又没了（video-lab.md §3.5 那条根因）。 */
+ok(Math.abs(pc.top - p0.top) <= 3 && pc.vh === p0.vh && p0.fits && [p0, pa, pb, pc].every((r) => r.docAt === 0),
+  '⑩ 真机滑回顶部恢复原样（位置与画面尺寸都回到吸住之前；整页收在一屏内、滚的一直是框而不是文档）',
+  `top ${p0.top}→${pc.top} · 高 ${p0.vh}→${pc.vh} · 框底在屏内 ${p0.fits} · 文档 scrollTop ${p0.docAt}/${pa.docAt}/${pb.docAt}/${pc.docAt}（可滚余量 ${p0.docScroll}）`);
+
+/** ⑪ 跟读（语音识别）：这台机器的 WebView 是"对象能构造但回调一个都不回"那一类，
+ *  所以只认两件事 —— 不许永久停在"正在听…"，且必须给出原因或分数。
+ *  判据用结构（那行 amber 原因段），不枚举文案：枚举会让改措辞变成假红。 */
+const micRead = () => String(ev(`(()=>{const n=(s)=>(s||'').replace(/\\s+/g,'');const t=n(document.body.innerText);
+  const b=[...document.querySelectorAll('button')].find(e=>(e.title||'').includes('跟读'));
+  const why=[...document.querySelectorAll('p')].filter(e=>/text-amber-600/.test(e.className||'')&&n(e.innerText)).map(e=>n(e.innerText));
+  return JSON.stringify({stuck: !!b && n(b.innerText).includes('正在听'),
+    reason: why.length ? why[0].slice(0, 26) : '', scored: /识别到/.test(t)});})()`));
+const clickedMic = ev(`(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&(e.title||'').includes('跟读'));if(b)b.click();return b?'clicked':'NOBTN';})()`);
+sleep(2500);
+const micMid = micRead();
+let mic = micMid;
+for (let t = 0; t < 8 && /"stuck":true/.test(mic); t++) { sleep(2000); mic = micRead(); }
+ok(/"stuck":false/.test(mic) && (/"reason":"[^"]/.test(mic) || /"scored":true/.test(mic)),
+  '⑪ 点跟读：不许卡在"正在听…"，且必须给原因或分数（识别通道在真机 WebView 里往往不回回调）', mic);
 
 const fails = results.filter((x) => !x).length;
 console.log(`\n真机核验 ${results.length - fails}/${results.length} 通过${fails ? '' : ' ✓'}`);

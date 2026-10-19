@@ -504,6 +504,7 @@ export default function VideoLabPage() {
      * 就是 AGENTS 那条"点了没反应／转圈不结束"。所以：try/catch + 看门狗各自兜一层。
      */
     let got = false;
+    let errored = false;
     let rec: any;
     const stopWatch = () => { if (watch) { clearTimeout(watch); watch = null; } };
     let watch: ReturnType<typeof setTimeout> | null = setTimeout(() => {
@@ -513,20 +514,45 @@ export default function VideoLabPage() {
     }, 9000);
     try {
       rec = new API();
-      rec.lang = lesson?.meta.lang === 'zh' ? 'zh-CN' : lesson?.meta.lang === 'ja' ? 'ja-JP' : 'en-US';
+      const recLang = lesson?.meta.lang === 'zh' ? 'zh-CN' : lesson?.meta.lang === 'ja' ? 'ja-JP' : 'en-US';
+      rec.lang = recLang;
       rec.continuous = false; rec.interimResults = false; rec.maxAlternatives = 1;
       rec.onresult = (e: any) => {
         got = true; stopWatch();
         const t = String(e?.results?.[0]?.[0]?.transcript || '');
+        /**
+         * 真机实测（2026-10-19 Redmi）：房间里没人说话时这个通道会凭空回一句中文（「你的蛋蛋」），
+         * 界面就当用户读砸了 —— "识别到 0% · 没读准：i thought that he might…"。
+         * 英文句子的识别结果不可能一个英文字母都没有，这种回报只能算设备的问题，不许当成学习者的分数。
+         */
+        if (recLang === 'en-US' && !/[A-Za-z]/.test(t)) {
+          setSpoken(''); setScore(null);
+          setMicNote(`识别通道${t ? `回了「${t}」` : '回了空的一句'}，里面一个英文字母都没有 —— 是这台机器的识别没按英文来，不是你读得差，所以这次不计分。可以先点「朗读」听原句，再点「听写这句」用拼写检验`);
+          return;
+        }
         setSpoken(t);
         setScore(scoreSpeech(cur.text, t));
       };
-      rec.onerror = (e: any) => setMicNote(
-        e?.error === 'not-allowed' || e?.error === 'service-not-allowed'
-          ? '麦克风权限被拒绝 —— 允许后再点一次'
-          : e?.error === 'no-speech' ? '没听到声音，再试一次' : `这一次没识别出来（${e?.error || '未知原因'}），再点一次试试`,
-      );
-      rec.onend = () => { stopWatch(); setRecording(false); };
+      rec.onerror = (e: any) => {
+        errored = true;
+        setMicNote(
+          e?.error === 'not-allowed' || e?.error === 'service-not-allowed'
+            ? '麦克风权限被拒绝 —— 允许后再点一次'
+            : e?.error === 'no-speech' ? '没听到声音，再试一次' : `这一次没识别出来（${e?.error || '未知原因'}），再点一次试试`,
+        );
+      };
+      /**
+       * 有的通道是"start 成功、既不给 result 也不给 error，直接 end"（2026-10-19 用假通道复现过：
+       * 界面当时一个字都没变，用户读到的就是"点了没反应"）。这条必须说实话，
+       * 但别把已经报过 error 的那次覆盖掉 —— 权限被拒那种原因更准。
+       */
+      rec.onend = () => {
+        stopWatch();
+        setRecording(false);
+        if (!got && !errored) {
+          setMicNote('这次没有听到任何内容（识别通道直接结束了）—— 再点一次，靠近麦克风把整句说完；也可以先点「朗读」听原句');
+        }
+      };
       recRef.current = rec;
       rec.start();
     } catch (e) {

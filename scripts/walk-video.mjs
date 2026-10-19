@@ -209,6 +209,52 @@ for (let t = 0; t < 8; t++) {
 ok(/"stuck":false/.test(micState) && /"said":true/.test(micState),
   '⑧ 跟读要么给分数要么给原因，而且不许卡在"正在听…"（点了没反应 = 原生桥那族缺陷）', micState);
 
+/**
+ * ⑧b 真 Chrome 这条路只走 "error:not-allowed → end"（本机实测），所以另外两种最容易变哑巴的
+ * 形状只能靠假通道确定性复现：
+ *   ① start() 成功、什么结果都不给，直接 onend —— 界面上一个字的反馈都没有；
+ *   ② 一个回调都不回（模拟器 APK 真实形状）—— 靠 9 秒看门狗收摊。
+ */
+/** 判"有没有说实话"用结构而不是枚举文案：这一页的原因行就是那条 amber 段落（与按钮 teal 态同一类判据）。
+ *  枚举句子会让"改措辞"变成假红 —— 本轮第一次就这么假红过一回。 */
+const micRead = () => String(ev(`(()=>{const n=(s)=>(s||'').replace(/\s+/g,'');const t=n(document.body.innerText);
+  const b=[...document.querySelectorAll('button')].find(e=>(e.title||'').includes('跟读'));
+  const why=[...document.querySelectorAll('p')].filter(e=>/text-amber-600/.test(e.className||'')&&n(e.innerText)).map(e=>n(e.innerText));
+  return JSON.stringify({stuck: !!b && n(b.innerText).includes('正在听'),
+    reason: why.length ? why[0].slice(0, 30) : '', scored: /识别到/.test(t)});})()`));
+const micOk = (s) => /"stuck":false/.test(s) && (/"reason":"[^"]/.test(s) || /"scored":true/.test(s));
+ev(`(()=>{window.__RealSR = window.SpeechRecognition;
+  window.SpeechRecognition = class { constructor() { this.lang = ''; } start() { setTimeout(() => { if (this.onend) this.onend(); }, 250); } stop() {} };
+  return 'stubbed-end-only';})()`);
+clickText('跟读');
+sleep(1600);
+const endOnly = micRead();
+ok(micOk(endOnly),
+  '⑧b 假通道①「start 成功但直接 onend、无结果无报错」也必须给一句实话（否则就是点了没反应）', endOnly);
+ev(`(()=>{window.SpeechRecognition = class { constructor() { this.lang = ''; } start() {} stop() {} }; return 'stubbed-silent';})()`);
+clickText('跟读');
+sleep(2500);
+const silentMid = micRead();      // 看门狗还没到点：这一趟应当仍然是"正在听…"
+let silent = silentMid;
+for (let t = 0; t < 8 && /"stuck":true/.test(silent); t++) { sleep(2000); silent = micRead(); }
+ok(micOk(silent) && /"stuck":true/.test(silentMid),
+  '⑧b 假通道②「一个回调都不回」：中途确实还在听（正对照），9 秒看门狗必须收摊并说明原因',
+  `中途 ${silentMid} → 最终 ${silent}`);
+/**
+ * 假通道③（2026-10-19 真机 Redmi 抓到的形状）：没人说话时通道凭空回一句中文。
+ * 这一条要的是**反面的**东西 —— 不许出现分数：把设备的幻觉打成"你读得差 0%"，
+ * 用户看到的就是"我明明读了，它说我一塌糊涂"。所以判 reason 有 + scored 无。
+ */
+ev(`(()=>{window.SpeechRecognition = class { constructor() { this.lang = ''; }
+  start() { setTimeout(() => { if (this.onresult) this.onresult({ results: [[{ transcript: '你的蛋蛋' }]] }); if (this.onend) this.onend(); }, 250); } stop() {} };
+  return 'stubbed-hallucination';})()`);
+clickText('跟读');
+sleep(1600);
+const halluc = micRead();
+ok(/"stuck":false/.test(halluc) && /"reason":"[^"]/.test(halluc) && /"scored":false/.test(halluc),
+  '⑧b 假通道③「非英文幻觉回报」必须说实话且**不计分**（否则把设备的毛病打成用户的 0 分）', halluc);
+ev('(()=>{window.SpeechRecognition = window.__RealSR; return "restored";})()');
+
 /* ── 9. 回列表 → 删除这一课（连媒体与译文键一起清） ── */
 const back = ev(`(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&e.querySelector('svg[class*="chevron-left"]'));if(b){b.click();return 'ok';}return 'NOBACK';})()`);
 sleep(1600);

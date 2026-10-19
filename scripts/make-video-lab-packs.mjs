@@ -246,6 +246,18 @@ for (const w of targets) {
   const 时长告警 = pr.秒 && subsEnd && (pr.秒 / subsEnd > 1.6 || pr.秒 / subsEnd < 0.6)
     ? '⚠️ 媒体 ' + pr.秒 + 's 与字幕覆盖 ' + subsEnd + 's 差太多（截断下载或没裁到同区间），要么裁媒体要么补转录' : '';
 
+  /**
+   * 容器声称的时长与实际解出来的音频不一致（假时长头那一类：截断下载的 m4a 头写 100 分钟、
+   * 真语音只有 5 分钟；或抽音轨被超时掐断）。这种在**出包这一刻**看得见，所以在这里说破。
+   * 另有一类这里看不见 —— 平台只给前 10 分钟（元数据与容器都自洽，只有下载时才对得上），
+   * 那一条归 scripts/fetch-video-source.mjs 管。
+   */
+  const srcProbe = probeMedia(src);
+  const 截断告警 = srcProbe.秒 > 60 && r.duration && r.duration < srcProbe.秒 * 0.95
+    ? '⚠️ 源媒体被平台截断：容器标 ' + srcProbe.秒 + ' 秒，实际只解出 ' + Math.round(r.duration) + ' 秒音频'
+      + '（换清晰度也一样）—— 这一课只覆盖前 ' + Math.floor(subsEnd / 60) + ' 分钟，后半段没拿到，不是转录漏了'
+    : '';
+
   /* ── 质检数字（不是形容词） ── */
   const seen = new Set();
   let dup = 0;
@@ -259,6 +271,7 @@ for (const w of targets) {
     + MB(fs.statSync(dest).size) + 'MB（' + how + '）' + NL
     + '字幕：' + sentences.length + ' 句 · 覆盖 0:00–' + Math.floor(subsEnd / 60) + ':' + String(subsEnd % 60).padStart(2, '0') + ' · 词级时间戳 ' + words + ' 个' + NL
     + (时长告警 ? '  ' + 时长告警 + NL : '')
+    + (截断告警 ? '  ' + 截断告警 + NL : '')
     + '重复句 ' + dup + '（占 ' + Math.round((dup / sentences.length) * 100) + '%）· 夹非英文 ' + mixed + ' 句 · 碎句(≤2 词) ' + frags + ' 句' + NL
     + '最长句 ' + longest.text.length + ' 字符：' + longest.text.slice(0, 60) + NL
     + '转录：faster-whisper ' + (r.model || model) + '，语种 ' + (r.language || 'en')
