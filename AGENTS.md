@@ -103,7 +103,7 @@ node scripts/verify-wordbank-loading.mjs          # 53  加载层集成（无需
 node scripts/verify-char-hygiene.mjs              # 9   数据不可见坏字符（U+FFFD + PUA）零残留：扫描器正/负对照 + src/data + public/books + 脚本覆盖自证
 node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆分（基线任意时刻可重采）
 node scripts/verify-tts-progress.mjs              # 6175 朗读切片与进度反查表
-node scripts/verify-tts-hardening.mjs             # 15   TTS 降级/在途去重/桌面限定（注意：没有 npm script）
+node scripts/verify-tts-hardening.mjs             # 21   TTS 降级/在途去重/桌面限定/内置引擎入队顺序（注意：没有 npm script）
 node scripts/verify-chunks-data.mjs               # 55   语块库 963 条数据卫生 + 读取层去重（12 组重复冻结成基线、去重顺序判别、已记组行为）+ 短语库/语块库显示语言同源 + 列表内移动的单一滚动权威
 node scripts/verify-native-tts.mjs                # 45   原生插件边界：替身真跑「async return 插件对象＝永久挂死」+ 取语音列表 4s 超时 + 六处调用点 + 先问能力再猜沉默（看门狗吃句长、每词 ≥380ms、起播证据两档）
 node scripts/verify-books-meta.mjs                # 227  书目元数据 + 复习词高亮
@@ -117,7 +117,7 @@ node scripts/verify-backup-idb.mjs                # 16   导出学习数据真�
 node scripts/verify-cloud-sync-hygiene.mjs        # 70   云同步：下行回声/失败可见/按需补推 + 13 订阅者逐个点名 + 缓存作废静态与真跑（正对照）
 node scripts/verify-sentence-lab.mjs              # 16   拆句训练主干判定索引同源（真转译跑出分歧）
 node scripts/verify-spelling-resume.mjs           # 24   拼写断点按词书分键 + 迁移 + 重置枚举
-node scripts/verify-video-lab.mjs                 # 146  视频精听：字幕三解析真跑 + 假 IDB 真跑存储层（封顶连媒体删/写失败不谎报/译文分键）+ LCS 跟读比对真跑 + **批次翻译调度真跑（批次切分/串行增量/坏批退队尾重试一次/连坏两批收摊/stopped 停取新活）** + **拖拽文件分类 splitImportFiles 真跑** + 六件套与页面接线 + **第 ⑩ 节把"用户视角"那批逐条钉住（两段式删课/删课清进度/选视频反馈与反悔/拖拽/课表展开/重播真播/释义卡进视野/单句与 A-B 双向互斥/已听与学完态/快捷键/课时取自 durationOf 而非整片时长/学习时长按课分键）**（⚠️ 剥注释走转译器，正则会被 accept="video/*" 骗到）
+node scripts/verify-video-lab.mjs                 # 152  视频精听：字幕三解析真跑 + 假 IDB 真跑存储层（封顶连媒体删/写失败不谎报/译文分键）+ LCS 跟读比对真跑 + **批次翻译调度真跑（批次切分/串行增量/坏批退队尾重试一次/连坏两批收摊/stopped 停取新活）** + **拖拽文件分类 splitImportFiles 真跑** + 六件套与页面接线 + **第 ⑩ 节把"用户视角"那批逐条钉住（两段式删课/删课清进度/选视频反馈与反悔/拖拽/课表展开/重播真播/释义卡进视野/单句与 A-B 双向互斥/已听与学完态/快捷键/课时取自 durationOf 而非整片时长/学习时长按课分键）**（⚠️ 剥注释走转译器，正则会被 accept="video/*" 骗到）
 node scripts/verify-chain-verdict.mjs             # 36   语块接龙判定三档（未判定不计分也不判错）
 node scripts/verify-ai-parse.mjs                  # 10   AI 解析约定：25 个解析点判空 + 无贪婪正则（元判据固件自证）
 node scripts/verify-dashboard-glance.mjs            # 25   首页内容扩展：续学标签表穷举（/sentences 漏过）+ 三张横幅 0 义务整卡不渲染（待复习 / 纠偏待重考，行门控含第三张）+ 本周柱状日期与高度 + ?tab= 深链三道门（只认 MODES key / 不强进向导 / 走 enterMode 并抹参数）
@@ -158,11 +158,14 @@ node scripts/phone-emu.mjs install           # 装 NativeThink-emu-x86_64.apk（
 node scripts/phone-emu.mjs launch && node scripts/phone-emu.mjs smoke
 node scripts/walk-phone.mjs                # 装机四条走查（4 收藏 + 5 纠偏夹具，含"四级 6827 句 vs 纠偏 1 句"正对照）
 node scripts/walk-video.mjs --port 9226 --base https://localhost   # 视频精听 53 条走查在 APK 上重跑（本机版：--port 9222 --base http://127.0.0.1:8001）
-node scripts/probe-real-media.mjs [--media 路径 --subs 路径 --short-subs 路径]   # 视频精听 38 条（两遍×19）：真媒体（blob→IDB→<video> 解码→逐词高亮→**停在中段时当前句正是那一句**→A-B 越过出点真回跳→单句与 A-B 双向互斥→学习时长按课分键 0.2→0.3→0.3→换页读回→两段式删除清干净）+ 负对照（同一段媒体配一份短得多的字幕 → 必须说破假时长）；素材自动拷进 dist/client/__probe__/，期望时长与句数现算
+node scripts/probe-real-media.mjs [--media 路径 --subs 路径 --short-subs 路径]   # 视频精听 52 条（两遍×26）：真媒体（blob→IDB→<video> 解码→逐词高亮→**停在中段时当前句正是那一句**→A-B 越过出点真回跳→单句与 A-B 双向互斥→学习时长按课分键 0.2→0.3→0.3→换页读回→两段式删除清干净 + **吸顶悬浮的几何判据**（这一屏收在一屏内由自己的框滚、两个不同 scrollTop 下 sticky 元素 top 一致、画面缩档、滑回顶部复原、吸住时点词释义卡整张落在播放器下方））+ 负对照（同一段媒体配一份短得多的字幕 → 必须说破假时长）；素材自动拷进 dist/client/__probe__/，期望时长与句数现算
 node scripts/check-video-lab-packs.mjs [目录名关键字]   # 逐课**实测**素材包能不能用：ffprobe 读画面轨/音轨/媒体末秒 + 那份 JSON 的字幕末秒与句数 + ffmpeg volumedetect 峰值。判红四条：没画面轨（用户硬要求）、没音轨或峰值< -60dB、字幕比媒体长（播放器空转）、媒体比字幕长 >3s（片尾空白会被当成"时间线乱跳"）。当前十六课全绿（07-16 为真实新闻/演讲/对话/纪录片/长访谈），差值 0–2 秒
 node scripts/make-video-lab-packs.mjs [--add 名字关键字 [--dir 目录 --title 标题 --note 说明]] [--model small]   # 把转录伴侣的产物做成可导入的素材包（**无画面轨直接拒绝出包**；有画面的统一压到 ≤480p H.264 + faststart 并裁到字幕区间；已裁好的成品媒体会被沿用；+ 质检数字），输出 B:/nt-materials/video-lab
 node scripts/import-video-lesson.mjs --port 9223 --media x.mp4 --subs x.json --no-saf   # 真机导入：SAF 打不动、setFileInputFiles 被 WebView 拒，只能分块注入字节走 App 自己的 onChange（--no-saf 把「选完媒体顺手弹系统选择器」接掉，连灌几课才不用在手机上点取消；pendingMedia→onChange→存库全都照原样真跑）
-node scripts/check-video-on-phone.mjs <课名关键字>   # 真机侧 8 条行为核验（在**自己导入的那一课**上跑，不碰用户原有课）：blob 读回 <video> 真解码 + videoWidth>0 有画面 + 已听 x/y + **暂停态点重播：钩 play() 数调用次数**（别靠固定延时读 paused，真机会假红）+ 点词后释义卡整卡在屏内 + 单句/A-B 互斥按钮态 + IDB 里 m:/s: 条数按索引记录推（别写死数字）
+node scripts/check-video-on-phone.mjs <课名关键字>   # 真机侧 10 条行为核验（在**自己导入的那一课**上跑，不碰用户原有课）：blob 读回 <video> 真解码 + videoWidth>0 有画面 + 已听 x/y + **暂停态点重播：钩 play() 数调用次数**（别靠固定延时读 paused，真机会假红）+ 点词后释义卡整卡在屏内 + 单句/A-B 互斥按钮态 + IDB 里 m:/s: 条数按索引记录推（别写死数字）
+# node scripts/check-tts-latency.mjs [--port 9226 模拟器 | 9223 真机] [--quick]   # 离线朗读实测台账：每个音色的 RTF、入队顺序 A/B（首包等几次合成）、缓存冷热；直连 SherpaTts 插件并给每段文本带运行级 nonce（不然第二次全命中原生文件缓存，测的不是合成）
+#   吸顶为什么不吸（布局类问题先隔离再改）：把 scripts/probe-sticky.html 拷进 dist/client/__probe__/ 打开，
+#   ?ov=0/1/2/3 切外壳那三层 overflow，__scroll(300) 后跑 __r() 看 winTop —— 恒 0 才叫吸住（详见 video-lab.md §3.5）
 #   smoke 之后走查照旧：CDP_PORT=9226 node scripts/device-eval.mjs eval "<表达式>"
 # ⚠️ 起不来先看 check 的"加速"那行：x86_64 必须有 AEHD/WHPX，没驱动时 emulator 直接拒启
 #    （管理员跑一次 SDK 里现成的 extras/google/Android_Emulator_Hypervisor_Driver/silent_install.bat）
@@ -297,6 +300,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 | 提交类操作谎报成功 | 后端只有一个 boolean，503（通道未配）与网络失败都归成"没成功"，UI 一律 toast 成功 | 结果分档返回，UI 按档给不同提示；失败保留条目并提供重试入口 |
 | 全站 toast 提示不出现 | `ui/sonner.tsx` 有 `Toaster` 但没人挂载 | 唯一出口在 `src/index.tsx`；新页面不要再挂第二个，`verify-overlay-fit` ⑤ 剥注释全仓扫描会断言 |
 | 全屏浮层顶部被手机状态栏压住 | `fixed inset-0` 的浮层脱离文档流，**绕过了外壳 `SidebarProvider` 那层 safe-area 内缩**（Android 15+ edge-to-edge 下 inset 实测 47px） | 浮层根节点自己补 `safe-area-top safe-area-bottom`（阅读器 `PageReader.tsx:1210`，2026-09-30 真机反馈已修）；新增贴顶全屏层同理，`verify-overlay-fit` ④ 会扫；本机验收用 CDP `Emulation.setSafeAreaInsetsOverride`（insets 传对象）强制 47/24 量顶栏 top |
+| 页面里 `position: sticky` 静默不吸（写了 `sticky top-0` 但元素跟着内容一起滚走） | **外壳把 sticky 的约束根抢走了**：`SidebarInset` 的 `overflow-x-hidden`（`Layout.tsx:115`）按规范会把**计算出的 `overflow-y` 变成 auto**，`main` 又明写 `overflow-y-auto`（`:117`）—— 两层都是"滚动容器"，可它们的高度随内容长（外层只有 `min-h-screen`，没谁把高度钉在视口上），于是**真正在滚的一直是文档**（实测 `main.scrollHeight − main.clientHeight = 0`）。sticky 相对"最近的滚动容器"算偏移，而那个容器从不滚 → 永远不吸 | 别改外壳（会牵动路由复位的 `window.scrollTo`、语块库的单一滚动权威、各页 `pb-20` 让位）。要让某页吸顶，就给那一屏**自己做滚动容器**：把高度钉成 `innerHeight − 本层绝对 top − main 下边距`（实测出来，不是猜 calc），内容进那个框，`sticky` 与 `IntersectionObserver` 的 root 都指它 —— 完整实测表与五条口径见 [video-lab.md §3.5](./docs/modules/video-lab.md)；判据用几何（两个 `scrollTop` 下 `rect.top` 一致），class 里有 `sticky` 不算数 |
 | 练习界面一张接一张弹提示 | 评分/翻面/收藏/开关各处都挂 toast，答 30 张就是几十条（用户两次要求静默，最后一条是「不要在练习界面有任何提示」） | 三个练习模式只剩**白名单**：失败/空队列 + 唯一撤销入口；其余反馈交给界面计数（已评 / Flame 连对 / 今天新学 x/y / ★ 实心 / 进度条）。新增提示必须先改守卫 ⑧d 白名单，见 [vocabulary.md](./docs/modules/vocabulary.md) 注意事项 13 |
 | 手机上"点了没反应／转圈不结束"，网页版一切正常 | **只在 APK 成立的原生桥逻辑**：`async` 函数 `return` 一个 Capacitor 插件对象 → 它是 Proxy、`typeof x.then === 'function'` → Promise 同化把 `then` 当原生方法发出去 → resolve/reject 永不调用 → **永久 pending**（不是抛错，`try/catch` 兜不住）。同类的还有"整屏抽屉导航后不关，新页面被吞点击"（`AppSidebar.tsx:108`），以及**"接口存在≠通道可用"**（精听跟读：模拟器 WebView 里 `webkitSpeechRecognition` 存在、`start()` 也不抛，但 onresult/onerror/onend 一个都不回 → 按钮永久停在"正在听…"，2026-10-18 装机走查才抓到） | 插件对象一律装在持有者里返回（`native-tts.ts:51,67-77`），原生桥的每个 await 自带超时；这类调用**还要看门狗 + try/catch 兜"从不回调"**（`VideoLabPage.tsx:413-460`，9 秒收摊并给界面文案）；前两条由 `verify-native-tts`(45) 与 `verify-overlay-fit` ⑥⑦ 守，第三条由 `verify-video-lab` 两条断言守，**但真凭据只有真机/模拟器 CDP**（typecheck 与静态守卫都看不见） |
 | 某个页面一点就「页面出错」，同一个组件在别的页面正常 | **共享组件带了 hook 前置条件**：`useFramerMotion()` 在没有 `<LazyFramerProvider>` 祖先时曾直接 throw（真机 2026-10-17：收藏页「开始回顾」裸渲染 `FavoriteReviewMode`，学习记录页包了 provider 所以那边一直正常）。守卫旧写法"任意一个宿主包了就放行"看不见这种缺线 | 渲染点自己包 provider（`verify-overlay-fit` ⑦ 现在**逐个宿主**点名 + 两处入口分别钉）；hook 侧改成缺 provider 时退化成无动画 + 一次性 `console.warn`（动画前置条件不许能掀翻用户的页面）。同族的另一条：收藏清单读盘不校验形状，`content` 是对象就整页崩 → `use-favorites.sanitizeFavorites` 在读盘边界收掉（守卫 ㉔ 真跑） |
@@ -330,11 +334,11 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening 15 · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · **video-lab 146** · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit **80** · chain-verdict 36 · dashboard-glance 25 · correction-notes **90** · guard-shape **7**；合计 **7,910**，2026-10-19 第 42 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening 21 · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · **video-lab 152** · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit **80** · chain-verdict 36 · dashboard-glance 25 · correction-notes **90** · guard-shape **7**；合计 **7,922**，2026-10-19 第 44 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs` + `node scripts/verify-char-hygiene.mjs`（清了坏字符还要递增 `CACHE_VERSION`，否则老缓存挡住修复）
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过 `android/app/build.gradle` 的 `abiFilters` 或任何打包脚本 → 至少跑一次 `npm run package:apk:emu`（它收尾会读 APK 自己的 zip 中央目录自证：x86_64 的 sherpa `.so` 在、www/books/piper/tts 资产在、arm 0 条）；模拟器装机走 `node scripts/phone-emu.mjs check`
-- [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级 → `verify-tts-hardening`；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**
+- [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级**或内置引擎的入队顺序** → `verify-tts-hardening`（裸跑，它没有 npm script）；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`
 - [ ] 改过 `ui/dialog` 基座或设置面板 → `verify-overlay-fit`
 - [ ] 改过 `functions/` → 想清楚网页/APK/桌面三条路；改过 index.html 版本 meta 或 `version.properties` → `node scripts/verify-app-version.mjs`（产物段先 build:web）
