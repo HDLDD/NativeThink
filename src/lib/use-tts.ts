@@ -715,11 +715,14 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         // 真机上"点朗读没反应"就是这个后果。
         const t0 = Date.now();
         const voiceId = localVoiceIdFor(settings.selectedVoiceURI);
+        // 先送当前这一片，再考虑下一片。原生队列是串行的（synthLock），
+        // 把预取排在前面会让首包等**两次**合成（实测：旧写法首包 = 2×单片合成时长）。
+        const req = sherpaSpeak(chunks[idx], { voiceId, speed: rate });
         const next = chunks[idx + 1];
-        // 原生合成是串行的（synthLock）：前方还有在途请求时不再预取，
-        // 否则预合成只是把请求堆进原生队列（曾是线程数耗尽的诱因之一）。
-        if (next && sherpaInFlightCount() === 0) sherpaPrewarm(next, { voiceId, speed: rate });
-        sherpaSpeak(chunks[idx], { voiceId, speed: rate })
+        // 背压：队列里除了本片还有别人在途，就不再往上添（预取堆进原生队列曾是线程数耗尽的诱因之一）。
+        // 计数含刚提交的本片自己，所以"只有本片"就是 ≤1。
+        if (next && sherpaInFlightCount() <= 1) sherpaPrewarm(next, { voiceId, speed: rate });
+        req
           .then(({ url }) => playUrl(url, { engine: 'piper', t0, retryNextEngine, skipChunk }))
           .catch(retryNextEngine);
         return;

@@ -407,6 +407,9 @@ public class SherpaTtsPlugin extends Plugin {
                 new OfflineTtsMatchaModelConfig(),   // 未使用，但必须给空实例
                 kokoro,
                 new OfflineTtsKittenModelConfig(),   // 同上
+                // numThreads：实测过三档（四核 x86_64 模拟器，Kokoro int8）：2 线程 RTF 1.44~1.75、
+                // 3 线程 1.38~1.45、4 线程 1.23~1.34 —— 加线程只是次线性，越不过"追上播放"那条线，
+                // 而吃满核数会跟 UI/音频线程抢 CPU。所以维持 cores/2，不当优化用。
                 Math.max(2, Runtime.getRuntime().availableProcessors() / 2), // numThreads
                 false,      // debug
                 "cpu");     // provider

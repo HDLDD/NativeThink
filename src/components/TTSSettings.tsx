@@ -74,6 +74,8 @@ export default function TTSSettings() {
   /** 未手动选语音时，朗读实际会自动使用的本地音色（用于设置页如实回显） */
   const [autoVoice, setAutoVoice] = useState<INativeVoice | null>(null);
   const [previewing, setPreviewing] = useState<string | null>(null);
+  /** 当前选中的内置音色（用来把"这个音色在这类设备上有多快"如实写在选它的地方） */
+  const selectedLocalVoice = listLocalVoices().find((v) => v.id === settings.selectedVoiceURI) || null;
   const [probing, setProbing] = useState(false);
   const [probeResults, setProbeResults] = useState<ITtsEngineProbe[] | null>(null);
   const [loadingNative, setLoadingNative] = useState(false);
@@ -422,7 +424,11 @@ export default function TTSSettings() {
               <p className="text-[9px] text-muted-foreground leading-relaxed">
                 {previewing
                   ? '首次试听需加载模型（约 109MB），请稍候…'
-                  : '全部设备内合成。带「英音」的音色适合练英式听力；点任意音色即切换并试听。'}
+                  : selectedLocalVoice?.modelId === 'kokoro'
+                    // 选了就说清代价（实测数在四核 x86_64 模拟器上取，Kokoro int8 三档线程 1.23~1.75）：
+                    // 合成比播放慢，长文每句之间一定有空档 —— 这不是预取深度能修的。
+                    ? '已选 Kokoro：音质更好，但实测合成慢于播放（RTF≈1.2~1.7），长文朗读每句之间会有停顿，第一句也要等上十秒上下。要连续朗读请换 Lessac（RTF≈0.1）或在线音色；只导字幕的课里「朗读本句」不受影响。'
+                    : '全部设备内合成。带「英音」的音色适合练英式听力；点任意音色即切换并试听。'}
               </p>
             </div>
           )}

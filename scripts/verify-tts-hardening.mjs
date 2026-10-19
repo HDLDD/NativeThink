@@ -53,9 +53,25 @@ const fakePlugin = {
   init: async () => { globalThis.__ttsTestInitCalls++; return { status: 'ready', error: null, sampleRate: 24000, cached: 0, loadedModels: [] }; },
   status: async () => ({ status: 'ready', error: null, sampleRate: 24000, cached: 0 }),
   speak: async (o) => {
-    globalThis.__ttsTestSpeakCalls++;
-    await new Promise((r) => setTimeout(r, 15));   // 模拟原生合成耗时，让并发真的重叠
-    return { path: '/fake/' + globalThis.__ttsTestSpeakCalls + '.wav', bytes: 100, durationMs: 900, cached: false, ms: 12 };
+    // globalThis.__ttsTail 打开时模拟原生 synthLock：**在任何一个 await 之前**取走队尾并接上自己，
+    // 所以"谁先调用"就是"谁先合成"。（写成 await 之后再赋值的话，两个调用会读到同一个旧队尾 →
+    // 替身其实是在并行跑，那条"首包等两次合成"的断言就成了假绿。）
+    const one = () => {
+      globalThis.__ttsTestSpeakCalls++;
+      globalThis.__ttsLog = globalThis.__ttsLog || [];
+      globalThis.__ttsActive = (globalThis.__ttsActive || 0) + 1;
+      if (globalThis.__ttsActive > 1) globalThis.__ttsOverlapped = true;   // 串行替身绝不该重入
+      globalThis.__ttsLog.push(['start', o.text]);
+      return new Promise((r) => setTimeout(r, 15)).then(() => {
+        globalThis.__ttsLog.push(['end', o.text]);
+        globalThis.__ttsActive--;
+        return { path: '/fake/' + globalThis.__ttsTestSpeakCalls + '.wav', bytes: 100, durationMs: 900, cached: false, ms: 12 };
+      });
+    };
+    if (!globalThis.__ttsTail) return one();
+    const job = globalThis.__ttsTail.then(one);
+    globalThis.__ttsTail = job.catch(() => {});   // 前一件失败不许把后面的全带倒
+    return job;
   },
   purge: async () => ({ removed: 0 }),
   readLog: async () => ({ log: '' }),
@@ -143,6 +159,47 @@ ok(/pathname === '\/api\/tts-voices'/.test(localServer),
   'C3 正对照：server/local-server.mjs 确实实现了该路由（桌面这条路径是活的）');
 ok(/startServer/.test(fs.readFileSync(path.join(ROOT, 'electron/main.mjs'), 'utf8')),
   'C4 正对照：Electron 主进程会起这个本地服务（所以只有桌面版值得请求）');
+
+/* ───────── D. 内置离线引擎的入队顺序（首包不该等两次合成） ───────── */
+/**
+ * 原生侧 synthLock 把合成串行化，所以"谁先入队"直接决定首包：
+ * 旧写法在 speak(本片) 之前先 sherpaPrewarm(下一片) → 本片排在第二个 → 首包 = 2×单片合成。
+ * 下面先用**串行替身真跑**证明这个差别是真的（比的是"本片排在队列第几件"这种确定性证据，不是毫秒数 ——
+ * 计时断言在本机抖过一次：43/16 与 43/31 两种读数都能出现），再从源码钉住 shipped 的写法确实是"本片先入队"。
+ */
+{
+  // 两轮各用一对**不同**文本：sherpaSpeak 那层有 urlCache，同一句第二次直接命中缓存、根本不下到替身
+  const headIdx = (log) => log.filter((e) => e[0] === 'start').findIndex((e) => /HEAD/.test(e[1]));
+  // 旧写法：预取先入队，本片排在它后面 → 首包要等两次合成
+  globalThis.__ttsTail = Promise.resolve(); globalThis.__ttsLog = []; globalThis.__ttsOverlapped = false;
+  await Promise.all([mod.sherpaSpeak('TAIL one.'), mod.sherpaSpeak('HEAD one.')]);
+  const oldLog = globalThis.__ttsLog.slice();
+  // 新写法：本片先入队，预取排在后面
+  globalThis.__ttsTail = Promise.resolve(); globalThis.__ttsLog = []; globalThis.__ttsOverlapped = false;
+  await Promise.all([mod.sherpaSpeak('HEAD two.'), mod.sherpaSpeak('TAIL two.')]);
+  const newLog = globalThis.__ttsLog.slice();
+
+  ok(headIdx(oldLog) === 1 && headIdx(newLog) === 0,
+    'D1 替身真跑：预取排前面时本片是队列里的第二件（首包等两次合成）；改成本片先入队后它是第一件',
+    `旧序 start ${oldLog.filter((e) => e[0] === 'start').map((e) => e[1].split(' ')[0])} · 新序 ${newLog.filter((e) => e[0] === 'start').map((e) => e[1].split(' ')[0])}`);
+  ok(!globalThis.__ttsOverlapped
+    && oldLog.slice(0, 2).map((e) => e[0]).join() === 'start,end' && newLog.slice(0, 2).map((e) => e[0]).join() === 'start,end',
+    'D2 正对照：替身真的串行（两次合成从不重叠，start/end 严格交替）—— 否则 D1 只是在比噪声',
+    `重叠=${String(globalThis.__ttsOverlapped)} · 旧 ${oldLog.map((e) => e[0]).join(',')} · 新 ${newLog.map((e) => e[0]).join(',')}`);
+
+  const useTts = fs.readFileSync(path.join(ROOT, 'src/lib/use-tts.ts'), 'utf8');
+  const piperBranch = useTts.match(/if \(engine === 'piper'\)[\s\S]{0,1200}?\n      \}/)?.[0] ?? '';
+  ok(piperBranch.length > 0, 'D3 脚手架自检：抓到 use-tts 的 piper 分支本体');
+  const iSpeak = piperBranch.indexOf('sherpaSpeak(chunks[idx]');
+  const iPre = piperBranch.indexOf('sherpaPrewarm(next');
+  ok(iSpeak >= 0 && iPre >= 0 && iSpeak < iPre,
+    'D4 shipped 写法确实是"本片先入队、预取排在后面"', `speak@${iSpeak} prewarm@${iPre}`);
+  ok(/sherpaInFlightCount\(\) <= 1/.test(piperBranch),
+    'D5 背压门槛用「≤1」：本片自己刚入队就算 1，写「===0」等于预取永不触发（每个切片边界都要现合成）');
+  // 选了就要说清代价（用户反复报过"参数写成装饰"）：Kokoro 的长文断续必须写在选它的那个面板上
+  ok(/selectedLocalVoice\?\.modelId === 'kokoro'/.test(ttsUi) && /RTF≈1\.2~1\.7/.test(ttsUi),
+    'D6 选中 Kokoro 时，设置页就地写明"合成慢于播放 → 长文每句之间会有停顿"（不许只在文档里说）');
+}
 
 /* ───────────────────────── 汇总 ───────────────────────── */
 let failed = 0;
