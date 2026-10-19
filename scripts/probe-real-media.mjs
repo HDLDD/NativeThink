@@ -203,6 +203,59 @@ function runOnce(tag, subsName, expectDur, wantWarn) {
   const keys = String(readKeys());
   ok(/"m:/.test(keys) && /"s:/.test(keys), `${tag} ⑯ media 表里确有这一课的 m: 与 s: 两条键`, keys.slice(0, 130));
 
+  /* ⑰ 吸顶悬浮：往下滑播放器要**钉住不动**并同时缩一档，让字幕还有地方看；滑回顶部要**恢复原样**。
+      判据只认几何：同一元素在两个不同 scrollTop 下 rect.top 相同 = 真的悬浮；
+      光看 class 里有 sticky 不算（外壳那两层 overflow 会把 sticky 静默吃掉，见 VideoLabPage 的 paneFit 注释）。
+      滚的是这一课自己的滚动框，不是文档 —— 所以顺带验"文档已经不需要滚"（页面收在一屏内）。 */
+  const rect = () => ev(`(()=>{const w=document.querySelector('div.sticky'),v=document.querySelector('video'),ol=document.querySelector('ol');
+    if(!w||!v)return 'NO_STICKY';let b=w.parentElement;while(b&&!(b.scrollHeight>b.clientHeight+8&&/auto|scroll/.test(getComputedStyle(b).overflowY)))b=b.parentElement;
+    if(!b)return 'NO_SCROLLER';const B=b.getBoundingClientRect(),W=w.getBoundingClientRect(),V=v.getBoundingClientRect(),O=ol?ol.getBoundingClientRect():null;
+    const doc=document.scrollingElement;
+    return JSON.stringify({top:Math.round(W.top-B.top),vh:Math.round(V.height),st:Math.round(b.scrollTop),
+      h:Math.round(b.scrollHeight-b.clientHeight),docScroll:Math.round(Math.max(0,doc.scrollHeight-doc.clientHeight)),
+      boxFits:Math.round(B.bottom)<=Math.round(window.innerHeight)+2,
+      vidIn:V.bottom>B.top+2&&V.top<B.bottom-2,olIn:O?(O.bottom>B.top+2&&O.top<B.bottom-2):false});})()`);
+  const setScroll = (px) => { ev(`(()=>{const w=document.querySelector('div.sticky');if(!w)return 0;let b=w.parentElement;
+    while(b&&!(b.scrollHeight>b.clientHeight+8&&/auto|scroll/.test(getComputedStyle(b).overflowY)))b=b.parentElement;
+    if(b)b.scrollTop=${px};return 1;})()`); sleep(1300); };
+  const r0 = JSON.parse(String(rect()));
+  ok(r0.h > 200 && r0.docScroll <= 2, `${tag} ⑰a 这一课收在一屏里、由自己的滚动框滚（滚动条不在文档上）`, JSON.stringify(r0));
+  ok(r0.boxFits, `${tag} ⑰a′ 滚动框没有被裁到屏幕外（高度是量出来的）`, JSON.stringify(r0));
+  const H = r0.h;
+  setScroll(Math.round(H * 0.55));
+  const ra = JSON.parse(String(rect()));
+  setScroll(Math.round(H * 0.85));
+  const rb = JSON.parse(String(rect()));
+  const pinned = Math.abs(ra.top - rb.top) <= 2 && ra.top < r0.top - 20;
+  ok(pinned, `${tag} ⑰b 往下滑播放器钉在顶部：两个不同滚动位置 rect.top 一致，且确实比原位高`,
+    `原位 ${r0.top} · ${ra.st}px→${ra.top} · ${rb.st}px→${rb.top}`);
+  ok((ra.vidIn && ra.olIn) || (rb.vidIn && rb.olIn), `${tag} ⑱ 吸住时视频与字幕列表同时可见（"能同时查找字幕和视频"）`,
+    `${ra.st}px: 视频=${ra.vidIn} 字幕=${ra.olIn} · ${rb.st}px: 视频=${rb.vidIn} 字幕=${rb.olIn} · 视频高 ${ra.vh}`);
+  ok(ra.vh <= r0.vh * 0.82, `${tag} ⑲ 吸住时视频自动缩档，把地方让给字幕`, `${r0.vh} → ${ra.vh}`);
+  setScroll(0);
+  const rc = JSON.parse(String(rect()));
+  ok(Math.abs(rc.top - r0.top) <= 2 && rc.vh === r0.vh, `${tag} ⑳ 滑回顶部恢复原样（位置与视频高度都回到吸住之前）`,
+    `top ${r0.top}→${rc.top} · 高 ${r0.vh}→${rc.vh}`);
+
+  /* ⑳b 吸住时点词：释义卡必须落在播放器**下面**、整张在滚动框里 —— 播放器现在压在滚动框顶上，
+      而 scrollIntoView 原本只认可视区，不避让就会把卡片塞到播放器背后，等于"查词没反应" */
+  setScroll(Math.round(H * 0.55));
+  const word = ev(`(()=>{const s=[...document.querySelectorAll('p span')].filter(e=>/cursor-pointer/.test(e.className||''))[0];
+    if(!s)return 'NOWORD';const t=(s.innerText||'').trim();s.click();return t;})()`);
+  let card = 'NOCARD';
+  for (let k = 0; k < 12; k++) {
+    sleep(800);
+    card = String(ev(`(()=>{const w=document.querySelector('div.sticky');if(!w)return 'NO_STICKY';
+      let b=w.parentElement;while(b&&!(b.scrollHeight>b.clientHeight+8&&/auto|scroll/.test(getComputedStyle(b).overflowY)))b=b.parentElement;
+      const c=[...document.querySelectorAll('div')].filter(e=>/收藏这个词|词库里没有这个词/.test(e.innerText||'')&&e.getBoundingClientRect().height>0).pop();
+      if(!c)return 'NOCARD';const R=c.getBoundingClientRect(),B=b.getBoundingClientRect(),W=w.getBoundingClientRect();
+      return JSON.stringify({below:R.top>=W.bottom-2,inBox:R.top>=B.top-2&&R.bottom<=B.bottom+2,
+        top:Math.round(R.top),pb:Math.round(W.bottom),bb:Math.round(B.bottom)});})()`));
+    if (card !== 'NOCARD' && card !== 'NO_STICKY') break;
+  }
+  ok(/"below":true/.test(card) && /"inBox":true/.test(card),
+    `${tag} ⑳b 吸住时点词，释义卡整张落在播放器下方且没超出滚动框`, `点的是 ${word} · ${card}`);
+
   /* 删除连媒体一起清 —— 现在是两段式确认，一次点击只进确认态 */
   ev(`(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&e.querySelector('svg[class*="chevron-left"]'));if(b)b.click();return 1;})()`);
   sleep(1800);
@@ -212,12 +265,12 @@ function runOnce(tag, subsName, expectDur, wantWarn) {
   const armed = has('再点一次删除');
   const t2 = trash();
   sleep(2500);
-  ok(String(t1) === 'ok' && armed, `${tag} ⑰ 第一次点垃圾桶只进确认态（媒体+字幕+译文一起没太重了）`, String(t1));
-  ok(String(t2) === 'ok' && has('还没有导入的课程'), `${tag} ⑱ 第二次点才真删，回到空态`, String(t2));
+  ok(String(t1) === 'ok' && armed, `${tag} ㉑ 第一次点垃圾桶只进确认态（媒体+字幕+译文一起没太重了）`, String(t1));
+  ok(String(t2) === 'ok' && has('还没有导入的课程'), `${tag} ㉒ 第二次点才真删，回到空态`, String(t2));
   const keys2 = String(readKeys());
   const clean2 = keys2.replace(/["\\\s\[\]]/g, '');
   ok(/video-index/.test(clean2) && !/m:/.test(clean2) && !/s:/.test(clean2) && !/z:/.test(clean2),
-    `${tag} ⑲ 删除把 m:/s:/z: 一起收掉，media 表只剩索引那一条`, 'raw=' + JSON.stringify(keys2).slice(0, 140));
+    `${tag} ㉓ 删除把 m:/s:/z: 一起收掉，media 表只剩索引那一条`, 'raw=' + JSON.stringify(keys2).slice(0, 140));
 }
 
 runOnce('A 匹配的媒体+字幕', SUBS_NAME, ffdur, false);

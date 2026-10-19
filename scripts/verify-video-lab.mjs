@@ -534,6 +534,26 @@ ok(typeof M.parseSrt === 'function' && typeof M.createVideoStore === 'function',
       /* 学习时长：按课分键去重 —— 按全局句序号去重的话，换一课的同序号句子永远不再计时长 */
       ok(/reachedRef\.current\.get\(lesson\.meta\.id\)[\s\S]{0,240}if \(!seen\.has\(i\)\) \{\s*seen\.add\(i\);\s*addStudyMinutes\(0\.2, ["']video["']\)/.test(page),
         '学习时长按「课」分键去重（换课同序号要能再计，重看同句不许刷时长）');
+      /* 悬浮播放器（2026-10-19 用户要求"往下滑视频一直悬浮在上方，滑回顶部恢复"）。
+         这一组只认"结构对不对"，几何由 probe-real-media 在真浏览器里量（sticky 会不会被祖先的
+         overflow 静默吃掉，静态看根本看不出来 —— 外壳 SidebarInset 的 overflow-x-hidden 实测会
+         把 overflow-y 算成 auto，文档才是真在滚的那层）。 */
+      ok(/const paneRef = useRef\(null\)/.test(page)
+        && /window\.innerHeight - top - pb/.test(page)
+        && /style=\{paneH \? \{ height: paneH \} : undefined\}/.test(page),
+        '这一课的面板高度是量出来的（窗口高 − 本层绝对 top − main 下边距），不是猜 calc —— 猜高了会把滚动框裁到屏外');
+      ok(/className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain \[overflow-anchor:none\]"/.test(page),
+        '这一课自带滚动框，且关掉自动滚动锚定（吸住那瞬视频缩档 → 浏览器改 scrollTop → 解除吸住 → 长回去，短课会来回抖）');
+      ok(/const box = boxRef\.current;[\s\S]{0,320}new IntersectionObserver\([\s\S]{0,160}\{ root: box, threshold: 0 \}/.test(page),
+        '吸住判定的 IntersectionObserver 根必须是这个滚动框（拿 main 当根判不到：外壳那两层自己从不滚，真正在滚的是文档）');
+      ok(/lesson\.url && canPin && 'sticky top-0'/.test(page) && /const canPin = paneH >= 480/.test(page),
+        '窗口矮到吸住后放不下字幕时不吸（canPin 门）；只在有媒体的课上 sticky —— 仅字幕课没有画面可悬浮');
+      ok(/stuck \? 'mx-auto w-\[58%\] max-h-\[30vh\]' : 'w-full max-h-\[46vh\]'/.test(page),
+        '吸住时画面收档（手机上视频是被宽度限住高度的，只改 max-h 等于不缩）');
+      ok(/scrollPaddingTop: `\$\{cover\}px`/.test(page)
+        && /el\.getBoundingClientRect\(\)\.bottom - box\.getBoundingClientRect\(\)\.top/.test(page)
+        && !/calc\(30vh \+/.test(page),
+        '吸住后给释义卡的避让值取自实测播放器高度（写死 calc 的猜法在矮窗口里 scrollIntoView 只能"尽力而为"，卡片仍旧压在播放器底下）');
     }
 
     let pass = 0, fail = 0, names = [];

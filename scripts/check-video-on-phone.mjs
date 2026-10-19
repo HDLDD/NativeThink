@@ -8,10 +8,13 @@
 import { execFileSync } from 'node:child_process';
 const ROOT = 'B:/NativeThink';
 const DEV = ROOT + '/scripts/device-eval.mjs';
-const KEYWORD = process.argv[2] || 'birthday-gift';
+/** 第一个非选项参数是课名关键字；--port 9223（真机）/ 9226（电脑侧模拟器） */
+const argv = process.argv.slice(2);
+const KEYWORD = argv.find((a) => !a.startsWith('--')) || 'birthday-gift';
+const PORT = argv[argv.indexOf('--port') + 1] || '9223';
 const ev = (expr) => {
   const out = execFileSync(process.execPath, [DEV, 'eval', expr], {
-    cwd: ROOT, encoding: 'utf8', env: { ...process.env, CDP_PORT: '9223' }, timeout: 120000,
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, CDP_PORT: PORT }, timeout: 120000,
   }).trim();
   try { return JSON.parse(out); } catch { return out; }
 };
@@ -94,6 +97,33 @@ const keys = String(ev(`(async()=>{const db=await new Promise(r=>{const q=indexe
 const kn = JSON.parse(String(keys).replace(/^"|"$/g, '').replace(/\\"/g, '"'));
 ok(kn && kn.索引 > 0 && kn.媒体 === kn.索引 && kn.字幕 === kn.索引,
   '⑧ 每一课的原声 blob 与字幕都真在 IndexedDB 里（列表上那句「x MB 原声」只是元数据）', keys);
+
+/** ⑨⑩ 吸顶悬浮（真机几何才算数：textZoom 120% + 852 CSS 高，视频是被宽度限住高度的，
+ *  电脑侧那条"缩档"断言在这里可能天然是假 —— 所以这一测只看实测 rect，不看 class） */
+const boxExpr = `(()=>{const w=document.querySelector('div.sticky');if(!w)return null;
+  let b=w.parentElement;while(b&&!(b.scrollHeight>b.clientHeight+8&&/auto|scroll/.test(getComputedStyle(b).overflowY)))b=b.parentElement;return b;})()`;
+const rect = () => String(ev(`(()=>{const w=document.querySelector('div.sticky'),v=document.querySelector('video');
+  if(!w||!v)return 'NO_STICKY';const b=${boxExpr};if(!b)return 'NO_BOX';
+  const B=b.getBoundingClientRect(),W=w.getBoundingClientRect(),V=v.getBoundingClientRect(),ol=document.querySelector('ol');const O=ol?ol.getBoundingClientRect():null;
+  const doc=document.scrollingElement;
+  return JSON.stringify({top:Math.round(W.top-B.top),vh:Math.round(V.height),st:Math.round(b.scrollTop),
+    h:Math.round(b.scrollHeight-b.clientHeight),docScroll:Math.round(Math.max(0,doc.scrollHeight-doc.clientHeight)),
+    fits:B.bottom<=innerHeight+2,vidIn:V.bottom>B.top+2&&V.top<B.bottom-2,olIn:O?(O.bottom>B.top+2&&O.top<B.bottom-2):false,
+    ih:innerHeight});})()`));
+const setScroll = (px) => { ev(`(()=>{const b=${boxExpr};if(b)b.scrollTop=${px};return 1;})()`); sleep(1400); };
+const p0 = JSON.parse(rect().replace(/^"|"$/g, '').replace(/\\"/g, '"'));
+setScroll(Math.round((p0.h || 0) * 0.55));
+const pa = JSON.parse(rect().replace(/^"|"$/g, '').replace(/\\"/g, '"'));
+setScroll(Math.round((p0.h || 0) * 0.85));
+const pb = JSON.parse(rect().replace(/^"|"$/g, '').replace(/\\"/g, '"'));
+ok(pa.top !== undefined && Math.abs(pa.top - pb.top) <= 3 && pa.top < p0.top - 20 && pa.vidIn && (pa.olIn || pb.olIn),
+  '⑨ 真机往下滑：播放器钉在滚动框顶上不动，画面与字幕同时在（"能同时查找字幕和视频"）',
+  `原位 ${p0.top} · ${pa.st}px→${pa.top} · ${pb.st}px→${pb.top} · 字幕可见 ${pa.olIn}/${pb.olIn} · 视口 ${p0.ih}`);
+setScroll(0);
+const pc = JSON.parse(rect().replace(/^"|"$/g, '').replace(/\\"/g, '"'));
+ok(Math.abs(pc.top - p0.top) <= 3 && pc.vh === p0.vh && p0.docScroll <= 2 && p0.fits,
+  '⑩ 真机滑回顶部恢复原样（位置与画面尺寸都回到吸住之前；整页收在一屏内、文档不跟着滚）',
+  `top ${p0.top}→${pc.top} · 高 ${p0.vh}→${pc.vh} · 文档可滚 ${p0.docScroll} · 框底在屏内 ${p0.fits}`);
 
 const fails = results.filter((x) => !x).length;
 console.log(`\n真机核验 ${results.length - fails}/${results.length} 通过${fails ? '' : ' ✓'}`);

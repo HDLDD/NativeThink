@@ -46,6 +46,12 @@ const RATES = [0.5, 0.75, 1, 1.25, 1.5];
 /** 一次点「翻译本课」最多翻这么多句（剩下再点一次），免得长视频一口气打爆额度 */
 const TRANSLATE_LIMIT = 120;
 /**
+ * 吸顶时给播放器补的"胶水"：sticky 钉住的是滚动框内边缘，但它上方还有 space-y 那 12px 间距，
+ * 滑上来的字幕会从缝里露出来 —— 用一层向上伸 32px 的同色带子盖住（带子被滚动框裁掉的部分自然看不见）。
+ */
+const STICKY_GLUE_CLASS =
+  'bg-background/95 backdrop-blur-sm before:absolute before:inset-x-0 before:-top-8 before:h-8 before:bg-background';
+/**
  * 一批 8 句、串行（不抢并发）。实测同一通道同一模型：串行每批 3.2–4.5 秒，
  * 起 3 路并发后每批拖到 8–30 秒、还有一路永不回包 —— functions/api/ai/chat.js 里写着
  * 「智谱免费档并发仅 1」。所以慢的部分只能靠「每批完成即上屏」摊开，而不是靠并发。
@@ -117,8 +123,26 @@ export default function VideoLabPage() {
   const [confirmDel, setConfirmDel] = useState('');
   /** 这一课"到达过"的最远句（换课/重进都从进度里读回来，用来给"听完了"的反馈） */
   const [listened, setListened] = useState(0);
+  /** 播放器是否已经"吸"在顶部（往下滑 = true，滑回顶部 = false），用来顺手把它缩一档，给字幕腾地方 */
+  const [stuck, setStuck] = useState(false);
+  /** 这一课的面板高度（量出来的，见 paneFit 的注释）；量不到就不限制，退回整页随文档滚动 */
+  const [paneH, setPaneH] = useState(0);
+  /** 吸住时播放器在滚动框里占掉的高度（量出来的，给 scroll-padding 当避让值用；不吸住时 0） */
+  const [cover, setCover] = useState(0);
 
   const mediaRef = useRef<HTMLVideoElement | null>(null);
+  /** 播放器上方的一像素哨兵：它滚出滚动框顶 = 播放器已经吸住了（IntersectionObserver 的判定目标） */
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  /** 这一课自己的滚动框：sticky 与 IntersectionObserver 都以它为根（文档滚那条路走不通，见 paneFit 注释） */
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const paneRef = useRef<HTMLDivElement | null>(null);
+  /** 吸住时压在滚动框顶上那一层（播放器卡），量它的高度给 scroll-padding 当避让值 */
+  const playerRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * 窗口矮到吸住后连一行字幕都放不下时**就不吸**（播放器跟着内容滚走）——
+   * 那种尺寸下"悬浮"等于把整个滚动框盖住，比不悬浮更糟。480 是"播放器 + 至少两行字幕"的量。
+   */
+  const canPin = paneH >= 480;
   /** 点词后的释义卡（手机上播放器占掉大半屏，卡片很可能在视口外 —— 说了"点词查词"就得让人看见结果） */
   const lookupRef = useRef<HTMLDivElement | null>(null);
   const urlRef = useRef<string | null>(null);
@@ -154,6 +178,58 @@ export default function VideoLabPage() {
       try { recRef.current?.abort(); } catch { /* 已经自己结束了 */ }
     };
   }, []);
+
+  /**
+   * 这一课要做成"自己一个滚动框"，而不是跟着整页文档滚。
+   * 原因是实测出来的（dist/client/__probe__/sticky-test.html 四个变体逐个量过）：
+   * 外壳 SidebarInset 的 overflow-x-hidden 会把它**计算出的 overflow-y 变成 auto**，
+   * main 又写着 overflow-y-auto —— 于是文档才是真正在滚的那一层，而这俩盒子都不是"会在自己内部滚"的盒子。
+   * sticky 的约束根是"最近的滚动容器"，所以在这种结构里 sticky 永远不吸（内容跟着文档一起走），
+   * 只有把滚动收进这一层框，sticky 与 IntersectionObserver 才有正确的参照。
+   * 高度靠量：窗口高 − 本层在文档里的绝对 top − main 的下边距（那条正是手机底部导航的让位）。
+   * 量不到（找不到 main / 还没挂载）就返回 0，界面照旧整页滚 —— 不吸顶，但绝不裁内容。
+   */
+  useEffect(() => {
+    const pane = paneRef.current;
+    if (!pane) return;
+    const fit = () => {
+      const main = pane.closest('main');
+      if (!main) { setPaneH(0); return; }
+      const top = pane.getBoundingClientRect().top + (document.scrollingElement?.scrollTop || 0);
+      const pb = parseFloat(getComputedStyle(main).paddingBottom) || 0;
+      setPaneH(Math.max(0, Math.round(window.innerHeight - top - pb)));
+    };
+    fit();
+    // page-enter 动画带 transform，头 240ms 量到的 top 会偏高几像素；动画落地后再量一次
+    const t = window.setTimeout(fit, 420);
+    window.addEventListener('resize', fit);
+    return () => { window.clearTimeout(t); window.removeEventListener('resize', fit); };
+  }, [lesson?.meta.id]);
+
+  /** 播放器吸顶判定：哨兵滚出滚动框顶就算"吸住了"（随后画面收一档，字幕才有地方看） */
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const box = boxRef.current;
+    if (!sentinel || !box || !lesson?.url || !canPin || typeof IntersectionObserver === 'undefined') { setStuck(false); return; }
+    const io = new IntersectionObserver((es) => setStuck(!es[0].isIntersecting), { root: box, threshold: 0 });
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, [lesson?.url, lesson?.meta.id, canPin]);
+
+  /**
+   * 避让值实测：吸住后播放器压在滚动框顶上，点词的释义卡要落到它下面才有意义。
+   * 用量出来的高度而不是 calc(30vh + 若干) —— 手机上的视频是被宽度限住高度的（30vh 根本碰不到），
+   * 猜大了 scrollIntoView 会"尽力而为"，结果卡片仍旧压在播放器底下。
+   */
+  useEffect(() => {
+    if (!stuck) { setCover(0); return; }
+    const t = requestAnimationFrame(() => {
+      const el = playerRef.current, box = boxRef.current;
+      if (!el || !box) { setCover(0); return; }
+      setCover(Math.round(el.getBoundingClientRect().bottom - box.getBoundingClientRect().top) + 10);
+    });
+    return () => cancelAnimationFrame(t);
+  }, [stuck, lesson?.url, lesson?.meta.id, paneH]);
 
   const openLesson = useCallback(async (id: string) => {
     setBusy('读取…');
@@ -682,7 +758,14 @@ export default function VideoLabPage() {
   }
 
   return (
-    <div className="space-y-3">
+    <div ref={paneRef} className="flex min-h-0 flex-col" style={paneH ? { height: paneH } : undefined}>
+     {/* scroll-padding-top：吸住后释义卡的 scrollIntoView 只认滚动框的可视区，不知道顶上压着播放器；
+         这道内边距是浏览器原生的"避让"，比手工算 scrollTop 可靠（只在吸住时才需要） */}
+     {/* overflow-anchor:none：吸住那一瞬视频缩档会让下方内容整体上移，Chrome 默认会"锚住可见内容"顺手改 scrollTop，
+         于是哨兵又被挪回视口里 → 解除吸住 → 视频长回去 → 再吸，短课上来回抖。缩的是播放器自己的高度，
+         哨兵在它上面，位置本就不该变 —— 所以把这个自动补偿关掉才是对的。 */}
+     <div ref={boxRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain [overflow-anchor:none]"
+       style={cover ? { scrollPaddingTop: `${cover}px` } : undefined}>
       <div className="flex items-center gap-2">
         <Button size="sm" variant="ghost" className="rounded-2xl px-2" onClick={() => { safeStorage.removeItem(LAST_OPEN_KEY); setLesson(null); if (urlRef.current) { URL.revokeObjectURL(urlRef.current); urlRef.current = null; } videoStore.list().then(setList); }}>
           <ChevronLeft className="size-4" />
@@ -691,10 +774,17 @@ export default function VideoLabPage() {
         <span className="text-[9px] font-bold text-muted-foreground tabular-nums shrink-0">{idx + 1}/{sentences.length}</span>
       </div>
 
-      <Card className="rounded-[28px] border-border shadow-sm overflow-hidden">
+      {/* 悬浮播放器：往下滑时钉在滚动框顶上并把画面收到 58% 宽（"视频和字幕同时看得见"），往上滑回顶部自动恢复原样。
+          钉住要靠这一层自己就是滚动容器（见 paneFit 的实测注释），同时原来那一大张卡必须拆成两张 ——
+          整张卡当 sticky 盒子会让下面的字幕一起被钉住，等于没有腾地方。 */}
+      <div ref={sentinelRef} aria-hidden className="h-px" />
+      <div ref={playerRef} className={cn('z-20', lesson.url && canPin && 'sticky top-0',
+        stuck && STICKY_GLUE_CLASS)}>
+      <Card className="rounded-[24px] border-border shadow-sm overflow-hidden">
         <CardContent className="p-0">
           {lesson.url ? (
-            <video ref={mediaRef} src={lesson.url} controls playsInline className="w-full max-h-[46vh] bg-black"
+            <video ref={mediaRef} src={lesson.url} controls playsInline
+              className={cn('block bg-black', stuck ? 'mx-auto w-[58%] max-h-[30vh]' : 'w-full max-h-[46vh]')}
               onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onLoadedMetadata={checkDuration} />
           ) : (
             <div className="w-full h-24 bg-muted/40 flex items-center justify-center gap-2">
@@ -748,6 +838,13 @@ export default function VideoLabPage() {
                 <Sparkles className="size-3 inline mr-0.5" />{zhBusy || '翻译字幕'}
               </button>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+      </div>
+      {/* 播放器以下的部分照常滚动：当前句卡、快捷键提示、已听进度 */}
+      <Card className="rounded-[28px] border-border shadow-sm">
+        <CardContent className="p-3 pt-2 space-y-2.5">
             {/* 快捷键只写在 title 里等于手机上没有；键盘用户值得有一行明说 */}
             <p className="hidden sm:block text-[9px] font-bold text-muted-foreground/70">
               空格 播放/暂停 · ↑ ↓ 上/下一句 · ← → 快退/快进 5 秒 · F 单句循环 · Enter 重播本句
@@ -820,7 +917,6 @@ export default function VideoLabPage() {
               </div>
             )}
             {zhNote && <p className="text-[10px] font-bold text-muted-foreground leading-relaxed">{zhNote}</p>}
-          </div>
         </CardContent>
       </Card>
 
@@ -904,6 +1000,7 @@ export default function VideoLabPage() {
           </ol>
         </CardContent>
       </Card>
+     </div>
     </div>
   );
 }

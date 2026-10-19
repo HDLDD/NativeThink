@@ -1,0 +1,47 @@
+<!doctype html>
+<!--
+  为什么 position: sticky 在这套外壳里静默不吸 —— 一张可重跑的实测页（2026-10-19 第 43 测）。
+
+  用法：把它拷进 dist/client/__probe__/（或任何静态目录），浏览器打开后：
+    ?ov=0  照抄外壳，但 main 不给 overflow-y-auto
+    ?ov=1  照抄外壳（SidebarInset 带 overflow-x-hidden + main 带 overflow-y-auto）
+    ?ov=2  去掉 SidebarInset 的 overflow-x-hidden
+    ?ov=3  去掉 overflow-x-hidden，但 main 仍带 overflow-y-auto
+  在控制台跑 __scroll(300) 再跑 __r()，看 winTop：恒为 0 = 吸住了；跟着 scrollTop 变负 = 没吸。
+
+  实测结论（Chrome 142 桌面）：只有 ov=2 吸住。因为 overflow-x:hidden 配 overflow-y:visible
+  会把**计算出的 overflow-y 变成 auto**，而这两层的高度都随内容长（没人把高度钉在视口上），
+  真正在滚的一直是文档 —— sticky 相对"最近的滚动容器"算偏移，对着一个从不滚的容器就算不出来。
+  所以要让某一层吸顶，必须让**滚动发生在那一层内部**（视频精听 §3.5 就是这么做的）。
+-->
+<html>
+<head><meta charset="utf-8"><title>sticky scroll container test</title>
+<style>body{margin:0;font:14px system-ui} .row{height:60px;border-bottom:1px solid #ddd}</style>
+</head>
+<body>
+<div id="inset" style="display:flex;flex-direction:column;min-width:0;overflow-x:hidden;min-height:100vh">
+  <header style="height:56px;background:#eee">Header</header>
+  <main id="main" style="flex-1;width:100%;padding:16px">
+    <div id="sticky" style="position:sticky;top:0;z-index:20;height:120px;background:#0b8">sticky player</div>
+    <div style="height:2000px;background:#fcc">filler</div>
+  </main>
+</div>
+<script>
+  const q = new URLSearchParams(location.search);
+  if (q.get('ov') === '1') document.getElementById('main').style.overflowY = 'auto';
+  if (q.get('ov') === '2') document.getElementById('inset').style.overflowX = 'visible';
+  if (q.get('ov') === '3') { document.getElementById('inset').style.overflowX = 'visible'; document.getElementById('main').style.overflowY = 'auto'; }
+  window.__r = () => {
+    const m = document.getElementById('main'), s = document.getElementById('sticky');
+    return JSON.stringify({
+      ov: q.get('ov') || '0',
+      docTop: Math.round(document.scrollingElement.scrollTop),
+      mainScrollable: Math.round(m.scrollHeight - m.clientHeight),
+      top: Math.round(s.getBoundingClientRect().top - m.getBoundingClientRect().top),
+      winTop: Math.round(s.getBoundingClientRect().top),
+    });
+  };
+  window.__scroll = (px) => { document.scrollingElement.scrollTop = px; return Math.round(document.scrollingElement.scrollTop); };
+</script>
+</body>
+</html>
