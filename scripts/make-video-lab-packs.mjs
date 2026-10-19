@@ -158,7 +158,14 @@ const ensureTranscript = async (itemPath) => {
 const files = (await api('/api/files')).items;
 const slug = add.replace(/[^\w]+/g, '-').toLowerCase().replace(/^-+|-+$/g, '').slice(0, 28) || 'lesson';
 const targets = add
-  ? [{ dir: 'custom-' + slug, stem: slug, pick: add, note: '按 --add 现做的一课（转录伴侣里的媒体）。结构问题看下面的质检数字。' }]
+  ? [{
+    /** --add 默认落到 custom-<slug>，几课一起现做就会全是 custom-*；给 --dir/--title/--note 才能一次排好编号与说明 */
+    dir: arg('dir', 'custom-' + slug),
+    title: arg('title', slug),
+    stem: slug,
+    pick: add,
+    note: arg('note', '按 --add 现做的一课（转录伴侣里的媒体）。结构问题看下面的质检数字。'),
+  }]
   : BUILTIN;
 
 const report = [];
