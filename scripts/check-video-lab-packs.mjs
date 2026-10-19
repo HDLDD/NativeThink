@@ -67,6 +67,21 @@ for (const dir of fs.readdirSync(MAT).sort()) {
   const pk = (String(vol).match(/max_volume: (-?[\d.]+) dB/) || [])[1];
   row.峰值dB = pk ?? '读不出';
 
+  /**
+   * 顺手抽一帧预览：ffprobe 只能证明"有画面轨"，证明不了画面是不是被教学贴图占了
+   * （翻录的电视画面、卡拉OK式大字幕、右侧一整块词汇表 —— 这三种都能过上面所有机器判据）。
+   * 出包后必须人眼过一遍，所以把图落在课目录里，一次看全。--no-frames 跳过。
+   */
+  if (!process.argv.includes('--no-frames') && realDur > 0) {
+    const jpg = path.join(full, '预览.jpg');
+    try {
+      execFileSync('ffmpeg', ['-y', '-v', 'error', '-ss', String(Math.round(realDur * 0.4)), '-i',
+        path.join(full, media), '-frames:v', '1', '-vf', 'scale=480:-1', jpg],
+        { encoding: 'utf8', timeout: 120000 });
+      row.预览 = '预览.jpg';
+    } catch { row.预览 = '抽帧失败'; }
+  }
+
   const errs = [];
   if (!v) errs.push('没有画面轨（用户的硬要求：素材必须有画面）');
   if (!a) errs.push('没有音轨');

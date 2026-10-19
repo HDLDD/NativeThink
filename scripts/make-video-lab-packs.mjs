@@ -124,7 +124,14 @@ const probeMedia = (file) => {
 };
 
 const api = async (p, init) => {
-  const r = await fetch(BASE + p, init);
+  let r;
+  try {
+    r = await fetch(BASE + p, init);
+  } catch (e) {
+    /** 服务没起时 fetch 抛的是裸 TypeError（cause: ECONNREFUSED），一行裸崩等于没告诉人要干什么 */
+    throw new Error(BASE + ' 连不上（' + (e?.cause?.code || e?.cause?.message || e.message)
+      + '）—— 转录伴侣要先跑起来：cd B:/dshzmd && PORT=8848 ASR_MODEL=base python app/server.py');
+  }
   if (!r.ok) throw new Error(p + ' → HTTP ' + r.status + ' ' + (await r.text()).slice(0, 160));
   return r.json();
 };
@@ -144,7 +151,9 @@ const ensureTranscript = async (itemPath) => {
     return again.result || again;
   }
   let last = 0;
-  for (let i = 0; i < 240; i++) {
+  /** 轮询上限 60 分钟：43 分钟的访谈在 CPU 上跑 base 可能超过 20 分钟，写死 240 次会把还在跑的活当超时 */
+  const cap = Number(process.env.NT_WAIT || 720);
+  for (let i = 0; i < cap; i++) {
     await new Promise((res) => setTimeout(res, 5000));
     const j = await api('/api/jobs/' + post.job_id + '?since=' + last);
     last += (j.sentences || []).length;
@@ -152,7 +161,7 @@ const ensureTranscript = async (itemPath) => {
     if (j.status === 'error') throw new Error('转录失败：' + (j.error || j.message));
     if (i % 6 === 5) console.log('  …' + ((i + 1) * 5) + 's ' + (j.percent ?? '?') + '% 句=' + j.count);
   }
-  throw new Error('转录超时（20 分钟）');
+  throw new Error('转录超时（等了 ' + Math.round(cap * 5 / 60) + ' 分钟）');
 };
 
 const files = (await api('/api/files')).items;
