@@ -18,6 +18,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
+import { useAI } from '@/hooks/use-ai';
+import { extractJson } from '@/lib/utils';
 import { useFavorites, type IFavoriteItem } from '@/lib/use-favorites';
 import { queryWords, preloadCoreOnly, preloadDetail, isDetailReady, getEssentialLevels, isAllReady, getTotalLearnableCount } from '@/data/wordbank';
 import type { IWordEntry } from '@/data/wordbank';
@@ -58,6 +60,12 @@ export default function GlobalWordSearch() {
   const [dataReady, setDataReady] = useState(() => isAllReady());
   const inputRef = useRef<HTMLInputElement>(null);
   const tts = useTTS();
+  const { chat: aiChat } = useAI();
+  /** 背景词书加载进度：每本加载完 +1，让搜索结果与总数跟着重算 */
+  const [levelsVersion, setLevelsVersion] = useState(0);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<null | { word: string; phonetic?: string; meaning: string; example?: string; exampleZh?: string }>(null);
+  const [aiError, setAiError] = useState('');
   const { favorites, addFavorite, removeFavorite, isWordFavorited } = useFavorites();
 
   // Expanded word for detail view
@@ -80,7 +88,8 @@ export default function GlobalWordSearch() {
         // Phase 2: Load remaining levels in background (non-blocking)
         const allLevels = ['zhongkao', 'gaokao', 'cet4', 'cet6', 'cet46freq', 'cet46elite', 'ielts', 'toefl', 'postgraduate', 'professional', 'advanced'];
         const remaining = allLevels.filter(l => !essential.includes(l));
-        remaining.forEach(level => preloadCoreOnly([level]));
+        // 每加载完一本就 bump 一次：否则第一批只覆盖「当前等级 ±1」，搜索结果与总数会一直停在 7,731
+        remaining.forEach(level => preloadCoreOnly([level]).then(() => setLevelsVersion(v => v + 1)));
       });
     }
   }, [open, dataReady]);
@@ -93,6 +102,8 @@ export default function GlobalWordSearch() {
       // Reset state on close
       setQuery('');
       setExpandedWord(null);
+      setAiResult(null);
+      setAiError('');
     }
   }, [open]);
 
@@ -100,13 +111,13 @@ export default function GlobalWordSearch() {
   const results = useMemo(() => {
     if (!query.trim() || !dataReady) return [];
     return queryWords({ search: query.trim(), limit: MAX_RESULTS, sortBy: 'frequency' });
-  }, [query, dataReady]);
+  }, [query, dataReady, levelsVersion]);
 
   const totalWords = useMemo(() => {
     if (!dataReady) return 0;
     // 跨书按词去重（词书是累积式的，各本相加会把同一个词数好几遍）
     return getTotalLearnableCount();
-  }, [dataReady]);
+  }, [dataReady, levelsVersion]);
 
   // 展开某词时才加载该等级的 detail（幂等；已加载则同步就绪）。
   // ⚠️ 必须放在 results 定义之后：依赖数组在渲染期求值，提前引用会触发 TDZ 白屏。
@@ -129,6 +140,45 @@ export default function GlobalWordSearch() {
     });
     return () => { alive = false; };
   }, [expandedWord, results]);
+
+  /** 词库里没有时交给 AI：只查词义/例句，不写任何本地存储 */
+  const handleAiLookup = async () => {
+    const q = query.trim();
+    if (!q || aiLoading) return;
+    setAiLoading(true);
+    setAiError('');
+    setAiResult(null);
+    try {
+      const raw = await aiChat([
+        {
+          role: 'system',
+          content:
+            '你是英汉词典。只输出一个 JSON 对象，不要 markdown、不要解释。字段：word（原词）, phonetic（音标，可空）, meaning（中文释义）, example（英文例句）, exampleZh（例句中文）。不确定的字段用空字符串。',
+        },
+        { role: 'user', content: q },
+      ]);
+      if (!String(raw).trim()) {
+        setAiError('AI 服务不可用，请稍后再试或检查 AI 设置');
+        return;
+      }
+      const parsed = extractJson<{ word?: string; phonetic?: string; meaning?: string; example?: string; exampleZh?: string }>(raw);
+      if (!parsed || !parsed.meaning) {
+        setAiError('AI 返回格式异常，请重试');
+        return;
+      }
+      setAiResult({
+        word: parsed.word || q,
+        phonetic: parsed.phonetic,
+        meaning: parsed.meaning,
+        example: parsed.example,
+        exampleZh: parsed.exampleZh,
+      });
+    } catch {
+      setAiError('AI 查询失败，请检查网络或 AI 设置');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   // Favorite toggle（词族判重：学习卡 'word' 与词库浏览 'vocabulary' 视为同一条）
   const handleToggleFav = (word: IWordEntry) => {
@@ -172,7 +222,7 @@ export default function GlobalWordSearch() {
           </DialogHeader>
           <p className="text-sm text-muted-foreground font-medium mt-3">
             {dataReady
-              ? `搜索 ${totalWords.toLocaleString()} 个单词 — 覆盖中考到高阶 9 个等级`
+              ? `搜索 ${totalWords.toLocaleString()} 个单词 — 11 本词书${levelsVersion < 8 ? '（仍在加载其余词书…）' : ''}`
               : '正在加载词库数据…'}
           </p>
 
@@ -216,12 +266,47 @@ export default function GlobalWordSearch() {
               </p>
             </div>
           ) : results.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
-              <div className="size-16 rounded-2xl bg-muted flex items-center justify-center">
-                <BookOpen className="size-7 opacity-30" />
+            <div className="flex flex-col items-center justify-center py-10 gap-3 text-muted-foreground">
+              <div className="size-14 rounded-2xl bg-muted flex items-center justify-center">
+                <BookOpen className="size-6 opacity-30" />
               </div>
-              <p className="text-sm font-medium">未找到匹配 "{query}" 的单词</p>
-              <p className="text-xs text-muted-foreground/60">试试其他关键词或缩短搜索词</p>
+              <p className="text-sm font-medium">11 本词书里没有 "{query}"</p>
+              <p className="text-xs text-muted-foreground/60">它可能不在考试词表里；可以让 AI 查一下词义与例句。</p>
+              <Button
+                variant="outline"
+                onClick={handleAiLookup}
+                disabled={aiLoading}
+                className="rounded-2xl"
+              >
+                {aiLoading ? <Loader2 className="size-4 animate-spin" /> : <BookOpen className="size-4" />}
+                {aiLoading ? '正在查询…' : '用 AI 查这个词'}
+              </Button>
+              {aiError && <p className="text-xs text-destructive font-medium">{aiError}</p>}
+              {aiResult && (
+                <div className="w-full mt-2 rounded-2xl border border-border bg-card p-4 text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-black text-foreground">{aiResult.word}</span>
+                    {aiResult.phonetic && <span className="text-xs text-muted-foreground">{aiResult.phonetic}</span>}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="ml-auto size-8 rounded-full text-muted-foreground hover:text-ink-teal"
+                      aria-label="朗读"
+                      onClick={() => tts.speak(aiResult.word, { rate: 0.85 })}
+                    >
+                      <Volume2 className="size-4" />
+                    </Button>
+                  </div>
+                  <p className="mt-2 text-sm text-foreground">{aiResult.meaning}</p>
+                  {aiResult.example && (
+                    <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                      {aiResult.example}
+                      {aiResult.exampleZh && <span className="block mt-1">{aiResult.exampleZh}</span>}
+                    </p>
+                  )}
+                  <p className="mt-2 text-[10px] text-muted-foreground/60">AI 结果，未收录进词库</p>
+                </div>
+              )}
             </div>
           ) : (
             <>

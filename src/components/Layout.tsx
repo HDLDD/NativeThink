@@ -65,7 +65,25 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 }
 
 export function Layout() {
-  const location = useLocation();
+  /** 各功能的强调色：只做极淡的页头光晕与标题细节，用来区分模块，不替代品牌色。 */
+const MODULE_ACCENTS: Record<string, string> = {
+  '/think': '#0E8F6E',
+  '/chunks': '#B45309',
+  '/conversation': '#4F46E5',
+  '/shadowing': '#C2410C',
+  '/vocabulary': '#0F766E',
+  '/articles': '#0369A1',
+  '/writing': '#7C3AED',
+  '/sentences': '#BE123C',
+  '/spelling': '#4D7C0F',
+  '/video': '#0E7490',
+  '/progress': '#475569',
+  '/favorites': '#BE185D',
+};
+
+const location = useLocation();
+  const moduleKey = location.pathname.split('/')[1] || '';
+  const moduleAccent = MODULE_ACCENTS['/' + moduleKey];
   const { focused } = useFocusMode();
 
   // Route change UX: reset scroll to top, retrigger the page-enter animation,
@@ -114,7 +132,11 @@ export function Layout() {
       {!focused && <AppSidebar />}
       <SidebarInset className="flex flex-col min-w-0 overflow-x-hidden bg-background min-h-screen">
         {!focused && <Header />}
-        <main className="flex-1 w-full overflow-y-auto px-4 sm:px-6 lg:px-10 py-4 sm:py-6 lg:py-8 pb-20 lg:pb-8">
+        <main
+          data-module={moduleKey || 'home'}
+          style={moduleAccent ? ({ ['--module-accent' as string]: moduleAccent } as React.CSSProperties) : undefined}
+          className="flex-1 w-full overflow-y-auto px-4 sm:px-6 lg:px-10 py-4 sm:py-6 lg:py-8 pb-20 lg:pb-8"
+        >
           <div className="max-w-[1600px] mx-auto">
             {/* keyed by pathname → remounts on navigation → page-enter animation */}
             <ErrorBoundary>

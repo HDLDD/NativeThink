@@ -515,3 +515,7 @@ html[data-ui-theme="lime"] { --brand: #0FA968; --brand-strong: #0C8A54; --brand-
 html.dark[data-ui-theme="porcelain"] { --brand: #7EA8FF; --brand-strong: #6A98F0; --brand-rgb: 126 168 255; }
 html.dark[data-ui-theme="graphite"] { --brand: #E7E7EA; --brand-strong: #FFFFFF; --brand-rgb: 231 231 234; }
 html.dark[data-ui-theme="lime"] { --brand: #3ECF8E; --brand-strong: #D9F86A; --brand-rgb: 62 207 142; }
+
+/* 功能区分：每屏顶部一层极淡的模块色光（由 Layout 写入 --module-accent）。
+   只调色温，不改任何布局与组件；没有 --module-accent 的页面保持原样。 */
+main[data-module] { background-image: radial-gradient(120% 30% at 50% 0%, color-mix(in srgb, var(--module-accent, transparent) 7%, transparent) 0%, transparent 72%); background-repeat: no-repeat; }
