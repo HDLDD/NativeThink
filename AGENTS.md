@@ -32,7 +32,7 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 背单词 `/vocabulary` | [modules/vocabulary.md](./docs/modules/vocabulary.md) | 9 种模式（含「短语闪卡」—— 九个考试短语库共用短语侧 SM-2；「中译英」—— 看中文拼/选英文；「纠偏重考」—— 把纠偏本里的表达四选一重认，不碰 SM-2）、三个正交开关（`setupDone`/`showWizard`/`immersed`）、SM-2、三套并行重排实现 |
 | 词库数据 | [modules/wordbank-data.md](./docs/modules/wordbank-data.md) | 11 本、两层去重、核心/detail 拆分、IDB 主 + localStorage 兜底、改完必跑的两个脚本；四六级两本派生词书（真题考频口径）单点生成 |
 | 阅读 `/articles` | [modules/reading.md](./docs/modules/reading.md) | 五种来源一套阅读器、运行时全文升级、**两套切章必须对齐**、复习词文章词表是派生的（删文章即回词表） |
-| 朗读 TTS | [modules/tts.md](./docs/modules/tts.md) | 引擎降级链、切片 180 由上游 200 硬上限钉死、闪退自愈、音色四处同步、云端缓存 FIFO 400 条 + Blob URL 用完即 revoke、**系统语音的插件边界（async 别 return 插件对象，否则永久挂死）** |
+| 朗读 TTS | [modules/tts.md](./docs/modules/tts.md) | 引擎降级链、切片 180 由上游 200 硬上限钉死、**取消按代际 chainGenRef（布尔会被旧链复活）**、闪退自愈、音色四处同步、云端缓存 FIFO 400 条 + Blob URL 用完即 revoke、**系统语音的插件边界（async 别 return 插件对象，否则永久挂死）** |
 | AI 服务与端侧模型 | [modules/ai-services.md](./docs/modules/ai-services.md) | Key 优先级、服务端免费档回退、端侧回落条件、`extractJson` 规定由 `verify:ai-parse` 全仓扫、**中继防滥用守卫（Origin/限流/形状校验/出厂 Key 用量，无守卫覆盖）** |
 | 母语思维 `/think` | [modules/think-in-english.md](./docs/modules/think-in-english.md) | 4 tab；换题不 abort 导致流式内容串题 |
 | 语块 `/chunks` | [modules/chunks.md](./docs/modules/chunks.md) | 最大单文件；963 条（**手改写进 `chunks-extra.ts`**）、练习池走 `useStableShuffle`、**同短语多登记 → 读取层去重（筛选后、洗牌前）**、短语库按字母段折叠（4,805→1,148 元素）、接龙判定三档（未判定不送分）；**短语 SM-2 进度 store 三处共享**（本页「短语复习」「闪卡」+ 词汇页「短语闪卡」） |
@@ -104,7 +104,7 @@ node scripts/verify-wordbank-loading.mjs          # 53  加载层集成（无需
 node scripts/verify-char-hygiene.mjs              # 9   数据不可见坏字符（U+FFFD + PUA）零残留：扫描器正/负对照 + src/data + public/books + 脚本覆盖自证
 node scripts/verify-wordbank-split.mjs --check <baseline.json>   # 数据层拆分（基线任意时刻可重采）
 node scripts/verify-tts-progress.mjs              # 6175 朗读切片与进度反查表
-node scripts/verify-tts-hardening.mjs             # 21   TTS 降级/在途去重/桌面限定/内置引擎入队顺序（注意：没有 npm script）
+node scripts/verify-tts-hardening.mjs             # 31   TTS 降级/在途去重/桌面限定/内置引擎入队顺序 + **E 节：朗读取消必须按代际 chainGenRef**（speak/cancel 各开一代、五处续链都传 gen、playUrl 五条退出与链入口都比代际、stopAudio 先摘四个回调再掐）（注意：没有 npm script）
 node scripts/verify-chunks-data.mjs               # 55   语块库 963 条数据卫生 + 读取层去重（12 组重复冻结成基线、去重顺序判别、已记组行为）+ 短语库/语块库显示语言同源 + 列表内移动的单一滚动权威
 node scripts/verify-native-tts.mjs                # 45   原生插件边界：替身真跑「async return 插件对象＝永久挂死」+ 取语音列表 4s 超时 + 六处调用点 + 先问能力再猜沉默（看门狗吃句长、每词 ≥380ms、起播证据两档）
 node scripts/verify-books-meta.mjs                # 227  书目元数据 + 复习词高亮
@@ -163,6 +163,7 @@ node scripts/walk-phone.mjs                # 装机四条走查（4 收藏 + 5 �
 node scripts/walk-video.mjs --port 9226 --base https://localhost   # 视频精听 56 条走查在 APK 上重跑（本机版：--port 9222 --base http://127.0.0.1:8001）
 node scripts/walk-interaction-fx.mjs              # 交互层 16 条运行时走查（无头 Chrome）：pointerdown→下一帧毫秒、data-pressing 挂上且 pointerup 收回、合成事件也能量到缩放在发生、按下前后**布局盒** offsetLeft/Top 不动（不许用 getBoundingClientRect 判不占位——它含 scale）、涟漪自清、键盘不画也不挂、reduce 既不建节点也 scale 1、连点上限、奖励 canvas 唯一
 node scripts/check-interaction-on-phone.mjs --port 9226 --tier strong   # 按压词汇设备凭据 13 条（模拟器 9226 / 真机 9223）：用 CDP Input.dispatchTouchEvent 发**设备级真触摸**，量 data-pressing 挂上→computed scale 到档位值（实测 scale 0.97、响应 32ms）→移开抬手仍收回→布局盒不动。⚠️ 就是这条通道量出来「这台 WebView 触摸下根本不进 :active」（按下期间整页 :active 计数恒 0），所以缩放必须由委托层挂属性，:active 只当鼠标的并列来源
+node scripts/walk-quickcard-tts.mjs --port 9226 --level cet4 --fixture scripts/data/tts-shape-fixture.json   # 快速闪卡朗读取证（模拟器/真机都行）：把 Audio.play/fetch/系统语音/Capacitor 桥全录下来，逐张点喇叭与例句，分得清"没发起""发起了被 AbortError 掐掉""慢了但响了"。夹具把 185 字两片的长句、含斜杠、多句、24 字上下这些可疑形状钉进同一轮，别靠随机撞。⚠️ 测法三条坑：页面上有两个 lucide-volume2（自动发音开关也是它）、设备可能带着上一轮关掉的 vocab_autospeak、读数要按 performance.now 时间窗归属而不是先清缓冲
 node scripts/probe-real-media.mjs [--media 路径 --subs 路径 --short-subs 路径]   # 视频精听 52 条（两遍×26）：真媒体（blob→IDB→<video> 解码→逐词高亮→**停在中段时当前句正是那一句**→A-B 越过出点真回跳→单句与 A-B 双向互斥→学习时长按课分键 0.2→0.3→0.3→换页读回→两段式删除清干净 + **吸顶悬浮的几何判据**（这一屏收在一屏内由自己的框滚、两个不同 scrollTop 下 sticky 元素 top 一致、画面缩档、滑回顶部复原、吸住时点词释义卡整张落在播放器下方））+ 负对照（同一段媒体配一份短得多的字幕 → 必须说破假时长）；素材自动拷进 dist/client/__probe__/，期望时长与句数现算
 node scripts/check-video-lab-packs.mjs [目录名关键字]   # 逐课**实测**素材包能不能用：ffprobe 读画面轨/音轨/媒体末秒 + 那份 JSON 的字幕末秒与句数 + ffmpeg volumedetect 峰值。判红四条：没画面轨（用户硬要求）、没音轨或峰值< -60dB、字幕比媒体长（播放器空转）、媒体比字幕长 >3s（片尾空白会被当成"时间线乱跳"）。当前二十二课全绿（07-22 为真实新闻/演讲/对话/纪录片/长访谈/发布会问答），差值 0–2 秒；18 课是源被平台截断的前 10 分钟，说明里已写破
 node scripts/make-video-lab-packs.mjs [--add 名字关键字 [--dir 目录 --title 标题 --note 说明]] [--model small]   # 把转录伴侣的产物做成可导入的素材包（**无画面轨直接拒绝出包**；有画面的统一压到 ≤480p H.264 + faststart 并裁到字幕区间；已裁好的成品媒体会被沿用；+ 质检数字），输出 B:/nt-materials/video-lab
@@ -341,7 +342,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening 21 · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · **video-lab 154** · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit **80** · chain-verdict 36 · dashboard-glance 25 · correction-notes **90** · guard-shape **7** · **interaction-fx 75** · **imports-tracked 8**；合计 **8,007**，2026-10-20 第 48 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening 21 · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · **video-lab 154** · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit **80** · chain-verdict 36 · dashboard-glance 25 · correction-notes **90** · guard-shape **7** · **interaction-fx 75** · **imports-tracked 8**；合计 **8,017**，2026-10-20 第 49 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs` + `node scripts/verify-char-hygiene.mjs`（清了坏字符还要递增 `CACHE_VERSION`，否则老缓存挡住修复）
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过 `android/app/build.gradle` 的 `abiFilters` 或任何打包脚本 → 至少跑一次 `npm run package:apk:emu`（它收尾会读 APK 自己的 zip 中央目录自证：x86_64 的 sherpa `.so` 在、www/books/piper/tts 资产在、arm 0 条）；模拟器装机走 `node scripts/phone-emu.mjs check`
@@ -349,6 +350,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`
 - [ ] 改过 `ui/dialog` 基座或设置面板 → `verify-overlay-fit`
 - [ ] 改过 `src/index.css` 的 `--fx-*` 段 / `ui/button` 基座 / `lib/press-fx.ts` / `CelebrateLayer` / 任何练习页的按钮 class → `node scripts/verify-interaction-fx.mjs` + `node scripts/walk-interaction-fx.mjs`（改基座=全站共享，务必再跑 `verify:all`）；设备侧凭据走 `node scripts/check-interaction-on-phone.mjs --port 9226 --tier strong`（模拟器）/ `--port 9223`（真机）——**`:active` 在 Android WebView 的触摸下根本不生效**（设备级真触摸实测：pointerdown 到了、涟漪建了、整页 :active 恒 0），缩放由委托层挂 `data-pressing` 投递，这条通道量的就是它
+- [ ] 改过 `use-tts` 的**取消/降级链**（speak/cancel/stopAudio/playUrl/playChunkWithFallback）→ `node scripts/verify-tts-hardening.mjs`（E 节 10 条）+ 设备取证 `node scripts/walk-quickcard-tts.mjs --port 9226 --level cet4 --fixture <词表.json>`（静态守卫看不见"被自己掐掉"这类竞态，只有真装机能看见）
 - [ ] 改过 `functions/` → 想清楚网页/APK/桌面三条路；改过 index.html 版本 meta 或 `version.properties` → `node scripts/verify-app-version.mjs`（产物段先 build:web）
 - [ ] 改过 index.html 的字体/图标引用或 `public/fonts/` → `node scripts/verify-brand-fonts.mjs`（产物段先 build:web；**不许再引入外链字体域名与 icon**）
 - [ ] 新增/修改模块行为 → 同步更新 `docs/modules/` 对应那篇（**带 `文件:行号`**）

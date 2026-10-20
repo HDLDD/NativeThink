@@ -201,6 +201,47 @@ ok(/startServer/.test(fs.readFileSync(path.join(ROOT, 'electron/main.mjs'), 'utf
     'D6 选中 Kokoro 时，设置页就地写明"合成慢于播放 → 长文每句之间会有停顿"（不许只在文档里说）');
 }
 
+/* ───────────── E. 取消的代际令牌（2026-10-20 快速闪卡"部分单词/句子读不出来"的根因） ─────────────
+   旧写法靠 abortedRef 这个布尔判取消，但 speak() 是 `abortedRef=true → 取消 → abortedRef=false`
+   同步走完的，被掐那条链的 onerror 之后才跑，读到的已经是 false → 旧链继续降级/进下一句，
+   第一件事就是 playUrl → stopAudio() → 把刚起播的新朗读掐了。模拟器 APK 受控夹具实测：
+   13 张里 caregiver 的自动朗读发了两次 play、两次都 AbortError。 */
+{
+  const U = fs.readFileSync(path.join(ROOT, 'src/lib/use-tts.ts'), 'utf8');
+  const iChain = U.indexOf('const playChunkWithFallback = useCallback');
+  const entry = U.slice(iChain, U.indexOf('const playUrl = (', iChain));
+  ok(/chainGenRef = useRef\(0\)/.test(U), 'E1 有单调递增的代际令牌（不是靠布尔判取消）');
+  const bumps = (U.match(/chainGenRef\.current\+\+/g) || []).length;
+  ok(bumps === 2, `E2 speak() 与 cancel() 各开一代（当前 ${bumps} 处，必须恰好 2）`);
+  const sp = U.slice(U.indexOf('const speak = useCallback'), U.indexOf('const speak = useCallback') + 900);
+  ok(sp.indexOf('chainGenRef.current++') >= 0 && sp.indexOf('chainGenRef.current++') < sp.indexOf('abortedRef.current = true'),
+    'E2 顺序钉死：speak() 里先开新一代，再动 abortedRef/取消 —— 反过来的话旧链的回调仍可能赶在新一代之前复活');
+  ok(/gen = chainGenRef\.current/.test(U), 'E3 链入口把代际作为形参带下去（递归时必须原样传）');
+  const iGuard = entry.indexOf('if (gen !== chainGenRef.current) return;');
+  const iEngines = entry.indexOf('const engines');
+  ok(iGuard >= 0 && iEngines >= 0 && iGuard < iEngines,
+    'E3 链体第一件事就是比代际（排在 engines 组装之前，否则旧链会先跑到 stopAudio 再返回）');
+  /** 续链（带 idx/engineIdx 变量）必须沿用同一代；从 0 起头的是新链，取当前代即可 */
+  const 续链 = (U.match(/playChunkWithFallback\(chunks, (?:idx[^)]*)\)/g) || []);
+  const 漏传 = 续链.filter((c) => !/gen\)/.test(c));
+  ok(续链.length >= 5 && 漏传.length === 0,
+    `E4 ${续链.length} 处"续链"调用全部带 gen（漏一处，那一跳之后代际判定就废了 —— 实测漏过原生恢复重播那条）`,
+    漏传.slice(0, 3).join(' | '));
+  const pu = U.slice(U.indexOf('const playUrl = ('), U.indexOf('/** 供 URL 引擎使用的两个回调'));
+  const guards = (pu.match(/gen !== chainGenRef\.current/g) || []).length;
+  ok(guards >= 5, `E5 playUrl 的每条退出路径都比代际（入口/onended/onerror/25s 看门狗/play().catch，当前 ${guards} 处）`);
+  const sa = U.slice(U.indexOf('const stopAudio = () =>'), U.indexOf('const stopAudio = () =>') + 700);
+  ok(/onplay = null[\s\S]{0,120}pause\(\); [^\n]*src = ''/.test(sa)
+    && /onended = null/.test(sa) && /onerror = null/.test(sa) && /onpause = null/.test(sa),
+    'E6 stopAudio 先把四个回调摘干净再掐音频 —— src=\'\' 触发的 AbortError 属于上一条链，留着回调就等于让它复活');
+  ok(!/if \(audioRef\.current\) \{ audioRef\.current\.pause\(\); audioRef\.current\.src = ''; \}/.test(U),
+    'E6 反向：不许退回"直接 pause + 清 src"的旧形状（那正是互相掐的入口）');
+  /* 自证：把链入口那句判定抽掉，E3 的判据必须变假 —— 否则 E3 是恒真 */
+  const sabotaged = entry.replace('if (gen !== chainGenRef.current) return;', '');
+  ok(!/if \(gen !== chainGenRef\.current\) return;/.test(sabotaged),
+    'E7 正对照：抽掉入口判定后该判据确实为假（不是随便写个正则都过）');
+}
+
 /* ───────────────────────── 汇总 ───────────────────────── */
 let failed = 0;
 for (const r of results) {

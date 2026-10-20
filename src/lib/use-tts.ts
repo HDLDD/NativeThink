@@ -362,6 +362,17 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   const currentBlobUrlRef = useRef<string | null>(null);
   const ssUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const genRef = useRef(0);
+  /**
+   * 音频链（cf/piper/edge/google + 原生）的**代际令牌**。
+   * 为什么 `abortedRef` 不够：speak() 里是 `abortedRef=true → 取消 → abortedRef=false` 同步走完的，
+   * 而被掐掉那条链的 `onerror` 是**之后**才跑的 —— 它读到的 abortedRef 已经是 false，
+   * 于是旧链按"本引擎失败了"继续降级/进下一句，第一件事就是 `playUrl → stopAudio()`，
+   * 把刚起播的**新**朗读掐了（两张卡互相掐，最后谁都没声）。
+   * 快速闪卡实测（模拟器 APK + 受控夹具 13 张）：`caregiver` 自动朗读发了两次 play，
+   * 两次都 `AbortError`，界面上就是"这个词没读出来，再点一次就有"。
+   * 代际号只增不减，旧链的每个回调都拿自己那份和当前值比，不等就直接返回。
+   */
+  const chainGenRef = useRef(0);
   const abortedRef = useRef(false);
   const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const safetyRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -381,7 +392,13 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
     if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null; }
   };
   const stopAudio = () => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
+    if (audioRef.current) {
+      /** 先摘回调再掐：src='' 会让元素报 AbortError，那些回调属于**上一条**朗读链，
+       *  留着它们就等于让旧链在取消之后复活（见 chainGenRef 的注释）。 */
+      const dying = audioRef.current;
+      dying.onplay = null; dying.onended = null; dying.onerror = null; dying.onpause = null;
+      dying.pause(); dying.src = '';
+    }
     // 释放上一段音频的 Blob URL（不 revoke 会驻留内存到页面卸载 —— 长会话内存单调增长）
     if (currentBlobUrlRef.current) {
       try { URL.revokeObjectURL(currentBlobUrlRef.current); } catch { /* ignore */ }
@@ -457,7 +474,10 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   // Cascade fallback: cf → edge → google — each level only degrades on actual failure
 
   const playChunkWithFallback = useCallback(
-    (chunks: string[], idx: number, rate: number, engineIdx: number) => {
+    (chunks: string[], idx: number, rate: number, engineIdx: number, gen = chainGenRef.current) => {
+      /** 旧链的迟到回调（onerror / 合成 resolve / 看门狗）一律直接返回：
+       *  现在活着的是另一条链，让它去 stopAudio/换引擎就是把别人的声音掐了。 */
+      if (gen !== chainGenRef.current) return;
       // Android APK：原生系统 TTS 引擎优先 — 离线、即时、不断流；
       // 失败（无语音引擎等）再走网络引擎链。桌面构建 /api/tts 走本地 SAPI。
       // 引擎顺序（实测：Edge 直连在国内网络不可达，故不作为首选；
@@ -508,11 +528,11 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         optionsRef.current?.onChunk?.(idx, wordsBefore);
       }
 
-      const onDone = () => playChunkWithFallback(chunks, idx + 1, rate, 0); // next chunk, reset to best engine
+      const onDone = () => playChunkWithFallback(chunks, idx + 1, rate, 0, gen); // next chunk, reset to best engine
       const onFail = () => {
         // Current engine failed — try next one for the SAME chunk
         if (engineIdx + 1 < engines.length) {
-          playChunkWithFallback(chunks, idx, rate, engineIdx + 1);
+          playChunkWithFallback(chunks, idx, rate, engineIdx + 1, gen);
         } else {
           // 所有在线引擎失败 — 最后兜底：系统 SpeechSynthesis 直读
           // （桌面端部分环境可用；浏览器端通常可用）。仍失败才提示。
@@ -554,6 +574,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         },
       ) => {
         if (abortedRef.current) { opts.skipChunk(); return; }
+        if (gen !== chainGenRef.current) return;
         stopAudio();
         currentBlobUrlRef.current = url.startsWith('blob:') ? url : null;
         // 关键：撤掉上一个引擎留下的看门狗。否则它会在新引擎朗读途中触发，
@@ -574,12 +595,14 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
             reportPlayback({ engine: opts.engine, firstAudioMs: Date.now() - opts.t0, fellBack: engineIdx > 0 });
           }
         };
-        a.onended = () => { if (audioRef.current === a) audioRef.current = null; if (currentBlobUrlRef.current === url) { try { URL.revokeObjectURL(url); } catch { /* */ } currentBlobUrlRef.current = null; } opts.skipChunk(); };
+        a.onended = () => { if (gen !== chainGenRef.current) return; if (audioRef.current === a) audioRef.current = null; if (currentBlobUrlRef.current === url) { try { URL.revokeObjectURL(url); } catch { /* */ } currentBlobUrlRef.current = null; } opts.skipChunk(); };
         a.onerror = () => {
+          if (gen !== chainGenRef.current) return;
           if (audioRef.current === a) audioRef.current = null;
           madeSound ? opts.skipChunk() : opts.retryNextEngine();
         };
         safetyRef.current = setTimeout(() => {
+          if (gen !== chainGenRef.current) return;
           // Don't kill a chunk the user deliberately paused
           if (a.paused) return;
           if (audioRef.current === a) { a.pause(); a.src = ''; audioRef.current = null; }
@@ -588,14 +611,15 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
         // After first-touch prime(), mobile browsers allow play() — but if it
         // still fails (e.g. no prior user gesture), cascade to next engine
         a.play().catch(() => {
+          if (gen !== chainGenRef.current) return;
           if (audioRef.current === a) audioRef.current = null;
           madeSound ? opts.skipChunk() : opts.retryNextEngine();
         });
       };
 
       /** 供 URL 引擎使用的两个回调 —— 已出声就进下一句，否则换引擎重试本句 */
-      const retryNextEngine = () => playChunkWithFallback(chunks, idx, rate, engineIdx + 1);
-      const skipChunk = () => playChunkWithFallback(chunks, idx + 1, rate, 0);
+      const retryNextEngine = () => playChunkWithFallback(chunks, idx, rate, engineIdx + 1, gen);
+      const skipChunk = () => playChunkWithFallback(chunks, idx + 1, rate, 0, gen);
 
       if (engine === 'native') {
         getNativeTts()
@@ -619,7 +643,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
             if (abortedRef.current) return;
             stopAudio();
             nativeActiveRef.current = true;
-            nativeReplayRef.current = () => playChunkWithFallback(chunks, idx, rate, 0);
+            nativeReplayRef.current = () => playChunkWithFallback(chunks, idx, rate, 0, gen);
             setIsSpeaking(true); setIsPaused(false);
 
             const text = chunks[idx];
@@ -906,7 +930,8 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
 
   const speak = useCallback(
     (text: string, opts?: SpeakOptions) => {
-      // Cancel whatever is playing
+      // Cancel whatever is playing（同时开新的一代：旧链的所有回调从此静默）
+      chainGenRef.current++;
       abortedRef.current = true;
       ssCancel();
       stopAudio();
@@ -968,6 +993,7 @@ export function useTTS(options?: UseTTSOptions): TTSHandle {
   );
 
   const cancel = useCallback(() => {
+    chainGenRef.current++;
     abortedRef.current = true;
     ssCancel();
     stopAudio();

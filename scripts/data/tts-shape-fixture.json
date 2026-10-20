@@ -1,0 +1,33 @@
+{
+  "_说明": "快速闪卡朗读取证的形状夹具（2026-10-20）。跑法：node scripts/walk-quickcard-tts.mjs --port 9226 --level cet4 --fixture scripts/data/tts-shape-fixture.json。词面来自 cet4 词库，选词口径=把「可疑形状」各钉两条，长句只占 255/99,022，随机走十几次也撞不到，所以必须显式排队。",
+  "_形状": {
+    "appliance": "例句 185 字 → chunkText 切两片（验「读一半就停」）",
+    "caregiver": "例句 197 字 → 两片；本轮缺陷的当事词（自动朗读两次都被 AbortError 掐掉）",
+    "accordingly": "多句（. + 大写）",
+    "actual": "多句（短）",
+    "affirmation": "含斜杠 → cleanText 把 / 换成空格（he/she → he she）",
+    "chairman": "含斜杠",
+    "able": "例句 28 字（刚好超过 24 字的「短朗读云端优先」线）",
+    "abnormal": "例句 18 字（低于 24 → 走云端优先）",
+    "about": "例句 21 字 · 无句末标点",
+    "abundant": "例句 33 字 · 无句末标点",
+    "abandon": "普通对照",
+    "ability": "普通对照",
+    "aboard": "普通对照（首尾空格由 cleanText 收）"
+  },
+  "order": [
+    "appliance",
+    "caregiver",
+    "accordingly",
+    "actual",
+    "affirmation",
+    "chairman",
+    "able",
+    "abnormal",
+    "about",
+    "abundant",
+    "abandon",
+    "ability",
+    "aboard"
+  ]
+}

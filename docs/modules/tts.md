@@ -29,7 +29,51 @@
 
 **这条已经证完了（2026-10-19 晚，d0e47380 / Redmi Turbo 3，8 核 → `numThreads=4`）**：`node scripts/check-tts-latency.mjs --port 9223 --quick` 实测 Kokoro RTF **1.18–1.25** —— 比四核模拟器（1.38–1.75）好，但**仍然越不过 1.0**，所以设置面板那句"长文每句之间会有停顿"**保持原样、不放宽**（`RTF≈1.2~1.7` 这个区间正好把真机压在低端）。真机同时复现了首包"砍半而两轮总时长相等"（lessac 1207→609ms / 1207 vs 1200ms；Kokoro 20508→9989ms / 20508 vs 19965ms），见开头那张表。
 
-## 1. 功能
+## 取消必须按"代际"，不能按布尔（2026-10-20，"快速闪卡部分单词/句子无法朗读"的根因）
+
+症状与 2026-10-15 那次（§预合成下一张）**不是同一个 bug**：这次连点喇叭也有时会没声，
+自动朗读则是每隔几张死一张。取证通道是 `node scripts/walk-quickcard-tts.mjs --port 9226 --fixture …`
+（模拟器 APK，把 `Audio.play` / `fetch` / `speechSynthesis` / Capacitor 桥全记下），
+受控夹具 13 张里抓到这张：
+
+```
+自动→ play尝试:https://localhos(piper)  fetch…  play尝试:blob  play-拒:piper/AbortError  play-拒:blob/AbortError
+```
+
+**同一次自动朗读发起了两回，两回都被 AbortError 掐死** —— 掐它的不是网络，是 App 自己。
+
+链条：`speak()` 开头是 `abortedRef=true → ssCancel/stopAudio → abortedRef=false`，**同步走完**；
+而被 `stopAudio()` 掐掉的那个 `<audio>`（`src=''`）会在**之后**派发 `onerror`，
+旧链的 handler 读到的 `abortedRef` 已经是 `false`，于是按"本引擎失败了"继续降级/进下一句，
+第一件事就是 `playUrl → stopAudio()` —— 把**刚起播的新朗读**掐了。两次连续朗读（自动 + 手动、
+或快速切卡）就会互相掐，最后谁都没声。
+
+修法（`src/lib/use-tts.ts`，守卫 `verify-tts-hardening` E 节 10 条钉住）：
+
+- `chainGenRef` **单调递增的代际号**，`speak()` 与 `cancel()` 各 `++`（且 `++` 必须排在
+  `abortedRef.current = true` 之前）；链函数把它作为形参一路传下去，共 5 处续链调用。
+- 链体第一件事就是 `if (gen !== chainGenRef.current) return;`（**排在 `engines` 组装之前**，
+  否则旧链已经先跑过一次 `stopAudio` 了）；`playUrl` 的入口 / `onended` / `onerror` /
+  25s 看门狗 / `play().catch()` 五条退出路径各自都比一遍。
+- `stopAudio()` **先把 `onplay/onended/onerror/onpause` 摘干净**再 `pause(); src=''` ——
+  旧元素的 AbortError 不该再驱动任何链。
+- 原生引擎"暂停后恢复重播"那条 `nativeReplayRef` 也是续链，同样必须带 `gen`
+  （E4 就是当场抓到这一处漏传：不带 gen 时它取的是"调用那一刻"的当代，
+  于是隔了一轮之后仍会把旧文本盖到新朗读上）。
+
+修后同一套夹具：点喇叭 13/13、点例句 13/13（含 185 字切成两片的 `appliance`，两片都响）、
+自动朗读不再有 AbortError。
+
+**踩过的测法坑**（都写进脚本注释了，下轮别再犯）：① 页面上有**两个** `lucide-volume2` 图标 ——
+「自动发音」开关和词面喇叭同图标，按图标取第一个会把开关当喇叭点，于是一边测一边把自动朗读关掉，
+读数变成"13/13 自动都没声"；② 该设备此前被走过 `vocab_autospeak=0`，**默认开**的开关是关着的，
+"自动朗读没声"在那个设备上根本是预期行为；③ 先清缓冲再读会把"点击当帧就发生的那次 play"抹掉，
+必须改成**按 `performance.now()` 时间窗归属**；④ **进轮之后也不许清缓冲** —— 第一张的朗读就在进轮那几百毫秒里发起，
+清了读数就变成"每轮第一张都不读"，我差点据此再修一个不存在的缺陷。真要定性第一张，读**组件自己的状态**：
+从卡面 `<h2>` 上的 `__reactFiber$` 往上走到 QC 的 hooks 链，取 `lastSpokenRef`（形如 `0-mankind` 就是 effect 跑过并记了账），
+配合事件缓冲一起看 —— 这次实测第一张确实 `play尝试 → play-ok`，"1/13 没声"是测量伪影。
+
+
 
 同一段英文，在手机上要能离线、即时、连续地读出来；离线引擎崩了/网络断了要自动换下一条通道，而不是静音。
 
