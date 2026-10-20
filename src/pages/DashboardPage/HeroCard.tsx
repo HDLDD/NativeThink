@@ -5,37 +5,70 @@ import { Button } from '@/components/ui/button';
 
 interface HeroCardProps {
   onStartLearning: () => void;
+  /** 今天到期的复习词数（真实队列，不是文案） */
+  dueCount: number;
+  todayMinutes: number;
+  dailyGoalMinutes: number;
 }
 
-function HeroCardInner({ onStartLearning }: HeroCardProps) {
+/**
+ * 首页主行动卡：标题直接说"今天要做什么"，不再放营销标语。
+ * 数据来自 SM-2 队列与今日统计；进度条是今天的时间目标，不是假进度。
+ */
+function HeroCardInner({ onStartLearning, dueCount, todayMinutes, dailyGoalMinutes }: HeroCardProps) {
+  const goal = dailyGoalMinutes > 0 ? dailyGoalMinutes : 30;
+  const pct = Math.min(100, Math.round((todayMinutes / goal) * 100));
+
   return (
-    <Card className="col-span-12 lg:col-span-7 rounded-[32px] lg:rounded-[48px] border-border shadow-sm overflow-hidden relative">
-      <CardContent className="p-6 sm:p-12 min-h-[280px] lg:min-h-[400px] flex items-center relative overflow-hidden">
-        {/* 背景装饰大字 */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[80px] sm:text-[120px] lg:text-[180px] font-black text-muted/15 lg:text-muted/30 italic tracking-tighter leading-none opacity-50 pointer-events-none select-none">
-          THINK
+    <Card className="col-span-12 lg:col-span-7 rounded-[32px] lg:rounded-[40px] border-border shadow-sm overflow-hidden">
+      <CardContent className="p-6 sm:p-10 lg:p-12 min-h-[280px] lg:min-h-[380px] flex flex-col justify-between gap-6">
+        <div className="flex items-center justify-between gap-3">
+          <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-ink-teal">
+            今日学习
+          </span>
+          <span className="text-xs font-bold text-muted-foreground tabular-nums">
+            今日 {todayMinutes}/{goal} 分
+          </span>
         </div>
 
-        <div className="relative z-10 w-full sm:w-3/5">
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-ink-teal px-3 py-1 lg:px-4 lg:py-1.5 rounded-full text-[9px] lg:text-[10px] font-black uppercase tracking-widest mb-4 lg:mb-8">
-            Daily Learning
-          </div>
-          <h2 className="text-2xl sm:text-3xl lg:text-5xl font-black text-foreground mb-2 lg:mb-4 leading-[1.1] tracking-tight">
-            用母语思维
-            <br />
-            <span className="text-ink-teal italic">说地道英语</span>
+        <div>
+          <h2 className="text-[26px] sm:text-4xl lg:text-[42px] font-black leading-[1.22] tracking-tight text-foreground">
+            {dueCount > 0 ? (
+              <>
+                还有 <span className="text-ink-teal tabular-nums">{dueCount}</span> 个词到期，
+                <br className="hidden sm:block" />
+                先复习，再学新的。
+              </>
+            ) : (
+              <>
+                今天没有到期词，
+                <br className="hidden sm:block" />
+                直接学 20 个新词。
+              </>
+            )}
           </h2>
-          <p className="text-muted-foreground text-xs lg:text-sm font-medium mb-6 lg:mb-10 max-w-sm leading-relaxed">
-            摆脱中式英语，建立像 native speaker 一样的英语思维。每天 30 分钟，让英语成为你的本能。
+          <p className="mt-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
+            复习 · 新词 · 复习词短文 · 纠偏，一条线走完。断点自动保存，可随时停下。
           </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <Button
             size="lg"
             onClick={onStartLearning}
-            className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl text-[10px] lg:text-xs font-black uppercase tracking-wider shadow-sm transition-all gap-2"
+            className="h-11 sm:h-12 w-full sm:w-auto rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-6 text-xs font-black uppercase tracking-wider text-white shadow-sm gap-2"
           >
-            <Play className="size-3.5 lg:size-4" />
+            <Play className="size-4" />
             开始今日学习
           </Button>
+          <span className="text-[11px] text-muted-foreground">按当前复习队列与每日目标安排</span>
+        </div>
+
+        <div className="h-1 w-full rounded-full bg-muted overflow-hidden" aria-hidden>
+          <div
+            className="h-full rounded-full bg-[var(--brand)] transition-[width] duration-500"
+            style={{ width: `${pct}%` }}
+          />
         </div>
       </CardContent>
     </Card>

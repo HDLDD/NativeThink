@@ -346,7 +346,12 @@ export default function DashboardPage() {
 
       {/* Hero + KPI 区域 */}
       <div className="grid grid-cols-12 gap-8">
-        <HeroCard onStartLearning={() => setShowLearnDialog(true)} />
+        <HeroCard
+          onStartLearning={() => setShowLearnDialog(true)}
+          dueCount={dueCount}
+          todayMinutes={stats.todayMinutes}
+          dailyGoalMinutes={stats.dailyGoalMinutes}
+        />
 
         {/* KPI 四宫格 - 5/12 */}
         <div className="col-span-12 lg:col-span-5 grid grid-cols-2 gap-4">
