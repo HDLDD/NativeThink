@@ -128,7 +128,7 @@ node scripts/verify-interaction-fx.mjs              # 107  交互反馈层：tok
 node scripts/verify-settings-themes.mjs             # 29   设置页与外观主题：四套主题注册表 + 左上角返回（无来源页回首页） + classic 必须零覆盖 + initUiTheme 在 createRoot 之前 + 每个非 classic 主题都有 token/暗色/--brand 覆盖 + 全站 tsx 不再硬编码 #00B894 + 顶栏只剩搜索/设置/用户菜单 + 四个设置面板挂在 /settings + Row 把 asChild 注入的 props 展开到真按钮 + 路由与侧边栏登记；变异 M1-M5 逐条验红
 node scripts/verify-imports-tracked.mjs             # 8    仓库完整性：src/ 下每条 @/ 与相对 import 都必须解析到真实文件**并且被 git 跟踪**（7295b55 漏提交 ResultFx —— 仓库里留了一条指向不存在文件的 import，而本机 typecheck/build/其他守卫在有完整工作目录的机器上全是绿的）；三条自证：不存在的模块必须解析失败、跟踪判定必须给出两种答案、注释里的 import 不算数
 node scripts/verify-app-version.mjs                 # 11   版本号单一载体：meta 注入链路 + 产物一致性（产物段先 build:web）
-node scripts/verify-brand-fonts.mjs                 # 26   品牌资产自托管：字体与 favicon 外链零残留 + woff2 结构自洽 + 生效栈正对照（产物段先 build:web）
+node scripts/verify-brand-fonts.mjs                 # 35   品牌字体与中文自托管：7 条 @font-face（品牌 3 + Noto 4）+ CJK unicode-range + 外链/favicon 零残留 + woff2 结构自洽 + 生效栈正对照（产物段先 build:web）
 npm run verify:rv-articles                        # 104  复习词汇文章：选词/分篇/覆盖出队/体裁主题/原位重写（含旧 slice(0,10) 正对照）
 npm run verify:study-credit                       # 80   学习时长记账：闸门真跑 + 提交点接线（含精听按课去重）+ 口径双向锁（本地动作不许套闸门，含短语闪卡翻面直计时）
 npm run verify:all                                # —    收尾必跑：typecheck + 全部 verify-*（自动发现，新增守卫不用登记）
@@ -347,7 +347,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening **31** · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · **video-lab 154** · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit **80** · chain-verdict 36 · dashboard-glance 25 · correction-notes **90** · guard-shape **7** · **interaction-fx 107** · **imports-tracked 8** · **settings-themes 29**；合计 **8,078**，2026-10-20 第 51 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening **31** · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · **video-lab 154** · ai-parse 10 · app-version 11 · brand-fonts 35 · char-hygiene 9 · rv-articles 104 · study-credit **80** · chain-verdict 36 · dashboard-glance 25 · correction-notes **90** · guard-shape **7** · **interaction-fx 107** · **imports-tracked 8** · **settings-themes 29**；合计 **8,087**，2026-10-21 第 52 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs` + `node scripts/verify-char-hygiene.mjs`（清了坏字符还要递增 `CACHE_VERSION`，否则老缓存挡住修复）
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过 `android/app/build.gradle` 的 `abiFilters` 或任何打包脚本 → 至少跑一次 `npm run package:apk:emu`（它收尾会读 APK 自己的 zip 中央目录自证：x86_64 的 sherpa `.so` 在、www/books/piper/tts 资产在、arm 0 条）；模拟器装机走 `node scripts/phone-emu.mjs check`

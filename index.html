@@ -17,11 +17,18 @@
          文件来自 @fontsource/plus-jakarta-sans@5.3.0（与 fonts.googleapis.com 同一份 woff2），
          放 public/fonts/，OFL 许可证随附见 public/fonts/LICENSE.txt。原外链 fonts.googleapis.com
          对大陆不可达 —— 每条路由报一次资源错误且字体从未生效（ROADMAP #7，2026-10-05 落地）。
-         中文不再加载 Noto Sans SC 网页字，走 --font-sans 兜底栈里的系统字。 -->
+         中文也自托管：部分 ROM（实测 Onyx 25053RT47C）把系统所有中文字体族映射成书法体
+         "WDNSSMJS"，显式指定 Noto/思源也无效 —— 只能随包带一份。用 Noto Sans SC 简体子集
+         400/500/600/700（@fontsource/noto-sans-sc@5.3.1，OFL 见 LICENSE-noto-sans-sc.txt），
+         unicode-range 只吃 CJK，英文继续走 Plus Jakarta Sans。 -->
     <style>
       @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-display: swap; font-weight: 400; src: url(/fonts/plus-jakarta-sans-latin-400-normal.woff2) format('woff2'); }
       @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-display: swap; font-weight: 600; src: url(/fonts/plus-jakarta-sans-latin-600-normal.woff2) format('woff2'); }
       @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-display: swap; font-weight: 700; src: url(/fonts/plus-jakarta-sans-latin-700-normal.woff2) format('woff2'); }
+      @font-face { font-family: 'Noto Sans SC'; font-style: normal; font-display: swap; font-weight: 400; src: url(/fonts/noto-sans-sc-400-normal.woff2) format('woff2'); unicode-range: U+2E80-2FFF, U+3000-303F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF; }
+      @font-face { font-family: 'Noto Sans SC'; font-style: normal; font-display: swap; font-weight: 500; src: url(/fonts/noto-sans-sc-500-normal.woff2) format('woff2'); unicode-range: U+2E80-2FFF, U+3000-303F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF; }
+      @font-face { font-family: 'Noto Sans SC'; font-style: normal; font-display: swap; font-weight: 600; src: url(/fonts/noto-sans-sc-600-normal.woff2) format('woff2'); unicode-range: U+2E80-2FFF, U+3000-303F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF; }
+      @font-face { font-family: 'Noto Sans SC'; font-style: normal; font-display: swap; font-weight: 700; src: url(/fonts/noto-sans-sc-700-normal.woff2) format('woff2'); unicode-range: U+2E80-2FFF, U+3000-303F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF; }
     </style>
   </head>
   <body>

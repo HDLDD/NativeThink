@@ -1,30 +1,31 @@
 #!/usr/bin/env node
 /**
- * verify-brand-fonts.mjs — 品牌字体自托管的回归守卫（ROADMAP #7，2026-10-05）。
+ * verify-brand-fonts.mjs — 品牌字体与中文自托管的回归守卫。
  *
- * 背景：index.html 原从 fonts.googleapis.com 拉 Plus Jakarta Sans + Noto Sans SC。
- * 大陆直连该域名不可达 —— 每条路由控制台报一次资源错误，字体从未生效
- * （旧链接是 media="print" 非阻塞加载，所以只是"长得不是设计稿那套字"）。
- * 改为自托管：@fontsource 官方重打包的 latin 子集（与 Google 同一份 woff2），
- * 中文不再加载网页字、走系统字回退栈。
+ * 背景一（2026-10-05，ROADMAP #7）：index.html 原从 fonts.googleapis.com 拉
+ * Plus Jakarta Sans + Noto Sans SC。大陆直连该域名不可达 —— 每条路由控制台报一次
+ * 资源错误，字体从未生效。改为自托管 @fontsource 的 latin 子集。
+ *
+ * 背景二（2026-10-21，真机 141）：Onyx 25053RT47C 把系统所有中文字体族
+ * （PingFang SC / Microsoft YaHei / Noto Sans CJK / sans-serif / system-ui）
+ * 全部映射成书法体 `WDNSSMJS (Non-Commercial Use)`（CDP CSS.getPlatformFontsForNode
+ * 实测），显式指定字体名无效 —— 只能随包带一份中文字体。现在自托管
+ * Noto Sans SC 简体子集 400/500/600/700，并用 unicode-range 只吃 CJK，
+ * 英文继续走 Plus Jakarta Sans。
  *
  * 本脚本钉住三段契约：
- *   A. 源侧：index.html 零外链字体域名；@font-face 恰三条（400/600/700）指向本地
- *      /fonts/*.woff2；woff2 是真文件（magic + header 声明长度与文件长度自洽，
- *      防占位/截断）；OFL 许可证随附（重分发合规）；**icon 链接零 http 外链**
- *      （2026-10-05 清理：原挂着模板遗留的 lf3-static.bytednsdoc.com shortcut icon。
- *      本机 Chromium 判别实验（A/B/C/D 四组并列 icon）：带 type 的 SVG 无论前后都被选中、
- *      同型取先声明者 —— 原形态下该外链 URL 从未被请求，属惰性残留；但取舍是浏览器
- *      实现细节（不支持 SVG favicon 的老浏览器可能选中它），属真实外部依赖，删之）
- *   B. 字体栈：tailwind-theme.css 两处 --font-sans 都不含 'Noto Sans SC'，
- *      且都以 'Plus Jakarta Sans' 开头（正对照：不是删外链了事，品牌字仍是首选）
+ *   A. 源侧：index.html 零外链字体域名；7 条 @font-face（品牌 3 + 中文 4）
+ *      全部指向本地 /fonts/*.woff2；中文 4 条带 CJK unicode-range；
+ *      woff2 是真文件（magic + header 声明长度与文件长度自洽）；两份 OFL 许可证随附；
+ *      icon 链接零 http 外链（2026-10-05 清理的惰性残留）。
+ *   B. 字体栈：tailwind-theme.css 两处 --font-sans 都以 Plus Jakarta Sans 开头、
+ *      **紧接 'Noto Sans SC'**（必须先于系统字体，否则被 ROM 书法体截走）。
  *   C. 产物侧（先 npm run build:web）：dist/client 的 index/404 无外链字体域名、
- *      无外链 icon、@font-face 在位、fonts/ 资产结构自洽、构建出的 CSS 里生效栈已换
+ *      无外链 icon、@font-face 7 条在位、fonts/ 7 个 woff2 齐、构建出的 CSS
+ *      生效栈同时含 Plus Jakarta Sans 与 Noto Sans SC。
  *
- * 注意本文件所有"不许出现 X"的扫描都先剥注释 —— index.html 与 tailwind-theme.css
- * 的溯源注释里写着旧域名和 'Noto Sans SC' 字样，不剥会把自己判红（chain-verdict 教训）。
- *
- * 用法：node scripts/verify-brand-fonts.mjs
+ * 注意本文件所有"不许出现 X"的扫描都先剥注释 —— 注释里写着旧域名，
+ * 不剥会把自己判红（chain-verdict 教训）。
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, resolve, dirname, basename } from 'node:path';
@@ -44,6 +45,7 @@ const skip = (label) => { skipped++; console.log('  ․ ' + label); };
 const stripHtmlComments = (s) => s.replace(/<!--[\s\S]*?-->/g, '');
 const stripCssComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '');
 const EXTERNAL_FONT = /fonts\.(googleapis|gstatic)\.com/;
+const OFL = /SIL Open Font License/i;
 
 /* ── A. 源侧：index.html ── */
 const htmlCode = stripHtmlComments(read('index.html'));
@@ -55,15 +57,30 @@ if (EXTERNAL_FONT.test(htmlCode)) {
 }
 
 const faces = [...htmlCode.matchAll(/@font-face\s*\{[^}]*\}/g)].map((m) => m[0]);
-check(faces.length === 3, 'index.html 恰有 3 条 @font-face', `faces=${faces.length}`);
-check(faces.every((f) => /'Plus Jakarta Sans'/.test(f)),
-  '三条 @font-face 均为 Plus Jakarta Sans（品牌字体本体）');
+check(faces.length === 7, 'index.html 恰有 7 条 @font-face（品牌 3 + 中文 4）', `faces=${faces.length}`);
 
-const weights = faces.map((f) => (f.match(/font-weight:\s*(\d+)/) || [])[1]).sort().join(',');
-check(weights === '400,600,700', '三条 @font-face 权重为 400/600/700（与旧外链等价）', weights);
+const isLocalWoff = (f) => {
+  const u = (f.match(/url\(([^)]+)\)/) || [])[1] || '';
+  return /^\/fonts\/[\w.-]+\.woff2$/.test(u);
+};
+
+const brandFaces = faces.filter((f) => /'Plus Jakarta Sans'/.test(f));
+const cnFaces = faces.filter((f) => /'Noto Sans SC'/.test(f));
+
+check(brandFaces.length === 3, '品牌字体恰 3 条 @font-face（Plus Jakarta Sans）', `faces=${brandFaces.length}`);
+const brandWeights = brandFaces.map((f) => (f.match(/font-weight:\s*(\d+)/) || [])[1]).sort().join(',');
+check(brandWeights === '400,600,700', '品牌字体权重为 400/600/700（与旧外链等价）', brandWeights);
+check(brandFaces.every(isLocalWoff), '品牌字体 src 全部走本地 /fonts/*.woff2（无 http 外链）',
+  brandFaces.map((f) => (f.match(/url\(([^)]+)\)/) || [])[1] || '').join(' '));
+
+check(cnFaces.length === 4, '中文字体恰 4 条 @font-face（Noto Sans SC）', `faces=${cnFaces.length}`);
+const cnWeights = cnFaces.map((f) => (f.match(/font-weight:\s*(\d+)/) || [])[1]).sort().join(',');
+check(cnWeights === '400,500,600,700', '中文字体权重为 400/500/600/700', cnWeights);
+check(cnFaces.every((f) => isLocalWoff(f) && /unicode-range:[^;]*4E00-9FFF/.test(f)),
+  '中文字体 src 全部本地，且每条都声明 CJK unicode-range（英文不重复下载）');
 
 const faceSrcs = faces.map((f) => (f.match(/url\(([^)]+)\)/) || [])[1] || '');
-check(faceSrcs.length === 3 && faceSrcs.every((u) => /^\/fonts\/[\w.-]+\.woff2$/.test(u)),
+check(faceSrcs.length === 7 && faceSrcs.every((u) => /^\/fonts\/[\w.-]+\.woff2$/.test(u)),
   '所有 @font-face src 走本地 /fonts/*.woff2 绝对路径（无 http 外链）', faceSrcs.join(' '));
 
 const woffFiles = faceSrcs.map((u) => join(ROOT, 'public', u.replace(/^\//, '')));
@@ -81,8 +98,10 @@ for (const p of woffFiles) {
 }
 
 const license = existsSync(join(ROOT, 'public/fonts/LICENSE.txt')) ? read('public/fonts/LICENSE.txt') : '';
-check(/SIL Open Font License/i.test(license),
-  'public/fonts/LICENSE.txt 随附 OFL 许可证（字体重分发合规）');
+check(OFL.test(license), 'public/fonts/LICENSE.txt 随附 OFL 许可证（品牌字体重分发合规）');
+const cnLicense = existsSync(join(ROOT, 'public/fonts/LICENSE-noto-sans-sc.txt'))
+  ? read('public/fonts/LICENSE-noto-sans-sc.txt') : '';
+check(OFL.test(cnLicense), 'public/fonts/LICENSE-noto-sans-sc.txt 随附 OFL 许可证（中文字体重分发合规）');
 
 /* icon 链接（favicon / apple-touch-icon / mask-icon）：与字体同口径，零 http 外链。
    取所有 <link> 标签后按 rel 含 "icon" 过滤（兼容引号风格与属性顺序），
@@ -98,9 +117,8 @@ check(iconTags.some((tag) => /href\s*=\s*["']?\/favicon\.svg["']?/i.test(tag))
 
 /* ── B. 字体栈：tailwind-theme.css ── */
 const css = stripCssComments(read('src/tailwind-theme.css'));
-check(!/Noto Sans SC/.test(css),
-  "tailwind-theme.css 不再引用 'Noto Sans SC'（中文走系统字栈）",
-  (css.match(/[^\n]*Noto Sans SC[^\n]*/) || [])[0] || '');
+check(/Noto Sans SC/.test(css),
+  "tailwind-theme.css 引用 'Noto Sans SC'（中文自托管字体必须进栈）");
 
 const stacks = [...css.matchAll(/--font-sans:\s*([^;]+);/g)]
   .map((m) => m[1].replace(/\s+/g, ' ').trim());
@@ -108,6 +126,9 @@ check(stacks.length === 2, '抓到两处 --font-sans 声明（Lark 栈 + @theme 
 check(stacks.every((s) => s.startsWith("'Plus Jakarta Sans'")),
   '两处 --font-sans 都以 Plus Jakarta Sans 开头（正对照：品牌字仍是首选）',
   JSON.stringify(stacks.map((s) => s.slice(0, 40))));
+check(stacks.every((s) => /^'Plus Jakarta Sans', 'Noto Sans SC'/.test(s)),
+  '两处 --font-sans 都把 Noto Sans SC 紧排在品牌字之后（必须先于系统字体，否则被 ROM 书法体截走）',
+  JSON.stringify(stacks.map((s) => s.slice(0, 50))));
 
 /* ── C. 产物侧：dist/client（先 npm run build:web） ── */
 const DIST = join(ROOT, 'dist', 'client');
@@ -122,11 +143,11 @@ if (!existsSync(join(DIST, 'index.html'))) {
     const dExtIcons = tagList(d).filter((tag) => /href\s*=\s*["']?https?:\/\//i.test(tag));
     check(dExtIcons.length === 0, `C 产物 ${f} 的 icon 链接零 http 外链`, dExtIcons.join(' '));
     const dfs = [...d.matchAll(/@font-face\s*\{[^}]*\}/g)].length;
-    check(dfs === 3, `C 产物 ${f} 有 3 条 @font-face`, `faces=${dfs}`);
+    check(dfs === 7, `C 产物 ${f} 有 7 条 @font-face`, `faces=${dfs}`);
   }
 
   const distFonts = [...readdirSync(join(DIST, 'fonts')).filter((f) => f.endsWith('.woff2'))];
-  check(distFonts.length === 3, 'C 产物 dist/client/fonts 有 3 个 woff2', distFonts.join(', '));
+  check(distFonts.length === 7, 'C 产物 dist/client/fonts 有 7 个 woff2', distFonts.join(', '));
   check(woffFiles
     .map((p) => basename(p))
     .every((n) => distFonts.includes(n)),
@@ -134,13 +155,11 @@ if (!existsSync(join(DIST, 'index.html'))) {
 
   const cssFiles = readdirSync(join(DIST, 'assets')).filter((f) => f.endsWith('.css'));
   check(cssFiles.length > 0, 'C 产物找到构建出的 CSS', `files=${cssFiles.length}`);
-  const badCss = cssFiles.filter((f) => /Noto Sans SC/.test(readFileSync(join(DIST, 'assets', f), 'utf8')));
-  check(badCss.length === 0, "C 构建产物 CSS 不含 'Noto Sans SC'", badCss.join(', '));
   const goodCss = cssFiles.filter((f) => {
     const c = readFileSync(join(DIST, 'assets', f), 'utf8');
-    return /--font-sans:[^;]*Plus Jakarta Sans/.test(c);
+    return /--font-sans:[^;]*Plus Jakarta Sans/.test(c) && /--font-sans:[^;]*Noto Sans SC/.test(c);
   });
-  check(goodCss.length > 0, 'C 构建产物 CSS 的 --font-sans 生效栈含 Plus Jakarta Sans（正对照）');
+  check(goodCss.length > 0, 'C 构建产物 CSS 的 --font-sans 同时含 Plus Jakarta Sans 与 Noto Sans SC（正对照）');
 }
 
 /* ── 汇总 ── */
