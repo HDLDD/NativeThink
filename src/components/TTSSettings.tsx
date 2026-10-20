@@ -244,7 +244,7 @@ export default function TTSSettings({ trigger }: { trigger?: ReactNode } = {}) {
         collisionPadding={12}
         className="w-72 max-w-[calc(100vw-1.5rem)] max-h-[calc(var(--radix-popover-content-available-height)-1.5rem)] rounded-[24px] border-border shadow-lg p-0 overflow-hidden flex flex-col"
       >
-        <div className="p-5 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 shrink-0">
+        <div className="p-5 border-b border-border bg-muted/40 shrink-0">
           <h4 className="text-sm font-black text-foreground flex items-center gap-2">
             <Volume2 className="size-4 text-ink-teal" />
             TTS 朗读设置

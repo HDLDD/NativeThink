@@ -54,7 +54,7 @@ export default function ChangelogDialog({ trigger }: { trigger?: ReactNode } = {
         )}
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[80vh] rounded-[32px] p-0 overflow-hidden">
-        <div className="p-6 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10">
+        <div className="p-6 border-b border-border bg-muted/40">
           <DialogHeader>
             <DialogTitle className="text-xl font-black italic text-foreground flex items-center gap-2">
               <ScrollText className="size-5 text-ink-teal" />

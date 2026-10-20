@@ -48,7 +48,7 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
       <DialogContent className="max-w-sm rounded-[32px] p-0 overflow-hidden">
-        <div className="p-6 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10">
+        <div className="p-6 border-b border-border bg-muted/40">
           <DialogHeader>
             <DialogTitle className="text-xl font-black italic text-foreground">
               {mode === 'login' ? '登录' : '注册'}

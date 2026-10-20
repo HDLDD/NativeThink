@@ -1170,7 +1170,7 @@ function PromptCard({
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-2 min-w-0">
             {isAi && (
-              <Badge className="shrink-0 text-[8px] font-black uppercase rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">
+              <Badge className="shrink-0 text-[8px] font-black uppercase rounded-full px-1.5 py-0 bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white border-0">
                 AI
               </Badge>
             )}

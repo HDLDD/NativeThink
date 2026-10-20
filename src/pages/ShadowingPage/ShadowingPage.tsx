@@ -907,7 +907,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="flex items-center gap-1.5 min-w-0">
                             {corpus.id.startsWith('ai_') && (
-                              <Badge className="shrink-0 text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
+                              <Badge className="shrink-0 text-[8px] font-black rounded-full px-1.5 py-0 bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white border-0">AI</Badge>
                             )}
                             <h4 className="text-sm font-black text-foreground line-clamp-1">{corpus.title}</h4>
                           </div>
@@ -1285,7 +1285,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                             </p>
                             {isExtra && (
                               <>
-                                <Badge className="shrink-0 text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
+                                <Badge className="shrink-0 text-[8px] font-black rounded-full px-1.5 py-0 bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white border-0">AI</Badge>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();

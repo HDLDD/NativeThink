@@ -993,7 +993,7 @@ export default function DeepVocabularyPage() {
           </div>
           <button data-press="soft"
             onClick={handleOpenWizard}
-            className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 border-2 border-[var(--brand)]/30 hover:border-[var(--brand)] transition-all duration-200"
+            className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-[var(--brand)]/5 border-2 border-[var(--brand)]/30 hover:border-[var(--brand)] transition-all duration-200"
           >
             {(() => {
               // 选「全部」时用中性的书库图标 —— 别拿四级的图标冒充，会让人以为当前词书是四级
@@ -1012,7 +1012,7 @@ export default function DeepVocabularyPage() {
         </div>
         <button data-press="soft"
           onClick={handleOpenWizard}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 border-2 border-[var(--brand)]/30 hover:border-[var(--brand)] hover:shadow-lg hover:shadow-emerald-200/30 dark:hover:shadow-emerald-900/20 transition-all duration-200 group"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[var(--brand)]/5 border-2 border-[var(--brand)]/30 hover:border-[var(--brand)] hover:shadow-lg hover:shadow-emerald-200/30 dark:hover:shadow-emerald-900/20 transition-all duration-200 group"
         >
           {(() => {
             // 同上：「全部」显示书库图标
@@ -1678,7 +1678,7 @@ export default function DeepVocabularyPage() {
                           <Bot className="size-4 text-violet-500" />
                           <span className="text-xs font-black uppercase tracking-wider text-violet-500">AI 生成例句</span>
                           {(aiWordData[wordKey(selectedWord)]?.sentences?.length ?? 0) > 0 && (
-                            <Badge className="text-[9px] font-black rounded-full px-2 py-0.5 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">
+                            <Badge className="text-[9px] font-black rounded-full px-2 py-0.5 bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white border-0">
                               {aiWordData[wordKey(selectedWord)].sentences.length}
                             </Badge>
                           )}

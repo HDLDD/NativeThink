@@ -1602,7 +1602,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                   </button>
                                   <span className="text-sm font-black text-foreground">{chunk.content}</span>
                                   {chunk.id.startsWith('ai_') && (
-                                    <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
+                                    <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white border-0">AI</Badge>
                                   )}
                                 </div>
                                 <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{chunk.meaning}</p>
@@ -1689,7 +1689,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           {/* Badges */}
                           <div className="flex items-center gap-2 mb-4 flex-wrap">
                             {detailChunk.id.startsWith('ai_') && (
-                              <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
+                              <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white border-0">AI</Badge>
                             )}
                             <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal border-none">
                               {CATEGORY_LABELS[detailChunk.category] || detailChunk.category}
@@ -1856,7 +1856,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
             <DialogContent className="max-w-lg rounded-[32px] p-0 overflow-hidden">
               {detailChunk && (
                 <>
-                  <div className="p-6 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10">
+                  <div className="p-6 border-b border-border bg-muted/40">
                     <DialogHeader>
                       <div className="flex items-center gap-2 mb-3">
                         <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal border-none">
@@ -1933,7 +1933,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           <Bot className="size-4 text-violet-500" />
                           <p className="text-[10px] font-black uppercase tracking-wider text-violet-500">AI 生成例句</p>
                           {aiSentences[detailChunk.id] && aiSentences[detailChunk.id].length > 0 && (
-                            <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">
+                            <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white border-0">
                               {aiSentences[detailChunk.id].length}
                             </Badge>
                           )}
@@ -2289,7 +2289,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
               <div className="p-8 rounded-[32px] bg-gradient-to-br from-[var(--brand)]/10 via-emerald-50 dark:via-emerald-500/10 to-transparent border border-[var(--brand)]/10 text-center relative overflow-hidden">
                 <div className="absolute top-4 right-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   {aiChainChallenge ? (
-                    <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
+                    <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white border-0">AI</Badge>
                   ) : (
                     `第 ${currentChainIdx + 1} 个`
                   )}
@@ -2502,7 +2502,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                       </button>
                                       <span className="text-sm font-black text-foreground">{chunk.content}</span>
                                       {chunk.id.startsWith('ai_') && (
-                                        <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
+                                        <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white border-0">AI</Badge>
                                       )}
                                     </div>
                                     <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{chunk.meaning}</p>
@@ -2540,7 +2540,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                         <div className="shrink-0">
                           <div className="flex items-center gap-2 flex-wrap mb-3">
                             {selectedPhrase.id.startsWith('ai_') && (
-                              <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
+                              <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white border-0">AI</Badge>
                             )}
                             <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-sky-100 dark:bg-sky-500/15 text-sky-600 border-none">
                               {CATEGORY_LABELS[selectedPhrase.category] || selectedPhrase.category}

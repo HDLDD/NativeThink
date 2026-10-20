@@ -44,7 +44,7 @@ function classNameOf(src, tagRe, label) {
 /* ───────────── 1. Dialog 基座：所有模态框共用的兜底 ───────────── */
 {
   const dlg = read('src/components/ui/dialog.tsx');
-  const cls = classNameOf(dlg, /DialogPrimitive\.Content/, 'DialogContent 基座');
+  const cls = classNameOf(dlg, /<DialogPrimitive\.Content/, 'DialogContent 基座');
   check(/max-h-\[calc\(100dvh-2rem\)\]/.test(cls), 'DialogContent 基座夹住视口高度（不再靠 translate 居中两头溢出）', cls.slice(0, 60));
   check(/overflow-y-auto/.test(cls), 'DialogContent 基座自带滚动兜底（子级没做内部滚动时也能滚到）');
   check(/overscroll-contain/.test(cls), 'DialogContent 基座 overscroll-contain（滚到底不带动背后页面）');

@@ -437,7 +437,7 @@ export default function HelpGuide({ defaultOpen, trigger }: { defaultOpen?: bool
         </Tabs>
 
         {/* Footer */}
-        <div className="p-4 border-t border-border bg-muted/20 flex items-center justify-between sticky bottom-0 bg-background">
+        <div className="p-4 border-t border-border bg-card flex items-center justify-between sticky bottom-0 z-10">
           <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">NativeThink — 用母语思维，说地道英语</p>
           <a href="https://platform.deepseek.com" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-ink-teal hover:underline flex items-center gap-1">
             <Key className="size-3" />获取 API Key<ExternalLink className="size-3" />
