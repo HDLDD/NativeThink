@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { useTTS } from '@/lib/use-tts';
 import { useAI } from '@/hooks/use-ai';
 import { extractJson } from '@/lib/utils';
+import { getWordInsight, type IWordInsight } from '@/lib/word-insight';
 import { useFavorites, type IFavoriteItem } from '@/lib/use-favorites';
 import { queryWords, preloadCoreOnly, preloadDetail, isDetailReady, getEssentialLevels, isAllReady, getTotalLearnableCount } from '@/data/wordbank';
 import type { IWordEntry } from '@/data/wordbank';
@@ -66,6 +67,9 @@ export default function GlobalWordSearch() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<null | { word: string; phonetic?: string; meaning: string; example?: string; exampleZh?: string }>(null);
   const [aiError, setAiError] = useState('');
+  const [insight, setInsight] = useState<IWordInsight | null>(null);
+  const [insightLoading, setInsightLoading] = useState(false);
+  const [insightError, setInsightError] = useState('');
   const { favorites, addFavorite, removeFavorite, isWordFavorited } = useFavorites();
 
   // Expanded word for detail view
@@ -122,6 +126,8 @@ export default function GlobalWordSearch() {
   // 展开某词时才加载该等级的 detail（幂等；已加载则同步就绪）。
   // ⚠️ 必须放在 results 定义之后：依赖数组在渲染期求值，提前引用会触发 TDZ 白屏。
   useEffect(() => {
+    setInsight(null);
+    setInsightError('');
     if (!expandedWord) { setDetailReady(false); setDetailFailed(false); return; }
     const entry = results.find((w) => w.word.toLowerCase() === expandedWord.toLowerCase());
     if (!entry) { setDetailReady(false); setDetailFailed(false); return; }
@@ -140,6 +146,22 @@ export default function GlobalWordSearch() {
     });
     return () => { alive = false; };
   }, [expandedWord, results]);
+
+  /** 词根拆解 / 近义辨析：AI 派生数据，按词缓存，不碰学习进度 */
+  const handleLoadInsight = async (word: string) => {
+    if (insightLoading) return;
+    setInsightLoading(true);
+    setInsightError('');
+    try {
+      const got = await getWordInsight(aiChat, word);
+      if (got) setInsight(got);
+      else setInsightError('AI 暂时没有返回可用结果');
+    } catch {
+      setInsightError('加载失败，请稍后再试');
+    } finally {
+      setInsightLoading(false);
+    }
+  };
 
   /** 词库里没有时交给 AI：只查词义/例句，不写任何本地存储 */
   const handleAiLookup = async () => {
@@ -491,6 +513,53 @@ export default function GlobalWordSearch() {
                               )}
                             </div>
                           )}
+
+                          {/* 词根与辨析（AI，按词缓存） */}
+                          <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                                词根与辨析
+                              </p>
+                              {!insight && (
+                                <button
+                                  onClick={() => handleLoadInsight(word.word)}
+                                  disabled={insightLoading}
+                                  className="text-[10px] font-bold text-ink-teal hover:underline disabled:opacity-50"
+                                >
+                                  {insightLoading ? '生成中…' : 'AI 拆词根 / 辨析近义'}
+                                </button>
+                              )}
+                            </div>
+                            {insightError && <p className="mt-1.5 text-[10px] text-destructive">{insightError}</p>}
+                            {insight && (
+                              <div className="mt-2 space-y-2">
+                                {insight.parts.length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {insight.parts.map((part) => (
+                                      <span key={part.part} className="rounded-md bg-background px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+                                        {part.part}
+                                        {part.gloss && <span className="text-muted-foreground"> · {part.gloss}</span>}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                {insight.rootMeaning && (
+                                  <p className="text-[11px] text-muted-foreground">词根核心义：{insight.rootMeaning}</p>
+                                )}
+                                {insight.synonyms.length > 0 && (
+                                  <ul className="space-y-1">
+                                    {insight.synonyms.map((syn) => (
+                                      <li key={syn.word} className="text-[11px] leading-relaxed">
+                                        <span className="font-bold text-foreground">{syn.word}</span>
+                                        {syn.difference && <span className="text-muted-foreground"> — {syn.difference}</span>}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                {insight.tip && <p className="text-[11px] text-muted-foreground">记忆钩子：{insight.tip}</p>}
+                              </div>
+                            )}
+                          </div>
 
                           {/* Deep explanation */}
                           {word.deepExplanation && (
