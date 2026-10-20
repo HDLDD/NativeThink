@@ -57,7 +57,7 @@ ok(/--fx-press-strong:\s*0\.970/.test(CSS) && /--fx-press-soft:\s*0\.985/.test(C
   '① 档位数值钉死：strong 0.970 / soft 0.985（真机 393 CSS + textZoom 120% 下量出来的）');
 ok(/--fx-in:\s*110ms/.test(CSS) && /--fx-out:\s*170ms/.test(CSS) && /--fx-ripple:\s*420ms/.test(CSS),
   '① 时长钉死：按下 110ms / 抬起 170ms / 涟漪 420ms（抬起不用 spring —— 尾巴要 400ms 才算完）');
-ok(/\[data-press\]:active\s*\{[^}]*scale:\s*var\(--fx-press-soft\)/.test(CSS),
+ok(/scale:\s*var\(--fx-press-soft\)/.test(CSS) && /scale:\s*var\(--fx-press-strong\)/.test(CSS),
   '① 按压缩放走独立 `scale` 属性（写 transform 会覆盖既有的 translate，两者不能共存）');
 ok(!/\[data-press\][^{]*\{[^}]*transform:\s*scale/.test(CSS),
   '① 反向：不许有人把缩放改回 transform: scale(...)');
@@ -165,6 +165,38 @@ ok(/\[data-press\][\s\S]{0,80}scale:\s*1 !important/.test(rmBlock),
   '⑨ reduce 偏好下缩放强制回 1（CSS 兜第二层，第一层在委托里）');
 ok(/\.fx-ripple[\s\S]{0,120}animation:\s*none !important/.test(rmBlock),
   '⑨ reduce 偏好下涟漪/环/抖全部停');
+
+/* ── ⑩ 按压态的投递机制：这条是 2026-10-20 模拟器 APK 实测逼出来的 ──
+   CDP 设备级真触摸（Input.dispatchTouchEvent，不是合成事件）按下时：pointerdown 带着
+   pointerType:"touch" 到了元素、涟漪也建了节点，但按下期间整页
+   document.querySelectorAll(':active').length 恒为 0 —— 这台 WebView 触摸下根本不进 :active。
+   所以缩放必须由委托层挂 data-pressing，:active 只作为真鼠标的并列来源。 */
+ok(/\[data-press\]:active,\s*\[data-press\]\[data-pressing\]\s*\{[^}]*scale:\s*var\(--fx-press-soft\)/.test(CSS),
+  '⑩ CSS 的 soft 档把 `:active` 与 `[data-pressing]` **并列**在同一条规则里（只留 :active = APK 上没有手感）；' +
+  '正则钉到 `var(--fx-press-soft)` 那一身，否则降级块里那条同形的选择器会替它蒙过去');
+ok(/\[data-press="strong"\]:active,\s*\[data-press="strong"\]\[data-pressing\]\s*\{[^}]*scale:\s*var\(--fx-press-strong\)/.test(CSS),
+  '⑩ strong 档同样两条来源并列，且都指到同一个 token（不许各写一个数）');
+ok(/host\.setAttribute\('data-pressing', ''\)/.test(FX),
+  '⑩ 委托层在 pointerdown 上挂 data-pressing');
+ok(/aria-disabled[\s\S]{0,120}host\.setAttribute\('data-pressing'[\s\S]{0,240}const reduce[\s\S]{0,160}if \(reduce\)\s*return;[\s\S]{0,240}ripple\(host,/.test(FX),
+  '⑩ 顺序钉死：门槛（off/disabled）→ 挂按压态 → 判降级 → 画涟漪。挂按压态必须在 reduce 之前 —— 降级只该停涟漪，不该顺手把手感也没收；在 disabled 之后 —— 禁用的按钮不许装成按得下去');
+ok(/document\.querySelectorAll\('\[data-pressing\]'\)\.forEach\(\(el\) => el\.removeAttribute\('data-pressing'\)\)/.test(FX),
+  '⑩ 收回是"清全站"而不是"记谁被挂过"：元素在按住期间被 React 换掉也不会留下孤儿属性');
+for (const t of ['pointerup', 'pointercancel']) {
+  ok(new RegExp(`addEventListener\\('${t}', release`).test(FX) && new RegExp(`removeEventListener\\('${t}', release`).test(FX),
+    `⑩ ${t} 既挂也撤（缺 ${t} 会留下一个"永久按着"的元素，缺撤会在热更新/重挂后叠两份监听）`);
+}
+ok(/window\.addEventListener\('blur', release\)/.test(FX),
+  '⑩ 窗口失焦也收 —— 按住时切走（通知栏/切 App）不会再留一个按住的按钮');
+const stray = [];
+for (const rel of allTs) {
+  if (/press-fx\.ts$/.test(rel)) continue;
+  const code = stripTs(read(path.join('src', rel)));
+  if (/data-pressing/.test(code)) stray.push(rel.replace(/\\/g, '/'));
+}
+ok(stray.length === 0, '⑩ 反向：除委托层之外，全站不许有任何地方自己写 data-pressing（属性就是接口，两处写就会漂移）', JSON.stringify(stray));
+ok(/\[data-press\]\[data-pressing\][\s\S]{0,400}scale:\s*1 !important/.test(rmBlock),
+  '⑩ 降级块也把新机制那档强制回 1（漏了这条 = 减少动效偏好下仍然缩放）');
 
 /* ── 收尾 ── */
 const pass = results.filter((r) => r.pass).length;

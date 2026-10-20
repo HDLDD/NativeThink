@@ -30,33 +30,44 @@ const ok = (c, n, d = '') => { results.push(c); console.log(`${c ? '✓' : '✗'
 const has = (t) => String(ev(`(()=>((document.body.innerText||'').replace(/\\s+/g,'').includes(${JSON.stringify(t)}))||'')()`)) === 'true';
 
 /**
- * 一次按下，量四件事：pointerdown→下一帧的毫秒、涟漪是否建了节点、
- * 按下前后 rect 是否**逐位相等**（只缩放不占位）、以及 toast 有没有冒出来。
+ * 一次按下，量五件事：pointerdown→下一帧的毫秒、涟漪是否建了节点、按压缩放有没有发生、
+ * **布局盒**（offsetLeft/offsetTop）动没动（只缩放不占位）、以及 toast 有没有冒出来。
+ * ⚠️ "不占位"必须看布局盒而不是 getBoundingClientRect —— 后者**含 scale**：
+ *    实测 strong 档 115px 宽缩到 0.97 时视觉左边自己就动了 1.7px，用它判会假红；
+ *    而真正要钉的是"会不会把下面的卡片推得跳一下"，那是布局问题，只有 offsetLeft/Top 说得清。
  */
 const press = (sel) => String(ev(`(async()=>{
   const el=document.querySelector('${sel}'); if(!el) return 'NO_TARGET';
   const r0=el.getBoundingClientRect();
   if(r0.width<4||r0.top<0||r0.top>innerHeight-4) return 'OFF_SCREEN:'+JSON.stringify({top:Math.round(r0.top),h:Math.round(r0.height)});
   const x=r0.left+r0.width/2, y=r0.top+r0.height/2;
+  const 布局0=[el.offsetLeft,el.offsetTop];
   const t0=performance.now();
   el.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true,clientX:x,clientY:y,pointerType:'touch'}));
   const built=document.querySelectorAll('.fx-ripple').length;
-  const scale=getComputedStyle(el).scale||'';
+  const 挂上了=el.hasAttribute('data-pressing');
   await new Promise(k=>requestAnimationFrame(()=>requestAnimationFrame(k)));
   const ms=performance.now()-t0;
-  const r1=el.getBoundingClientRect();
+  const scale=getComputedStyle(el).scale||'';
+  const 布局稳=el.offsetLeft===布局0[0]&&el.offsetTop===布局0[1];
   const toasts=document.querySelectorAll('[data-sonner-toast]').length;
-  return JSON.stringify({ms:+ms.toFixed(1),built,scale,rect稳:r0.left===r1.left&&r0.top===r1.top&&r0.width===r1.width&&r0.height===r1.height,toasts});
+  el.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:x,clientY:y,pointerType:'touch'}));
+  await new Promise(k=>requestAnimationFrame(k));
+  return JSON.stringify({ms:+ms.toFixed(1),built,挂上了,scale,布局稳,
+    收回:!el.hasAttribute('data-pressing'),toasts});
 })()`));
 
 ev(`(()=>{location.href='${BASE}/vocabulary';return 'go';})()`);
 sleep(3200);
 ok(!has('页面出错'), '⓪ /vocabulary 打开没有「页面出错」');
 
-/* ① 委托真的挂着：按一个基座按钮，涟漪建了节点 */
+/* ① 委托真的挂着：按一个基座按钮，涟漪建了节点、按压缩放确实发生 */
 const a = JSON.parse(press('[data-press]') || '{}');
 ok(a.built >= 1 && a.ms <= 100, `① pointerdown → 下一帧 ≤100ms 且涟漪建了节点`, JSON.stringify(a));
-ok(a.rect稳 === true, '① 按下前后 rect 逐位相等（缩放走独立 scale，不占位、不推挤布局）', JSON.stringify(a));
+ok(a.挂上了 === true, '① 按下时委托挂上了 data-pressing（缩放不能只靠 :active —— 模拟器 APK 实测触摸下 :active 恒 false）', JSON.stringify(a));
+ok(Number(a.scale) < 1 && Number(a.scale) > 0.9, '① 合成 pointerdown 也能量到缩放在发生（换成 JS 挂属性之前这条根本测不到）', `scale=${a.scale}`);
+ok(a.布局稳 === true, '① 按下前后**布局盒**不动（offsetLeft/offsetTop 逐位相等 = 只缩放不占位，不会把下面的卡片推得跳一下）', JSON.stringify(a));
+ok(a.收回 === true, '① pointerup 后 data-pressing 收回（不收回就是一个永久按住的按钮）', JSON.stringify(a));
 ok(a.toasts === 0, '① 按下不弹 toast（练习界面零提示口径没被动画带破）');
 
 /* ② 涟漪播完自己摘掉，不留在 DOM 里 */
@@ -64,17 +75,17 @@ sleep(700);
 const cleaned = String(ev(`(()=>document.querySelectorAll('.fx-ripple').length)()`));
 ok(Number(cleaned) === 0, '② 涟漪播完自清（600ms 后节点数归 0，不无界堆积）', `当前 ${cleaned}`);
 
-/* ③ 键盘触发不画涟漪（没有触点坐标），但缩放仍在 */
+/* ③ 键盘触发不画涟漪也不挂按压态（没有触点坐标；Enter 的 :active 由浏览器自己决定） */
 const kb = String(ev(`(async()=>{
   const el=document.querySelector('[data-press]');
   const before=document.querySelectorAll('.fx-ripple').length;
   el.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:0,clientY:0,pointerType:'keyboard'}));
   await new Promise(k=>requestAnimationFrame(k));
-  return JSON.stringify({before,after:document.querySelectorAll('.fx-ripple').length});
+  return JSON.stringify({before,after:document.querySelectorAll('.fx-ripple').length,挂:el.hasAttribute('data-pressing')});
 })()`));
-ok(/"after":0/.test(kb) || /"after":0[,}]/.test(kb), '③ 键盘触发一个涟漪都不画', kb);
+ok(/"after":0[,}]/.test(kb) && /"挂":false/.test(kb), '③ 键盘触发：一个涟漪都不画、也不挂 data-pressing', kb);
 
-/* ④ reduce 偏好下委托层直接不建节点（不是靠 CSS 藏） */
+/* ④ reduce 偏好下委托层直接不建节点（不是靠 CSS 藏），缩放也被钉回 1 */
 const rm = String(ev(`(async()=>{
   const real=window.matchMedia;
   window.matchMedia=(q)=>String(q).includes('prefers-reduced-motion')?{matches:true,addEventListener(){},removeListener(){}}:real(q);
@@ -82,10 +93,13 @@ const rm = String(ev(`(async()=>{
   el.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:20,clientY:20,pointerType:'touch'}));
   await new Promise(k=>requestAnimationFrame(k));
   const n=document.querySelectorAll('.fx-ripple').length;
+  const scale=getComputedStyle(el).scale;
+  el.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerType:'touch'}));
   window.matchMedia=real;
-  return JSON.stringify({节点:n});
+  return JSON.stringify({节点:n,scale});
 })()`));
 ok(/"节点":0/.test(rm), '④ reduce 下**不建节点**（藏而不建是两回事：藏的那版 DOM 里仍有残留）', rm);
+ok(/"scale":"1"/.test(rm), '④ reduce 下新机制那条也 scale:1 !important 兜住了（否则挂了属性照样缩）', rm);
 
 /* ⑤ 同一元素连点 6 次，在飞涟漪有上限 */
 const cap = String(ev(`(async()=>{

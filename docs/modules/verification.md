@@ -358,4 +358,17 @@ typecheck + eslint + `npm run verify:all` **28 项全绿**，断言合计 **7,88
 
 ⑦ **两条变异第一次是绿的，暴露守卫自己假绿**：`/prefers-reduced-motion/.test(FX)` 只要那行 `matchMedia` 还在就过，把早退删掉照样绿；`/cancelAnimationFrame\(rafRef\.current\)/` 匹配到的是循环内那处，cleanup 里删掉也不红。**形状**：断言不能匹配"那行字还在"，要匹配"行为发生了" —— 改成钉「reduce 早退排在 `ripple(host,` **之前**」与「cleanup 里 sink 与 rAF **两件一起**撤」，两条才真红。10 条变异最终逐条点名。
 
-⑧ 计数：新守卫 `verify-interaction-fx` **65 条**、`walk-interaction-fx` **12 条**运行时、真机探针 `check-interaction-on-phone` **8 条**（装机后跑）；`verify:all` **29 项全绿**，断言合计 **7,989**。首屏预算没动（不新增依赖、涟漪节点按下才建）。
+⑧ 计数见第 48 测（`verify-interaction-fx` 从 65 涨到 **75**、`walk-interaction-fx` 从 12 涨到 **16**、设备探针从 8 涨到 **13**）；首屏预算没动（不新增依赖、涟漪节点按下才建）。
+
+2026-10-20 第 48 测（第 44 测⑤那条"合成事件不产生激活"只说对了一半 —— 装机通道本身会推翻设计）：第 47 测留下的"真机 8 条待跑"改用**模拟器 APK**（`node scripts/phone-emu.mjs` + `check-interaction-on-phone.mjs --port 9226`）跑完，两条当场翻车：
+
+① **`:active` 在这台 Android WebView 的触摸下根本不生效**。`Input.dispatchTouchEvent` 是设备级真触摸（不是合成事件），实测按下时：`pointerdown` 带着 `pointerType:"touch"` 到了目标元素、涟漪节点也建出来了，但**按下期间整页 `document.querySelectorAll(':active').length` 恒为 0**、`computed scale` 恒为 1。三条通道并测才能定位：真触摸（active 0）/ `Input.dispatchMouseEvent`（active 9 —— 鼠标那条成立）/ 页面内合成 `PointerEvent`（active 0）。结论：**凡是要求在 APK 上成立的按压反馈，状态必须由 JS 投递** —— 委托层 `pointerdown` 挂 `data-pressing`，CSS 把 `:active` 与 `[data-pressing]` 并列（鼠标那条白捡零延迟）。收回四条路径：`pointerup` / `pointercancel` / `window blur` / 卸载函数，少一条就留下一个"永久按着"的按钮；收回实现成"清全站 `[data-pressing]`"而不是"记住刚才挂了谁"，因为按住期间 React 可能已经把那个节点换掉（练习面换卡）。
+**顺带的收益**：机制变成 JS 挂属性之后，**电脑侧合成 pointerdown 也能量到缩放在发生**（`walk-interaction-fx` ① 新增这条），不必等装机才有凭据 —— 一条难测的行为改成了两处可测。
+
+② **"缩放不占位"原来钉错了对象**。第 47 测用的是"按下前后 `getBoundingClientRect()` 逐位相等"，而 **rect 是含 `scale` 的**：strong 档 115px 宽缩到 0.97，视觉左边自己就动 **1.78px** → ⑨ 当场红。错不在实现而在判据：真正要钉的是"会不会把下面的卡片推得跳一下"，那是**布局**问题，只有 `offsetLeft/offsetTop` 说得清（不受 transform/scale 影响）。改成两条：布局盒按下前后逐位相等（实测 Δ0,0），**并且**视觉位移不超过"按档位缩放应得的那点量"（`宽 × (1-scale) / 2 = 1.73px`）—— 超过了才是真重排。⚠️ 网页版当时这条是"侥幸绿"：`:active` 没生效 → 没缩放 → rect 当然不动。**假绿的断言会把设计缺陷一起藏掉**，这是第 44 测①那条元判据的运行时版本。
+
+③ **挑目标要过三重门，否则测的是遮罩**。模拟器新装状态会自动开「使用指南」和「选词书向导」，一层 `dialog-overlay` 盖住整页 —— 第一版按"在屏幕上"挑元素，按下落到遮罩上，③⑨ 双双假红（真机第一次跑也是同一条）。现在的 `pick`：尺寸够大 + `elementFromPoint` 命中它或其后代 + 自身与祖先链 `pointer-events` 都不为 none + 不在打开的 dialog-overlay 之下；读数一律按**坐标**回查宿主（`elementFromPoint(x,y).closest('[data-press]')`）而不是按索引，因为点一下评分按钮就换卡、`[data-press]` 列表跟着重排。
+
+④ 变异 M11(soft 档) 第一次也是绿的：`/\[data-press\]:active,\s*\[data-press\]\[data-pressing\]/` 被**降级块里同形的那条选择器**替它答了；把正则钉到 `var(--fx-press-soft)` 那一身才红。另有两条变异实验本身无效（锚点写成转译后的形状 / "插入"而非"搬移"），重做后才红 —— **变异没变红要先怀疑实验，再怀疑断言**。
+
+⑤ 计数（本轮实测）：`verify-interaction-fx` **75** 条（+⑩ 按压态机制 10 条）、`walk-interaction-fx` **16** 条、`check-interaction-on-phone` **13** 条 ×（strong / soft 两档各跑一遍，模拟器 13/13 两次）；`verify:all` 见本节末。设备侧读数：`data-pressing` 挂上 → `scale 0.97`、**响应时延 32ms**、涟漪在飞 2（上限 3）宿主 1、600ms 自清 0、toast 0。

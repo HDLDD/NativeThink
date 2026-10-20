@@ -328,8 +328,17 @@ h1, h2, h3 { letter-spacing: -0.015em; }
   transition-duration: var(--fx-out), 140ms, 140ms, 140ms, 140ms, 140ms, 140ms, 140ms;
   transition-timing-function: var(--fx-ease);
 }
-[data-press]:active { scale: var(--fx-press-soft); transition-duration: var(--fx-in), 140ms, 140ms, 140ms, 140ms, 140ms, 140ms, 140ms; }
-[data-press="strong"]:active { scale: var(--fx-press-strong); }
+/* 按压态有两个来源，缺一不可：
+   `:active` —— 真鼠标的零延迟路径；
+   `[data-pressing]` —— 由 press-fx 的 pointerdown 委托挂上。
+   ⚠️ 为什么不能只靠 `:active`：2026-10-20 模拟器 APK 上用 CDP `Input.dispatchTouchEvent`
+   （设备级真触摸，不是合成事件）实测——`pointerdown` 带着 `pointerType:"touch"` 到了元素、
+   涟漪也建了节点，但整页 `document.querySelectorAll(':active').length` 恒为 **0**，
+   也就是说这个 WebView 在触摸下根本不进 `:active`。把手感挂在一个平台可能不给的伪类上，
+   发出去的 APK 就没有按压反馈（而且自动化通道根本测不到）。JS 挂属性这条路三种形态都成立，
+   并且测得到——所以两条都留、以 `[data-pressing]` 为准。 */
+[data-press]:active, [data-press][data-pressing] { scale: var(--fx-press-soft); transition-duration: var(--fx-in), 140ms, 140ms, 140ms, 140ms, 140ms, 140ms, 140ms; }
+[data-press="strong"]:active, [data-press="strong"][data-pressing] { scale: var(--fx-press-strong); }
 
 /* 涟漪装在自有的宿主层里：不给按钮加 overflow:hidden —— 那会掐掉焦点环与内部浮层 */
 .fx-ripple-host { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; z-index: 0; }
@@ -363,7 +372,7 @@ h1, h2, h3 { letter-spacing: -0.015em; }
 
 /* 降级：减少动效偏好下**不画涟漪、不缩放**（委托层直接不建节点，这里再兜一层） */
 @media (prefers-reduced-motion: reduce) {
-  [data-press], [data-press]:active { scale: 1 !important; transition: none !important; }
+  [data-press], [data-press]:active, [data-press][data-pressing] { scale: 1 !important; transition: none !important; }
   .fx-ripple, .fx-ring::after, .fx-shake { animation: none !important; }
   .fx-arc .fx-arc-fg { animation-duration: 0.01ms !important; }
 }

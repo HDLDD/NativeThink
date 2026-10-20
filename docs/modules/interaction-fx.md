@@ -25,8 +25,10 @@ framer-motion 已经在**首屏壳里**（`verify-bundle-budget` 的 540KB 基�
 | 曲线 | `cubic-bezier(0.22, 1, 0.36, 1)` | 全站一条 |
 
 **三条故意不做**：① 卡面整张（滑动评分区）不给缩放 —— 它和手势拖拽共存，缩一下 + 手指一动就抖；
-② 键盘触发（Enter/Space）不画涟漪 —— 没有触点坐标，只走 `:active` 缩放；
+② 键盘触发（Enter/Space）不画涟漪、也不挂按压态 —— 没有触点坐标；
 ③ `prefers-reduced-motion` 下涟漪与缩放**全关**，只留基座那层压暗。
+
+⚠️ **"按下去缩了"这条在 APK 上原来是不成立的** —— 见 §3.4，那是装机实测逼出来的机制改动，不是调参。
 
 ## 3. 四个单元（每个都能独立看懂、独立测）
 
@@ -56,7 +58,37 @@ framer-motion 已经在**首屏壳里**（`verify-bundle-budget` 的 540KB 基�
 - **`transition-property` 是整体覆盖**：只写 `scale` 会把元素原有的 `transition-colors` 顶掉（快速闪卡的词面 chip 就中招）。
   所以白名单里必须把颜色项一起列出（`:325-331`），守卫有一条专门钉它。
 
-### 3.4 降级与边界
+### 3.4 缩放**不能只靠 `:active`**（2026-10-20 模拟器 APK 实测，这条改掉了原来的设计）
+
+`node scripts/check-interaction-on-phone.mjs --port 9226` 用 CDP `Input.dispatchTouchEvent`
+（设备级真触摸，不是 `dispatchEvent` 那种合成事件）按下时量到：
+
+| 读数 | 结果 |
+|---|---|
+| `pointerdown` 是否到达目标 | **到了**，`pointerType:"touch"`，涟漪节点也建了 |
+| 按下期间整页 `document.querySelectorAll(':active').length` | **恒为 0** |
+| 按下期间 `getComputedStyle(el).scale` | **恒为 1**（`:active` 没进，缩放自然没发生） |
+
+也就是说这台 Android WebView 在触摸下**根本不进 `:active`**。第一版把缩放只挂在 `:active` 上，
+等于"网页版有手感、发出去的 APK 没有"，而且**自动化通道还测不到**（合成事件同样不激活）。
+所以按压态改由委托层投递：`pointerdown` → `host.setAttribute('data-pressing','')`，
+CSS 里 `:active` 与 `[data-pressing]` **并列**在同一条规则（鼠标那条留着，白捡零延迟）。
+
+收回路径是四条，缺一条就会留下一个"永久按着"的按钮：`pointerup` / `pointercancel` / `window blur` /
+`initPressFx` 的卸载函数。收回写的是"清全站 `[data-pressing]`"而不是"记住刚才挂了谁" ——
+因为按住期间 React 可能把那个节点换掉（练习面换卡），记身份会漏。
+
+**这条改动的附带收益**：机制变成 JS 挂属性之后，**电脑侧也能测了** ——
+`walk-interaction-fx.mjs` 用合成 `pointerdown` 就能验缩放档位，不必等到装机才有凭据。
+
+**同一次实测还推翻了一条判据**：`getBoundingClientRect()` **含 scale**。
+strong 档 115px 宽的按钮缩到 0.97 时，视觉左边自己就动了 1.7px —— 拿"按下前后 rect 逐位相等"判"不占位"
+**判的是错的东西**（网页版当时因为 `:active` 根本没生效，才侥幸是绿的）。
+"不占位"真正要钉的是**布局盒**：`offsetLeft/offsetTop` 不受 transform/scale 影响，按下前后必须逐位相等；
+视觉位移则反过来只许在"按档位缩放应得的那点量"以内（`宽 × (1-scale) / 2`），超了才是真重排。
+两条都写进了 `check-interaction-on-phone.mjs` ⑨ 与 `walk-interaction-fx.mjs` ①。
+
+### 3.5 降级与边界
 
 - reduce 判断在**委托层**（`press-fx.ts:70-72`，排在画涟漪之前），不是靠 CSS 藏 —— 藏的那版 DOM 里仍留着节点。
 - 拿不到有效 `rect`（`display:none`、零尺寸）就不画，**绝不猜坐标**；同一元素在飞的涟漪 `MAX_IN_FLIGHT = 3`，超了丢最旧的；`animationend` 自摘。
@@ -80,21 +112,34 @@ framer-motion 已经在**首屏壳里**（`verify-bundle-budget` 的 540KB 基�
 
 ## 6. 验证
 
-- `node scripts/verify-interaction-fx.mjs` —— **65 条**：token 单点定义与数值、`scale` 而非 `transform`（含反向断言）、
+- `node scripts/verify-interaction-fx.mjs` —— **75 条**：token 单点定义与数值、`scale` 而非 `transform`（含反向断言）、
   颜色过渡白名单、9 个练习面 `active:scale` 计数为 0 且 `data-press` 覆盖数只许涨不许跌、基座档位推导、
   委托层四条边界（键盘/reduce/无尺寸/上限）、涟漪两档且不许回到 `currentColor`、奖励层唯一出口（剥注释全仓扫描）、
-  结果层不引 motion 不弹 toast、闪卡接线四条（含两条正对照）。
-  **变异 10 条逐条点名**：M1 缩放写回 transform / M3 删 reduce 早退 / M4 `>=7` / M5 去掉"评过≥1" / M6 不清 ref /
-  M7 第二处挂载 / M8 回到 currentColor / M9 加回 ad-hoc scale / M10 DPR 不夹 / M11 cleanup 不撤 rAF。
-  ⚠️ 其中 M3、M11 **第一次是绿的** —— 断言在假绿（`/prefers-reduced-motion/.test(FX)` 只要那行 matchMedia 还在就过；
-  `cancelAnimationFrame` 匹配到的是循环内那处而不是 cleanup），改成钉"早退排在画涟漪之前"和"sink 与 rAF 一起撤"才真红。
-- `node scripts/walk-interaction-fx.mjs` —— **12 条**运行时（无头 Chrome + CDP）：`pointerdown→下一帧 3.7ms`、
-  按下前后 `rect` 逐位相等、涟漪自清、键盘 0 个、reduce 0 节点、连点 6 次在飞 ≤3 且宿主只 1 个、
-  canvas 唯一且 `pointer-events:none`、三面运行时覆盖数（`/vocabulary` 24、`/chunks` 11、`/video` 11）。
-- `node scripts/check-interaction-on-phone.mjs [--port 9223] [--index N]` —— 真机 8 条，**用 CDP `Input.dispatchTouchEvent` 真触摸**。
-  为什么非要有它：`dispatchEvent(new PointerEvent(...))` 是合成事件，不产生浏览器激活，**`:active` 根本不会生效** ——
-  电脑侧只能量到涟漪与不占位，量不到"按下去真的缩了"。
-- 收尾一律 `npm run verify:all`（改的是 `<Button>` 基座 = 全站共享组件；当前 29 项全绿）。
+  结果层不引 motion 不弹 toast、闪卡接线四条（含两条正对照）、**⑩ 按压态投递机制十条**（两条 CSS 选择器并列、
+  挂属性、门槛→挂→降级→涟漪的**顺序**、收回按"清全站"、pointerup/pointercancel 既挂又撤、失焦也撤、
+  反向"除委托层全站不许自己写 data-pressing"、降级块覆盖新机制）。
+  **变异逐条点名**：M1 缩放写回 transform / M3 删 reduce 早退 / M4 `>=7` / M5 去掉"评过≥1" / M6 不清 ref /
+  M7 第二处挂载 / M8 回到 currentColor / M9 加回 ad-hoc scale / M10 DPR 不夹 / M11 cleanup 不撤 rAF /
+  M11 摘掉 soft 档并列选择器 / M12 摘掉 strong 档 / M13 不挂属性 / M14 挪到 reduce 之后 / M15 收回改清错集合 /
+  M16 缺 pointercancel / M17 卸载不撤 pointerup / M18 不管失焦 / M19 页面自己写属性 / M20 降级块漏新机制 /
+  M21 挂属性挪到 disabled 门槛之前。
+  ⚠️ 三条**第一次是绿的**、都是断言在假绿：M3、M11(rAF)，以及本轮的 **M11(soft 档)** ——
+  `/\[data-press\]:active,\s*\[data-press\]\[data-pressing\]/` 被**降级块里同形的那条选择器**替它答了，
+  正则必须钉到 `var(--fx-press-soft)` 那一身才红。M17/M21 则是变异锚点用错了（源码带 `as EventListener`、
+  以及"插入"而不是"搬移"）—— 实验本身无效，重做后才红。
+- `node scripts/walk-interaction-fx.mjs` —— **16 条**运行时（无头 Chrome + CDP）：`pointerdown→下一帧 ≤100ms`、
+  **合成 pointerdown 现在也能量到缩放在发生**（换成 JS 挂属性之前这条测不到）、`data-pressing` 挂上且 pointerup 收回、
+  **布局盒** `offsetLeft/offsetTop` 按下前后不动、涟漪自清、reduce 下既不建节点也 scale 1、键盘 0 个、
+  连点 6 次在飞 ≤3 且宿主只 1 个、canvas 唯一且 `pointer-events:none`、三面运行时覆盖数。
+- `node scripts/check-interaction-on-phone.mjs --port 9226 --tier strong`（模拟器）/ `--port 9223`（真机）——
+  **13 条**，用 CDP `Input.dispatchTouchEvent` 发**设备级真触摸**（不是合成事件）。
+  这一条通道就是 §3.4 那个发现的来源，也是它把判据改成了：② 挂上 `data-pressing`、③ scale 到档位值、
+  ④ 响应时延（实测 32ms）、⑦ 手指**移到别处再抬手**属性仍收回、⑨ 布局盒不动 + 视觉位移不超缩放应得量、
+  ⑩⑪ 连点上限与自清。挑目标必须过**三重门**（尺寸、`elementFromPoint` 命中它或其后代、自身与祖先链
+  `pointer-events` 都不为 none、且不在打开的 dialog-overlay 之下），否则新装状态的选词书向导会让按下落到遮罩上 ——
+  这是本脚本第一版两条假红的根因。读数按**坐标**回查宿主（`elementFromPoint().closest('[data-press]')`）而不是按索引，
+  因为点一下评分按钮就把卡片换掉、`[data-press]` 列表跟着重排。
+- 收尾一律 `npm run verify:all`（改的是 `<Button>` 基座 = 全站共享组件）。
 
 ## 7. 已知边界（别当成已完成）
 
