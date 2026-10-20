@@ -59,7 +59,7 @@ const RV_GENRES: { key: string; label: string }[] = [
 const RV_TOPIC_FREE = 'free';
 
 const LEVELS: { key: Level; label: string; color: string; desc: string }[] = [
-  { key: 'beginner', label: '初级', color: '#00B894', desc: '简单句式，常用词汇' },
+  { key: 'beginner', label: '初级', color: 'var(--brand)', desc: '简单句式，常用词汇' },
   { key: 'intermediate', label: '中级', color: '#F59E0B', desc: '复合句，丰富表达' },
   { key: 'advanced', label: '高级', color: '#6C5CE7', desc: '学术/专业级别' },
 ];
@@ -897,7 +897,7 @@ export default function ArticlePage() {
           <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="rounded-2xl text-[10px] font-bold gap-1">
             <Upload className="size-3.5" />导入书籍
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setGenDialogOpen(true)} className="rounded-2xl text-[10px] font-bold gap-1 bg-[#00B894]/5 border-[#00B894]/30 text-ink-teal">
+          <Button variant="outline" size="sm" onClick={() => setGenDialogOpen(true)} className="rounded-2xl text-[10px] font-bold gap-1 bg-[var(--brand)]/5 border-[var(--brand)]/30 text-ink-teal">
             <Wand2 className="size-3.5" />AI 生成
           </Button>
         </div>
@@ -996,12 +996,12 @@ export default function ArticlePage() {
               return (
               <Card
                 key={book.id}
-                className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
+                className="rounded-[24px] border-border hover:border-[var(--brand)]/40 hover:shadow-md transition-all cursor-pointer group"
                 onClick={() => { void openBookFromList(book).then((ok) => { if (!ok) toast.error('书本内容加载失败，请重试'); }); saveToHistory(book.zhTitle, '', 'books', { bookId: book.id }); }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
-                    <div className="size-12 rounded-2xl bg-gradient-to-br from-[#00B894]/10 to-emerald-100 dark:to-emerald-500/20 flex items-center justify-center text-2xl shrink-0">
+                    <div className="size-12 rounded-2xl bg-gradient-to-br from-[var(--brand)]/10 to-emerald-100 dark:to-emerald-500/20 flex items-center justify-center text-2xl shrink-0">
                       📖
                     </div>
                     <div className="flex-1 min-w-0">
@@ -1026,7 +1026,7 @@ export default function ArticlePage() {
                             <span className="text-muted-foreground font-bold">{pct}%</span>
                           </div>
                           <div className="h-1 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-[#00B894] rounded-full transition-all" style={{ width: `${pct}%` }} />
+                            <div className="h-full bg-[var(--brand)] rounded-full transition-all" style={{ width: `${pct}%` }} />
                           </div>
                         </div>
                       )}
@@ -1067,10 +1067,10 @@ export default function ArticlePage() {
                 </div>
                 <div className="stagger grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {items.map((w) => (
-                    <Card key={w.id} className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all">
+                    <Card key={w.id} className="rounded-[24px] border-border hover:border-[var(--brand)]/40 hover:shadow-md transition-all">
                       <CardContent className="p-5 space-y-3">
                         <div className="flex items-start gap-3">
-                          <div className="size-11 rounded-2xl bg-gradient-to-br from-[#00B894]/10 to-emerald-100 dark:to-emerald-500/20 flex items-center justify-center text-xl shrink-0">
+                          <div className="size-11 rounded-2xl bg-gradient-to-br from-[var(--brand)]/10 to-emerald-100 dark:to-emerald-500/20 flex items-center justify-center text-xl shrink-0">
                             {group === 'cc' ? '📗' : group === 'translated' ? '🌐' : group === 'royalroad' ? '⚔️' : '📘'}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1145,12 +1145,12 @@ export default function ArticlePage() {
           <div className="stagger grid grid-cols-1 sm:grid-cols-2 gap-4">
             {SCP_ARTICLES.map((a) => (
               <Card key={a.id}
-                className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
+                className="rounded-[24px] border-border hover:border-[var(--brand)]/40 hover:shadow-md transition-all cursor-pointer group"
                 onClick={() => { openReader(a); saveToHistory(a.zhTitle, '', 'scp', { bookId: a.id }); }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
-                    <div className="size-12 rounded-2xl bg-gradient-to-br from-[#00B894]/10 to-emerald-100 dark:to-emerald-500/20 flex items-center justify-center text-2xl shrink-0">
+                    <div className="size-12 rounded-2xl bg-gradient-to-br from-[var(--brand)]/10 to-emerald-100 dark:to-emerald-500/20 flex items-center justify-center text-2xl shrink-0">
                       🗂️
                     </div>
                     <div className="flex-1 min-w-0">
@@ -1193,7 +1193,7 @@ export default function ArticlePage() {
             {PUBLICATIONS.map((pub) => (
               <Card
                 key={pub.id}
-                className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
+                className="rounded-[24px] border-border hover:border-[var(--brand)]/40 hover:shadow-md transition-all cursor-pointer group"
                 onClick={() => { openReader(pub); saveToHistory(pub.zhTitle, '', 'publications', { pubId: pub.id }); }}
               >
                 <CardContent className="p-5">
@@ -1383,7 +1383,7 @@ export default function ArticlePage() {
                 size="sm"
                 onClick={() => aiTopicInput.trim() && generateAiArticle(aiTopicInput.trim())}
                 disabled={!aiTopicInput.trim() || aiLoading || !isConfigured}
-                className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white text-[10px] font-bold px-4"
+                className="rounded-xl bg-[var(--brand)] hover:bg-[#00a882] text-white text-[10px] font-bold px-4"
               >
                 {aiLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
                 <span className="ml-1">生成</span>
@@ -1402,7 +1402,7 @@ export default function ArticlePage() {
                   disabled={aiLoading}
                   className={cn(
                     'p-4 rounded-2xl border-2 text-center transition-all',
-                    'border-border hover:border-[#00B894]/50 hover:bg-[#00B894]/5',
+                    'border-border hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5',
                     'disabled:opacity-50',
                   )}
                 >
@@ -1425,7 +1425,7 @@ export default function ArticlePage() {
                 {aiArticles.map((a) => (
                   <Card
                     key={a.id}
-                    className="rounded-2xl border-border hover:border-[#00B894]/40 hover:shadow-sm transition-all cursor-pointer group"
+                    className="rounded-2xl border-border hover:border-[var(--brand)]/40 hover:shadow-sm transition-all cursor-pointer group"
                     onClick={() => openReader(a)}
                     title={a.rvWords?.length ? `复习词：${a.rvWords.join(', ')}` : undefined}
                   >
@@ -1515,7 +1515,7 @@ export default function ArticlePage() {
             {speechMeta.map((speech) => (
               <Card
                 key={speech.id}
-                className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all overflow-hidden group cursor-pointer"
+                className="rounded-[24px] border-border hover:border-[var(--brand)]/40 hover:shadow-md transition-all overflow-hidden group cursor-pointer"
                 onClick={() => loadSpeech(speech.id)}
               >
                 <CardContent className="p-5">
@@ -1563,7 +1563,7 @@ export default function ArticlePage() {
             <Button
               type="submit"
               disabled={wikiSearching || !wikiQuery.trim()}
-              className="rounded-2xl bg-[#00B894] hover:bg-[#00A080] text-white font-bold gap-1.5"
+              className="rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-bold gap-1.5"
             >
               {wikiSearching ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
               搜索
@@ -1575,7 +1575,7 @@ export default function ArticlePage() {
               {wikiResults.map((r) => (
                 <Card
                   key={r.title}
-                  className="rounded-[24px] border-border hover:border-[#00B894]/40 hover:shadow-md transition-all cursor-pointer group"
+                  className="rounded-[24px] border-border hover:border-[var(--brand)]/40 hover:shadow-md transition-all cursor-pointer group"
                   onClick={() => openWikiPage(r.title)}
                 >
                   <CardContent className="p-4 flex items-center gap-3">
@@ -1618,7 +1618,7 @@ export default function ArticlePage() {
                   <button
                     key={s}
                     onClick={() => { setWikiQuery(s); searchWiki(s); }}
-                    className="px-3 py-1.5 rounded-full bg-muted hover:bg-[#00B894]/10 hover:text-ink-teal text-xs font-bold text-muted-foreground transition-colors"
+                    className="px-3 py-1.5 rounded-full bg-muted hover:bg-[var(--brand)]/10 hover:text-ink-teal text-xs font-bold text-muted-foreground transition-colors"
                   >
                     {s}
                   </button>
@@ -1632,7 +1632,7 @@ export default function ArticlePage() {
       {/* ── AI Generate Dialog ── */}
       <Dialog open={genDialogOpen} onOpenChange={setGenDialogOpen}>
         <DialogContent className="max-w-md rounded-[32px] p-0 overflow-hidden">
-          <div className="p-6 border-b border-border bg-gradient-to-r from-[#00B894]/5 to-emerald-50 dark:to-emerald-500/10">
+          <div className="p-6 border-b border-border bg-gradient-to-r from-[var(--brand)]/5 to-emerald-50 dark:to-emerald-500/10">
             <DialogHeader>
               <DialogTitle className="text-lg font-black flex items-center gap-2">
                 <Wand2 className="size-5 text-ink-teal" />AI 生成内容
@@ -1654,7 +1654,7 @@ export default function ArticlePage() {
                     onClick={() => setGenType(t.key)}
                     className={cn(
                       'px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2',
-                      genType === t.key ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                      genType === t.key ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
                     )}
                   >{t.label}</button>
                 ))}
@@ -1675,7 +1675,7 @@ export default function ArticlePage() {
                     onClick={() => setGenLevel(l.key)}
                     className={cn(
                       'px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2',
-                      genLevel === l.key ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                      genLevel === l.key ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
                     )}
                   >{l.label}</button>
                 ))}
@@ -1691,7 +1691,7 @@ export default function ArticlePage() {
                     onClick={() => setGenWordCount(n)}
                     className={cn(
                       'px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2',
-                      genWordCount === n ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                      genWordCount === n ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal' : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
                     )}
                   >{n}</button>
                 ))}
@@ -1708,7 +1708,7 @@ export default function ArticlePage() {
             <Button
               onClick={generateContent}
               disabled={aiLoading || !isConfigured}
-              className="w-full rounded-2xl bg-[#00B894] hover:bg-[#00A080] text-white text-sm font-black"
+              className="w-full rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white text-sm font-black"
             >
               {aiLoading ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Wand2 className="size-4 mr-2" />}
               生成
@@ -1760,13 +1760,13 @@ export default function ArticlePage() {
                 onChange={(e) => setImportText(e.target.value)}
                 placeholder="粘贴英文正文…&#10;&#10;有 Chapter 1 / 第1章 等标题会自动切分章节；没有则按约 2500 词自动分节"
                 rows={6}
-                className="w-full rounded-2xl border border-input bg-background px-4 py-3 text-xs resize-y focus:outline-none focus:ring-2 focus:ring-[#00B894]/20 focus:border-[#00B894]"
+                className="w-full rounded-2xl border border-input bg-background px-4 py-3 text-xs resize-y focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 focus:border-[var(--brand)]"
               />
             </div>
           </div>
           <div className="p-6 border-t border-border flex gap-3 justify-end">
             <Button variant="outline" onClick={() => setImportOpen(false)} className="rounded-2xl">取消</Button>
-            <Button onClick={doImport} disabled={importing || !importText.trim()} className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black">
+            <Button onClick={doImport} disabled={importing || !importText.trim()} className="rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-black">
               {importing ? <Loader2 className="size-4 mr-1.5 animate-spin" /> : <Upload className="size-4 mr-1.5" />}
               {importing ? '导入中…' : '导入'}
             </Button>
@@ -1787,7 +1787,7 @@ export default function ArticlePage() {
       {/* ── Usage Guide Dialog ── */}
       <Dialog open={showGuide} onOpenChange={setShowGuide}>
         <DialogContent className="max-w-lg rounded-[32px] p-0 overflow-hidden">
-          <div className="p-6 border-b border-border bg-gradient-to-r from-[#00B894]/5 to-emerald-50 dark:to-emerald-500/10">
+          <div className="p-6 border-b border-border bg-gradient-to-r from-[var(--brand)]/5 to-emerald-50 dark:to-emerald-500/10">
             <DialogHeader>
               <DialogTitle className="text-lg font-black flex items-center gap-2">
                 <HelpCircle className="size-5 text-ink-teal" />使用指南

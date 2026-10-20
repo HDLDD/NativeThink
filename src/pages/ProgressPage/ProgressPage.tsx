@@ -337,9 +337,9 @@ export default function ProgressPage() {
 
   const getIntensityClass = (minutes: number) => {
     if (minutes === 0) return 'bg-muted/50';
-    if (minutes < 20) return 'bg-[#00B894]/30';
-    if (minutes < 40) return 'bg-[#00B894]/60';
-    return 'bg-[#00B894]';
+    if (minutes < 20) return 'bg-[var(--brand)]/30';
+    if (minutes < 40) return 'bg-[var(--brand)]/60';
+    return 'bg-[var(--brand)]';
   };
 
   const typeLabelMap: Record<string, string> = {
@@ -391,7 +391,7 @@ export default function ProgressPage() {
               variant="outline"
               size="sm"
               onClick={() => setShowResetDialog(true)}
-              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
             >
               <RotateCw className="size-3.5 mr-1.5" />
               管理学习记录
@@ -400,7 +400,7 @@ export default function ProgressPage() {
               variant="outline"
               size="sm"
               onClick={exportLearningData}
-              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
             >
               <Download className="size-3.5 mr-1.5" />
               导出学习数据
@@ -409,7 +409,7 @@ export default function ProgressPage() {
               variant="outline"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
-              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
             >
               <Upload className="size-3.5 mr-1.5" />
               从备份恢复
@@ -808,7 +808,7 @@ export default function ProgressPage() {
                       className={cn(
                         'aspect-square rounded-2xl flex flex-col items-center justify-center text-xs transition-all',
                         isCurrentMonth ? '' : 'opacity-30',
-                        isToday && 'ring-1 ring-inset ring-[#00B894]',
+                        isToday && 'ring-1 ring-inset ring-[var(--brand)]',
                       )}
                     >
                       <div
@@ -836,9 +836,9 @@ export default function ProgressPage() {
                 </span>
                 <div className="flex items-center gap-1">
                   <div className="size-6 rounded-lg bg-muted/50" />
-                  <div className="size-6 rounded-lg bg-[#00B894]/30" />
-                  <div className="size-6 rounded-lg bg-[#00B894]/60" />
-                  <div className="size-6 rounded-lg bg-[#00B894]" />
+                  <div className="size-6 rounded-lg bg-[var(--brand)]/30" />
+                  <div className="size-6 rounded-lg bg-[var(--brand)]/60" />
+                  <div className="size-6 rounded-lg bg-[var(--brand)]" />
                 </div>
                 <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                   少 → 多
@@ -930,8 +930,8 @@ export default function ProgressPage() {
                     className={cn(
                       'rounded-xl text-[10px] font-black uppercase tracking-wider',
                       favReviewMode
-                        ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50'
-                        : 'border-border hover:border-[#00B894] hover:text-ink-teal',
+                        ? 'bg-[var(--brand)] text-white shadow-lg shadow-emerald-200/50'
+                        : 'border-border hover:border-[var(--brand)] hover:text-ink-teal',
                     )}
                   >
                     {favReviewMode ? '浏览模式' : '开始回顾'}
@@ -949,7 +949,7 @@ export default function ProgressPage() {
                   {filteredFavorites.map((item) => (
                     <Card
                       key={item.id}
-                      className="rounded-[28px] border-border hover:border-[#00B894]/30 hover:shadow-md transition-all duration-300 group"
+                      className="rounded-[28px] border-border hover:border-[var(--brand)]/30 hover:shadow-md transition-all duration-300 group"
                     >
                       <CardContent className="p-5">
                         <div className="flex items-start justify-between gap-3 mb-3">

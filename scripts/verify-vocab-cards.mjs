@@ -438,8 +438,8 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/currentLevel\?: string;/.test(page) && /\{onSwitchBook && currentLevel === key && \(/.test(page) && /\{onSwitchBook && currentLevel === 'all' && \(/.test(page),
     '换书向导给当前词书打「当前」标记（单个词书 + 全部词库两处都要）');
   check(/currentLevel=\{selectedLevel\}/.test(page), '页面把当前词书传给向导（标记的数据源）');
-  check(/onSwitchBook && currentLevel === key \? 'border-\[#00B894\]/.test(page),
-    '当前词书卡片有视觉强调（正对照：只在换书模式 + 命中当前书时）');
+  check(/onSwitchBook && currentLevel === key \? 'border-\[var\(--brand\)\]/.test(page),
+    '当前词书卡片有视觉强调（正对照：只在换书模式 + 命中当前书时；品牌色走 --brand，换主题会跟着变）');
 
   /**
    * 走完向导必须**直接落进所选模式**（2026-09-29 真机化验收时发现的另一半"多点一步"）：

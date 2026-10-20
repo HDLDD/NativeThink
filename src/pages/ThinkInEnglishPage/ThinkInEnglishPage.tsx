@@ -795,7 +795,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   <Button
                     type="submit"
                     disabled={detectorLoading || !detectorInput.trim()}
-                    className="bg-[#00B894] hover:bg-[#00A080] text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+                    className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
                   >
                     {detectorLoading ? (
                       <>
@@ -885,7 +885,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   variant="outline"
                   size="sm"
                   onClick={nextExercise}
-                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
                 >
                   <RefreshCw className="size-3.5" />
                   换一题
@@ -949,14 +949,14 @@ The chineseText should subtly embed English thinking patterns so learners discov
                     type="button"
                     variant="outline"
                     onClick={() => setShowNativeRef(!showNativeRef)}
-                    className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+                    className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
                   >
                     {showNativeRef ? '隐藏参考' : '查看母语者表达'}
                   </Button>
                   <Button
                     type="submit"
                     disabled={translationLoading || !translationInput.trim()}
-                    className="bg-[#00B894] hover:bg-[#00A080] text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+                    className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
                   >
                     {translationLoading ? (
                       <>
@@ -998,7 +998,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               )}
 
               {translationResult && (
-                <Card className="rounded-[32px] border-[#00B894]/20 bg-[#00B894]/5 dark:border-[#00B894]/30 dark:bg-[#00B894]/10">
+                <Card className="rounded-[32px] border-[var(--brand)]/20 bg-[var(--brand)]/5 dark:border-[var(--brand)]/30 dark:bg-[var(--brand)]/10">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-ink-teal">
                       <Lightbulb className="size-4.5" />
@@ -1051,7 +1051,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   variant="outline"
                   size="sm"
                   onClick={nextBackExercise}
-                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
                 >
                   <RefreshCw className="size-3.5" />
                   换一题
@@ -1075,9 +1075,9 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="p-6 rounded-[32px] bg-gradient-to-br from-[#00B894]/5 to-emerald-50 dark:from-[#00B894]/10 dark:to-emerald-500/10 border border-[#00B894]/10">
+              <div className="p-6 rounded-[32px] bg-gradient-to-br from-[var(--brand)]/5 to-emerald-50 dark:from-[var(--brand)]/10 dark:to-emerald-500/10 border border-[var(--brand)]/10">
                 <div className="flex items-center gap-2 mb-4">
-                  <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-[#00B894]/15 dark:bg-[#00B894]/25 text-ink-teal border-none">
+                  <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-[var(--brand)]/15 dark:bg-[var(--brand)]/25 text-ink-teal border-none">
                     关键词
                   </Badge>
                   <Badge
@@ -1124,14 +1124,14 @@ The chineseText should subtly embed English thinking patterns so learners discov
                     type="button"
                     variant="outline"
                     onClick={() => setShowBackRef(!showBackRef)}
-                    className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+                    className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
                   >
                     {showBackRef ? '隐藏参考' : '查看参考句子'}
                   </Button>
                   <Button
                     type="submit"
                     disabled={backLoading || !backInput.trim()}
-                    className="bg-[#00B894] hover:bg-[#00A080] text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+                    className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
                   >
                     {backLoading ? (
                       <>
@@ -1175,7 +1175,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               )}
 
               {backResult && (
-                <Card className="rounded-[32px] border-[#00B894]/20 bg-[#00B894]/5 dark:border-[#00B894]/30 dark:bg-[#00B894]/10">
+                <Card className="rounded-[32px] border-[var(--brand)]/20 bg-[var(--brand)]/5 dark:border-[var(--brand)]/30 dark:bg-[var(--brand)]/10">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-ink-teal">
                       <Lightbulb className="size-4.5" />
@@ -1228,7 +1228,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   variant="outline"
                   size="sm"
                   onClick={nextNativeExercise}
-                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
                 >
                   <RefreshCw className="size-3.5" />
                   换一题
@@ -1289,7 +1289,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                     type="button"
                     variant="outline"
                     onClick={() => setShowNativeThinkRef(!showNativeThinkRef)}
-                    className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+                    className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
                   >
                     {showNativeThinkRef ? '隐藏参考' : '查看母语者表达'}
                   </Button>

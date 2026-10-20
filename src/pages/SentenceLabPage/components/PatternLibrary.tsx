@@ -78,7 +78,7 @@ export function PatternLibrary({ initialPatternId }: { initialPatternId?: string
               className={cn(
                 'px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
                 cat === c
-                  ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal'
+                  ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
                   : 'border-border text-muted-foreground hover:border-muted-foreground/40',
               )}
             >
@@ -95,7 +95,7 @@ export function PatternLibrary({ initialPatternId }: { initialPatternId?: string
               className={cn(
                 'w-full text-left rounded-2xl border p-3 transition-all',
                 active?.id === p.id
-                  ? 'border-[#00B894] bg-[#00B894]/5'
+                  ? 'border-[var(--brand)] bg-[var(--brand)]/5'
                   : 'border-border/60 bg-card hover:border-muted-foreground/30',
               )}
             >
@@ -133,7 +133,7 @@ export function PatternLibrary({ initialPatternId }: { initialPatternId?: string
                   const m = part.match(/^\{(.+)\}$/);
                   if (!m) return <span key={i}>{part}</span>;
                   return (
-                    <span key={i} className="inline-block px-2 py-0.5 mx-0.5 rounded-lg bg-[#00B894]/10 text-ink-teal border border-[#00B894]/30">
+                    <span key={i} className="inline-block px-2 py-0.5 mx-0.5 rounded-lg bg-[var(--brand)]/10 text-ink-teal border border-[var(--brand)]/30">
                       {m[1]}
                     </span>
                   );
@@ -147,7 +147,7 @@ export function PatternLibrary({ initialPatternId }: { initialPatternId?: string
                 <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">中文思维</p>
                 <p className="text-[11px] font-bold text-foreground/80 leading-relaxed">{active.zhThinking}</p>
               </div>
-              <div className="rounded-2xl border border-[#00B894]/30 bg-[#00B894]/5 p-3">
+              <div className="rounded-2xl border border-[var(--brand)]/30 bg-[var(--brand)]/5 p-3">
                 <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal mb-1 flex items-center gap-1">
                   <Lightbulb className="size-3" /> 母语者为什么这样组织
                 </p>
@@ -202,7 +202,7 @@ export function PatternLibrary({ initialPatternId }: { initialPatternId?: string
               <p className="text-[13px] font-black text-foreground leading-relaxed">{built}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" className="rounded-xl text-[10px] font-black bg-[#00B894] hover:bg-[#00A383]"
+              <Button size="sm" className="rounded-xl text-[10px] font-black bg-[var(--brand)] hover:bg-[#00A383]"
                 disabled={!builtReady}
                 onClick={() => {
                   speak(built);

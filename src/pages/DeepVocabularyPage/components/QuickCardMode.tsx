@@ -657,7 +657,7 @@ export default function QuickCardMode({ level }: { level: string }) {
           initial={{ scale: 0.94, opacity: 0, y: 12 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 220, damping: 20 }}
-          className="rounded-[32px] border-2 border-[#00B894]/20 bg-card shadow-sm p-6 sm:p-8 space-y-5"
+          className="rounded-[32px] border-2 border-[var(--brand)]/20 bg-card shadow-sm p-6 sm:p-8 space-y-5"
         >
           <div className="text-center space-y-5">
             <Target className="size-12 text-muted-foreground/40 mx-auto" />
@@ -726,7 +726,7 @@ export default function QuickCardMode({ level }: { level: string }) {
                 <RotateCcw className="size-3.5 mr-1.5" />只重练不认识的（{wrongWords.length}）
               </Button>
             )}
-            <Button onClick={buildQueue} className="flex-1 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white text-xs font-black">
+            <Button onClick={buildQueue} className="flex-1 rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white text-xs font-black">
               <RefreshCw className="size-3.5 mr-1.5" />再来一组
             </Button>
           </div>
@@ -753,7 +753,7 @@ export default function QuickCardMode({ level }: { level: string }) {
   if (paused) {
     return (
       <div className="space-y-4">
-        <div className="rounded-[32px] border-2 border-[#00B894]/20 bg-card shadow-sm p-8 text-center space-y-5">
+        <div className="rounded-[32px] border-2 border-[var(--brand)]/20 bg-card shadow-sm p-8 text-center space-y-5">
           <Zap className="size-12 text-ink-teal/60 mx-auto" />
           <div className="space-y-1">
             <p className="text-xl font-black italic text-foreground">快速闪卡</p>
@@ -769,7 +769,7 @@ export default function QuickCardMode({ level }: { level: string }) {
                 onClick={() => changeRoundSize(n)}
                 className={cn(
                   'px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all',
-                  roundSize === n ? 'bg-[#00B894] text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                  roundSize === n ? 'bg-[var(--brand)] text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80',
                 )}
               >
                 {n}
@@ -779,7 +779,7 @@ export default function QuickCardMode({ level }: { level: string }) {
               onClick={() => changeRoundSize(ROUND_ALL)}
               className={cn(
                 'px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all',
-                roundSize === ROUND_ALL ? 'bg-[#00B894] text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                roundSize === ROUND_ALL ? 'bg-[var(--brand)] text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80',
               )}
               title="不限量：一次过完整本词书"
             >
@@ -800,7 +800,7 @@ export default function QuickCardMode({ level }: { level: string }) {
               onClick={beginRun}
               disabled={allWords.length === 0}
               className={cn('rounded-2xl text-white text-xs font-black px-8 py-4',
-                queue.length > 0 && idx < queue.length ? 'bg-muted-foreground/40 hover:bg-muted-foreground/50' : 'bg-[#00B894] hover:bg-[#00a882]')}
+                queue.length > 0 && idx < queue.length ? 'bg-muted-foreground/40 hover:bg-muted-foreground/50' : 'bg-[var(--brand)] hover:bg-[#00a882]')}
             >
               <Zap className="size-4 mr-1.5" />
               {allWords.length === 0 ? '词书加载中…' : queue.length > 0 && idx < queue.length ? '重新开一轮' : '开始闪卡'}
@@ -879,7 +879,7 @@ export default function QuickCardMode({ level }: { level: string }) {
             onClick={() => { setShowHistory((v) => !v); setShowFavs(false); }}
             className={cn(
               'ml-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1',
-              showHistory ? 'bg-[#00B894] text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80',
+              showHistory ? 'bg-[var(--brand)] text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80',
             )}
             title="学习记录（每轮留档）"
           >
@@ -916,7 +916,7 @@ export default function QuickCardMode({ level }: { level: string }) {
           <button
             onClick={() => setDetailWord(prevWord)}
             data-press="soft"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-border bg-card max-w-[62%] transition-colors hover:border-[#00B894]/40 hover:bg-[#00B894]/5"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-border bg-card max-w-[62%] transition-colors hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5"
             title={`查看「${prevWord.word}」详情`}
           >
             <ChevronLeft className="size-3 shrink-0 text-muted-foreground" />
@@ -931,7 +931,7 @@ export default function QuickCardMode({ level }: { level: string }) {
       <div className="flex items-center gap-3">
         <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-[#00B894] to-emerald-400 rounded-full transition-all duration-300"
+            className="h-full bg-gradient-to-r from-[var(--brand)] to-emerald-400 rounded-full transition-all duration-300"
             style={{ width: `${Math.min(100, (answeredCount / Math.max(1, uniqueTotal)) * 100)}%` }}
           />
         </div>
@@ -947,7 +947,7 @@ export default function QuickCardMode({ level }: { level: string }) {
           className={cn(
             'shrink-0 size-7 rounded-xl flex items-center justify-center border transition-colors',
             autoSpeak
-              ? 'border-[#00B894]/40 bg-[#00B894]/10 text-ink-teal'
+              ? 'border-[var(--brand)]/40 bg-[var(--brand)]/10 text-ink-teal'
               : 'border-border bg-muted/40 text-muted-foreground',
           )}
         >
@@ -1069,7 +1069,7 @@ export default function QuickCardMode({ level }: { level: string }) {
           disabled={idx === 0}
           className={cn(
             'shrink-0 px-4 py-4 rounded-2xl border-2 border-border text-muted-foreground font-black text-sm flex items-center justify-center gap-1.5',
-            idx === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:border-[#00B894]/40 hover:text-ink-teal',
+            idx === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:border-[var(--brand)]/40 hover:text-ink-teal',
           )}
           title="上一个 (Backspace)"
         >
@@ -1085,7 +1085,7 @@ export default function QuickCardMode({ level }: { level: string }) {
         <button
           data-press="strong"
           onClick={markKnown}
-          className="flex-1 max-w-[150px] py-4 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg flex items-center justify-center gap-2"
+          className="flex-1 max-w-[150px] py-4 rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-black text-sm shadow-lg flex items-center justify-center gap-2"
         >
           <Check className="size-4" />认识 <span className="text-[9px] opacity-70">2</span>
         </button>
@@ -1431,7 +1431,7 @@ function HistoryPanel({
 
       {/* 当前累积：学完的词表按"选择的数量"切份，不足一份的余数先存在这里 */}
       {pending && pending.words.length > 0 && (
-        <div className="rounded-2xl border border-dashed border-[#00B894]/50 bg-[#00B894]/5 p-2.5 space-y-2">
+        <div className="rounded-2xl border border-dashed border-[var(--brand)]/50 bg-[var(--brand)]/5 p-2.5 space-y-2">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black text-ink-teal">
               当前累积 {pending.words.length}
@@ -1442,7 +1442,7 @@ function HistoryPanel({
             </span>
             <button
               onClick={() => onDrill(asRun(pending.words, 'pending', Date.now(), pending.size))}
-              className="ml-auto shrink-0 px-2.5 py-1 rounded-xl bg-[#00B894]/10 text-ink-teal text-[10px] font-black hover:bg-[#00B894]/20"
+              className="ml-auto shrink-0 px-2.5 py-1 rounded-xl bg-[var(--brand)]/10 text-ink-teal text-[10px] font-black hover:bg-[var(--brand)]/20"
             >
               重练这 {pending.words.length} 个
             </button>
@@ -1507,7 +1507,7 @@ function HistoryPanel({
                   </button>
                   <button
                     onClick={() => onDrill(r)}
-                    className="shrink-0 px-2.5 py-1.5 rounded-xl bg-[#00B894]/10 text-ink-teal text-[10px] font-black hover:bg-[#00B894]/20 flex items-center gap-1"
+                    className="shrink-0 px-2.5 py-1.5 rounded-xl bg-[var(--brand)]/10 text-ink-teal text-[10px] font-black hover:bg-[var(--brand)]/20 flex items-center gap-1"
                   >
                     <RotateCcw className="size-3" />重练
                   </button>

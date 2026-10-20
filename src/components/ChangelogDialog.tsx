@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { ScrollText, Loader2 } from 'lucide-react';
 /**
  * react-markdown + remark-gfm + unified/mdast/micromark 压缩后 ≈45KB。
@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
-export default function ChangelogDialog() {
+export default function ChangelogDialog({ trigger }: { trigger?: ReactNode } = {}) {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -42,14 +42,16 @@ export default function ChangelogDialog() {
   return (
     <Dialog onOpenChange={(open) => { if (open) loadChangelog(); }}>
       <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="更新日志"
-          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
-        >
-          <ScrollText className="size-4.5" />
-        </Button>
+        {trigger ?? (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="更新日志"
+            className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
+          >
+            <ScrollText className="size-4.5" />
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[80vh] rounded-[32px] p-0 overflow-hidden">
         <div className="p-6 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10">

@@ -901,7 +901,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                         className={cn(
                           'w-full text-left p-4 rounded-2xl transition-all duration-200',
                           selectedId === corpus.id
-                            ? 'bg-[#00B894]/10 border border-[#00B894]/30'
+                            ? 'bg-[var(--brand)]/10 border border-[var(--brand)]/30'
                             : 'bg-muted/30 border border-transparent hover:bg-muted hover:border-border',
                         )}
                       >
@@ -1000,7 +1000,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-[#00B894] to-emerald-400 rounded-full transition-all duration-500"
+                      className="h-full bg-gradient-to-r from-[var(--brand)] to-emerald-400 rounded-full transition-all duration-500"
                       style={{ width: `${progressPercent}%` }}
                     />
                   </div>
@@ -1017,7 +1017,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                     className={cn(
                       'text-2xl font-black leading-relaxed mb-6 p-5 rounded-[24px] transition-all duration-300',
                       tts.isSpeaking
-                        ? 'text-ink-teal bg-[#00B894]/5 border border-[#00B894]/20'
+                        ? 'text-ink-teal bg-[var(--brand)]/5 border border-[var(--brand)]/20'
                         : 'text-foreground',
                     )}
                   >
@@ -1026,7 +1026,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
 
                   {/* Pronunciation hints */}
                   {currentSentence.annotatedText && (
-                    <div className="p-4 rounded-[24px] bg-gradient-to-br from-[#00B894]/5 to-emerald-50 dark:from-[#00B894]/10 dark:to-emerald-500/10 border border-[#00B894]/10 mb-6">
+                    <div className="p-4 rounded-[24px] bg-gradient-to-br from-[var(--brand)]/5 to-emerald-50 dark:from-[var(--brand)]/10 dark:to-emerald-500/10 border border-[var(--brand)]/10 mb-6">
                       <div className="flex items-center gap-2 mb-2">
                         <Sparkles className="size-4 text-ink-teal" />
                         <span className="text-xs font-black uppercase tracking-wider text-ink-teal">语音标注</span>
@@ -1061,7 +1061,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                           'size-16 rounded-full text-white shadow-xl hover:scale-105 transition-all',
                           tts.isSpeaking
                             ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-200/50'
-                            : 'bg-[#00B894] hover:bg-[#00A080] shadow-emerald-200/50 dark:shadow-emerald-900/30',
+                            : 'bg-[var(--brand)] hover:bg-[var(--brand-strong)] shadow-emerald-200/50 dark:shadow-emerald-900/30',
                         )}
                       >
                         {tts.isSpeaking ? <Pause className="size-7" /> : <Play className="size-7 ml-1" />}
@@ -1085,7 +1085,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                         onClick={toggleLoop}
                         className={cn(
                           'rounded-2xl gap-1.5 text-[10px] font-black uppercase tracking-wider',
-                          isLooping ? 'bg-[#00B894]/10 text-ink-teal' : 'bg-muted text-muted-foreground hover:text-ink-teal',
+                          isLooping ? 'bg-[var(--brand)]/10 text-ink-teal' : 'bg-muted text-muted-foreground hover:text-ink-teal',
                         )}
                       >
                         <Repeat className="size-3.5" />
@@ -1114,14 +1114,14 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                         size="sm"
                         onClick={playCurrentSentence}
                         disabled={tts.isSpeaking}
-                        className="rounded-2xl gap-2 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+                        className="rounded-2xl gap-2 text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
                       >
                         <Volume2 className="size-4" />再听一遍
                       </Button>
                       <Button
                         onClick={markCompleted}
                         disabled={completedSentences.has(currentDoneKey)}
-                        className="bg-gradient-to-r from-emerald-500 to-[#00B894] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30 hover:scale-105 transition-all gap-2 disabled:opacity-50 disabled:hover:scale-100"
+                        className="bg-gradient-to-r from-emerald-500 to-[var(--brand)] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30 hover:scale-105 transition-all gap-2 disabled:opacity-50 disabled:hover:scale-100"
                       >
                         <CheckCircle2 className="size-4" />
                         {completedSentences.has(currentDoneKey) ? '已完成' : '我读完了'}
@@ -1152,7 +1152,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                             'rounded-2xl gap-2 text-[10px] font-black uppercase tracking-wider flex-1',
                             recordingVoice
                               ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
-                              : 'bg-[#00B894] hover:bg-[#00a882] text-white',
+                              : 'bg-[var(--brand)] hover:bg-[#00a882] text-white',
                           )}
                         >
                           <Mic className="size-3.5" />
@@ -1162,7 +1162,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
 
                       {/* Live transcript while recording */}
                       {recordingVoice && userTranscript && (
-                        <div className="p-3 rounded-2xl bg-[#00B894]/5 border border-[#00B894]/20">
+                        <div className="p-3 rounded-2xl bg-[var(--brand)]/5 border border-[var(--brand)]/20">
                           <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal mb-1">正在听...</p>
                           <p className="text-sm italic text-foreground/80">{userTranscript}</p>
                         </div>
@@ -1216,7 +1216,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                       </Button>
                       <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-[#00B894] rounded-full transition-all duration-500"
+                          className="h-full bg-[var(--brand)] rounded-full transition-all duration-500"
                           style={{ width: `${progressPercent}%` }}
                         />
                       </div>
@@ -1265,14 +1265,14 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                           className={cn(
                             'w-full text-left p-3 rounded-2xl transition-all flex items-start gap-3 group/row',
                             isCurrent
-                              ? 'bg-[#00B894]/10 border border-[#00B894]/30'
+                              ? 'bg-[var(--brand)]/10 border border-[var(--brand)]/30'
                               : 'bg-muted/20 border border-transparent hover:bg-muted/50',
                           )}
                         >
                           <div
                             className={cn(
                               'size-6 rounded-full flex items-center justify-center shrink-0 mt-0.5',
-                              done ? 'bg-emerald-500 text-white' : isCurrent ? 'bg-[#00B894] text-white' : 'bg-muted text-muted-foreground',
+                              done ? 'bg-emerald-500 text-white' : isCurrent ? 'bg-[var(--brand)] text-white' : 'bg-muted text-muted-foreground',
                             )}
                           >
                             {done ? (
@@ -1337,7 +1337,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
 function renderAnnotated(text: string) {
   return text.split(/(<u>[\s\S]*?<\/u>)/g).filter(Boolean).map((seg, i) =>
     seg.startsWith('<u>') && seg.endsWith('</u>') ? (
-      <u key={i} className="underline decoration-[#00B894] decoration-2 underline-offset-4 not-italic font-semibold">{seg.slice(3, -4)}</u>
+      <u key={i} className="underline decoration-[var(--brand)] decoration-2 underline-offset-4 not-italic font-semibold">{seg.slice(3, -4)}</u>
     ) : (
       <span key={i}>{seg.replace(/<\/?u>/g, '')}</span>
     ),

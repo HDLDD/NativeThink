@@ -327,7 +327,7 @@ export default function DashboardPage() {
           {lastVisit && (
             <button
               onClick={() => navigate(lastVisit.path)}
-              className="w-full flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3 text-left hover:border-[#00B894]/40 hover:shadow-md transition-all group"
+              className="w-full flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3 text-left hover:border-[var(--brand)]/40 hover:shadow-md transition-all group"
             >
               <span className="size-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center shrink-0">
                 <HistoryIcon className="size-4" />
@@ -361,7 +361,7 @@ export default function DashboardPage() {
             icon={Target}
             label="今日目标"
             value={`${Math.round(stats.todayMinutes)}/${stats.dailyGoalMinutes}m`}
-            color="#00B894"
+            color="var(--brand)"
             onClick={() => navigate('/progress')}
           />
           <KpiCard
@@ -436,7 +436,7 @@ export default function DashboardPage() {
                   key={opt.path}
                   onClick={() => { navigate(opt.path); setShowLearnDialog(false); }}
                   className={cn(
-                    'group p-4 rounded-2xl border-2 border-border hover:border-[#00B894]/30 text-left transition-all duration-200',
+                    'group p-4 rounded-2xl border-2 border-border hover:border-[var(--brand)]/30 text-left transition-all duration-200',
                     'hover:shadow-md hover:-translate-y-0.5',
                     opt.bg,
                   )}

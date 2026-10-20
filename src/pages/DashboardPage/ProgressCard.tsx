@@ -18,7 +18,7 @@ function ProgressCardInner({ todayMinutes, dailyGoalMinutes, progressPercent }: 
           </span>
           <div className="flex gap-3 text-[9px] font-black uppercase text-gray-400">
             <span className="flex items-center gap-1.5">
-              <span className="size-2 rounded-full bg-[#00B894]"></span>
+              <span className="size-2 rounded-full bg-[var(--brand)]"></span>
               Done
             </span>
             <span className="flex items-center gap-1.5">
@@ -51,7 +51,7 @@ function ProgressCardInner({ todayMinutes, dailyGoalMinutes, progressPercent }: 
                 cx="40"
                 cy="40"
                 r="32"
-                stroke="#00B894"
+                stroke="var(--brand)"
                 strokeWidth="6"
                 fill="none"
                 strokeLinecap="round"

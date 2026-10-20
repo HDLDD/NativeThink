@@ -31,7 +31,7 @@ export default function CetExamPage() {
       <Card className="rounded-3xl border-border/60">
         <CardContent className="p-6 space-y-4">
           <div className="flex items-start gap-3">
-            <div className="size-11 shrink-0 rounded-2xl bg-gradient-to-br from-[#00B894] to-emerald-500 text-white grid place-items-center">
+            <div className="size-11 shrink-0 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-emerald-500 text-white grid place-items-center">
               <Smartphone className="size-5" />
             </div>
             <div>

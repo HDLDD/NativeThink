@@ -91,7 +91,7 @@ export function SentenceExplain({ onJumpToGrammar }: { onJumpToGrammar?: (topicI
         {(['全部', '书籍', '演讲', '刊物'] as SourceFilter[]).map((s) => (
           <button key={s} type="button" onClick={() => { setSrcFilter(s); setIdx(0); }}
             className={cn('px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
-              srcFilter === s ? 'border-[#00B894] bg-[#00B894]/5 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40')}>
+              srcFilter === s ? 'border-[var(--brand)] bg-[var(--brand)]/5 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40')}>
             {s}
           </button>
         ))}
@@ -99,7 +99,7 @@ export function SentenceExplain({ onJumpToGrammar }: { onJumpToGrammar?: (topicI
         {(['全部', '入门', '进阶', '高阶'] as LevelFilter[]).map((s) => (
           <button key={s} type="button" onClick={() => { setLvFilter(s); setIdx(0); }}
             className={cn('px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
-              lvFilter === s ? 'border-[#00B894] bg-[#00B894]/5 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40')}>
+              lvFilter === s ? 'border-[var(--brand)] bg-[var(--brand)]/5 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40')}>
             {s}
           </button>
         ))}
@@ -161,7 +161,7 @@ export function SentenceExplain({ onJumpToGrammar }: { onJumpToGrammar?: (topicI
         </div>
 
         {/* 为什么这么译 / 怎么译 */}
-        <div className="rounded-2xl border border-[#00B894]/25 bg-[#00B894]/5 p-4 space-y-2">
+        <div className="rounded-2xl border border-[var(--brand)]/25 bg-[var(--brand)]/5 p-4 space-y-2">
           <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal flex items-center gap-1.5">
             <Languages className="size-3.5" /> 为什么这么译 · 怎么译
           </p>
@@ -169,7 +169,7 @@ export function SentenceExplain({ onJumpToGrammar }: { onJumpToGrammar?: (topicI
             <ol className="space-y-1.5">
               {explain.translation.map((t, i) => (
                 <li key={i} className="flex items-start gap-2">
-                  <span className="size-4 shrink-0 rounded-full bg-[#00B894]/15 text-ink-teal grid place-items-center text-[9px] font-black mt-0.5">
+                  <span className="size-4 shrink-0 rounded-full bg-[var(--brand)]/15 text-ink-teal grid place-items-center text-[9px] font-black mt-0.5">
                     {i + 1}
                   </span>
                   <p className="text-[12px] font-bold text-foreground/85 leading-relaxed">{t}</p>
@@ -201,7 +201,7 @@ export function SentenceExplain({ onJumpToGrammar }: { onJumpToGrammar?: (topicI
                     className={cn(
                       'px-2.5 py-1 rounded-full text-[10px] font-black border transition-all flex items-center gap-1',
                       topic && onJumpToGrammar
-                        ? 'border-[#00B894]/40 bg-[#00B894]/5 text-ink-teal hover:bg-[#00B894]/10'
+                        ? 'border-[var(--brand)]/40 bg-[var(--brand)]/5 text-ink-teal hover:bg-[var(--brand)]/10'
                         : 'border-border bg-muted text-muted-foreground',
                     )}
                     title={topic ? `看语法：${topic.name}` : '语法地图里暂无对应条目'}
@@ -219,7 +219,7 @@ export function SentenceExplain({ onJumpToGrammar }: { onJumpToGrammar?: (topicI
           {/* 结构分解（原有标注，作为语法层的展开） */}
           {resolved && (
             <div className="space-y-1.5 pt-1">
-              <div className="rounded-xl bg-[#00B894]/5 border border-[#00B894]/20 p-2.5">
+              <div className="rounded-xl bg-[var(--brand)]/5 border border-[var(--brand)]/20 p-2.5">
                 <p className="text-[9px] font-black uppercase tracking-wider text-ink-teal mb-0.5">主干</p>
                 <p className="text-[12px] font-black text-foreground">{item.backboneGloss}</p>
               </div>
@@ -227,7 +227,7 @@ export function SentenceExplain({ onJumpToGrammar }: { onJumpToGrammar?: (topicI
                 <div key={i} className="flex items-start gap-2 rounded-xl border border-border/60 p-2.5">
                   <span className={cn(
                     'shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-black border',
-                    rs.seg.r === 'core' ? 'bg-[#00B894]/10 text-ink-teal border-[#00B894]/30'
+                    rs.seg.r === 'core' ? 'bg-[var(--brand)]/10 text-ink-teal border-[var(--brand)]/30'
                       : rs.seg.r === 'conn' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20'
                         : 'bg-muted text-muted-foreground border-border',
                   )}>

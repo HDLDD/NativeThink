@@ -3,7 +3,7 @@
  * Shown as an icon button in the Header toolbar.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { Volume2, Gauge, Play, Activity, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -63,7 +63,7 @@ function mergeVoices(prev: VoiceOption[], next: VoiceOption[]): VoiceOption[] {
   return out.sort((a, b) => rank(a) - rank(b));
 }
 
-export default function TTSSettings() {
+export default function TTSSettings({ trigger }: { trigger?: ReactNode } = {}) {
   const { settings, updateSettings } = useTTSSettings();
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [open, setOpen] = useState(false);
@@ -220,14 +220,16 @@ export default function TTSSettings() {
   return (
     <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="TTS 朗读设置"
-          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
-        >
-          <Volume2 className="size-4.5" />
-        </Button>
+        {trigger ?? (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="TTS 朗读设置"
+            className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
+          >
+            <Volume2 className="size-4.5" />
+          </Button>
+        )}
       </PopoverTrigger>
       {/*
         面板必须自己滚动：手机上（APK 与移动端网页）视口只有 ~850 CSS px，而内容
@@ -327,7 +329,7 @@ export default function TTSSettings() {
                     className={cn(
                       'px-2 py-1.5 rounded-xl text-[10px] font-bold text-left transition-all border',
                       active
-                        ? 'border-[#00B894] text-ink-teal bg-[#00B894]/5'
+                        ? 'border-[var(--brand)] text-ink-teal bg-[var(--brand)]/5'
                         : 'border-border text-muted-foreground hover:border-muted-foreground/30',
                     )}
                   >
@@ -407,7 +409,7 @@ export default function TTSSettings() {
                       className={cn(
                         'px-2 py-1.5 rounded-xl text-[10px] font-bold text-left transition-all border',
                         active
-                          ? 'border-[#00B894] text-ink-teal bg-[#00B894]/5'
+                          ? 'border-[var(--brand)] text-ink-teal bg-[var(--brand)]/5'
                           : 'border-border text-muted-foreground hover:border-muted-foreground/30',
                       )}
                     >
@@ -441,7 +443,7 @@ export default function TTSSettings() {
                 <span className={cn(
                   'text-[9px] font-black px-2 py-0.5 rounded-full',
                   sherpaDisabled ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
-                    : sherpa?.status === 'ready' ? 'bg-[#00B894]/10 text-[#00B894]'
+                    : sherpa?.status === 'ready' ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
                     : sherpa?.status === 'error' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400'
                       : 'bg-muted text-muted-foreground',
                 )}>
@@ -524,7 +526,7 @@ export default function TTSSettings() {
                 </Select>
                 {/* 未手动选语音时，朗读会自动改用本地音色 —— 网络音色每次合成都要联网（约 2 秒） */}
                 {settings.nativeVoiceIndex === null && autoVoice && (
-                  <p className="text-[9px] font-bold text-[#00B894] leading-snug">
+                  <p className="text-[9px] font-bold text-[var(--brand)] leading-snug">
                     未手动选择 · 朗读时自动使用本地音色「{autoVoice.name}」(离线 · 低延迟)
                   </p>
                 )}
@@ -544,7 +546,7 @@ export default function TTSSettings() {
                     onClick={() => updateSettings({ preferNative: !settings.preferNative })}
                     className={cn(
                       'relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0',
-                      settings.preferNative ? 'bg-[#00B894]' : 'bg-muted-foreground/30',
+                      settings.preferNative ? 'bg-[var(--brand)]' : 'bg-muted-foreground/30',
                     )}
                   >
                     <span className={cn(
@@ -579,18 +581,18 @@ export default function TTSSettings() {
               <p className="text-[10px] font-bold text-foreground leading-relaxed">
                 {lastReport.engine === 'piper' ? (
                   <>
-                    内置离线引擎（<span className="text-[#00B894]">设备内合成，与网速无关</span>）· 起播 {lastReport.firstAudioMs}ms
+                    内置离线引擎（<span className="text-[var(--brand)]">设备内合成，与网速无关</span>）· 起播 {lastReport.firstAudioMs}ms
                     {lastReport.firstAudioMs > 400 && ' — 首次朗读含模型加载，之后会更快'}
                   </>
                 ) : lastReport.engine === 'native' ? (
                   lastReport.startEvidence === false ? (
                     <>
-                      系统引擎（<span className="text-[#00B894]">离线，与网速无关</span>）· 整句念完 {lastReport.firstAudioMs}ms
+                      系统引擎（<span className="text-[var(--brand)]">离线，与网速无关</span>）· 整句念完 {lastReport.firstAudioMs}ms
                       {' — 这台设备的引擎不回报「开始发声」时刻，上面是整句耗时，不是起播延迟'}
                     </>
                   ) : (
                     <>
-                      系统引擎（<span className="text-[#00B894]">离线，与网速无关</span>）· 起播 {lastReport.firstAudioMs}ms
+                      系统引擎（<span className="text-[var(--brand)]">离线，与网速无关</span>）· 起播 {lastReport.firstAudioMs}ms
                       {lastReport.firstAudioMs > 600 && ' — 偏慢，多半是所选音色为网络音色'}
                     </>
                   )
@@ -643,7 +645,7 @@ export default function TTSSettings() {
                   onClick={() => updateSettings({ rate: r })}
                   className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
                     settings.rate === r
-                      ? 'bg-[#00B894] text-white'
+                      ? 'bg-[var(--brand)] text-white'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
                   }`}
                 >
@@ -658,7 +660,7 @@ export default function TTSSettings() {
             variant="outline"
             size="sm"
             onClick={testVoice}
-            className="w-full rounded-xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+            className="w-full rounded-xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
           >
             <Play className="size-3.5 mr-2" />
             测试声音
@@ -675,7 +677,7 @@ export default function TTSSettings() {
               try { setProbeResults(await probeTtsEngines(settings.rate)); }
               finally { setProbing(false); }
             }}
-            className="w-full rounded-xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+            className="w-full rounded-xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
           >
             {probing ? <Loader2 className="size-3.5 mr-2 animate-spin" /> : <Activity className="size-3.5 mr-2" />}
             {probing ? '自检中…' : '朗读自检'}
@@ -713,7 +715,7 @@ export default function TTSSettings() {
               onClick={() => { const v = !sfxOn; setSfxOn(v); setSfxEnabled(v); if (v) sfxTick(); }}
               className={cn(
                 'relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0',
-                sfxOn ? 'bg-[#00B894]' : 'bg-muted-foreground/30',
+                sfxOn ? 'bg-[var(--brand)]' : 'bg-muted-foreground/30',
               )}
             >
               <span

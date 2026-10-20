@@ -406,3 +406,112 @@ h1, h2, h3 { letter-spacing: -0.015em; }
   .fx-ripple, .fx-ring::after, .fx-shake { animation: none !important; }
   .fx-arc .fx-arc-fg { animation-duration: 0.01ms !important; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   可切换外观主题（2026-10-20）。classic = 无任何覆盖，即现有界面。
+   只改设计变量，不动布局；暗色模式只换强调色，深色背景沿用现有那一套。
+   主题定义在 src/lib/ui-theme.ts（id 必须与这里的选择器一一对应）。
+   ══════════════════════════════════════════════════════════════════════ */
+html[data-ui-theme="porcelain"] {
+  --background: #F4F7FC;
+  --foreground: #0B1220;
+  --card: #FFFFFF;
+  --card-foreground: #0B1220;
+  --popover: #FFFFFF;
+  --popover-foreground: #0B1220;
+  --border: rgba(15, 23, 42, 0.07);
+  --input: rgba(15, 23, 42, 0.07);
+  --muted: #EEF2F8;
+  --muted-foreground: #667085;
+  --primary: #2F6BFF;
+  --primary-foreground: #FFFFFF;
+  --secondary: #EEF2F8;
+  --accent: #2F6BFF;
+  --accent-foreground: #FFFFFF;
+  --ring: #2F6BFF;
+  --ink-teal: #2F6BFF;
+  --sidebar: #FFFFFF;
+  --sidebar-border: rgba(15, 23, 42, 0.06);
+  --sidebar-accent: #EEF2F8;
+  --sidebar-primary: #2F6BFF;
+  --sidebar-ring: #2F6BFF;
+  --chart-1: #2F6BFF;
+}
+html[data-ui-theme="graphite"] {
+  --background: #F6F6F7;
+  --foreground: #0A0A0A;
+  --card: #FFFFFF;
+  --card-foreground: #0A0A0A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0A0A0A;
+  --border: rgba(10, 10, 10, 0.07);
+  --input: rgba(10, 10, 10, 0.07);
+  --muted: #EFEFF1;
+  --muted-foreground: #71717A;
+  --primary: #0A0A0A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #EFEFF1;
+  --accent: #0A0A0A;
+  --accent-foreground: #FFFFFF;
+  --ring: #0A0A0A;
+  --ink-teal: #0A0A0A;
+  --sidebar: #FFFFFF;
+  --sidebar-border: rgba(10, 10, 10, 0.06);
+  --sidebar-accent: #EFEFF1;
+  --sidebar-primary: #0A0A0A;
+  --sidebar-ring: #0A0A0A;
+  --chart-1: #0A0A0A;
+}
+html[data-ui-theme="lime"] {
+  --background: #F5F7F3;
+  --foreground: #0D0F0C;
+  --card: #FFFFFF;
+  --card-foreground: #0D0F0C;
+  --popover: #FFFFFF;
+  --popover-foreground: #0D0F0C;
+  --border: rgba(13, 15, 12, 0.07);
+  --input: rgba(13, 15, 12, 0.07);
+  --muted: #EDF1EA;
+  --muted-foreground: #6B7268;
+  --primary: #0D0F0C;
+  --primary-foreground: #D9F86A;
+  --secondary: #EDF1EA;
+  --accent: #0FA968;
+  --accent-foreground: #FFFFFF;
+  --ring: #0FA968;
+  --ink-teal: #0FA968;
+  --sidebar: #FFFFFF;
+  --sidebar-border: rgba(13, 15, 12, 0.06);
+  --sidebar-accent: #EDF1EA;
+  --sidebar-primary: #0FA968;
+  --sidebar-ring: #0FA968;
+  --chart-1: #0FA968;
+}
+/* 暗色：背景仍用现有深色体系，只把强调色换成对应主题 */
+html.dark[data-ui-theme="porcelain"] {
+  --primary: #7EA8FF; --ring: #7EA8FF; --accent: #7EA8FF; --ink-teal: #8FB4FF;
+  --sidebar-primary: #7EA8FF; --sidebar-ring: #7EA8FF; --chart-1: #7EA8FF;
+}
+html.dark[data-ui-theme="graphite"] {
+  --primary: #E7E7EA; --primary-foreground: #0A0A0A; --ring: #E7E7EA; --accent: #E7E7EA;
+  --accent-foreground: #0A0A0A; --ink-teal: #E7E7EA; --sidebar-primary: #E7E7EA; --chart-1: #E7E7EA;
+}
+html.dark[data-ui-theme="lime"] {
+  --primary: #D9F86A; --primary-foreground: #0D0F0C; --ring: #D9F86A; --accent: #3ECF8E;
+  --ink-teal: #3ECF8E; --sidebar-primary: #D9F86A; --chart-1: #3ECF8E;
+}
+/* 选中文字跟随主色（原主题保留青绿） */
+html[data-ui-theme="porcelain"] ::selection { background: #2F6BFF; color: #FFFFFF; }
+html[data-ui-theme="graphite"] ::selection { background: #0A0A0A; color: #FFFFFF; }
+html[data-ui-theme="lime"] ::selection { background: #0FA968; color: #FFFFFF; }
+
+/* 品牌色的单一来源：主题切换时只换这三个变量，所有用 var(--brand) 的地方一起变。
+   --brand-rgb 供 alpha 用法（rgb(var(--brand-rgb) / .15)）—— 直接写 rgba(0,184,148,·)
+   会让阴影/高光在换主题后仍然是绿的。 */
+:root { --brand: #00B894; --brand-strong: #00A080; --brand-rgb: 0 184 148; }
+html[data-ui-theme="porcelain"] { --brand: #2F6BFF; --brand-strong: #2559E0; --brand-rgb: 47 107 255; }
+html[data-ui-theme="graphite"] { --brand: #0A0A0A; --brand-strong: #000000; --brand-rgb: 10 10 10; }
+html[data-ui-theme="lime"] { --brand: #0FA968; --brand-strong: #0C8A54; --brand-rgb: 15 169 104; }
+html.dark[data-ui-theme="porcelain"] { --brand: #7EA8FF; --brand-strong: #6A98F0; --brand-rgb: 126 168 255; }
+html.dark[data-ui-theme="graphite"] { --brand: #E7E7EA; --brand-strong: #FFFFFF; --brand-rgb: 231 231 234; }
+html.dark[data-ui-theme="lime"] { --brand: #3ECF8E; --brand-strong: #D9F86A; --brand-rgb: 62 207 142; }

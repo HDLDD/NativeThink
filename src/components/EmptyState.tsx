@@ -44,11 +44,11 @@ export function EmptyState({ icon: Icon, title, description, action, size = 'md'
           style={{ inset: -s.ringGap * 3, animationDelay: '1400ms' }}
         />
         {/* Static soft halo */}
-        <span className="absolute inset-[-6px] rounded-full bg-[#00B894]/10" />
+        <span className="absolute inset-[-6px] rounded-full bg-[var(--brand)]/10" />
         {/* Icon core */}
         <span className={cn(
           'relative z-10 flex items-center justify-center rounded-full',
-          'bg-gradient-to-br from-[#00B894] to-emerald-500 text-white',
+          'bg-gradient-to-br from-[var(--brand)] to-emerald-500 text-white',
           'shadow-lg shadow-emerald-200/60 dark:shadow-emerald-900/40',
           s.box,
         )}>

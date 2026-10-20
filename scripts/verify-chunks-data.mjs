@@ -226,9 +226,9 @@ ok(/return dedupeChunks\(sortedChunks\);/.test(pageCode) && /return dedupeChunks
 /* ── 显示语言对齐（2026-10-07 用户反馈：「显示模块模仿语块库的，不然太难看了」）
    两个列表各写一份卡片类，漂移是必然的；这里把"同一套"钉成字符串比对。 ── */
 const ROW_CARD = "'w-full text-left p-3 rounded-2xl transition-all duration-200 border-2";
-const ROW_SELECTED = 'border-[#00B894] bg-[#00B894]/5 shadow-sm';
-const DETAIL_FRAME = 'rounded-[32px] border-2 border-[#00B894]/20 shadow-sm overflow-hidden';
-const FAV_BTN = 'rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal';
+const ROW_SELECTED = 'border-[var(--brand)] bg-[var(--brand)]/5 shadow-sm';
+const DETAIL_FRAME = 'rounded-[32px] border-2 border-[var(--brand)]/20 shadow-sm overflow-hidden';
+const FAV_BTN = 'rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal';
 const SPEAK_BTN = 'e.stopPropagation(); tts.speak(chunk.content)';
 const libRow = pageCode.slice(pageCode.indexOf('onClick={() => setDetailChunk(chunk)}'), pageCode.indexOf('onClick={() => setDetailChunk(chunk)}') + 700);
 const phRow = pageCode.slice(pageCode.indexOf('id={`phrase-item-'), pageCode.indexOf('id={`phrase-item-') + 900);

@@ -76,9 +76,9 @@ function WeekGlanceCardInner({ calendar, dailyGoalMinutes, onNavigate }: WeekGla
                 className={
                   'w-full max-w-8 rounded-t-lg transition-all duration-500 ' +
                   (hitGoal
-                    ? 'bg-[#00B894]'
+                    ? 'bg-[var(--brand)]'
                     : d.minutes > 0
-                      ? 'bg-[#00B894]/35'
+                      ? 'bg-[var(--brand)]/35'
                       : 'bg-muted')
                 }
                 style={{ height: `${h}px` }}

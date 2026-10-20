@@ -28,7 +28,7 @@ import { useFavorites } from '@/lib/use-favorites';
 import { useWordNote, countWordNotes } from '@/lib/word-notes';
 
 const FL_LEVEL_COLORS: Record<string, string> = {
-  all: '#00B894', zhongkao: '#EF4444', gaokao: '#F97316', cet4: '#0EA5E9', cet6: '#6C5CE7', ielts: '#F59E0B', toefl: '#EC4899', postgraduate: '#8B5CF6', professional: '#14B8A6', advanced: '#64748B',
+  all: 'var(--brand)', zhongkao: '#EF4444', gaokao: '#F97316', cet4: '#0EA5E9', cet6: '#6C5CE7', ielts: '#F59E0B', toefl: '#EC4899', postgraduate: '#8B5CF6', professional: '#14B8A6', advanced: '#64748B',
 };
 
 /** 自动发音开关（持久化；此前 autoSpeak 恒为 false，预合成/自动朗读整段是死代码） */
@@ -826,11 +826,11 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             <span className="text-ink-teal tabular-nums">{masteredPct}%</span>
           </div>
           <div className="h-2.5 rounded-full overflow-hidden bg-muted flex">
-            <div className="h-full bg-[#00B894] transition-all" style={{ width: `${masteredPct}%` }} />
+            <div className="h-full bg-[var(--brand)] transition-all" style={{ width: `${masteredPct}%` }} />
             <div className="h-full bg-amber-400 transition-all" style={{ width: `${learningPct}%` }} />
           </div>
           <div className="flex items-center gap-3 text-[9px] font-bold text-muted-foreground">
-            <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-[#00B894] inline-block" />已掌握 {stats.mastered}</span>
+            <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-[var(--brand)] inline-block" />已掌握 {stats.mastered}</span>
             <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-amber-400 inline-block" />学习中 {stats.learning}</span>
             <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-muted-foreground/30 inline-block" />未学 {stats.new}</span>
             {stats.suspended > 0 && <span className="text-muted-foreground/60">已屏蔽 {stats.suspended}</span>}
@@ -963,7 +963,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                   title={`${d.date}：复习 ${d.count} 次`}>
                   <span className="text-[8px] font-black tabular-nums text-muted-foreground">{d.count || ''}</span>
                   <div className={cn('w-full rounded-t-md transition-all',
-                    i === weekHistory.length - 1 ? 'bg-[#00B894]' : 'bg-muted-foreground/30')}
+                    i === weekHistory.length - 1 ? 'bg-[var(--brand)]' : 'bg-muted-foreground/30')}
                     style={{ height: `${Math.max(2, (d.count / max) * 34)}px` }} />
                   <span className="text-[8px] font-bold text-muted-foreground/70">{d.label}</span>
                 </div>
@@ -1065,7 +1065,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
               {/* 正确率交给弧长说（ScoreArc 是结果层的图形件）；数字留着当刻度，不写"记得"这种句子 */}
               {sessionRated > 0 && (
                 <span className="flex items-center gap-1 tabular-nums" title={`本轮 ${sessionGood}/${sessionRated} 评在记得及以上`}>
-                  <ScoreArc value={accuracy / 100} size={18} color={accuracy >= 70 ? '#00B894' : '#F59E0B'} />
+                  <ScoreArc value={accuracy / 100} size={18} color={accuracy >= 70 ? 'var(--brand)' : '#F59E0B'} />
                   {accuracy}%
                 </span>
               )}

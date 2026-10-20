@@ -18,7 +18,7 @@
 
 ## 2. 路由与错误边界
 
-`src/app.tsx`：13 个页面 + `*` 兜底，全部 `lazy()`（`:6-19`），路由表 `:46-58`。
+`src/app.tsx`：14 个页面 + `*` 兜底，全部 `lazy()`（`:6-21`），路由表 `:47-63`。
 
 **每条 lazy 路由自己没有 Suspense**，只有一个 `ErrorBoundary`（`react-error-boundary` + `PageErrorFallback`，`:21-39`，带「刷新页面」按钮）。真正的懒加载兜底在 `Layout.tsx:121`：
 
@@ -84,3 +84,24 @@ AGENTS.md 说的"四件套"确实都还在，但**还有两处隐性要求**，�
 7. **APK 的 `/api/*` 重写只在 `index.html:25-35`**：存在 `window.Capacitor` 时设 `window.__API_BASE__ = 'https://nativethink.pages.dev'` 并包裹 `window.fetch`。**只覆盖 `fetch`** —— 音频/图片类 URL 要自己读 `__API_BASE__` 拼接（`use-tts.ts:232-238`）。
 8. **`public/_redirects` 的顺序与语义不能想当然**：`/api/* /api/* 200` 必须先于 `/* /index.html 200`，否则函数请求会被 SPA 兜底吃掉（返回 HTML 200 而不是 JSON）。`/models/* /models/* 404` 也是刻意的：web 版没内置模型，404 让 transformers 回落远程源。`public/_headers` 的 COOP/COEP（`credentialless`）是多线程 WASM（离线模型）必需，去掉会让 wasm 线程失效。
 9. **`wrangler.toml` 里有真实 KV namespace id**（`id = "68391cb5…"`）。它是 binding 标识、不是密钥，但要清楚：**这个文件改错会让线上函数读不到 KV**，而本项目没有部署 workflow（`.github` 目录不存在），push 到 `main` 就由 Pages Git 集成构建上线。
+
+## 8. 顶栏与外观主题（2026-10-20）
+
+**顶栏只留三件**：日期时间、全局搜索（`GlobalWordSearch`）、设置入口（齿轮 → `/settings`）+ 用户菜单。
+原先并排的 9 个图标（每日目标 / 更新日志 / 开发者主页 / 使用指南 / AI 设置 / 朗读设置 / 明暗切换）全部收进设置页，
+窄屏不再需要横向滚动。组件边界没变：`HelpGuide` / `AISettings` / `ChangelogDialog` / `TTSSettings` 都新增了
+`trigger?: ReactNode`，页面把整行按钮传进去当 `asChild` 的触发件 —— **自定义 trigger 必须把 Radix 注入的 props
+继续传给真正的按钮**（否则点得动但面板不打开，第一版就栽在这儿）。
+
+**外观主题是"明暗之外的第二维"**：
+
+| 层 | 位置 | 约定 |
+|---|---|---|
+| 主题注册表 | `src/lib/ui-theme.ts` | `classic`（默认，**不覆盖任何 token**）/ `porcelain` 电蓝 / `graphite` 石墨 / `lime` 青柠；id 与 CSS 选择器一一对应 |
+| token 覆盖 | `src/index.css` 末尾 `html[data-ui-theme="…"]` | 只改 `--background/--card/--border/--primary/--ink-teal/--sidebar*` 等设计变量；暗色只换强调色 |
+| 品牌单点 | `--brand` / `--brand-strong` / `--brand-rgb` | 全站原 `#00B894` 已换成 `var(--brand)`（497 处 / 48 个 tsx），换主题时按钮、图标、阴影一起变；`--brand-rgb` 供透明度用法 |
+| 启动 | `src/index.tsx` 的 `initUiTheme()` | 在 `createRoot` 之前把 `data-ui-theme` 写到 `<html>`，刷新不闪回默认 |
+| 选择入口 | `/settings` → 外观 | 亮/暗 + 四套主题色卡；选择写 `localStorage.__nativethink_ui_theme` 并广播给其它实例 |
+
+**已知边界**：canvas（`celebrate.ts`）与 Recharts 的 `fill` 仍拿字面色，不跟随主题；
+`emerald-*` / `teal-*` 这类语义色（成功/正确）与品牌色是两回事，主题不会把它们染成主色 —— 这是刻意的。

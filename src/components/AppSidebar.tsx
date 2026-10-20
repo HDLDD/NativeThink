@@ -13,6 +13,7 @@ import {
   PenLine,
   SpellCheck, Film,
   GraduationCap,
+  Settings,
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useGlobalDueCount } from '@/lib/use-word-learning';
@@ -45,6 +46,7 @@ const ROUTE_PREFETCH: Record<string, () => Promise<unknown>> = {
   '/video': () => import('@/pages/VideoLabPage/VideoLabPage'),
   '/sentences': () => import('@/pages/SentenceLabPage/SentenceLabPage'),
   '/cet': () => import('@/pages/CetExamPage/CetExamPage'),
+  '/settings': () => import('@/pages/SettingsPage/SettingsPage'),
 };
 
 const NAV_ITEMS = [
@@ -62,6 +64,7 @@ const NAV_ITEMS = [
   { path: '/video', label: '视频精听', icon: Film },
   { path: '/cet', label: '四六级 App', icon: GraduationCap },
   { path: '/progress', label: '学习记录', icon: BarChart3 },
+  { path: '/settings', label: '设置', icon: Settings },
 ];
 
 export default function AppSidebar() {
@@ -74,7 +77,7 @@ export default function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border/70 bg-card/85 backdrop-blur-md">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-4 group-data-[state=collapsed]:px-0 group-data-[state=collapsed]:justify-center">
-          <div className="size-10 shrink-0 rounded-2xl bg-gradient-to-br from-[#00B894] to-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30">
+          <div className="size-10 shrink-0 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30">
             <Sparkles className="size-5" />
           </div>
           <div className="flex-1 min-w-0 group-data-[state=collapsed]:hidden">
@@ -111,7 +114,7 @@ export default function AppSidebar() {
                       className={cn(
                         'flex items-center gap-3 transition-all duration-200 rounded-2xl',
                         isActive
-                          ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30 hover:bg-[#00B894] hover:text-white'
+                          ? 'bg-[var(--brand)] text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30 hover:bg-[var(--brand)] hover:text-white'
                           : 'text-foreground/60 hover:bg-muted hover:text-foreground',
                       )}
                     >

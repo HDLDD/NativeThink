@@ -111,7 +111,7 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
           <Button
             onClick={handleSubmit}
             disabled={loading}
-            className="w-full rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50"
+            className="w-full rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50"
           >
             {loading ? <Loader2 className="size-4 mr-2 animate-spin" /> : null}
             {mode === 'login' ? '登录' : '创建账号'}

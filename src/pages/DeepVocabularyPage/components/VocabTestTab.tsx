@@ -172,7 +172,7 @@ export function VocabTestTab({ level, levelLabel }: Props) {
             <div>
               <Button
                 onClick={start}
-                className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black gap-2 px-10"
+                className="rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-black gap-2 px-10"
               >
                 <Target className="size-4" />开始测试
               </Button>
@@ -192,7 +192,7 @@ export function VocabTestTab({ level, levelLabel }: Props) {
         <div className="flex items-center gap-3">
           <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
             <div
-              className="h-full bg-[#00B894] transition-all duration-300"
+              className="h-full bg-[var(--brand)] transition-all duration-300"
               style={{ width: `${((qIdx + (picked !== null ? 1 : 0)) / questions.length) * 100}%` }}
             />
           </div>
@@ -224,8 +224,8 @@ export function VocabTestTab({ level, levelLabel }: Props) {
                     disabled={picked !== null}
                     className={cn(
                       'w-full text-left px-4 py-3 rounded-2xl border-2 text-sm font-medium transition-all',
-                      picked === null && 'border-border hover:border-[#00B894]/50 hover:bg-[#00B894]/5',
-                      picked !== null && isAnswer && 'border-[#00B894] bg-[#00B894]/10',
+                      picked === null && 'border-border hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5',
+                      picked !== null && isAnswer && 'border-[var(--brand)] bg-[var(--brand)]/10',
                       picked !== null && isPicked && !isAnswer && 'border-rose-400 bg-rose-50 dark:bg-rose-500/10',
                       picked !== null && !isAnswer && !isPicked && 'border-border opacity-50',
                     )}
@@ -263,7 +263,7 @@ export function VocabTestTab({ level, levelLabel }: Props) {
             <p className="text-xs text-muted-foreground">{g.desc}</p>
           </div>
           <div className="flex items-center justify-center gap-3">
-            <Button onClick={start} className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2">
+            <Button onClick={start} className="rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-bold gap-2">
               <RefreshCw className="size-4" />再测一次
             </Button>
             {best && best.estimate >= est && (

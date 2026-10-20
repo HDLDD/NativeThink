@@ -109,7 +109,7 @@ const SCENARIOS: IScenario[] = [
     description: '和一位新朋友闲聊，练习日常话题表达',
     role: 'You are a friendly person you just met at a social event. Chat naturally about hobbies, work, travel, etc.',
     icon: MessageCircle,
-    color: '#00B894',
+    color: 'var(--brand)',
     bg: 'from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10',
   },
   {
@@ -176,7 +176,7 @@ export default function ConversationPage() {
     description: '',
     role: '',
     icon: 'MessageCircle' as IconName,
-    color: '#00B894',
+    color: 'var(--brand)',
     bg: 'from-emerald-50 to-teal-50',
   });
 
@@ -486,7 +486,7 @@ export default function ConversationPage() {
       description: '',
       role: '',
       icon: 'MessageCircle',
-      color: '#00B894',
+      color: 'var(--brand)',
       bg: 'from-emerald-50 to-teal-50',
     });
     toast.success('自定义场景已创建');
@@ -608,7 +608,7 @@ export default function ConversationPage() {
                 return (
                   <div
                     key={c.scenarioId}
-                    className="flex items-center gap-3 rounded-2xl border border-border p-3 hover:border-[#00B894]/40 transition-colors"
+                    className="flex items-center gap-3 rounded-2xl border border-border p-3 hover:border-[var(--brand)]/40 transition-colors"
                   >
                     <div
                       className="size-9 rounded-xl flex items-center justify-center text-white shrink-0"
@@ -634,7 +634,7 @@ export default function ConversationPage() {
                     <Button
                       size="sm"
                       onClick={() => resumeConversation(c)}
-                      className="rounded-xl bg-[#00B894] hover:bg-[#00A080] text-white shrink-0"
+                      className="rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white shrink-0"
                     >
                       继续
                     </Button>
@@ -701,7 +701,7 @@ export default function ConversationPage() {
             className="cursor-pointer hover:shadow-md transition-all duration-300 hover:-translate-y-1 group rounded-[32px] border-2 border-dashed border-muted-foreground/30 overflow-hidden bg-transparent"
           >
             <CardContent className="p-6 flex flex-col items-center justify-center text-center min-h-[200px]">
-              <div className="size-14 rounded-2xl flex items-center justify-center bg-muted text-muted-foreground mb-4 group-hover:scale-110 group-hover:bg-[#00B894] group-hover:text-white transition-all shadow-lg">
+              <div className="size-14 rounded-2xl flex items-center justify-center bg-muted text-muted-foreground mb-4 group-hover:scale-110 group-hover:bg-[var(--brand)] group-hover:text-white transition-all shadow-lg">
                 <Plus className="size-7" />
               </div>
               <h3 className="text-xl font-black text-muted-foreground mb-2 group-hover:text-foreground transition-colors">
@@ -761,7 +761,7 @@ export default function ConversationPage() {
                   onChange={(e) => setNewScenario({ ...newScenario, role: e.target.value })}
                   placeholder="例如：You are a hotel front desk receptionist. Greet the guest, check their reservation, and help them check in."
                   rows={3}
-                  className="w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#00B894]/20 focus:border-[#00B894]"
+                  className="w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 focus:border-[var(--brand)]"
                 />
               </div>
 
@@ -782,7 +782,7 @@ export default function ConversationPage() {
                         className={cn(
                           'flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border-2',
                           selected
-                            ? 'border-[#00B894] bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal'
+                            ? 'border-[var(--brand)] bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal'
                             : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
                         )}
                       >
@@ -836,7 +836,7 @@ export default function ConversationPage() {
               </Button>
               <Button
                 onClick={handleCreateScenario}
-                className="rounded-2xl bg-[#00B894] hover:bg-[#00A080] text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+                className="rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
               >
                 <Plus className="size-4 mr-1.5" />
                 创建场景
@@ -883,7 +883,7 @@ export default function ConversationPage() {
             onClick={() => setAutoRead(!autoRead)}
             className={cn(
               'rounded-xl text-[10px] font-black uppercase tracking-wider gap-1.5 h-7',
-              autoRead ? 'bg-[#00B894]/10 text-ink-teal' : 'bg-muted text-muted-foreground hover:text-ink-teal',
+              autoRead ? 'bg-[var(--brand)]/10 text-ink-teal' : 'bg-muted text-muted-foreground hover:text-ink-teal',
             )}
           >
             <Volume2 className="size-3" />
@@ -900,7 +900,7 @@ export default function ConversationPage() {
               size="sm"
               onClick={endConversation}
               disabled={analyzing}
-              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+              className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
             >
               {analyzing ? (
                 <>
@@ -971,7 +971,7 @@ export default function ConversationPage() {
                   className={cn(
                     'max-w-[80%] px-5 py-3 rounded-3xl text-sm leading-relaxed relative group/msg',
                     msg.role === 'user'
-                      ? 'bg-[#00B894] text-white rounded-br-md shadow-md shadow-emerald-200/30 dark:shadow-emerald-900/20'
+                      ? 'bg-[var(--brand)] text-white rounded-br-md shadow-md shadow-emerald-200/30 dark:shadow-emerald-900/20'
                       : 'bg-muted text-foreground rounded-bl-md',
                   )}
                 >
@@ -1081,7 +1081,7 @@ export default function ConversationPage() {
             <Button
               type="submit"
               disabled={isLoading || !input.trim()}
-              className="bg-[#00B894] hover:bg-[#00A080] text-white px-6 rounded-3xl shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+              className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 rounded-3xl shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
             >
               {isLoading ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
             </Button>

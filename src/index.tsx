@@ -8,6 +8,7 @@ import { FocusModeProvider } from "./lib/focus-mode";
 import { Toaster } from "@/components/ui/sonner";
 import CelebrateLayer from "./components/CelebrateLayer";
 import { initPressFx } from "./lib/press-fx";
+import { initUiTheme } from "./lib/ui-theme";
 import App from "./app";
 import "./index.css";
 import { checkBundledEngineHealth } from "./lib/sherpa-tts";
@@ -17,6 +18,8 @@ import { checkBundledEngineHealth } from "./lib/sherpa-tts";
 checkBundledEngineHealth();
 // 按压词汇的涟漪：一处事件委托覆盖全站 306 处裸 <button>，必须在 createRoot 之前挂上
 initPressFx();
+// 外观主题同理：挂载前把 <html data-ui-theme> 写好，避免首帧闪回默认主题
+initUiTheme();
 
 /** Simple error fallback — works on all platforms without Lark dependencies */
 function GlobalErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
@@ -26,7 +29,7 @@ function GlobalErrorFallback({ error, resetErrorBoundary }: { error: Error; rese
         <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
         <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>页面加载出错</h2>
         <p style={{ fontSize: 14, color: '#666', marginBottom: 16 }}>{error?.message || '未知错误'}</p>
-        <button onClick={resetErrorBoundary} style={{ padding: '8px 24px', borderRadius: 12, background: '#00B894', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={resetErrorBoundary} style={{ padding: '8px 24px', borderRadius: 12, background: 'var(--brand)', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}>
           刷新重试
         </button>
       </div>

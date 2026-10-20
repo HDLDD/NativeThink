@@ -320,7 +320,7 @@ export default function NovelReader({
           <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
             {/* 封面信息卡 */}
             <div className="flex items-start gap-4 p-4 sm:p-5 rounded-2xl border border-border bg-card">
-              <div className="size-14 sm:size-16 rounded-2xl bg-gradient-to-br from-[#00B894]/15 to-emerald-100 dark:to-emerald-500/20 flex items-center justify-center text-2xl sm:text-3xl shrink-0">
+              <div className="size-14 sm:size-16 rounded-2xl bg-gradient-to-br from-[var(--brand)]/15 to-emerald-100 dark:to-emerald-500/20 flex items-center justify-center text-2xl sm:text-3xl shrink-0">
                 📖
               </div>
               <div className="flex-1 min-w-0">
@@ -328,7 +328,7 @@ export default function NovelReader({
                   <span className="truncate">{content.zhTitle || content.title}</span>
                   {fullTextLoading && <Loader2 className="size-3.5 shrink-0 animate-spin text-ink-teal" />}
                   {!fullTextLoading && fullTextDone && (
-                    <span className="shrink-0 text-[9px] font-black text-ink-teal bg-[#00B894]/10 px-1.5 py-0.5 rounded-full">完整版</span>
+                    <span className="shrink-0 text-[9px] font-black text-ink-teal bg-[var(--brand)]/10 px-1.5 py-0.5 rounded-full">完整版</span>
                   )}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
@@ -383,7 +383,7 @@ export default function NovelReader({
             {/* 开始 / 继续阅读 */}
             <Button
               onClick={() => enterChapter(resumeIdx)}
-              className="w-full mt-4 h-12 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white text-sm font-black gap-2"
+              className="w-full mt-4 h-12 rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white text-sm font-black gap-2"
             >
               <Play className="size-4 fill-current shrink-0" />
               <span className="truncate">
@@ -409,7 +409,7 @@ export default function NovelReader({
                     onClick={() => enterChapter(i)}
                     className={cn(
                       'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-muted/70',
-                      isCurrent && 'bg-[#00B894]/10 hover:bg-[#00B894]/15',
+                      isCurrent && 'bg-[var(--brand)]/10 hover:bg-[var(--brand)]/15',
                     )}
                   >
                     <span className={cn('text-[11px] font-black tabular-nums w-6 shrink-0', isCurrent ? 'text-ink-teal' : 'text-muted-foreground/50')}>
@@ -469,7 +469,7 @@ export default function NovelReader({
         </div>
         {/* 章内滚动进度条 */}
         <div className="h-0.5 bg-muted/60">
-          <div ref={barRef} className="h-full bg-[#00B894] transition-[width] duration-150 ease-out" style={{ width: '0%' }} />
+          <div ref={barRef} className="h-full bg-[var(--brand)] transition-[width] duration-150 ease-out" style={{ width: '0%' }} />
         </div>
       </div>
 
@@ -488,9 +488,9 @@ export default function NovelReader({
           <div className="pt-4 pb-6 text-center">
             <h3 className="text-xl sm:text-2xl font-black text-foreground tracking-wide">{currentChapter?.title}</h3>
             <div className="mt-3 flex items-center justify-center gap-3">
-              <span className="h-px w-10 sm:w-16 bg-[#00B894]/30" />
-              <span className="size-1.5 rounded-full bg-[#00B894]/50" />
-              <span className="h-px w-10 sm:w-16 bg-[#00B894]/30" />
+              <span className="h-px w-10 sm:w-16 bg-[var(--brand)]/30" />
+              <span className="size-1.5 rounded-full bg-[var(--brand)]/50" />
+              <span className="h-px w-10 sm:w-16 bg-[var(--brand)]/30" />
             </div>
           </div>
 
@@ -499,7 +499,7 @@ export default function NovelReader({
             <button
               onClick={onTranslateChapter}
               disabled={transLoading}
-              className="w-full mb-6 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-[#00B894]/10 border border-[#00B894]/30 hover:bg-[#00B894]/20 hover:border-[#00B894]/50 transition-all text-xs font-black text-ink-teal disabled:opacity-60"
+              className="w-full mb-6 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-[var(--brand)]/10 border border-[var(--brand)]/30 hover:bg-[var(--brand)]/20 hover:border-[var(--brand)]/50 transition-all text-xs font-black text-ink-teal disabled:opacity-60"
             >
               {transLoading ? (
                 <>
@@ -574,7 +574,7 @@ export default function NovelReader({
             {chapterIdx < chapters.length - 1 ? (
               <button
                 onClick={() => enterChapter(chapterIdx + 1)}
-                className="w-full py-4 px-5 rounded-2xl border-2 border-[#00B894]/40 bg-[#00B894]/5 hover:bg-[#00B894]/15 hover:border-[#00B894]/60 transition-all text-left flex items-center gap-3 group"
+                className="w-full py-4 px-5 rounded-2xl border-2 border-[var(--brand)]/40 bg-[var(--brand)]/5 hover:bg-[var(--brand)]/15 hover:border-[var(--brand)]/60 transition-all text-left flex items-center gap-3 group"
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">下一章</p>
@@ -632,7 +632,7 @@ export default function NovelReader({
                 size="sm"
                 onClick={handleSaveNote}
                 disabled={!noteDraft.trim()}
-                className="flex-1 rounded-xl text-xs font-bold bg-[#00B894] hover:bg-[#00a882] text-white"
+                className="flex-1 rounded-xl text-xs font-bold bg-[var(--brand)] hover:bg-[#00a882] text-white"
               >
                 保存批注
               </Button>

@@ -105,14 +105,14 @@ function HistoryCalendarInner({
                   className={cn(
                     'aspect-square rounded-xl flex flex-col items-center justify-center text-xs transition-all relative',
                     !d.isCurrentMonth && 'opacity-30',
-                    isToday && 'ring-1 ring-[#00B894]',
+                    isToday && 'ring-1 ring-[var(--brand)]',
                   )}
                 >
                   <span className={cn('font-black', entry ? 'text-foreground' : 'text-muted-foreground')}>{d.day}</span>
                   {entry && (
                     <div className="absolute bottom-1 flex gap-0.5">
                       {entry.slice(0, 2).map((_, j) => (
-                        <span key={j} className="size-1 rounded-full bg-[#00B894]" />
+                        <span key={j} className="size-1 rounded-full bg-[var(--brand)]" />
                       ))}
                       {entry.length > 2 && <span className="text-[7px] font-black text-ink-teal">+{entry.length - 2}</span>}
                     </div>

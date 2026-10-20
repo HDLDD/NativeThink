@@ -1392,7 +1392,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   className={cn(
                     'flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold transition-all border-2',
                     librarySource === 'builtin'
-                      ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal'
+                      ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
                       : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
                   )}
                 >
@@ -1588,7 +1588,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                             className={cn(
                               'w-full text-left p-3 rounded-2xl transition-all duration-200 border-2',
                               detailChunk?.id === chunk.id
-                                ? 'border-[#00B894] bg-[#00B894]/5 shadow-sm'
+                                ? 'border-[var(--brand)] bg-[var(--brand)]/5 shadow-sm'
                                 : 'border-transparent bg-muted/30 hover:bg-muted hover:border-border',
                             )}
                           >
@@ -1620,7 +1620,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                       : 'text-muted-foreground/30 hover:text-ink-teal',
                                   )}
                                 >
-                                  <Brain className={cn('size-3.5', memorizedChunks.has(chunk.id) && 'fill-[#00B894]/20')} />
+                                  <Brain className={cn('size-3.5', memorizedChunks.has(chunk.id) && 'fill-[var(--brand)]/20')} />
                                 </button>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); toggleFavorite(chunk); }}
@@ -1686,7 +1686,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   {/* RIGHT COLUMN — Detail panel */}
                   <div className="col-span-12 lg:col-span-7">
                     {detailChunk ? (
-                      <Card className="rounded-[32px] border-2 border-[#00B894]/20 shadow-sm overflow-hidden">
+                      <Card className="rounded-[32px] border-2 border-[var(--brand)]/20 shadow-sm overflow-hidden">
                         <CardContent className="p-6">
                           {/* Badges */}
                           <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -1743,7 +1743,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
 
                           {/* Introduction */}
                           {detailChunk.introduction && (
-                            <div className="mb-4 p-3 rounded-2xl bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/8 dark:to-teal-500/8 border border-[#00B894]/10">
+                            <div className="mb-4 p-3 rounded-2xl bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/8 dark:to-teal-500/8 border border-[var(--brand)]/10">
                               <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal mb-1">English Introduction</p>
                               <p className="text-sm text-foreground/80 leading-relaxed italic">{detailChunk.introduction}</p>
                             </div>
@@ -1758,7 +1758,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           )}
 
                           {/* Example */}
-                          <div className="p-4 rounded-2xl bg-[#00B894]/5 border border-[#00B894]/10 mb-4">
+                          <div className="p-4 rounded-2xl bg-[var(--brand)]/5 border border-[var(--brand)]/10 mb-4">
                             <div className="flex items-center justify-between mb-1">
                               <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal">例句</p>
                               <Button
@@ -1797,14 +1797,14 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                               <Brain
                                 className={cn(
                                   'size-4 mr-2',
-                                  memorizedChunks.has(detailChunk.id) && 'fill-[#00B894]/20 text-ink-teal',
+                                  memorizedChunks.has(detailChunk.id) && 'fill-[var(--brand)]/20 text-ink-teal',
                                 )}
                               />
                               {memorizedChunks.has(detailChunk.id) ? '已记忆' : '记忆'}
                             </Button>
                             <Button
                               variant="outline"
-                              className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+                              className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
                               onClick={() => toggleFavorite(detailChunk)}
                             >
                               <Heart
@@ -1899,7 +1899,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                       </p>
                       <p className="text-sm text-foreground/80 font-medium">{detailChunk.usage}</p>
                     </div>
-                    <div className="p-5 rounded-2xl bg-[#00B894]/5 border border-[#00B894]/10">
+                    <div className="p-5 rounded-2xl bg-[var(--brand)]/5 border border-[var(--brand)]/10">
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal">
                           例句
@@ -2008,7 +2008,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                     <div className="flex gap-2 pt-2">
                       <Button
                         variant="outline"
-                        className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+                        className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
                         onClick={() => tts.speak(detailChunk.example, { rate: 0.9 })}
                       >
                         <BookOpen className="size-4 mr-2" />
@@ -2023,14 +2023,14 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                         <Brain
                           className={cn(
                             'size-4 mr-2',
-                            memorizedChunks.has(detailChunk.id) && 'fill-[#00B894]/20 text-ink-teal',
+                            memorizedChunks.has(detailChunk.id) && 'fill-[var(--brand)]/20 text-ink-teal',
                           )}
                         />
                         {memorizedChunks.has(detailChunk.id) ? '已记忆' : '记忆'}
                       </Button>
                       <Button
                         variant="outline"
-                        className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+                        className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
                         onClick={() => {
                           toggleFavorite(detailChunk);
                         }}
@@ -2092,7 +2092,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                     variant="outline"
                     size="sm"
                     onClick={nextQuestion}
-                    className="gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+                    className="gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
                   >
                     <RefreshCw className="size-3.5" />
                     下一题
@@ -2105,7 +2105,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-[#00B894] to-emerald-400 rounded-full transition-all duration-500"
+                    className="h-full bg-gradient-to-r from-[var(--brand)] to-emerald-400 rounded-full transition-all duration-500"
                     style={{ width: `${((currentQIdx + 1) / replacementExercises.length) * 100}%` }}
                   />
                 </div>
@@ -2144,8 +2144,8 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           : showWrong
                             ? 'border-rose-400 bg-rose-50 text-rose-700'
                             : isSelected
-                              ? 'border-[#00B894] bg-[#00B894]/5 text-ink-teal'
-                              : 'border-border bg-card hover:border-[#00B894]/40 hover:bg-muted/30 text-foreground',
+                              ? 'border-[var(--brand)] bg-[var(--brand)]/5 text-ink-teal'
+                              : 'border-border bg-card hover:border-[var(--brand)]/40 hover:bg-muted/30 text-foreground',
                       )}
                     >
                       <div className="flex items-center gap-3">
@@ -2157,7 +2157,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                               : showWrong
                                 ? 'bg-rose-500 text-white'
                                 : isSelected
-                                  ? 'bg-[#00B894] text-white'
+                                  ? 'bg-[var(--brand)] text-white'
                                   : 'bg-muted text-muted-foreground',
                           )}
                         >
@@ -2227,7 +2227,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   <Button
                     onClick={checkAnswer}
                     disabled={!selectedOption}
-                    className="bg-[#00B894] hover:bg-[#00A080] text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+                    className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
                   >
                     确认答案
                     <ArrowRight className="size-4 ml-2" />
@@ -2235,7 +2235,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                 ) : (
                   <Button
                     onClick={nextQuestion}
-                    className="bg-[#00B894] hover:bg-[#00A080] text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+                    className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
                   >
                     下一题
                     <ArrowRight className="size-4 ml-2" />
@@ -2288,7 +2288,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
             </CardHeader>
             <CardContent className="space-y-6">
               {/* 当前语块 */}
-              <div className="p-8 rounded-[32px] bg-gradient-to-br from-[#00B894]/10 via-emerald-50 dark:via-emerald-500/10 to-transparent border border-[#00B894]/10 text-center relative overflow-hidden">
+              <div className="p-8 rounded-[32px] bg-gradient-to-br from-[var(--brand)]/10 via-emerald-50 dark:via-emerald-500/10 to-transparent border border-[var(--brand)]/10 text-center relative overflow-hidden">
                 <div className="absolute top-4 right-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   {aiChainChallenge ? (
                     <Badge className="text-[8px] font-black rounded-full px-1.5 py-0 bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0">AI</Badge>
@@ -2360,7 +2360,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   <Button
                     type="submit"
                     disabled={!chainInput.trim() || chainLoading || chainFeedback?.correct}
-                    className="bg-[#00B894] hover:bg-[#00A080] text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+                    className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
                   >
                     {chainLoading ? (
                       <>
@@ -2459,7 +2459,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                           disabled={!has}
                           className={cn(
                             'w-6 h-5 rounded text-[9px] font-black transition-all',
-                            has ? 'bg-muted text-foreground hover:bg-[#00B894] hover:text-white' : 'text-muted-foreground/25 cursor-default',
+                            has ? 'bg-muted text-foreground hover:bg-[var(--brand)] hover:text-white' : 'text-muted-foreground/25 cursor-default',
                           )}
                         >
                           {letter}
@@ -2488,7 +2488,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                 className={cn(
                                   'w-full text-left p-3 rounded-2xl transition-all duration-200 border-2 mb-1',
                                   selectedPhrase?.id === chunk.id
-                                    ? 'border-[#00B894] bg-[#00B894]/5 shadow-sm'
+                                    ? 'border-[var(--brand)] bg-[var(--brand)]/5 shadow-sm'
                                     : 'border-transparent bg-muted/30 hover:bg-muted hover:border-border',
                                 )}
                               >
@@ -2522,7 +2522,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                             <button
                               type="button"
                               onClick={() => toggleLetterExpanded(letter)}
-                              className="w-full text-left px-3 py-1.5 mt-1 rounded-xl text-[10px] font-black text-ink-teal hover:bg-[#00B894]/10 transition-colors"
+                              className="w-full text-left px-3 py-1.5 mt-1 rounded-xl text-[10px] font-black text-ink-teal hover:bg-[var(--brand)]/10 transition-colors"
                             >
                               {expanded ? '收起，只看前 6 条' : `显示其余 ${chunks.length - PHRASE_LETTER_PREVIEW} 条（${letter} 共 ${chunks.length} 条）`}
                             </button>
@@ -2536,7 +2536,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                 {/* Right: Phrase detail */}
                 <div ref={phraseDetailRef} className="col-span-12 lg:col-span-7 flex flex-col min-h-0">
                   {selectedPhrase ? (
-                    <Card className="flex-1 flex flex-col min-h-0 rounded-[32px] border-2 border-[#00B894]/20 shadow-sm overflow-hidden">
+                    <Card className="flex-1 flex flex-col min-h-0 rounded-[32px] border-2 border-[var(--brand)]/20 shadow-sm overflow-hidden">
                       <CardContent className="p-4 lg:p-6 flex-1 flex flex-col min-h-0">
                         {/* Phrase header —— 与语块库详情同一套版式：徽章在上、标题独占一行、控件 shrink-0 */}
                         <div className="shrink-0">
@@ -2581,7 +2581,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                             <p className="text-lg font-bold text-foreground">{selectedPhrase.meaning}</p>
                           </div>
                           {selectedPhrase.introduction && (
-                            <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/8 dark:to-teal-500/8 border border-[#00B894]/10">
+                            <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/8 dark:to-teal-500/8 border border-[var(--brand)]/10">
                               <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal mb-1">English Introduction</p>
                               <p className="text-sm text-foreground/80 leading-relaxed italic">{selectedPhrase.introduction}</p>
                             </div>
@@ -2608,7 +2608,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                             </Button>
                           </div>
                           {/* Built-in example */}
-                          <div className="p-4 rounded-2xl bg-[#00B894]/5 dark:bg-[#00B894]/10 border border-[#00B894]/10">
+                          <div className="p-4 rounded-2xl bg-[var(--brand)]/5 dark:bg-[var(--brand)]/10 border border-[var(--brand)]/10">
                             <p className="text-xs font-black uppercase tracking-wider text-ink-teal mb-1.5">内置例句</p>
                             <p className="text-sm text-foreground italic leading-relaxed">「{cleanText(selectedPhrase.example)}」</p>
                             {(selectedPhrase.exampleZh || exampleTranslations[selectedPhrase.id]) ? (
@@ -2683,7 +2683,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                         <div className="flex gap-2 pt-2 shrink-0">
                           <Button
                             variant="outline"
-                            className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[#00B894] hover:text-ink-teal"
+                            className="rounded-2xl flex-1 text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
                             onClick={() => toggleFavorite(selectedPhrase)}
                           >
                             <Heart
@@ -2794,14 +2794,14 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                     className={cn(
                       'px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border',
                       reviewAutoSpeak
-                        ? 'border-[#00B894]/40 bg-[#00B894]/10 text-ink-teal'
+                        ? 'border-[var(--brand)]/40 bg-[var(--brand)]/10 text-ink-teal'
                         : 'border-border text-muted-foreground hover:text-foreground',
                     )}
                     title="出卡自动朗读 —— 与词汇模块共用此设置"
                   >
                     自动发音{reviewAutoSpeak ? '·开' : '·关'}
                   </button>
-                  <Button onClick={() => startMemorizedReview()} variant="outline" size="sm" className="rounded-2xl text-[10px] font-black uppercase tracking-wider gap-1.5 border-[#00B894]/30 text-ink-teal hover:bg-[#00B894]/10">
+                  <Button onClick={() => startMemorizedReview()} variant="outline" size="sm" className="rounded-2xl text-[10px] font-black uppercase tracking-wider gap-1.5 border-[var(--brand)]/30 text-ink-teal hover:bg-[var(--brand)]/10">
                     <Brain className="size-3.5" />已记 ({memorizedChunks.size})
                   </Button>
                   <Button onClick={() => startReview(20)} variant="outline" size="sm" className="rounded-2xl text-[10px] font-black uppercase tracking-wider gap-1.5">
@@ -2820,10 +2820,10 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                   <p className="text-sm text-muted-foreground font-medium mb-6">从 {allChunks.length} 个短语中随机抽取 20 个进行闪卡复习</p>
                   <div className="flex justify-center gap-3 flex-wrap">
                     <Button onClick={() => startReview(10)} variant="outline" size="sm" className="rounded-2xl text-xs font-bold">10 个</Button>
-                    <Button onClick={() => startReview(20)} size="sm" className="rounded-2xl text-xs font-bold bg-[#00B894] hover:bg-[#00A080] text-white">20 个</Button>
+                    <Button onClick={() => startReview(20)} size="sm" className="rounded-2xl text-xs font-bold bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white">20 个</Button>
                     <Button onClick={() => startReview(allChunks.length)} variant="outline" size="sm" className="rounded-2xl text-xs font-bold">全部 ({allChunks.length})</Button>
                     {memorizedChunks.size > 0 && (
-                      <Button onClick={() => startMemorizedReview()} size="sm" className="rounded-2xl text-xs font-bold bg-[#00B894]/10 text-ink-teal hover:bg-[#00B894]/20 border border-[#00B894]/30 gap-1.5">
+                      <Button onClick={() => startMemorizedReview()} size="sm" className="rounded-2xl text-xs font-bold bg-[var(--brand)]/10 text-ink-teal hover:bg-[var(--brand)]/20 border border-[var(--brand)]/30 gap-1.5">
                         <Brain className="size-3.5" />复习已记 ({memorizedChunks.size})
                       </Button>
                     )}
@@ -2889,7 +2889,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                 <div className="max-w-md mx-auto">
                   {/* Progress bar */}
                   <div className="h-1.5 bg-muted rounded-full mb-6">
-                    <div className="h-full bg-[#00B894] rounded-full transition-all" style={{ width: `${((reviewIdx + 1) / reviewQueue.length) * 100}%` }} />
+                    <div className="h-full bg-[var(--brand)] rounded-full transition-all" style={{ width: `${((reviewIdx + 1) / reviewQueue.length) * 100}%` }} />
                   </div>
                   {/* Flashcard */}
                   <div
@@ -2976,7 +2976,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                       <Button
                         onClick={() => handleReviewMark(5)}
                         size="sm"
-                        className="rounded-2xl text-[10px] font-bold bg-[#00B894] hover:bg-[#00A080] text-white col-span-2"
+                        className="rounded-2xl text-[10px] font-bold bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white col-span-2"
                       >
                         5 · 完全掌握 ✓
                       </Button>

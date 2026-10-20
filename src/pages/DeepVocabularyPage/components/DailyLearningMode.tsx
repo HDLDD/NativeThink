@@ -35,7 +35,7 @@ const AUTO_SPEAK_KEY = '__nativethink_vocab_autospeak';
 
 // Level color map
 const LEVEL_COLORS: Record<string, { accent: string; bg: string; border: string; light: string; gradient: string; label: string }> = {
-  all:          { accent: '#00B894', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', light: 'bg-emerald-50 dark:bg-emerald-500/15', gradient: 'from-emerald-500 to-[#00B894]', label: '全部' },
+  all:          { accent: 'var(--brand)', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', light: 'bg-emerald-50 dark:bg-emerald-500/15', gradient: 'from-emerald-500 to-[var(--brand)]', label: '全部' },
   zhongkao:     { accent: '#EF4444', bg: 'bg-red-500/10', border: 'border-red-500/20', light: 'bg-red-50 dark:bg-red-500/15', gradient: 'from-red-500 to-rose-500', label: '中考' },
   gaokao:       { accent: '#F97316', bg: 'bg-orange-500/10', border: 'border-orange-500/20', light: 'bg-orange-50 dark:bg-orange-500/15', gradient: 'from-orange-500 to-amber-500', label: '高考' },
   cet4:         { accent: '#0EA5E9', bg: 'bg-sky-500/10', border: 'border-sky-500/20', light: 'bg-sky-50 dark:bg-sky-500/15', gradient: 'from-sky-500 to-cyan-500', label: '四级' },
@@ -51,7 +51,7 @@ const LEVEL_COLORS: Record<string, { accent: string; bg: string; border: string;
 
 // Mode color map
 const MODE_COLORS: Record<ReviewMode, { accent: string; bg: string; gradient: string; icon: string }> = {
-  flashcard: { accent: '#00B894', bg: 'bg-emerald-500/10', gradient: 'from-emerald-500/20 to-[#00B894]/10', icon: 'text-emerald-500' },
+  flashcard: { accent: 'var(--brand)', bg: 'bg-emerald-500/10', gradient: 'from-emerald-500/20 to-[var(--brand)]/10', icon: 'text-emerald-500' },
   choice:    { accent: '#6C5CE7', bg: 'bg-violet-500/10', gradient: 'from-violet-500/20 to-purple-500/10', icon: 'text-violet-500' },
   spelling:  { accent: '#F59E0B', bg: 'bg-amber-500/10', gradient: 'from-amber-500/20 to-orange-500/10', icon: 'text-amber-500' },
   listening: { accent: '#0EA5E9', bg: 'bg-sky-500/10', gradient: 'from-sky-500/20 to-cyan-500/10', icon: 'text-sky-500' },
@@ -1160,7 +1160,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
             </span>
             <button data-press="strong"
               onClick={() => setDetailWord(prevWord)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-border bg-card max-w-[62%] transition-colors hover:border-[#00B894]/40 hover:bg-[#00B894]/5"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-border bg-card max-w-[62%] transition-colors hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5"
               title={`查看「${prevWord.word}」详情`}
             >
               <ChevronLeft className="size-3 shrink-0 text-muted-foreground" />
@@ -1184,7 +1184,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
           <div className="flex items-center gap-3">
             <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-[#00B894] to-emerald-400 rounded-full transition-all duration-300"
+                className="h-full bg-gradient-to-r from-[var(--brand)] to-emerald-400 rounded-full transition-all duration-300"
                 style={{ width: `${((currentIdx + (rated ? 1 : 0)) / sessionWords.length) * 100}%` }}
               />
             </div>
@@ -1318,7 +1318,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                     { q: 2, label: '有点印象', color: 'bg-orange-500 hover:bg-orange-600' },
                     { q: 3, label: '基本记得', color: 'bg-amber-500 hover:bg-amber-600' },
                     { q: 4, label: '比较熟悉', color: 'bg-emerald-500 hover:bg-emerald-600' },
-                    { q: 5, label: '完全掌握', color: 'bg-[#00B894] hover:bg-[#00A080]' },
+                    { q: 5, label: '完全掌握', color: 'bg-[var(--brand)] hover:bg-[var(--brand-strong)]' },
                   ].map(({ q, label, color }, i) => (
                     <button data-press="soft" key={q} onClick={() => handleRate(q)}
                       className={cn('relative px-3 py-2 rounded-2xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg transition-all hover:scale-105', color)}>
@@ -1366,12 +1366,12 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                     {choiceOptions.map((opt) => {
                       const isSelected = choiceSelected === opt.word;
                       const isCorrect = opt.word === currentWord.word;
-                      let borderClass = 'border-border hover:border-[#00B894]/40 bg-card';
+                      let borderClass = 'border-border hover:border-[var(--brand)]/40 bg-card';
                       if (choiceSelected) {
                         if (isCorrect) borderClass = 'border-emerald-500 bg-emerald-50';
                         else if (isSelected) borderClass = 'border-rose-400 bg-rose-50';
                       } else if (isSelected) {
-                        borderClass = 'border-[#00B894] bg-[#00B894]/5';
+                        borderClass = 'border-[var(--brand)] bg-[var(--brand)]/5';
                       }
                       return (
                         <button data-press="soft"
@@ -1393,7 +1393,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               {/* 答对自动进入下一张；答错停住让人看清正确答案（Enter/→ 也能走） */}
               {choiceSelected && !choiceCorrect && (
                 <div className="flex justify-center">
-                  <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
+                  <Button onClick={handleNext} className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
                     {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                     <ArrowRight className="size-4 ml-2" />
                   </Button>
@@ -1448,7 +1448,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                       )}
                     />
                     {!spellingChecked && (
-                      <Button onClick={handleSpellingCheck} disabled={!spellingInput.trim()} className="rounded-2xl bg-[#00B894] hover:bg-[#00A080] text-white">
+                      <Button onClick={handleSpellingCheck} disabled={!spellingInput.trim()} className="rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white">
                         确认
                       </Button>
                     )}
@@ -1515,7 +1515,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               {/* 答对自动进入下一张；答错停留看答案（Enter/→ 也能走） */}
               {spellingChecked && !spellingCorrect && (
                 <div className="flex justify-center">
-                  <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
+                  <Button onClick={handleNext} className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
                     {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                     <ArrowRight className="size-4 ml-2" />
                   </Button>
@@ -1578,7 +1578,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                       )}
                     />
                     {!listeningChecked && (
-                      <Button onClick={handleListeningCheck} disabled={!listeningInput.trim()} className="rounded-2xl bg-[#00B894] hover:bg-[#00A080] text-white">
+                      <Button onClick={handleListeningCheck} disabled={!listeningInput.trim()} className="rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white">
                         确认
                       </Button>
                     )}
@@ -1639,7 +1639,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               {/* 答对自动进入下一张；答错停留看答案（Enter/→ 也能走） */}
               {listeningChecked && !listeningCorrect && (
                 <div className="flex justify-center">
-                  <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
+                  <Button onClick={handleNext} className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
                     {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                     <ArrowRight className="size-4 ml-2" />
                   </Button>
@@ -1786,7 +1786,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                         )}
                       />
                       {!fillblankChecked && (
-                      <Button onClick={handleFillBlankCheck} disabled={!fillblankInput.trim()} className="rounded-2xl bg-[#00B894] hover:bg-[#00A080] text-white">
+                      <Button onClick={handleFillBlankCheck} disabled={!fillblankInput.trim()} className="rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white">
                         确认
                       </Button>
                     )}
@@ -1841,7 +1841,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                 {/* 答对自动进入下一张；答错停留看答案（Enter/→ 也能走） */}
                 {fillblankChecked && !fillblankCorrect && (
                   <div className="flex justify-center">
-                    <Button onClick={handleNext} className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
+                    <Button onClick={handleNext} className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg">
                       {currentIdx < sessionWords.length - 1 ? '下一个' : '完成本轮'}
                       <ArrowRight className="size-4 ml-2" />
                     </Button>
@@ -1868,7 +1868,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               initial={{ scale: 0.9, opacity: 0, y: 16 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               transition={{ type: 'spring', stiffness: 220, damping: 20 }}
-              className="w-full max-w-sm rounded-[32px] border-2 border-[#00B894]/20 bg-card shadow-2xl p-8 text-center space-y-5"
+              className="w-full max-w-sm rounded-[32px] border-2 border-[var(--brand)]/20 bg-card shadow-2xl p-8 text-center space-y-5"
             >
               <div className="text-6xl select-none" style={{ animation: 'session-cheer 600ms ease both' }}>🎉</div>
               <div className="space-y-1">
@@ -1895,7 +1895,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                 </Button>
                 <Button
                   onClick={() => { setSessionDone(false); startSession(); }}
-                  className="flex-1 rounded-2xl bg-[#00B894] hover:bg-[#00A080] text-white text-xs font-black shadow-lg shadow-emerald-200/50"
+                  className="flex-1 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white text-xs font-black shadow-lg shadow-emerald-200/50"
                 >
                   <BookOpen className="size-4 mr-1.5" />再来一组
                 </Button>

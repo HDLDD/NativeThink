@@ -277,7 +277,7 @@ export default function FavoritesPage() {
           <Button
             onClick={() => setReviewMode(true)}
             disabled={filteredFavorites.length === 0}
-            className="rounded-xl text-[10px] font-black uppercase tracking-wider bg-[#00B894] hover:bg-[#00a882] text-white shadow-lg shadow-emerald-200/50 gap-1.5"
+            className="rounded-xl text-[10px] font-black uppercase tracking-wider bg-[var(--brand)] hover:bg-[#00a882] text-white shadow-lg shadow-emerald-200/50 gap-1.5"
           >
             <BookOpen className="size-3.5" />
             开始回顾

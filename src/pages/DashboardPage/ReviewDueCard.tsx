@@ -18,7 +18,7 @@ function ReviewDueCardInner({ dueCount, onNavigate }: ReviewDueCardProps) {
   return (
     <button
       onClick={() => onNavigate('/vocabulary')}
-      className="w-full flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3 text-left hover:border-[#00B894]/40 hover:shadow-md transition-all group"
+      className="w-full flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3 text-left hover:border-[var(--brand)]/40 hover:shadow-md transition-all group"
     >
       <span className="size-8 rounded-xl bg-amber-50 dark:bg-amber-500/15 text-amber-600 flex items-center justify-center shrink-0">
         <RefreshCcw className="size-4" />

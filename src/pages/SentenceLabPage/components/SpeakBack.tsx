@@ -127,7 +127,7 @@ export function SpeakBack({ item }: { item: ISentenceLabItem }) {
           <Play className="size-3.5" /> 听原声
         </Button>
         {!recording ? (
-          <Button size="sm" className={cn('rounded-xl text-[10px] font-black', 'bg-[#00B894] hover:bg-[#00A383]')}
+          <Button size="sm" className={cn('rounded-xl text-[10px] font-black', 'bg-[var(--brand)] hover:bg-[#00A383]')}
             onClick={start}>
             <Mic className="size-3.5" /> 开始跟读
           </Button>
@@ -194,7 +194,7 @@ export function SpeakBack({ item }: { item: ISentenceLabItem }) {
           <div className="rounded-2xl bg-muted/40 p-3">
             <div className="relative h-8">
               {expectedBoundaries.map((b, i) => (
-                <span key={'e' + i} className="absolute top-1 w-0.5 h-3 rounded-full bg-[#00B894]"
+                <span key={'e' + i} className="absolute top-1 w-0.5 h-3 rounded-full bg-[var(--brand)]"
                   style={{ left: `${b * 100}%` }} />
               ))}
               {analysis.pauses.map((p, i) => (

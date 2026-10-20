@@ -958,7 +958,7 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
         {/* 左侧：写作区 */}
         <div className="col-span-12 lg:col-span-7 space-y-4">
           {/* 写作提示 */}
-          <Card className="rounded-[32px] border-border shadow-sm bg-gradient-to-br from-[#00B894]/5 to-emerald-50 dark:from-[#00B894]/10 dark:to-emerald-500/10 border-[#00B894]/10">
+          <Card className="rounded-[32px] border-border shadow-sm bg-gradient-to-br from-[var(--brand)]/5 to-emerald-50 dark:from-[var(--brand)]/10 dark:to-emerald-500/10 border-[var(--brand)]/10">
             <CardContent className="p-6">
               <div className="flex items-center gap-2 mb-3">
                 <Lightbulb className="size-4 text-ink-teal" />
@@ -970,7 +970,7 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
                 {selectedPrompt.tips.map((tip, idx) => (
                   <Badge
                     key={idx}
-                    className="rounded-full px-3 py-1 text-xs font-medium bg-white/70 text-foreground dark:bg-foreground/10 border border-[#00B894]/10"
+                    className="rounded-full px-3 py-1 text-xs font-medium bg-white/70 text-foreground dark:bg-foreground/10 border border-[var(--brand)]/10"
                   >
                     {tip}
                   </Badge>
@@ -1006,7 +1006,7 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
                   className={cn(
                     'h-full rounded-full transition-all duration-300',
                     wordCount >= selectedPrompt.wordLimit.min
-                      ? 'bg-gradient-to-r from-[#00B894] to-emerald-400'
+                      ? 'bg-gradient-to-r from-[var(--brand)] to-emerald-400'
                       : 'bg-amber-400',
                   )}
                   style={{ width: `${Math.min(100, (wordCount / Math.max(1, selectedPrompt.wordLimit.min)) * 100)}%` }}
@@ -1036,7 +1036,7 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
                 <Button
                   onClick={handleSubmit}
                   disabled={isSubmitting || wordCount < selectedPrompt.wordLimit.min}
-                  className="bg-[#00B894] hover:bg-[#00A080] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+                  className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
                   title="快捷键：Ctrl + Enter"
                 >
                   {isSubmitting ? (
@@ -1131,7 +1131,7 @@ function PromptGrid({
       {list.length > 12 && (
         <button
           onClick={() => setShowAll((v) => !v)}
-          className="mt-4 w-full py-3 rounded-2xl border-2 border-dashed border-border text-xs font-black text-muted-foreground hover:border-[#00B894]/50 hover:text-ink-teal transition-colors"
+          className="mt-4 w-full py-3 rounded-2xl border-2 border-dashed border-border text-xs font-black text-muted-foreground hover:border-[var(--brand)]/50 hover:text-ink-teal transition-colors"
         >
           {showAll ? '收起，只看前 12 题' : `展开其余 ${list.length - 12} 题（共 ${list.length} 题）`}
         </button>

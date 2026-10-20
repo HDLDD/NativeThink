@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import {
   Sparkles,
   Key,
@@ -74,7 +74,7 @@ function createInitialState(): ProviderStates {
   return states;
 }
 
-export default function AISettings() {
+export default function AISettings({ trigger }: { trigger?: ReactNode } = {}) {
   const [open, setOpen] = useState(false);
   const [states, setStates] = useState<ProviderStates>(createInitialState);
   // 离线备用小模型
@@ -191,17 +191,19 @@ export default function AISettings() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="AI 设置"
-          className="relative bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
-        >
-          <Cpu className="size-4.5" />
-          {configuredCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-background" />
-          )}
-        </Button>
+        {trigger ?? (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="AI 设置"
+            className="relative bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
+          >
+            <Cpu className="size-4.5" />
+            {configuredCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-background" />
+            )}
+          </Button>
+        )}
       </DialogTrigger>
       {/*
         窄视口守卫（2026-09-29 实测 393×600 上下各被裁 43px）：整块面板比视口高时，
@@ -219,7 +221,7 @@ export default function AISettings() {
             </DialogTitle>
             <p className="text-sm text-muted-foreground font-medium mt-1">
               已配置 {configuredCount}/{ALL_PROVIDERS.length} 个模型 · 当前：
-              <Badge className="ml-1.5 rounded-full px-2 py-0 text-[10px] font-black bg-[#00B894]/10 text-ink-teal border-none">
+              <Badge className="ml-1.5 rounded-full px-2 py-0 text-[10px] font-black bg-[var(--brand)]/10 text-ink-teal border-none">
                 {PROVIDER_CONFIGS[activeP].name}
               </Badge>
             </p>
@@ -242,7 +244,7 @@ export default function AISettings() {
                   className={cn(
                     'p-5 rounded-[24px] border-2 transition-all',
                     isActive && isConfigured
-                      ? 'border-[#00B894] bg-[#00B894]/5'
+                      ? 'border-[var(--brand)] bg-[var(--brand)]/5'
                       : 'border-border bg-muted/20',
                   )}
                 >
@@ -261,7 +263,7 @@ export default function AISettings() {
                         </Badge>
                       )}
                       {isActive && isConfigured && (
-                        <Badge className="rounded-full px-2 py-0 text-[9px] font-black bg-[#00B894]/15 text-ink-teal border-none">
+                        <Badge className="rounded-full px-2 py-0 text-[9px] font-black bg-[var(--brand)]/15 text-ink-teal border-none">
                           当前
                         </Badge>
                       )}
@@ -342,7 +344,7 @@ export default function AISettings() {
                       disabled={st.testing || !st.key.trim()}
                       className={cn(
                         'flex-1 rounded-xl text-[9px] font-black uppercase tracking-wider h-8',
-                        'border-border hover:border-[#00B894] hover:text-ink-teal',
+                        'border-border hover:border-[var(--brand)] hover:text-ink-teal',
                       )}
                     >
                       {st.testing ? (
@@ -371,13 +373,13 @@ export default function AISettings() {
                       <Button
                         size="sm"
                         onClick={() => handleSetActive(provider)}
-                        className="rounded-xl text-[9px] font-black uppercase tracking-wider bg-[#00B894] hover:bg-[#00A080] h-8 text-white shadow-sm shrink-0"
+                        className="rounded-xl text-[9px] font-black uppercase tracking-wider bg-[var(--brand)] hover:bg-[var(--brand-strong)] h-8 text-white shadow-sm shrink-0"
                       >
                         选用
                       </Button>
                     )}
                     {isActive && isConfigured && (
-                      <div className="flex items-center justify-center h-8 px-3 rounded-xl bg-[#00B894]/10 text-ink-teal text-[9px] font-black uppercase tracking-wider shrink-0">
+                      <div className="flex items-center justify-center h-8 px-3 rounded-xl bg-[var(--brand)]/10 text-ink-teal text-[9px] font-black uppercase tracking-wider shrink-0">
                         <CheckCircle2 className="size-3 mr-1" />
                         使用中
                       </div>
@@ -465,7 +467,7 @@ export default function AISettings() {
                 onClick={() => { const v = !llmAuto; setLlmAuto(v); setAutoFallbackEnabled(v); }}
                 className={cn(
                   'relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0',
-                  llmAuto ? 'bg-[#00B894]' : 'bg-muted-foreground/30',
+                  llmAuto ? 'bg-[var(--brand)]' : 'bg-muted-foreground/30',
                 )}
               >
                 <span className={cn(

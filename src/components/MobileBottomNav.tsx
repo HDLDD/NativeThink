@@ -57,7 +57,7 @@ export default function MobileBottomNav() {
               <Icon
                 className={cn(
                   'size-5.5 transition-all',
-                  isActive && 'drop-shadow-[0_0_6px_rgba(0,184,148,0.4)]',
+                  isActive && 'drop-shadow-[0_0_6px_rgb(var(--brand-rgb) / 0.4)]',
                 )}
                 strokeWidth={isActive ? 2.5 : 2}
               />
@@ -70,7 +70,7 @@ export default function MobileBottomNav() {
                 {label}
               </span>
               {isActive && (
-                <span className="absolute top-0 w-8 h-0.5 rounded-b-full bg-[#00B894]" />
+                <span className="absolute top-0 w-8 h-0.5 rounded-b-full bg-[var(--brand)]" />
               )}
             </button>
           );

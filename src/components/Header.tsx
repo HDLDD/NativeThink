@@ -1,39 +1,20 @@
-import { Sun, Moon, Bell, Calendar, Clock, Target, Settings } from 'lucide-react';
+import { Calendar, Clock, Settings as SettingsIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { useTheme } from '@/lib/use-theme';
-import { useLearningStats } from '@/lib/use-learning-stats';
 import { formatDate } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import UserMenu from './UserMenu';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { toast } from 'sonner';
-import { ExternalLink } from 'lucide-react';
-import AISettings from '@/components/AISettings';
-import TTSSettings from '@/components/TTSSettings';
-import HelpGuide from '@/components/HelpGuide';
 import GlobalWordSearch from '@/components/GlobalWordSearch';
-import ChangelogDialog from '@/components/ChangelogDialog';
 
-const GOAL_OPTIONS = [10, 20, 30, 45, 60];
-
+/**
+ * 顶栏只留三件事：日期时间、全局搜索、设置入口（+ 用户菜单）。
+ * 使用指南 / 朗读 / AI / 每日目标 / 更新日志 / 外观主题全部收进 /settings ——
+ * 顶栏图标从 9 个降到 3 个，窄屏不再需要横向滚动。
+ */
 export default function Header() {
-  const { theme, toggleTheme } = useTheme();
-  const { stats, setDailyGoal } = useLearningStats();
+  const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [goalOpen, setGoalOpen] = useState(false);
-
-  const handleGoalChange = (minutes: number) => {
-    setDailyGoal(minutes);
-    setGoalOpen(false);
-    toast.success(`每日目标已设为 ${minutes} 分钟 🎯`);
-  };
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -85,82 +66,17 @@ export default function Header() {
             </span>
           </div>
 
-          {/* 工具栏：手机端空间紧张时可横向滚动，避免最右侧图标被挤出屏幕 */}
-          <div className="flex items-center gap-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {/* Daily Goal Setting */}
-            <Dialog open={goalOpen} onOpenChange={setGoalOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="每日目标设置"
-                  className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
-                >
-                  <Target className="size-4.5" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-sm rounded-[32px] p-0 overflow-hidden">
-                <div className="p-6 border-b border-border bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10">
-                  <DialogHeader>
-                    <DialogTitle className="text-xl font-black italic text-foreground flex items-center gap-2">
-                      <Target className="size-5 text-ink-teal" />
-                      每日学习目标
-                    </DialogTitle>
-                  </DialogHeader>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-sm text-muted-foreground font-medium">
-                    选择你每天想要学习的时间：
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {GOAL_OPTIONS.map((min) => (
-                      <Button
-                        key={min}
-                        variant={stats.dailyGoalMinutes === min ? 'default' : 'outline'}
-                        size="lg"
-                        onClick={() => handleGoalChange(min)}
-                        className={`rounded-2xl font-black text-sm ${
-                          stats.dailyGoalMinutes === min
-                            ? 'bg-[#00B894] text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30'
-                            : 'border-border hover:border-[#00B894] hover:text-ink-teal'
-                        }`}
-                      >
-                        {min} 分钟
-                      </Button>
-                    ))}
-                  </div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-center pt-2">
-                    当前目标：{stats.dailyGoalMinutes} 分钟/天
-                  </p>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <ChangelogDialog />
-            <button
-              onClick={() => {
-                if (window.confirm('将跳转到开发者B站主页（bilibili），是否继续？')) {
-                  window.open('https://b23.tv/nHHPunY', '_blank', 'noopener,noreferrer');
-                }
-              }}
-              className="inline-flex items-center justify-center size-9 bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
-              aria-label="开发者B站主页"
-              title="开发者B站主页"
-            >
-              <ExternalLink className="size-4.5" />
-            </button>
-            <HelpGuide />
+          <div className="flex items-center gap-1 min-w-0">
             <GlobalWordSearch />
-            <AISettings />
-            <TTSSettings />
             <Button
               variant="ghost"
               size="icon"
-              onClick={toggleTheme}
-              aria-label="切换主题"
+              aria-label="设置"
+              title="设置"
+              onClick={() => navigate('/settings')}
               className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
             >
-              {theme === 'light' ? <Moon className="size-4.5" /> : <Sun className="size-4.5" />}
+              <SettingsIcon className="size-4.5" />
             </Button>
             <UserMenu />
           </div>

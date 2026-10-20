@@ -40,7 +40,7 @@ function HeroCardInner({ onStartLearning }: HeroCardProps) {
           <Button
             size="lg"
             onClick={onStartLearning}
-            className="bg-[#00B894] hover:bg-[#00A080] text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl text-[10px] lg:text-xs font-black uppercase tracking-wider shadow-xl shadow-emerald-200/50 dark:shadow-emerald-900/30 hover:scale-105 transition-all gap-2"
+            className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl text-[10px] lg:text-xs font-black uppercase tracking-wider shadow-xl shadow-emerald-200/50 dark:shadow-emerald-900/30 hover:scale-105 transition-all gap-2"
           >
             <Play className="size-3.5 lg:size-4" />
             开始今日学习

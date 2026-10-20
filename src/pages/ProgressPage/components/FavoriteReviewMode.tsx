@@ -122,7 +122,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-2">
-          <div className="size-10 rounded-xl bg-[#00B894]/10 flex items-center justify-center text-ink-teal">
+          <div className="size-10 rounded-xl bg-[var(--brand)]/10 flex items-center justify-center text-ink-teal">
             <CheckCircle2 className="size-5" />
           </div>
           <div>
@@ -161,7 +161,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
             <div className="flex items-center justify-center gap-2">
               <div className="flex-1 max-w-[200px] h-2.5 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-emerald-400 to-[#00B894] rounded-full transition-all duration-700"
+                  className="h-full bg-gradient-to-r from-emerald-400 to-[var(--brand)] rounded-full transition-all duration-700"
                   style={{ width: `${total > 0 ? Math.round((knownIds.size / total) * 100) : 0}%` }}
                 />
               </div>
@@ -173,14 +173,14 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
             <div className="flex gap-2">
               <Button
                 onClick={restart}
-                className="flex-1 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50"
+                className="flex-1 rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50"
               >
                 <RotateCw className="size-4 mr-2" />再来一次
               </Button>
               <Button
                 variant="outline"
                 onClick={onExit}
-                className="flex-1 rounded-2xl border-border hover:border-[#00B894] font-black text-sm"
+                className="flex-1 rounded-2xl border-border hover:border-[var(--brand)] font-black text-sm"
               >
                 <ArrowLeft className="size-4 mr-2" />返回浏览
               </Button>
@@ -199,7 +199,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="size-10 rounded-xl bg-[#00B894]/10 flex items-center justify-center text-ink-teal">
+              <div className="size-10 rounded-xl bg-[var(--brand)]/10 flex items-center justify-center text-ink-teal">
                 <Heart className="size-5" />
               </div>
               <div>
@@ -238,7 +238,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="size-10 rounded-xl bg-[#00B894]/10 flex items-center justify-center text-ink-teal">
+            <div className="size-10 rounded-xl bg-[var(--brand)]/10 flex items-center justify-center text-ink-teal">
               <Heart className="size-5" />
             </div>
             <div>
@@ -268,7 +268,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
       {/* Header + type filter */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="size-10 rounded-xl bg-[#00B894]/10 flex items-center justify-center text-ink-teal">
+          <div className="size-10 rounded-xl bg-[var(--brand)]/10 flex items-center justify-center text-ink-teal">
             <Heart className="size-5" />
           </div>
           <div>
@@ -293,7 +293,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
               className={cn(
                 'px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border-2',
                 filterType === type
-                  ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal'
+                  ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
                   : 'border-border bg-muted text-muted-foreground hover:border-muted-foreground/30',
               )}
             >
@@ -327,7 +327,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
       <div className="flex items-center gap-3">
         <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-[#00B894] to-emerald-400 rounded-full transition-all duration-300"
+            className="h-full bg-gradient-to-r from-[var(--brand)] to-emerald-400 rounded-full transition-all duration-300"
             style={{ width: `${total > 0 ? ((reviewed) / total) * 100 : 0}%` }}
           />
         </div>
@@ -448,7 +448,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
               mark(true);
             }}
             size="lg"
-            className="rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm px-6 shadow-lg shadow-emerald-200/50"
+            className="rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-black text-sm px-6 shadow-lg shadow-emerald-200/50"
           >
             <CheckCircle2 className="size-4.5 mr-2" />
             认识

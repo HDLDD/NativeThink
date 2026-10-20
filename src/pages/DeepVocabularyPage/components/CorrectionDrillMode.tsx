@@ -291,7 +291,7 @@ export default function CorrectionDrillMode() {
         {/* 与中译英同一口径：正确率交给弧长；一题没答不画弧（0% 的弧是个假判定） */}
         {answered > 0 && (
           <span className="flex items-center gap-1 text-xs font-black tabular-nums" title={`本轮答对 ${goodCount}/${answered}`}>
-            <ScoreArc value={goodCount / answered} size={18} color={goodCount / answered >= 0.7 ? '#00B894' : '#F59E0B'} />
+            <ScoreArc value={goodCount / answered} size={18} color={goodCount / answered >= 0.7 ? 'var(--brand)' : '#F59E0B'} />
             ✓{goodCount}
           </span>
         )}

@@ -20,7 +20,7 @@ function KpiCardInner({
   value,
   trend,
   trendUp = true,
-  color = '#00B894',
+  color = 'var(--brand)',
   onClick,
 }: KpiCardProps) {
   return (

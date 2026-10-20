@@ -31,7 +31,7 @@ interface ProgressChartsProps {
 // 颜色按 **key** 取，必须与 DashboardPage/constants.ts 的 MODULES[].color 一致 ——
 // 此前按下标对位数组，错位且 conversation/spelling 同为 #F59E0B，饼图图例无法区分
 const MODULE_COLORS: Record<string, string> = {
-  think: '#00B894',
+  think: 'var(--brand)',
   chunks: '#1F2937',
   conversation: '#6366F1',
   shadowing: '#F97316',
@@ -148,7 +148,7 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
                 />
                 <Bar
                   dataKey="minutes"
-                  fill="#00B894"
+                  fill="var(--brand)"
                   radius={[10, 10, 0, 0]}
                   maxBarSize={48}
                 />
@@ -261,10 +261,10 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
                 <Line
                   type="monotone"
                   dataKey="minutes"
-                  stroke="#00B894"
+                  stroke="var(--brand)"
                   strokeWidth={2.5}
                   dot={false}
-                  activeDot={{ r: 5, fill: '#00B894', stroke: '#fff', strokeWidth: 2 }}
+                  activeDot={{ r: 5, fill: 'var(--brand)', stroke: '#fff', strokeWidth: 2 }}
                 />
               </LineChart>
             </ResponsiveContainer>

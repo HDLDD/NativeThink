@@ -205,7 +205,7 @@ function DictationInput({
                       {!submitted && focusedIdx === i && (
                         <span
                           aria-hidden="true"
-                          className="spelling-caret ml-px inline-block w-[2px] h-[1.05em] bg-[#00B894] rounded-full"
+                          className="spelling-caret ml-px inline-block w-[2px] h-[1.05em] bg-[var(--brand)] rounded-full"
                         />
                       )}
                     </>
@@ -222,9 +222,9 @@ function DictationInput({
                       ? 'bg-emerald-400'
                       : 'bg-rose-400'
                     : hasValue
-                      ? 'bg-[#00B894]/60'
+                      ? 'bg-[var(--brand)]/60'
                       : 'bg-white/90 group-hover:bg-white',
-                  'group-focus-within:h-[3px] group-focus-within:bg-[#00B894]',
+                  'group-focus-within:h-[3px] group-focus-within:bg-[var(--brand)]',
                 )}
               />
 
@@ -310,7 +310,7 @@ function FillDisplay({
               className={cn(
                 'h-9 w-[calc(1ch*' + Math.max(part.content.replace(/[^a-zA-Z]/g, '').length + 2, 6) + '+ 12px)] min-w-[60px]',
                 'text-center text-sm font-mono rounded-xl border-2 outline-none transition-all duration-200',
-                'bg-background focus:border-[#00B894] focus:ring-2 focus:ring-[#00B894]/20',
+                'bg-background focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/20',
                 submitted
                   ? isCorrect
                     ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300'
@@ -344,7 +344,7 @@ function CompletionBanner({ todayPracticed, onRestart, onShowRecords }: {
 }) {
   useEffect(() => { sfxComplete(); }, []);
   return (
-    <Card className="p-6 rounded-2xl border-[#00B894]/20 shadow-sm bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5">
+    <Card className="p-6 rounded-2xl border-[var(--brand)]/20 shadow-sm bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5">
       <div className="flex flex-col items-center justify-center text-center">
         <Check className="size-8 text-ink-teal mb-2" />
         <h2 className="text-lg font-black italic mb-1">本轮完成！</h2>
@@ -355,7 +355,7 @@ function CompletionBanner({ todayPracticed, onRestart, onShowRecords }: {
           <Button
             size="sm"
             onClick={onRestart}
-            className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-1.5"
+            className="rounded-xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-bold gap-1.5"
           >
             <RefreshCw className="size-3.5" />
             再来一轮
@@ -1090,7 +1090,7 @@ export default function SpellingPage() {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#00B894]/10 text-ink-teal text-[10px] font-black uppercase tracking-wider">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--brand)]/10 text-ink-teal text-[10px] font-black uppercase tracking-wider">
             <Sparkles className="size-3.5" /> Spelling Practice
           </div>
           <h1 className="text-3xl font-black italic text-foreground">句子拼写</h1>
@@ -1107,7 +1107,7 @@ export default function SpellingPage() {
                 disabled={building || levelLoading}
                 className={cn(
                   'group p-4 rounded-2xl border-2 border-border text-left transition-all duration-200',
-                  'hover:border-[#00B894]/40 hover:shadow-md hover:-translate-y-0.5',
+                  'hover:border-[var(--brand)]/40 hover:shadow-md hover:-translate-y-0.5',
                   'disabled:opacity-60 disabled:cursor-wait',
                 )}
               >
@@ -1185,7 +1185,7 @@ export default function SpellingPage() {
                 className={cn(
                   'px-4 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-200',
                   mode === 'dictation'
-                    ? 'bg-[#00B894] text-white shadow-sm'
+                    ? 'bg-[var(--brand)] text-white shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -1196,7 +1196,7 @@ export default function SpellingPage() {
                 className={cn(
                   'px-4 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-200',
                   mode === 'fill'
-                    ? 'bg-[#00B894] text-white shadow-sm'
+                    ? 'bg-[var(--brand)] text-white shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -1215,7 +1215,7 @@ export default function SpellingPage() {
                 className={cn(
                   'px-3 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-200',
                   audioMode === 'sentence'
-                    ? 'bg-[#00B894] text-white shadow-sm'
+                    ? 'bg-[var(--brand)] text-white shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -1226,7 +1226,7 @@ export default function SpellingPage() {
                 className={cn(
                   'px-3 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-200',
                   audioMode === 'word'
-                    ? 'bg-[#00B894] text-white shadow-sm'
+                    ? 'bg-[var(--brand)] text-white shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -1241,7 +1241,7 @@ export default function SpellingPage() {
             className={cn(
               'px-3 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-200 border',
               autoRead
-                ? 'bg-[#00B894]/10 border-[#00B894]/30 text-ink-teal'
+                ? 'bg-[var(--brand)]/10 border-[var(--brand)]/30 text-ink-teal'
                 : 'border-border text-muted-foreground hover:text-foreground',
             )}
             title={autoRead ? '点击关闭自动朗读' : '点击开启自动朗读'}
@@ -1256,7 +1256,7 @@ export default function SpellingPage() {
                 variant="outline"
                 size="sm"
                 disabled={building || levelLoading}
-                className="rounded-[10px] gap-1.5 text-xs font-bold h-8 border-border hover:border-[#00B894]/40"
+                className="rounded-[10px] gap-1.5 text-xs font-bold h-8 border-border hover:border-[var(--brand)]/40"
                 title="切换词书"
               >
                 <Library className="size-3.5 text-ink-teal" />
@@ -1325,7 +1325,7 @@ export default function SpellingPage() {
 
         {/* Loading indicator — like DeepVocabularyPage */}
         {levelLoading && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#00B894]/5 border border-[#00B894]/20">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--brand)]/5 border border-[var(--brand)]/20">
             <Loader2 className="size-4 text-ink-teal animate-spin shrink-0" />
             <span className="text-xs font-bold text-ink-teal">正在加载词库...</span>
           </div>
@@ -1340,7 +1340,7 @@ export default function SpellingPage() {
             </span>
             <div className="w-32 h-1.5 bg-muted rounded-full overflow-hidden">
               <div
-                className="h-full bg-[#00B894] rounded-full transition-all duration-300"
+                className="h-full bg-[var(--brand)] rounded-full transition-all duration-300"
                 style={{ width: `${sessionQueue.length > 0 ? ((currentIndex + 1) / sessionQueue.length) * 100 : 0}%` }}
               />
             </div>
@@ -1369,7 +1369,7 @@ export default function SpellingPage() {
                 className={cn(
                   'px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap',
                   roundSize === n
-                    ? 'bg-[#00B894] text-white shadow-sm'
+                    ? 'bg-[var(--brand)] text-white shadow-sm'
                     : 'bg-muted text-muted-foreground hover:bg-muted/80',
                 )}
               >
@@ -1391,7 +1391,7 @@ export default function SpellingPage() {
               }}
               onBlur={() => { if (roundSize !== sessionQueue.length) { rebuildSession(); toast.success(`本轮 ${roundSize} 句`, { duration: 1200 }); } }}
               title="自定义本轮句数（失焦后生效）"
-              className="w-12 px-1.5 py-0.5 rounded-lg bg-muted text-[10px] font-black text-center outline-none focus:ring-2 focus:ring-[#00B894]/30"
+              className="w-12 px-1.5 py-0.5 rounded-lg bg-muted text-[10px] font-black text-center outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
             />
           </div>
 
@@ -1442,7 +1442,7 @@ export default function SpellingPage() {
           )}
           {(currentSentence?.source === 'word_example' && currentSentence.sourceWord) && (
             <div className="flex items-center justify-center gap-2 mt-2">
-              <Badge variant="outline" className="rounded-md text-[10px] h-5 font-bold text-ink-teal border-[#00B894]/30">
+              <Badge variant="outline" className="rounded-md text-[10px] h-5 font-bold text-ink-teal border-[var(--brand)]/30">
                 单词: {currentSentence.sourceWord}
               </Badge>
               {currentProgress && currentProgress.status !== 'new' && (
@@ -1527,7 +1527,7 @@ export default function SpellingPage() {
             {!submitted ? (
               <Button
                 onClick={handleSubmit}
-                className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
+                className="rounded-xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-bold gap-2"
               >
                 <Check className="size-4" />
                 提交答案
@@ -1556,7 +1556,7 @@ export default function SpellingPage() {
                 )}
                 <Button
                   onClick={handleNext}
-                  className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
+                  className="rounded-xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-bold gap-2"
                 >
                   {currentIndex < sessionQueue.length - 1 ? (
                     <>下一句 <ChevronRight className="size-4" /></>
@@ -2019,7 +2019,7 @@ function AIBatchAddDialog({
             <Button
               onClick={onGenerate}
               disabled={loading || !topic.trim()}
-              className="rounded-xl bg-[#00B894] hover:bg-[#00a882] text-white font-bold gap-2"
+              className="rounded-xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-bold gap-2"
             >
               {loading ? (
                 <>生成中...</>

@@ -153,7 +153,7 @@ export function BuildPractice() {
             {showRef ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
             {showRef ? '收起参考句' : '直接看参考句'}
           </Button>
-          <Button size="sm" className="rounded-xl text-[10px] font-black bg-[#00B894] hover:bg-[#00A383]"
+          <Button size="sm" className="rounded-xl text-[10px] font-black bg-[var(--brand)] hover:bg-[#00A383]"
             disabled={loading} onClick={submit}>
             {loading ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
             {loading ? 'AI 正在批改…' : '提交，让 AI 批改'}
@@ -177,7 +177,7 @@ export function BuildPractice() {
 
         {/* AI 反馈 */}
         {feedback && (
-          <div className="rounded-2xl border border-[#00B894]/30 bg-[#00B894]/5 p-4 space-y-2">
+          <div className="rounded-2xl border border-[var(--brand)]/30 bg-[var(--brand)]/5 p-4 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal flex items-center gap-1.5">
                 <Bot className="size-3.5" /> AI 批改

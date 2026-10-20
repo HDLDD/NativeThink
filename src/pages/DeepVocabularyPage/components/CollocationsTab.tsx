@@ -41,7 +41,7 @@ const PATTERN_LABELS: Record<CollocPattern, { label: string; icon: LucideIcon; c
   'verb+noun':    { label: '动词+名词', icon: Hash,       color: '#6366F1' },
   'verb+prep':    { label: '动词+介词', icon: ArrowUpDown, color: '#F97316' },
   'adj+noun':     { label: '形容词+名词', icon: Tag,       color: '#EC4899' },
-  'noun+prep':    { label: '名词+介词', icon: Link2,       color: '#00B894' },
+  'noun+prep':    { label: '名词+介词', icon: Link2,       color: 'var(--brand)' },
   'adv+adj':      { label: '副词+形容词', icon: Layers,    color: '#8B5CF6' },
   'phrasal_verb': { label: '短语动词',   icon: Sparkles,   color: '#F59E0B' },
   'fixed_phrase': { label: '固定短语',   icon: BookOpen,   color: '#14B8A6' },
@@ -73,7 +73,7 @@ function detectPattern(phrase: string): CollocPattern {
 // Level colors & labels
 // ============================================================
 const LEVEL_COLORS: Record<string, { hex: string; bg: string; bgLight: string; text: string; border: string; badge: string; badgeText: string }> = {
-  all:          { hex: '#00B894', bg: 'bg-emerald-50 dark:bg-emerald-500/15', bgLight: 'bg-emerald-50/50 dark:bg-emerald-500/8', text: 'text-emerald-600', border: 'border-emerald-200 dark:border-emerald-500/20', badge: 'bg-emerald-100 dark:bg-emerald-500/15', badgeText: 'text-emerald-600' },
+  all:          { hex: 'var(--brand)', bg: 'bg-emerald-50 dark:bg-emerald-500/15', bgLight: 'bg-emerald-50/50 dark:bg-emerald-500/8', text: 'text-emerald-600', border: 'border-emerald-200 dark:border-emerald-500/20', badge: 'bg-emerald-100 dark:bg-emerald-500/15', badgeText: 'text-emerald-600' },
   zhongkao:     { hex: '#EF4444', bg: 'bg-red-50 dark:bg-red-500/15', bgLight: 'bg-red-50/50 dark:bg-red-500/8', text: 'text-red-600', border: 'border-red-200 dark:border-red-500/20', badge: 'bg-red-100 dark:bg-red-500/15', badgeText: 'text-red-600' },
   gaokao:       { hex: '#F97316', bg: 'bg-orange-50 dark:bg-orange-500/15', bgLight: 'bg-orange-50/50 dark:bg-orange-500/8', text: 'text-orange-600', border: 'border-orange-200 dark:border-orange-500/20', badge: 'bg-orange-100 dark:bg-orange-500/15', badgeText: 'text-orange-600' },
   cet4:         { hex: '#0EA5E9', bg: 'bg-sky-50 dark:bg-sky-500/15', bgLight: 'bg-sky-50/50 dark:bg-sky-500/8', text: 'text-sky-600', border: 'border-sky-200 dark:border-sky-500/20', badge: 'bg-sky-100 dark:bg-sky-500/15', badgeText: 'text-sky-600' },
@@ -608,7 +608,7 @@ export default function CollocationsTab({
                                         wordMemorized ? 'text-ink-teal' : 'text-muted-foreground/40 hover:text-ink-teal',
                                       )}
                                     >
-                                      <Brain className={cn('size-3', wordMemorized && 'fill-[#00B894]/20')} />
+                                      <Brain className={cn('size-3', wordMemorized && 'fill-[var(--brand)]/20')} />
                                     </button>
                                     <button
                                       onClick={(e) => { e.stopPropagation(); onSelectWord?.(w); }}
@@ -636,7 +636,7 @@ export default function CollocationsTab({
                                   : 'text-muted-foreground/30 hover:text-ink-teal',
                               )}
                             >
-                              <Brain className={cn('size-3.5', memorizedCollocs.has(entry.phrase.toLowerCase()) && 'fill-[#00B894]/20')} />
+                              <Brain className={cn('size-3.5', memorizedCollocs.has(entry.phrase.toLowerCase()) && 'fill-[var(--brand)]/20')} />
                             </button>
                             <Badge className="text-[9px] font-black rounded-full px-2 py-0.5 bg-amber-100 dark:bg-amber-500/15 text-amber-600 border-none">
                               {entry.words.length}
@@ -802,7 +802,7 @@ export default function CollocationsTab({
                           : 'text-muted-foreground hover:text-ink-teal',
                       )}
                     >
-                      <Brain className={cn('size-5', memorizedCollocs.has(selectedEntry.phrase.toLowerCase()) && 'fill-[#00B894]/20')} />
+                      <Brain className={cn('size-5', memorizedCollocs.has(selectedEntry.phrase.toLowerCase()) && 'fill-[var(--brand)]/20')} />
                     </Button>
                     <Button
                       variant="ghost" size="icon"
@@ -867,7 +867,7 @@ export default function CollocationsTab({
                                 wordMemorized ? 'text-ink-teal' : 'text-muted-foreground/40 hover:text-ink-teal',
                               )}
                             >
-                              <Brain className={cn('size-3.5', wordMemorized && 'fill-[#00B894]/20')} />
+                              <Brain className={cn('size-3.5', wordMemorized && 'fill-[var(--brand)]/20')} />
                             </button>
                             <button
                               onClick={() => onSelectWord?.(w)}

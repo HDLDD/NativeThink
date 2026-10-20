@@ -3,7 +3,7 @@ import {
   Sparkles, Lightbulb, Target, ChevronRight, ExternalLink, Zap, Key,
   CheckCircle2, RotateCw, Link2, Shuffle, Edit3, Headphones, Coffee,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { safeStorage } from '@/lib/safe-storage';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -42,7 +42,7 @@ const MODULES: ModuleGuide[] = [
     icon: BookOpen,
     title: '词汇深度',
     route: '/vocabulary',
-    color: '#00B894',
+    color: 'var(--brand)',
     intro: '一站式词汇学习系统，七大模式：每日学习、快速闪卡、复习检测、短语闪卡、词库浏览、搭配学习、词汇量测试，配合 SM-2 间隔记忆算法科学掌握词汇。十一档词库：中考 / 高考 / 四级 / 六级 / 四六级高频 / 四六级高分 / 雅思 / 托福 / 考研 / 专业 / 高阶，去重后共 21,736 个可学单词。词书卡上显示的数字就是这本能出多少张卡（书内已按词去重）。',
     features: [
       { label: '每日学习', desc: '每日推送新词 + 到期待复习的旧词。六种学习方式：闪卡、选择题、拼写、听写、配对、填空。每日目标可选快捷档（5~100 词）或自定义，SM-2 自动安排复习间隔。' },
@@ -199,7 +199,7 @@ const FAQS = [
 // ============================================================
 const GETTING_STARTED = [
   {
-    num: 1, color: '#00B894', title: '选一本词书开始（AI 不用配）',
+    num: 1, color: 'var(--brand)', title: '选一本词书开始（AI 不用配）',
     desc: '进「词汇」会先让你选词书和学习方式，选完直接开始学。AI 功能出厂就带免费额度，不必自备 API Key；想换模型再点右上角 CPU 图标配 Key。',
     links: [
       { name: 'DeepSeek（推荐）', url: 'https://platform.deepseek.com' },
@@ -234,7 +234,7 @@ const GETTING_STARTED = [
 // ============================================================
 const HELP_TAB_KEY = '__nativethink_help_tab';
 
-export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
+export default function HelpGuide({ defaultOpen, trigger }: { defaultOpen?: boolean; trigger?: ReactNode }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   const { pathname } = useLocation();
   const [activeTab, setActiveTab] = useState(() => {
@@ -273,14 +273,16 @@ export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="使用帮助"
-          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
-        >
-          <HelpCircle className="size-4.5" />
-        </Button>
+        {trigger ?? (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="使用帮助"
+            className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
+          >
+            <HelpCircle className="size-4.5" />
+          </Button>
+        )}
       </DialogTrigger>
 
       <DialogContent className="max-w-3xl max-h-[85vh] rounded-[32px] p-0 overflow-y-auto">
@@ -288,7 +290,7 @@ export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
         <div className="p-6 border-b border-border bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 dark:from-emerald-500/10 dark:via-teal-500/10 dark:to-cyan-500/10">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black italic text-foreground flex items-center gap-2.5">
-              <div className="size-10 rounded-2xl bg-[#00B894]/15 text-ink-teal flex items-center justify-center">
+              <div className="size-10 rounded-2xl bg-[var(--brand)]/15 text-ink-teal flex items-center justify-center">
                 <Sparkles className="size-5.5" />
               </div>
               使用指南
@@ -338,7 +340,7 @@ export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
                           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">核心功能</p>
                           {mod.features.map((f, idx) => (
                             <div key={idx} className="flex items-start gap-2.5 bg-white/70 dark:bg-white/10 rounded-2xl p-3">
-                              <span className="size-5 rounded-lg bg-[#00B894]/10 text-ink-teal flex items-center justify-center shrink-0 mt-0.5">
+                              <span className="size-5 rounded-lg bg-[var(--brand)]/10 text-ink-teal flex items-center justify-center shrink-0 mt-0.5">
                                 <ChevronRight className="size-3" />
                               </span>
                               <div>
@@ -420,7 +422,7 @@ export default function HelpGuide({ defaultOpen }: { defaultOpen?: boolean }) {
                   <Card key={idx} className="rounded-[24px] border-border shadow-sm overflow-hidden">
                     <div className="p-5">
                       <div className="flex items-start gap-3">
-                        <div className="size-8 rounded-xl bg-[#00B894]/10 text-ink-teal flex items-center justify-center shrink-0 mt-0.5">
+                        <div className="size-8 rounded-xl bg-[var(--brand)]/10 text-ink-teal flex items-center justify-center shrink-0 mt-0.5">
                           <HelpCircle className="size-4" />
                         </div>
                         <div>

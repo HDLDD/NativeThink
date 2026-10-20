@@ -18,7 +18,7 @@ import { SpeakBack } from './SpeakBack';
 type Phase = 'split' | 'backbone' | 'reveal';
 
 const ROLE_STYLE: Record<string, { chip: string; label: string }> = {
-  core: { chip: 'bg-[#00B894]/10 text-ink-teal border-[#00B894]/30', label: '主干' },
+  core: { chip: 'bg-[var(--brand)]/10 text-ink-teal border-[var(--brand)]/30', label: '主干' },
   mod: { chip: 'bg-muted text-muted-foreground border-border', label: '修饰' },
   conn: { chip: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20', label: '连接' },
 };
@@ -193,7 +193,7 @@ export function ChunkDrill() {
         <div className="grid gap-3 sm:grid-cols-3">
           {READ_STEPS.map((s) => (
             <div key={s.n} className="flex items-start gap-2.5">
-              <span className="size-6 shrink-0 rounded-full bg-[#00B894]/10 text-ink-teal grid place-items-center text-[11px] font-black">
+              <span className="size-6 shrink-0 rounded-full bg-[var(--brand)]/10 text-ink-teal grid place-items-center text-[11px] font-black">
                 {s.n}
               </span>
               <div className="min-w-0">
@@ -213,7 +213,7 @@ export function ChunkDrill() {
             onClick={() => { setReviewMode(false); setIdx(0); }}
             className={cn(
               'px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all',
-              !reviewMode ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40',
+              !reviewMode ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40',
             )}
           >
             全部语料 · {SENTENCE_LAB.length}
@@ -223,7 +223,7 @@ export function ChunkDrill() {
             onClick={() => { setReviewMode(true); setIdx(0); toast.info(stats.due ? `复习 ${stats.due} 句待巩固` : '暂无待复习'); }}
             className={cn(
               'px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all flex items-center gap-1.5',
-              reviewMode ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40',
+              reviewMode ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40',
             )}
           >
             复习队列
@@ -252,7 +252,7 @@ export function ChunkDrill() {
                   onClick={() => { setSrcFilter(s); setIdx(0); }}
                   className={cn(
                     'px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
-                    srcFilter === s ? 'border-[#00B894] bg-[#00B894]/5 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40',
+                    srcFilter === s ? 'border-[var(--brand)] bg-[var(--brand)]/5 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40',
                   )}
                 >
                   {s}
@@ -268,7 +268,7 @@ export function ChunkDrill() {
                   onClick={() => { setLvFilter(s); setIdx(0); }}
                   className={cn(
                     'px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
-                    lvFilter === s ? 'border-[#00B894] bg-[#00B894]/5 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40',
+                    lvFilter === s ? 'border-[var(--brand)] bg-[var(--brand)]/5 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40',
                   )}
                 >
                   {s}
@@ -351,8 +351,8 @@ export function ChunkDrill() {
                           'inline-flex items-center justify-center align-middle mx-[3px] rounded-md transition-all',
                           'w-2.5 h-6 border border-dashed',
                           picked
-                            ? 'bg-[#00B894] border-[#00B894]'
-                            : 'border-muted-foreground/40 bg-background/60 hover:bg-[#00B894]/30 hover:border-[#00B894] hover:scale-y-110',
+                            ? 'bg-[var(--brand)] border-[var(--brand)]'
+                            : 'border-muted-foreground/40 bg-background/60 hover:bg-[var(--brand)]/30 hover:border-[var(--brand)] hover:scale-y-110',
                         )}
                       />
                     )}
@@ -390,7 +390,7 @@ export function ChunkDrill() {
               <p className="text-[14px] font-bold text-foreground leading-loose">
                 {stdParts.map((p, i) => (
                   <span key={i}>
-                    {i > 0 && <span className="inline-block w-1 h-4 align-middle mx-1.5 rounded-full bg-[#00B894]" />}
+                    {i > 0 && <span className="inline-block w-1 h-4 align-middle mx-1.5 rounded-full bg-[var(--brand)]" />}
                     {p}{' '}
                   </span>
                 ))}
@@ -417,7 +417,7 @@ export function ChunkDrill() {
                       className={cn(
                         'px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-all text-left max-w-full',
                         backbonePick === i
-                          ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal'
+                          ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
                           : 'border-border bg-card text-muted-foreground hover:border-muted-foreground/40',
                       )}
                     >
@@ -425,7 +425,7 @@ export function ChunkDrill() {
                     </button>
                   ))}
                 </div>
-                <Button size="sm" className="rounded-xl text-[10px] font-black bg-[#00B894] hover:bg-[#00A383]"
+                <Button size="sm" className="rounded-xl text-[10px] font-black bg-[var(--brand)] hover:bg-[#00A383]"
                   onClick={reveal}>
                   <BookOpen className="size-3.5" /> 揭晓拆解
                 </Button>
@@ -434,7 +434,7 @@ export function ChunkDrill() {
 
             {phase === 'reveal' && resolved && (
               <div className="space-y-3">
-                <div className="rounded-2xl bg-[#00B894]/5 border border-[#00B894]/20 p-3">
+                <div className="rounded-2xl bg-[var(--brand)]/5 border border-[var(--brand)]/20 p-3">
                   <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal mb-1">
                     主干读出来，整句其实就是这一句
                   </p>
@@ -450,7 +450,7 @@ export function ChunkDrill() {
                       <div key={i} className={cn(
                         'flex items-start gap-2.5 rounded-2xl border p-2.5',
                         wrongPick ? 'border-rose-300 bg-rose-50/50 dark:border-rose-500/30 dark:bg-rose-500/5'
-                          : rightPick ? 'border-[#00B894] bg-[#00B894]/5'
+                          : rightPick ? 'border-[var(--brand)] bg-[var(--brand)]/5'
                             : 'border-border/60',
                       )}>
                         <span className={cn('shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black border', st.chip)}>
@@ -484,7 +484,7 @@ export function ChunkDrill() {
         )}
 
         {/* 读法提示 */}
-        <div className="flex items-start gap-2 rounded-2xl bg-[#00B894]/5 border border-[#00B894]/20 p-3">
+        <div className="flex items-start gap-2 rounded-2xl bg-[var(--brand)]/5 border border-[var(--brand)]/20 p-3">
           <Lightbulb className="size-4 shrink-0 text-ink-teal mt-0.5" />
           <p className="text-[11px] font-bold text-foreground/80 leading-relaxed">{item.tip}</p>
         </div>
@@ -499,7 +499,7 @@ export function ChunkDrill() {
                 onClick={() => setUserBreaks(new Set())}>
                 <RotateCcw className="size-3.5" /> 清空
               </Button>
-              <Button size="sm" className="rounded-xl text-[10px] font-black bg-[#00B894] hover:bg-[#00A383]"
+              <Button size="sm" className="rounded-xl text-[10px] font-black bg-[var(--brand)] hover:bg-[#00A383]"
                 onClick={() => {
                   if (userBreaks.size === 0) { toast.info('先切开至少一处，再对照答案'); return; }
                   checkSplit();

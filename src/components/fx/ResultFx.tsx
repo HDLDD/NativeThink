@@ -15,7 +15,7 @@ const R = 15;
 const C = 2 * Math.PI * R;   // 94.25
 
 /** 收口弧：value 0..1。走 stroke-dashoffset（paint），不走 layout。 */
-export function ScoreArc({ value, size = 34, color = '#00B894', track = 'rgba(100,116,139,0.18)', className }:
+export function ScoreArc({ value, size = 34, color = 'var(--brand)', track = 'rgba(100,116,139,0.18)', className }:
   { value: number; size?: number; color?: string; track?: string; className?: string }) {
   const v = Math.max(0, Math.min(1, value));
   return (
@@ -41,7 +41,7 @@ export function StreakRing({ n, color = '#F59E0B', className, children }:
 
 /** 卡角的判定色点：未判定=中性，绝不用"成功"那一套去蒙一个没判的 */
 export function VerdictDot({ state, className }: { state: 'ok' | 'miss' | 'pending'; className?: string }) {
-  const color = state === 'ok' ? '#00B894' : state === 'miss' ? 'hsl(0 45% 52%)' : 'rgba(100,116,139,0.35)';
+  const color = state === 'ok' ? 'var(--brand)' : state === 'miss' ? 'hsl(0 45% 52%)' : 'rgba(100,116,139,0.35)';
   return <span aria-hidden className={cn('fx-dot shrink-0', className)} style={{ ['--fx-dot-color' as string]: color }} />;
 }
 

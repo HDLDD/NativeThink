@@ -71,14 +71,14 @@ function ReaderParagraphImpl({
           ? 'text-center pt-10 pb-3'
           // -mx/px 抵消：给高亮留出左右内边距，但文字位置与纵向间距完全不变（避免高亮移动时版面跳动）
           : 'rounded-xl transition-colors duration-300 -mx-2 px-2',
-        !isChapter && reading && 'bg-[#00B894]/10 ring-1 ring-inset ring-[#00B894]/30',
+        !isChapter && reading && 'bg-[var(--brand)]/10 ring-1 ring-inset ring-[var(--brand)]/30',
       )}
     >
       {isChapter ? (
         <div className="flex items-center justify-center gap-3">
-          <span className="h-px w-8 sm:w-12 bg-[#00B894]/30" />
+          <span className="h-px w-8 sm:w-12 bg-[var(--brand)]/30" />
           <h3 className="text-base sm:text-lg font-black text-ink-teal tracking-wide">{displayEn}</h3>
-          <span className="h-px w-8 sm:w-12 bg-[#00B894]/30" />
+          <span className="h-px w-8 sm:w-12 bg-[var(--brand)]/30" />
         </div>
       ) : (
         <>
@@ -183,7 +183,7 @@ function ReaderParagraphImpl({
           )}
           {/* Chinese translation */}
           {(transMode === 'zh' || transMode === 'bilingual') && para.zh && (
-            <p className="text-base text-muted-foreground leading-7 mt-1.5 pl-3 border-l-2 border-[#00B894]/50">
+            <p className="text-base text-muted-foreground leading-7 mt-1.5 pl-3 border-l-2 border-[var(--brand)]/50">
               {para.zh}
             </p>
           )}

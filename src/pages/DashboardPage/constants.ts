@@ -43,7 +43,7 @@ export const QUICK_ENTRIES = [
     path: '/think',
     label: '母语思维训练',
     icon: Brain,
-    color: 'from-[#00B894] to-emerald-400',
+    color: 'from-[var(--brand)] to-emerald-400',
     bg: 'bg-emerald-50 dark:bg-emerald-500/15',
     desc: '摆脱中式英语',
   },
@@ -122,7 +122,7 @@ export const MODULES = [
 ] as const;
 
 export const LEARNING_OPTIONS = [
-  { path: '/think', label: '母语思维训练', icon: Brain, color: 'from-[#00B894] to-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/15', desc: '摆脱中式英语，建立英语思维' },
+  { path: '/think', label: '母语思维训练', icon: Brain, color: 'from-[var(--brand)] to-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/15', desc: '摆脱中式英语，建立英语思维' },
   { path: '/chunks', label: '语块训练', icon: Puzzle, color: 'from-[#1F2937] to-gray-600', bg: 'bg-gray-50 dark:bg-gray-800', desc: '积累高频母语语块' },
   { path: '/conversation', label: 'AI 对话练习', icon: MessageSquare, color: 'from-[#6366F1] to-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/15', desc: '角色扮演自由对话' },
   { path: '/shadowing', label: '影子跟读', icon: Mic, color: 'from-[#F97316] to-orange-400', bg: 'bg-orange-50 dark:bg-orange-500/15', desc: '训练语音语调' },

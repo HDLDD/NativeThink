@@ -262,7 +262,7 @@ export default function ChunkFlashcards({ allChunks }: { allChunks: IChunk[] }) 
           initial={{ scale: 0.94, opacity: 0, y: 12 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 220, damping: 20 }}
-          className="rounded-[32px] border-2 border-[#00B894]/20 bg-card shadow-sm p-6 sm:p-8 space-y-5 text-center"
+          className="rounded-[32px] border-2 border-[var(--brand)]/20 bg-card shadow-sm p-6 sm:p-8 space-y-5 text-center"
         >
           <Target className="size-12 text-muted-foreground/40 mx-auto" />
           <div className="space-y-1">
@@ -285,7 +285,7 @@ export default function ChunkFlashcards({ allChunks }: { allChunks: IChunk[] }) 
             <Button variant="outline" onClick={exitRun} className="flex-1 rounded-2xl text-xs font-black">
               返回
             </Button>
-            <Button onClick={buildQueue} className="flex-1 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white text-xs font-black">
+            <Button onClick={buildQueue} className="flex-1 rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white text-xs font-black">
               <RefreshCw className="size-3.5 mr-1.5" />再来一组
             </Button>
           </div>
@@ -330,7 +330,7 @@ export default function ChunkFlashcards({ allChunks }: { allChunks: IChunk[] }) 
                 onClick={() => changeRoundSize(n)}
                 className={cn(
                   'px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all',
-                  roundSize === n ? 'bg-[#00B894] text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                  roundSize === n ? 'bg-[var(--brand)] text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80',
                 )}
               >
                 {n}
@@ -386,7 +386,7 @@ export default function ChunkFlashcards({ allChunks }: { allChunks: IChunk[] }) 
             onClick={toggleAutoSpeak}
             className={cn(
               'px-2 py-1 rounded-lg text-[10px] font-bold transition-all',
-              autoSpeak ? 'bg-[#00B894]/10 text-ink-teal' : 'bg-muted text-muted-foreground hover:bg-muted/80',
+              autoSpeak ? 'bg-[var(--brand)]/10 text-ink-teal' : 'bg-muted text-muted-foreground hover:bg-muted/80',
             )}
             title="自动发音"
           >
@@ -505,7 +505,7 @@ export default function ChunkFlashcards({ allChunks }: { allChunks: IChunk[] }) 
         <button
           data-press="strong"
           onClick={handleKnown}
-          className="flex-1 max-w-[150px] py-4 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg flex items-center justify-center gap-2"
+          className="flex-1 max-w-[150px] py-4 rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-black text-sm shadow-lg flex items-center justify-center gap-2"
         >
           <Check className="size-4" />认识 <span className="text-[9px] opacity-70">→</span>
         </button>

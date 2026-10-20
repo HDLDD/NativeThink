@@ -38,7 +38,7 @@ import {
 } from './reader-shared';
 
 const LEVELS = [
-  { key: 'beginner' as const, label: '初级', color: '#00B894' },
+  { key: 'beginner' as const, label: '初级', color: 'var(--brand)' },
   { key: 'intermediate' as const, label: '中级', color: '#F59E0B' },
   { key: 'advanced' as const, label: '高级', color: '#6C5CE7' },
 ];
@@ -1253,7 +1253,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
       {activePages > 0 && (
         <div className="shrink-0 h-0.5 bg-muted/60">
           <div
-            className="h-full bg-[#00B894] transition-all duration-300 ease-out"
+            className="h-full bg-[var(--brand)] transition-all duration-300 ease-out"
             style={{ width: `${((currentPage + 1) / activePages) * 100}%` }}
           />
         </div>
@@ -1327,7 +1327,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
             <button
               onClick={(e) => { e.stopPropagation(); translateCurrentPage(); }}
               disabled={transLoading || transAllLoading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-[#00B894]/10 border border-[#00B894]/30 hover:bg-[#00B894]/20 hover:border-[#00B894]/50 transition-all text-xs font-black text-ink-teal disabled:opacity-60"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-[var(--brand)]/10 border border-[var(--brand)]/30 hover:bg-[var(--brand)]/20 hover:border-[var(--brand)]/50 transition-all text-xs font-black text-ink-teal disabled:opacity-60"
             >
               {transLoading || transAllLoading ? (
                 <>
@@ -1439,7 +1439,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 {(['sm', 'base', 'lg', 'xl'] as const).map((key, i) => (
                   <button key={key} onClick={() => setFontSize(key)}
                     className={cn('flex-1 h-9 rounded-xl font-black transition-all border',
-                      fontSize === key ? 'border-[#00B894] text-ink-teal bg-[#00B894]/5' : 'border-border text-muted-foreground')}
+                      fontSize === key ? 'border-[var(--brand)] text-ink-teal bg-[var(--brand)]/5' : 'border-border text-muted-foreground')}
                     style={{ fontSize: 12 + i * 3 }}>A</button>
                 ))}
               </div>
@@ -1451,7 +1451,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 {([{ key: 'light', label: '浅色', bg: '#FFFFFF', fg: '#374151' }, { key: 'paper', label: '纸张', bg: '#F6F1E6', fg: '#5B4F3A' }, { key: 'night', label: '夜间', bg: '#16181B', fg: '#D6D3CC' }] as const).map(({ key, label, bg, fg }) => (
                   <button key={key} onClick={() => setReaderTheme(key)}
                     className={cn('rounded-xl border-2 p-2 flex flex-col items-center gap-1.5 transition-all',
-                      readerTheme === key ? 'border-[#00B894]' : 'border-border hover:border-muted-foreground/30')}>
+                      readerTheme === key ? 'border-[var(--brand)]' : 'border-border hover:border-muted-foreground/30')}>
                     <span className="w-full h-7 rounded-lg border border-black/5 flex items-center justify-center" style={{ background: bg }}>
                       <span className="text-[9px] font-bold" style={{ color: fg }}>Aa</span>
                     </span>
@@ -1468,7 +1468,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                   <Volume2 className="size-3.5" />{readerMode === 'novel' ? '朗读本章' : '朗读本页'}
                 </Button>
                 <Button variant="outline" size="sm" onClick={toggleAutoRead}
-                  className={cn('flex-1 rounded-xl text-xs font-bold gap-1', autoReadPages && 'bg-[#00B894] hover:bg-[#00a882] text-white border-transparent')}>
+                  className={cn('flex-1 rounded-xl text-xs font-bold gap-1', autoReadPages && 'bg-[var(--brand)] hover:bg-[#00a882] text-white border-transparent')}>
                   <Repeat className={cn('size-3.5', autoReadPages && 'animate-pulse')} />{autoReadPages ? '连读中…' : (readerMode === 'novel' ? '连读全书' : '连读全篇')}
                 </Button>
               </div>
@@ -1510,7 +1510,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                     onClick={() => { setMtEngine(k); setTranslateEngine(k); }}
                     className={cn(
                       'flex-1 py-1.5 rounded-xl text-[10px] font-black transition-all border',
-                      mtEngine === k ? 'border-[#00B894] text-ink-teal bg-[#00B894]/5' : 'border-border text-muted-foreground',
+                      mtEngine === k ? 'border-[var(--brand)] text-ink-teal bg-[var(--brand)]/5' : 'border-border text-muted-foreground',
                     )}
                   >
                     {label}
@@ -1633,7 +1633,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                 <span className="text-sm font-normal text-muted-foreground">{lookupData.phonetic}</span>
               )}
               {lookupData?.fromForm && (
-                <span className="text-[9px] font-bold text-ink-teal bg-[#00B894]/10 px-1.5 py-0.5 rounded-full">
+                <span className="text-[9px] font-bold text-ink-teal bg-[var(--brand)]/10 px-1.5 py-0.5 rounded-full">
                   {lookupData.fromForm} → {lookupData.word}
                 </span>
               )}
@@ -1697,7 +1697,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                     <button
                       key={w}
                       onClick={(e) => handleWordClick(e, w)}
-                      className="px-2.5 py-1 rounded-full bg-muted text-[11px] font-bold text-muted-foreground hover:bg-[#00B894]/10 hover:text-ink-teal transition-colors"
+                      className="px-2.5 py-1 rounded-full bg-muted text-[11px] font-bold text-muted-foreground hover:bg-[var(--brand)]/10 hover:text-ink-teal transition-colors"
                     >
                       {w}
                     </button>
@@ -1754,7 +1754,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
           {/* 本朗读单元（页/章）的进度 —— 词数口径，与段落高亮同源 */}
           <div className="h-1 w-36 overflow-hidden rounded-full bg-border/60">
             <div
-              className="h-full rounded-full bg-[#00B894] transition-[width] duration-500"
+              className="h-full rounded-full bg-[var(--brand)] transition-[width] duration-500"
               style={{ width: `${Math.round((readPos?.ratio ?? 0) * 100)}%` }}
             />
           </div>

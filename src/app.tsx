@@ -18,6 +18,7 @@ const SpellingPage = lazy(() => import("@/pages/SpellingPage/SpellingPage"));
 const VideoLabPage = lazy(() => import("@/pages/VideoLabPage/VideoLabPage"));
 const SentenceLabPage = lazy(() => import("@/pages/SentenceLabPage/SentenceLabPage"));
 const CetExamPage = lazy(() => import("@/pages/CetExamPage/CetExamPage"));
+const SettingsPage = lazy(() => import("@/pages/SettingsPage/SettingsPage"));
 
 function PageErrorFallback({ page }: { page: string }) {
   return (
@@ -30,7 +31,7 @@ function PageErrorFallback({ page }: { page: string }) {
         <p className="text-sm text-muted-foreground">页面加载时发生错误，请刷新重试</p>
         <button
           onClick={() => window.location.reload()}
-          className="px-4 py-2 rounded-xl bg-[#00B894] text-white font-black text-sm hover:bg-[#00a882] transition-colors"
+          className="px-4 py-2 rounded-xl bg-[var(--brand)] text-white font-black text-sm hover:bg-[#00a882] transition-colors"
         >
           刷新页面
         </button>
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="spelling" element={<ErrorBoundary fallback={<PageErrorFallback page="句子拼写" />}><SpellingPage /></ErrorBoundary>} />
         <Route path="video" element={<ErrorBoundary fallback={<PageErrorFallback page="视频精听" />}><VideoLabPage /></ErrorBoundary>} />
         <Route path="cet" element={<ErrorBoundary fallback={<PageErrorFallback page="四六级备考" />}><CetExamPage /></ErrorBoundary>} />
+        <Route path="settings" element={<ErrorBoundary fallback={<PageErrorFallback page="设置" />}><SettingsPage /></ErrorBoundary>} />
       </Route>
       <Route path="*" element={<Suspense fallback={<div className="animate-pulse space-y-6 py-4"><div className="h-7 w-40 rounded-xl bg-muted" /><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({ length: 6 }).map((_, i) => (<div key={i} className="rounded-2xl border border-border/50 bg-card p-4 space-y-3"><div className="h-4 w-3/4 rounded-lg bg-muted" /><div className="h-3 w-1/2 rounded-lg bg-muted/60" /><div className="h-3 w-full rounded-lg bg-muted/40" /></div>))}</div></div>}><ErrorBoundary fallback={<PageErrorFallback page="页面未找到" />}><NotFoundPage /></ErrorBoundary></Suspense>} />
       {/* eslint-enable @lark-apaas/no-duplicate-route-component */}

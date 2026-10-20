@@ -57,7 +57,7 @@ export function GrammarMap({ onJumpToPattern, jumpToTopic }: { onJumpToPattern?:
               className={cn(
                 'px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
                 group === g
-                  ? 'border-[#00B894] bg-[#00B894]/10 text-ink-teal'
+                  ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
                   : 'border-border text-muted-foreground hover:border-muted-foreground/40',
               )}
             >
@@ -74,7 +74,7 @@ export function GrammarMap({ onJumpToPattern, jumpToTopic }: { onJumpToPattern?:
               className={cn(
                 'w-full text-left rounded-2xl border p-3 transition-all',
                 active?.id === t.id
-                  ? 'border-[#00B894] bg-[#00B894]/5'
+                  ? 'border-[var(--brand)] bg-[var(--brand)]/5'
                   : 'border-border/60 bg-card hover:border-muted-foreground/30',
               )}
             >
@@ -100,7 +100,7 @@ export function GrammarMap({ onJumpToPattern, jumpToTopic }: { onJumpToPattern?:
             </div>
 
             {/* 本质 */}
-            <div className="rounded-2xl bg-[#00B894]/5 border border-[#00B894]/20 p-3.5">
+            <div className="rounded-2xl bg-[var(--brand)]/5 border border-[var(--brand)]/20 p-3.5">
               <p className="text-[10px] font-black uppercase tracking-wider text-ink-teal mb-1">本质一句话</p>
               <p className="text-[13px] font-bold text-foreground leading-relaxed">{active.essence}</p>
             </div>
@@ -147,7 +147,7 @@ export function GrammarMap({ onJumpToPattern, jumpToTopic }: { onJumpToPattern?:
                       <p className="text-[9px] font-black text-rose-600 dark:text-rose-400 mb-0.5">✗ 常见说法</p>
                       <p className="text-[11px] font-bold text-foreground/80 line-through decoration-rose-400/60">{p.wrong}</p>
                     </div>
-                    <div className="p-2.5 bg-[#00B894]/5">
+                    <div className="p-2.5 bg-[var(--brand)]/5">
                       <p className="text-[9px] font-black text-ink-teal mb-0.5">✓ 地道说法</p>
                       <p className="text-[11px] font-bold text-foreground">{p.right}</p>
                     </div>
@@ -173,7 +173,7 @@ export function GrammarMap({ onJumpToPattern, jumpToTopic }: { onJumpToPattern?:
                       key={pid}
                       type="button"
                       onClick={() => onJumpToPattern(pid)}
-                      className="px-2.5 py-1 rounded-full text-[10px] font-black border border-[#00B894]/30 bg-[#00B894]/5 text-ink-teal hover:bg-[#00B894]/10 transition-colors flex items-center gap-1"
+                      className="px-2.5 py-1 rounded-full text-[10px] font-black border border-[var(--brand)]/30 bg-[var(--brand)]/5 text-ink-teal hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-1"
                     >
                       <BookMarked className="size-3" /> {nm}
                     </button>
