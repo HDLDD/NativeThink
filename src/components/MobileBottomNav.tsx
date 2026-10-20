@@ -35,8 +35,11 @@ export default function MobileBottomNav() {
   const navigate = useNavigate();
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border/50 safe-area-bottom">
-      <div className="flex items-center justify-around h-16 px-1">
+    <nav
+      className="lg:hidden fixed left-3 right-3 z-40 rounded-[20px] border border-white/10 bg-[var(--ink)]/95 shadow-[0_18px_40px_-18px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+      style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}
+    >
+      <div className="flex items-center justify-between gap-0.5 px-1.5 py-1.5">
         {MOBILE_NAV.map(({ path, label, icon: Icon }) => {
           const isActive =
             path === '/'
@@ -48,30 +51,19 @@ export default function MobileBottomNav() {
               onClick={() => navigate(path)}
               onTouchStart={() => { ROUTE_PREFETCH[path]?.(); if (path === '/vocabulary') preloadCoreOnly(['cet4']); }}
               className={cn(
-                'flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 h-full py-1 transition-colors',
+                'flex h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-[15px] transition-colors',
                 isActive
-                  ? 'text-ink-teal'
-                  : 'text-foreground/60 hover:text-foreground',
+                  ? 'bg-[var(--brand)] text-[#06231A]'
+                  : 'text-white/45 hover:text-white',
               )}
             >
               <Icon
-                className={cn(
-                  'size-5.5 transition-all',
-                  isActive && 'drop-shadow-[0_0_6px_rgb(var(--brand-rgb) / 0.4)]',
-                )}
-                strokeWidth={isActive ? 2.5 : 2}
+                className="size-5"
+                strokeWidth={isActive ? 2.5 : 1.9}
               />
-              <span
-                className={cn(
-                  'text-[10px] font-bold transition-all',
-                  isActive && 'font-black',
-                )}
-              >
+              <span className={cn('text-[10px] leading-none', isActive ? 'font-black' : 'font-semibold')}>
                 {label}
               </span>
-              {isActive && (
-                <span className="absolute top-0 w-8 h-0.5 rounded-b-full bg-[var(--brand)]" />
-              )}
             </button>
           );
         })}

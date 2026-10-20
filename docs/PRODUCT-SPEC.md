@@ -109,39 +109,44 @@
 
 - **参考意图**: Free —— 无参考材料，从产品语义与学习场景出发自主设计
 - **核心情绪 / 应用类型**: 清爽、专注、有成长感的英语思维训练工具
-- **独特记忆点**: 「思维涟漪」——蓝绿色渐变光晕 + 柔和扩散圆环，贯穿检测器结果、进度环、语块卡片选中态
+- **独特记忆点**: 「墨面学习台」—— 深墨绿外壳 + 暖白纸面 + 编号式功能入口；一屏只有一处饱和（主行动块或当前导航）
 
 ## 2. Art Direction
 
-- **方向名**: 清澈学习感
-- **Design Style**: Swiss Minimalist + Soft Glass
-- **DNA**: soft 圆角 / subtle 阴影 / standard 间距 / 几何无衬线 + 中文清晰
+- **方向名**: 编辑式学习台（Ink Studio）
+- **Design Style**: Editorial Minimal + Ink Frame
+- **DNA**: 暖白纸面 / 细发丝边 / 非斜体无衬线标题 / 表格化数字（tabular-nums） / 没有彩色光晕与粉彩图标块
 - **应用类型**: Tool + Dashboard
 
 ## 3. Color System
 
-| 角色 | CSS 变量 | HSL | 说明 |
+| 角色 | CSS 变量 | 值 | 说明 |
 |---|---|---|---|
-| bg | `--background` | hsl(180 25% 97%) | 极浅青灰底 |
-| card | `--card` | hsl(0 0% 100%) | 纯白卡片 |
-| text | `--foreground` | hsl(210 25% 15%) | 深灰蓝正文 |
-| textMuted | `--muted-foreground` | hsl(210 12% 45%) | 辅助文字 |
-| primary | `--primary` | hsl(182 70% 40%) | 青蓝主色 |
-| accent | `--accent` | hsl(180 40% 94%) | 浅青底 |
-| border | `--border` | hsl(180 15% 88%) | 淡青灰边框 |
+| bg | `--background` | `#F3F4EF` | 暖白纸面（暗色 `#0B110D`） |
+| card | `--card` | `#FFFFFF` | 纸卡（暗色 `#131B16`） |
+| text | `--foreground` | `#14201A` | 墨绿正文 |
+| textMuted | `--muted-foreground` | `#68736B` | 辅助文字 |
+| primary | `--primary` | `#00B894` | 品牌青绿（唯一主色，走 `--brand`） |
+| ink | `--ink` | `#0D1A14` | 墨面：侧栏 / 主行动块 / 手机 dock |
+| lime | `--lime` | `#C8F26B` | 只在墨面上出现的信号色（CTA / 关键数字） |
+| warm | `--warm` | `#C98A2E` | 暖色强调（每日一句、纠偏待办） |
+| border | `--border` | `#E2E5DD` | 发丝边 |
 
 - 成功：`hsl(150 55% 42%)`；警告：`hsl(35 85% 55%)`；错误：低饱和红
-- 比例：60% 中性 / 30% 辅助 / 10% primary
+- 比例：60% 中性 / 30% 辅助 / 10% primary；**一屏只留一处高饱和**
+- 禁止：彩色光晕（`shadow-emerald/violet/sky…`）、大面积粉彩图标底、渐变大按钮
 
 ## 4. 字体与节奏
 
-- Inter + Noto Sans SC；标题 600-700，正文 300-500
-- 卡片 `rounded-xl`/`rounded-[32px]`，按钮 `rounded-2xl`
+- Plus Jakarta Sans / 系统中文字体；标题 600-800，正文 400-500
+- 标题一律正体（`h1-h4` 由 `index.css` 强制 `font-style: normal`）；数字用 `tabular-nums`
+- 卡片统一 `24px` 圆角（`[data-slot="card"]` 单点），按钮 `rounded-full` / `rounded-2xl`，导航圆角 11-15px
 
 ## 5. 全局布局契约
 
-- 左侧导航 + 主内容区；内容 `max-w-[1280px]`
-- 节奏：`px-6 md:px-8 py-8`，卡片 `p-6`，模块 `gap-6`
+- 左侧墨色导航 + 暖白纸面主内容区；顶栏 64px，只留时间 / 搜索 / 设置 / 用户菜单
+- 节奏：`px-4 sm:px-6 lg:px-10 py-4 sm:py-6 lg:py-8`，卡片 `p-5/6`，模块 `gap-6/8`
+- 手机：底部悬浮墨色 dock（6 个入口），内容用 `pb-20` 为它让位；dock 自己的 `bottom` 走 `env(safe-area-inset-bottom)`
 
 ## 6–9. 动效 / 组件原则 / 图片 / 反模式
 

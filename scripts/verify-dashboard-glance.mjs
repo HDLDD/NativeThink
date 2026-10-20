@@ -74,8 +74,8 @@ function runChecks(srcs) {
     '近 7 天由日期循环生成（不许 slice(-7) 取 calendar 数组尾 —— 跨天未学习时尾部是昨天，柱状错位一天）');
   ok(/byDate\.get\(date\)/.test(week),
     'calendar 按日期字符串查表取分钟');
-  ok(/h-28 flex items-end/.test(week),
-    '柱状容器有固定高度 h-28（标题/柱/星期三层不互压）');
+  ok(/h-\d+/.test(week) && /items-end/.test(week),
+    '柱状容器有固定高度 h-*（标题/柱/星期三层不互压；值可随版式调整，但不能省）');
   ok(/<WeekGlanceCard calendar=\{calendar\}/.test(dash),
     '首页把 calendar 真实传进本周概览');
   ok(/onNavigate\('\/progress'\)/.test(week),
@@ -119,7 +119,7 @@ const MUTATIONS = [
   { name: '本周概览改用 toISOString（错天复发）', file: 'week',
     from: 'const date = formatDate(d);', to: 'const date = d.toISOString().slice(0, 10);' },
   { name: '柱状容器丢固定高度（三层互压复发）', file: 'week',
-    from: 'h-28 flex items-end', to: 'flex items-end' },
+    from: 'flex h-20 items-end gap-1.5', to: 'flex h-auto items-end gap-1.5' },
   { name: '首页传给待复习卡的到期数写死 0（断线伪装）', file: 'dashboard',
     from: '<ReviewDueCard dueCount={dueCount}', to: '<ReviewDueCard dueCount={0}' },
   { name: '纠偏横幅 0 条也照常渲染（谎报待重考）', file: 'notedrill',

@@ -996,23 +996,23 @@ export default function ArticlePage() {
               return (
               <Card
                 key={book.id}
-                className="rounded-[24px] border-border hover:border-[var(--brand)]/40 hover:shadow-md transition-all cursor-pointer group"
+                className="rounded-[20px] border-border hover:border-foreground/25 transition-colors cursor-pointer group"
                 onClick={() => { void openBookFromList(book).then((ok) => { if (!ok) toast.error('书本内容加载失败，请重试'); }); saveToHistory(book.zhTitle, '', 'books', { bookId: book.id }); }}
               >
-                <CardContent className="p-5">
-                  <div className="flex items-start gap-3">
-                    <div className="size-12 rounded-2xl bg-gradient-to-br from-[var(--brand)]/10 to-emerald-100 dark:to-emerald-500/20 flex items-center justify-center text-2xl shrink-0">
-                      📖
+                <CardContent className="p-4 sm:p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="grid h-[58px] w-10 shrink-0 place-items-center rounded-[5px] rounded-l-[3px] bg-[var(--ink)] text-[15px] font-bold text-[var(--lime)] shadow-[inset_3px_0_0_rgba(255,255,255,0.12)]">
+                      {book.zhTitle.slice(0, 1)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-black text-foreground group-hover:text-ink-teal transition-colors line-clamp-2">
+                      <h3 className="text-[14px] font-bold text-foreground transition-colors line-clamp-2">
                         {book.zhTitle}
                       </h3>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{book.zhAuthor} · {book.title}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">{book.difficulty}</Badge>
-                        <Badge className="text-[10px] font-bold rounded-full px-2.5 py-0.5 bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400">{book.topic}</Badge>
-                        <span className="text-[9px] text-muted-foreground ml-auto">{(bookStats[book.id]?.words ?? book.totalWords).toLocaleString()} 词</span>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">{book.zhAuthor} · {book.title}</p>
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <Badge className="rounded-full border border-border bg-transparent px-2 py-0.5 text-[9px] font-medium text-muted-foreground">{book.difficulty}</Badge>
+                        <Badge className="rounded-full border border-border bg-transparent px-2 py-0.5 text-[9px] font-medium text-muted-foreground">{book.topic}</Badge>
+                        <span className="ml-auto text-[9px] tabular-nums text-muted-foreground">{(bookStats[book.id]?.words ?? book.totalWords).toLocaleString()} 词</span>
                       </div>
                       {/* Reading progress */}
                       {progress && hasProgress(progress, book.id) && (

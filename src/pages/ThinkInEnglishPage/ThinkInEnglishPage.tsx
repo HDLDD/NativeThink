@@ -744,7 +744,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
           <Card className="rounded-[40px] border-border shadow-sm">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
-                <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center">
+                <div className="size-9 text-ink-teal flex items-center justify-center">
                   <Search className="size-5.5" />
                 </div>
                 <div>
@@ -793,7 +793,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   <Button
                     type="submit"
                     disabled={detectorLoading || !detectorInput.trim()}
-                    className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+                    className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 py-3.5 rounded-full text-[12px] font-semibold tracking-wide"
                   >
                     {detectorLoading ? (
                       <>
@@ -810,7 +810,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </form>
 
               {detectorResult && (
-                <Card className="rounded-[32px] border-emerald-200/50 bg-emerald-50/30 dark:bg-emerald-500/10">
+                <Card className="rounded-[20px] border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-ink-teal">
                       <Lightbulb className="size-4.5" />
@@ -906,7 +906,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="p-6 rounded-[32px] bg-muted/30 border border-border/50">
+              <div className="p-5 rounded-[20px] bg-muted/25 border border-border">
                 <div className="flex items-center gap-2 mb-4">
                   <Badge
                     variant="outline"
@@ -952,7 +952,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   <Button
                     type="submit"
                     disabled={translationLoading || !translationInput.trim()}
-                    className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+                    className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 py-3.5 rounded-full text-[12px] font-semibold tracking-wide"
                   >
                     {translationLoading ? (
                       <>
@@ -967,7 +967,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </form>
 
               {showNativeRef && (
-                <Card className="rounded-[32px] border-emerald-200/50 bg-emerald-50/30 dark:bg-emerald-500/10">
+                <Card className="rounded-[20px] border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-emerald-600">
                       <CheckCircle2 className="size-4.5" />
@@ -994,7 +994,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               )}
 
               {translationResult && (
-                <Card className="rounded-[32px] border-[var(--brand)]/20 bg-[var(--brand)]/5 dark:border-[var(--brand)]/30 dark:bg-[var(--brand)]/10">
+                <Card className="rounded-[20px] border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-ink-teal">
                       <Lightbulb className="size-4.5" />
@@ -1071,7 +1071,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="p-6 rounded-[32px] bg-gradient-to-br from-[var(--brand)]/5 to-emerald-50 dark:from-[var(--brand)]/10 dark:to-emerald-500/10 border border-[var(--brand)]/10">
+              <div className="p-6 rounded-[20px] border border-border bg-muted/25">
                 <div className="flex items-center gap-2 mb-4">
                   <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-[var(--brand)]/15 dark:bg-[var(--brand)]/25 text-ink-teal border-none">
                     关键词
@@ -1127,7 +1127,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   <Button
                     type="submit"
                     disabled={backLoading || !backInput.trim()}
-                    className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+                    className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 py-3.5 rounded-full text-[12px] font-semibold tracking-wide"
                   >
                     {backLoading ? (
                       <>
@@ -1142,7 +1142,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </form>
 
               {showBackRef && (
-                <Card className="rounded-[32px] border-emerald-200/50 bg-emerald-50/30 dark:bg-emerald-500/10">
+                <Card className="rounded-[20px] border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-emerald-600">
                       <CheckCircle2 className="size-4.5" />
@@ -1171,7 +1171,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               )}
 
               {backResult && (
-                <Card className="rounded-[32px] border-[var(--brand)]/20 bg-[var(--brand)]/5 dark:border-[var(--brand)]/30 dark:bg-[var(--brand)]/10">
+                <Card className="rounded-[20px] border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-ink-teal">
                       <Lightbulb className="size-4.5" />
@@ -1247,7 +1247,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="p-6 rounded-[32px] bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-100 dark:from-violet-500/10 dark:to-purple-500/10 dark:border-violet-500/20">
+              <div className="p-5 rounded-[20px] border border-border bg-muted/25">
                 <div className="flex items-center gap-2 mb-4">
                   <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-violet-100 text-violet-600 border-none">
                     {nativeExercises[currentNativeIdx].category}
@@ -1305,7 +1305,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </form>
 
               {showNativeThinkRef && (
-                <Card className="rounded-[32px] border-violet-200/50 bg-violet-50/30 dark:bg-violet-500/10">
+                <Card className="rounded-[20px] border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-violet-600">
                       <CheckCircle2 className="size-4.5" />
@@ -1339,7 +1339,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               )}
 
               {nativeResult && (
-                <Card className="rounded-[32px] border-violet-200/50 bg-violet-50/30 dark:bg-violet-500/10">
+                <Card className="rounded-[20px] border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-violet-600">
                       <Lightbulb className="size-4.5" />

@@ -1,6 +1,5 @@
 import { memo } from 'react';
 import {
-  Quote,
   Clock,
   RefreshCw,
   Wand2,
@@ -23,6 +22,8 @@ interface DailySentenceCardProps {
   chunkLoading: boolean;
   favorited: boolean;
   isExampleFavorited: boolean;
+  /** 近几天的每日一句（不含今天这条），填满左栏并给回访一个入口 */
+  recent: { date: string; content: string; meaning: string }[];
   onShowHistory: () => void;
   onShuffle: () => void;
   onAiGenerate: () => void;
@@ -38,6 +39,7 @@ function DailySentenceCardInner({
   chunkLoading,
   favorited,
   isExampleFavorited,
+  recent,
   onShowHistory,
   onShuffle,
   onAiGenerate,
@@ -63,24 +65,21 @@ function DailySentenceCardInner({
         : '高级';
 
   return (
-    <Card className="col-span-12 lg:col-span-5 rounded-[40px] border-border shadow-sm">
-      <CardContent className="p-8">
-        <div className="flex items-center gap-2 mb-6">
-          <div className="size-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center">
-            <Quote className="size-5" />
-          </div>
-          <div className="flex-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-              Daily Expression
+    <Card className="col-span-12 lg:col-span-5 rounded-[26px] border-border">
+      <CardContent className="flex h-full flex-col p-6 sm:p-7">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              Daily expression
             </p>
-            <h3 className="text-lg font-black italic text-foreground">每日一句</h3>
+            <h3 className="mt-1 text-[15px] font-bold text-foreground">每日一句</h3>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             <Button
               variant="ghost"
               size="icon"
               onClick={onShowHistory}
-              className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal"
+              className="size-8 rounded-full text-muted-foreground hover:text-foreground"
               title="历史记录"
             >
               <Clock className="size-4" />
@@ -89,7 +88,7 @@ function DailySentenceCardInner({
               variant="ghost"
               size="icon"
               onClick={onShuffle}
-              className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal"
+              className="size-8 rounded-full text-muted-foreground hover:text-foreground"
               title="换一句"
             >
               <RefreshCw className="size-4" />
@@ -99,7 +98,7 @@ function DailySentenceCardInner({
               size="icon"
               onClick={onAiGenerate}
               disabled={chunkLoading}
-              className="rounded-xl size-8 text-muted-foreground hover:text-violet-500"
+              className="size-8 rounded-full text-muted-foreground hover:text-foreground"
               title="AI 生成"
             >
               {chunkLoading ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
@@ -107,93 +106,130 @@ function DailySentenceCardInner({
           </div>
         </div>
 
-        <div className="bg-muted/30 rounded-[28px] p-6 mb-5">
-          <div className="flex items-center gap-2 mb-3">
-            <p className="text-2xl font-black text-foreground leading-relaxed">
-              {dailyChunk.content}
-            </p>
-            <div className="flex items-center gap-1 shrink-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onTTS(dailyChunk.content)}
-                className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal"
-              >
-                <Volume2 className="size-4.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                title="复制本句"
-                onClick={() => {
-                  const text = `${dailyChunk.content}（${dailyChunk.meaning}）\n${cleanText(dailyChunk.example)}${exampleZh ? `\n${exampleZh}` : ''}`;
-                  try {
-                    navigator.clipboard?.writeText(text)
-                      .then(() => toast.success('已复制到剪贴板'))
-                      .catch(() => toast.error('复制失败，请手动选择文本'));
-                  } catch {
-                    toast.error('复制失败，请手动选择文本');
-                  }
-                }}
-                className="rounded-xl size-8 text-muted-foreground hover:text-ink-teal"
-              >
-                <Copy className="size-4" />
-              </Button>
+        <div className="mt-8 flex items-start gap-4">
+          <span className="mt-1.5 h-12 w-[3px] shrink-0 rounded-full bg-[var(--warm)]" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start gap-2">
+              <p className="text-[26px] font-extrabold leading-[1.25] tracking-tight text-foreground">
+                {dailyChunk.content}
+              </p>
+              <div className="flex shrink-0 items-center gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onTTS(dailyChunk.content)}
+                  aria-label="朗读短语"
+                  className="size-7 rounded-full text-muted-foreground hover:text-foreground"
+                >
+                  <Volume2 className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="复制本句"
+                  aria-label="复制本句"
+                  onClick={() => {
+                    const text = `${dailyChunk.content}（${dailyChunk.meaning}）\n${cleanText(dailyChunk.example)}${exampleZh ? `\n${exampleZh}` : ''}`;
+                    try {
+                      navigator.clipboard?.writeText(text)
+                        .then(() => toast.success('已复制到剪贴板'))
+                        .catch(() => toast.error('复制失败，请手动选择文本'));
+                    } catch {
+                      toast.error('复制失败，请手动选择文本');
+                    }
+                  }}
+                  className="size-7 rounded-full text-muted-foreground hover:text-foreground"
+                >
+                  <Copy className="size-3.5" />
+                </Button>
+              </div>
             </div>
+            <p className="mt-2 text-[13px] font-medium text-muted-foreground">{dailyChunk.meaning}</p>
           </div>
-          <p className="text-sm font-medium text-muted-foreground">{dailyChunk.meaning}</p>
         </div>
 
-        <div className="space-y-2 mb-5">
-          <div className="flex items-center gap-2">
-            <p className="text-sm text-foreground/80 italic">
-              「{cleanText(dailyChunk.example)}」
+        <div className="mt-7 space-y-2 border-t border-border pt-5">
+          <div className="flex items-start gap-2">
+            <p className="flex-1 text-[13px] leading-relaxed text-foreground/75">
+              {cleanText(dailyChunk.example)}
             </p>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onTTS(dailyChunk.example, { rate: 0.9 })}
-              aria-label="朗读例句"
-              className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0"
-            >
-              <Volume2 className="size-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onTranslateExample}
-              aria-label="翻译例句"
-              className="rounded-xl size-7 text-muted-foreground hover:text-violet-500 shrink-0"
-            >
-              <Languages className="size-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggleExampleFavorite}
-              aria-label="收藏例句"
-              className={cn(
-                'rounded-xl size-7 shrink-0',
-                isExampleFavorited ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500',
-              )}
-            >
-              <Heart className={cn('size-3.5', isExampleFavorited && 'fill-current')} />
-            </Button>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onTTS(dailyChunk.example, { rate: 0.9 })}
+                aria-label="朗读例句"
+                className="size-7 rounded-full text-muted-foreground hover:text-foreground"
+              >
+                <Volume2 className="size-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onTranslateExample}
+                aria-label="翻译例句"
+                className="size-7 rounded-full text-muted-foreground hover:text-foreground"
+              >
+                <Languages className="size-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onToggleExampleFavorite}
+                aria-label="收藏例句"
+                className={cn(
+                  'size-7 rounded-full shrink-0',
+                  isExampleFavorited ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500',
+                )}
+              >
+                <Heart className={cn('size-3.5', isExampleFavorited && 'fill-current')} />
+              </Button>
+            </div>
           </div>
           {exampleZh && (
             <StreamingText
               text={exampleZh}
-              className="block text-xs text-muted-foreground font-medium pl-1 border-l-2 border-violet-300"
+              className="block border-l-2 border-[var(--warm)]/40 pl-3 text-[12px] font-medium text-muted-foreground"
             />
           )}
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex gap-2">
-            <span className="px-3 py-1.5 rounded-full bg-emerald-50 text-ink-teal text-[10px] font-black uppercase tracking-wider">
+        {recent.length > 0 && (
+          <div className="mt-6 border-t border-border pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Recent</p>
+              <button
+                type="button"
+                onClick={onShowHistory}
+                className="text-[10px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                全部 →
+              </button>
+            </div>
+            <ul className="mt-3 space-y-2.5">
+              {recent.map((item, i) => (
+                <li key={`${item.date}-${i}`} className="flex items-baseline gap-3">
+                  <span className="w-9 shrink-0 text-[10px] tabular-nums text-muted-foreground/60">
+                    {item.date.slice(5)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/75">
+                    {item.content}
+                  </span>
+                  <span className="hidden max-w-[38%] truncate text-[10px] text-muted-foreground sm:block">
+                    {item.meaning}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="mt-auto flex items-center justify-between pt-6">
+          <div className="flex gap-1.5">
+            <span className="rounded-full bg-[var(--warm)]/10 px-2.5 py-1 text-[10px] font-bold tracking-wider text-[var(--warm)]">
               {categoryLabel}
             </span>
-            <span className="px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+            <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium tracking-wider text-muted-foreground">
               {difficultyLabel}
             </span>
           </div>
@@ -202,11 +238,11 @@ function DailySentenceCardInner({
             size="sm"
             onClick={onToggleFavorite}
             className={cn(
-              'rounded-2xl gap-1.5 text-[10px] font-black uppercase tracking-wider',
+              'gap-1.5 rounded-full px-2.5 text-[11px] font-medium',
               favorited ? 'text-rose-500' : 'text-muted-foreground',
             )}
           >
-            <Heart className={cn('size-4', favorited && 'fill-current')} />
+            <Heart className={cn('size-3.5', favorited && 'fill-current')} />
             {favorited ? '已收藏' : '收藏'}
           </Button>
         </div>

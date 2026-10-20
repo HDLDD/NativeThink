@@ -56,7 +56,7 @@ for (const id of ids.filter((i) => i !== 'classic')) {
     `② ${id}：暗色单独一块（深色背景沿用现有体系，只换强调色）`);
 }
 ok(!/html\[data-ui-theme="classic"\]/.test(CSS),
-  '② 反向：classic 不许有覆盖块（它必须就是现在的界面，一个像素都不变）');
+  '② 反向：classic 不许有覆盖块（它直接使用 :root 的墨壳/纸面基线）');
 
 /* ── ③ 品牌色单点 ── */
 ok(/--brand:\s*#00B894/.test(CSS) && /--brand-strong:\s*#00A080/.test(CSS) && /--brand-rgb:\s*0 184 148/.test(CSS),

@@ -1,5 +1,4 @@
 import { memo, useMemo } from 'react';
-import { CalendarCheck } from 'lucide-react';
 import type { ICalendarRecord } from '@/lib/use-learning-stats';
 import { formatDate } from '@/lib/utils';
 import { WEEK_DAYS } from './constants';
@@ -47,26 +46,23 @@ function WeekGlanceCardInner({ calendar, dailyGoalMinutes, onNavigate }: WeekGla
   return (
     <button
       onClick={() => onNavigate('/progress')}
-      className="w-full rounded-[32px] border border-border bg-card p-6 text-left hover:shadow-md transition-all group"
+      className="group w-full rounded-[24px] border border-border bg-card p-5 text-left transition-colors hover:border-foreground/20"
     >
-      <div className="flex items-start justify-between mb-5">
+      <div className="mb-4 flex items-start justify-between">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1 flex items-center gap-1.5">
-            <CalendarCheck className="size-3.5 text-ink-teal" />
-            Week Glance
-          </p>
-          <h3 className="text-lg font-black italic text-foreground">
-            本周 <span className="text-ink-teal">{Math.round(weekTotal)}</span> 分钟
-            <span className="ml-3 text-xs font-medium text-muted-foreground not-italic">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Week glance</p>
+          <h3 className="mt-1 text-[15px] font-bold text-foreground">
+            本周 <span className="tabular-nums">{Math.round(weekTotal)}</span> 分钟
+            <span className="ml-2 text-[11px] font-medium text-muted-foreground">
               打卡 {checkedDays}/7 天{goalDays > 0 && ` · 达标 ${goalDays} 天`}
             </span>
           </h3>
         </div>
-        <span className="text-[10px] font-black uppercase tracking-wider text-ink-teal opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <span className="shrink-0 text-[10px] font-medium text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
           详情 →
         </span>
       </div>
-      <div className="h-28 flex items-end gap-2" aria-hidden="true">
+      <div className="flex h-20 items-end gap-1.5" aria-hidden="true">
         {days.map((d) => {
           const h = d.minutes > 0 ? Math.max(8, Math.round((d.minutes / maxMinutes) * 96)) : 4;
           const hitGoal = d.minutes >= dailyGoalMinutes && d.minutes > 0;
@@ -74,7 +70,7 @@ function WeekGlanceCardInner({ calendar, dailyGoalMinutes, onNavigate }: WeekGla
             <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full min-w-0">
               <div
                 className={
-                  'w-full max-w-8 rounded-t-lg transition-all duration-500 ' +
+                  'w-full max-w-7 rounded-t-[4px] transition-all duration-500 ' +
                   (hitGoal
                     ? 'bg-[var(--brand)]'
                     : d.minutes > 0
@@ -92,8 +88,8 @@ function WeekGlanceCardInner({ calendar, dailyGoalMinutes, onNavigate }: WeekGla
           <div
             key={d.date}
             className={
-              'flex-1 text-center text-[10px] font-black min-w-0 ' +
-              (d.isToday ? 'text-ink-teal' : 'text-muted-foreground')
+              'flex-1 text-center text-[10px] font-medium min-w-0 ' +
+              (d.isToday ? 'text-foreground font-semibold' : 'text-muted-foreground')
             }
           >
             {d.weekday}

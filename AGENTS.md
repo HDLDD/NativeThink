@@ -275,12 +275,14 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 
 ## 设计系统（不可漂移）
 
-- 主色青蓝/青绿：主按钮、激活导航、进度环；品牌锚点 `#00B894`
-- 圆角：卡片 `rounded-xl` ~ `rounded-[32px]`/`rounded-[48px]`，按钮 `rounded-2xl`
-- 阴影：默认 `shadow-sm`，hover `shadow-md`；卡片以边框为主
+- 主色青蓝/青绿：主按钮、激活导航、进度环；品牌锚点 `#00B894`（CSS 里只走 `--brand` / `--brand-strong` / `--brand-rgb`）
+- 外壳是墨面、内容是纸面：侧栏/手机抽屉固定 `#0C1712`（不随主题），桌面主区暖白 `#F3F4EF`；墨面信号色 `--lime`、暖色强调 `--warm`
+- 一屏只留一处饱和：主行动块或当前导航，二者不要同时抢
+- 圆角：卡片统一 `24px`（`index.css` 的 `[data-slot="card"]` 单点），按钮 `rounded-full`/`rounded-2xl`，dock 20px；标题一律正体（`h1-h4` 在 `index.css` 强制 `font-style: normal`）
+- 材质：细边 + 短影；**禁止彩色光晕**（`shadow-emerald/violet/sky…` 已被全局清零）、禁止大面积粉彩图标块、禁止渐变大按钮
 - 反馈色（柔和，勿用考试红）：成功/地道 `hsl(150 55% 42%)`，警告/中式 `hsl(35 85% 55%)`，错误用低饱和红、克制使用
 - 深浅主题：`src/tailwind-theme.css` CSS 变量；UI 语言中文
-- 完整视觉 token 与反模式见 `docs/PRODUCT-SPEC.md`「UI 设计指南」
+- 完整视觉 token 与反模式见 `docs/PRODUCT-SPEC.md`「UI 设计指南」，外壳实现见 `docs/modules/shell-and-navigation.md` §8
 
 ---
 

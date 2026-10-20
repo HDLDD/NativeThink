@@ -638,23 +638,23 @@ export default function ProgressPage() {
         </Dialog>
 
       {/* 顶部统计：紧凑条（原四张 32px 大卡 + 彩色图标块，占掉近半屏） */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <StatTile
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[20px] border border-border bg-border md:grid-cols-4">
+        <StatTile className="rounded-none border-0 bg-card"
           label="连续天数"
           value={`${stats.streakDays} 天`}
           hint={`累计 ${stats.totalDays} 天`}
         />
-        <StatTile
+        <StatTile className="rounded-none border-0 bg-card"
           label="今日目标"
           value={`${Math.round(stats.todayMinutes)}/${stats.dailyGoalMinutes}m`}
           hint={`${Math.round((stats.todayMinutes / Math.max(1, stats.dailyGoalMinutes)) * 100)}%`}
         />
-        <StatTile
+        <StatTile className="rounded-none border-0 bg-card"
           label="累计学习"
           value={`${Math.round(calendar.reduce((sum, r) => sum + r.minutes, 0))} 分钟`}
           hint={`打卡 ${calendar.filter((r) => r.checkedIn).length} 天`}
         />
-        <StatTile
+        <StatTile className="rounded-none border-0 bg-card"
           label="地道表达"
           value={`${favorites.length} 条`}
           hint={`本周 +${favorites.filter((f) => Date.now() - f.createdAt < 7 * 86400000).length}`}
@@ -694,18 +694,16 @@ export default function ProgressPage() {
 
         {/* 日历 */}
         <TabsContent value="calendar" className="mt-6">
-          <Card className="rounded-[40px] border-border shadow-sm">
+          <Card className="rounded-[24px] border-border">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center">
-                    <Calendar className="size-5.5" />
-                  </div>
+                  <Calendar className="size-5 text-ink-teal" strokeWidth={1.8} />
                   <div>
-                    <CardTitle className="text-xl font-[900] italic text-foreground">
+                    <CardTitle className="text-[17px] font-extrabold text-foreground">
                       {monthLabel}
                     </CardTitle>
-                    <CardDescription className="text-sm font-medium mt-1">
+                    <CardDescription className="mt-0.5 text-[11px] font-medium">
                       本月已打卡 {calendarDays.filter((d) => d.checkedIn).length} 天
                     </CardDescription>
                   </div>
@@ -715,7 +713,7 @@ export default function ProgressPage() {
                     variant="ghost"
                     size="icon"
                     onClick={prevMonth}
-                    className="rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-ink-teal"
+                    className="rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
                   >
                     <TrendingUp className="size-4 rotate-180" />
                   </Button>
@@ -723,7 +721,7 @@ export default function ProgressPage() {
                     variant="ghost"
                     size="icon"
                     onClick={nextMonth}
-                    className="rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-ink-teal"
+                    className="rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
                   >
                     <TrendingUp className="size-4" />
                   </Button>
@@ -732,18 +730,18 @@ export default function ProgressPage() {
             </CardHeader>
             <CardContent>
               {/* 星期标题 */}
-              <div className="grid grid-cols-7 gap-2 mb-3">
+              <div className="mx-auto mb-2 grid max-w-[560px] grid-cols-7 gap-1.5">
                 {WEEK_DAYS.map((day) => (
                   <div
                     key={day}
-                    className="text-center text-[10px] font-black uppercase tracking-wider text-muted-foreground py-2"
+                    className="py-1 text-center text-[10px] font-medium text-muted-foreground"
                   >
                     {day}
                   </div>
                 ))}
               </div>
               {/* 日期格子 */}
-              <div className="grid grid-cols-7 gap-2">
+              <div className="mx-auto grid max-w-[560px] grid-cols-7 gap-1.5">
                 {calendarDays.map((day, idx) => {
                   const isCurrentMonth = day.date.getMonth() === currentMonth.getMonth();
                   const isToday =
@@ -752,22 +750,22 @@ export default function ProgressPage() {
                     <div
                       key={idx}
                       className={cn(
-                        'aspect-square rounded-2xl flex flex-col items-center justify-center text-xs transition-all',
+                        'h-11 sm:h-12 rounded-[10px] flex flex-col items-center justify-center text-[11px] transition-all',
                         isCurrentMonth ? '' : 'opacity-30',
                         isToday && 'ring-1 ring-inset ring-[var(--brand)]',
                       )}
                     >
                       <div
                         className={cn(
-                          'w-full h-full rounded-2xl flex flex-col items-center justify-center',
+                          'h-full w-full rounded-[10px] flex flex-col items-center justify-center',
                           getIntensityClass(day.minutes),
                           day.minutes > 0 && 'text-white',
                           day.minutes === 0 && 'text-muted-foreground',
                         )}
                       >
-                        <span className="font-black">{day.date.getDate()}</span>
+                        <span className="font-semibold">{day.date.getDate()}</span>
                         {day.minutes > 0 && (
-                          <span className="text-[9px] font-bold opacity-80">{Math.round(day.minutes)}m</span>
+                          <span className="text-[8px] font-medium opacity-80">{Math.round(day.minutes)}m</span>
                         )}
                       </div>
                     </div>
@@ -781,10 +779,10 @@ export default function ProgressPage() {
                   学习强度
                 </span>
                 <div className="flex items-center gap-1">
-                  <div className="size-6 rounded-lg bg-muted/50" />
-                  <div className="size-6 rounded-lg bg-[var(--brand)]/30" />
-                  <div className="size-6 rounded-lg bg-[var(--brand)]/60" />
-                  <div className="size-6 rounded-lg bg-[var(--brand)]" />
+                  <div className="size-4 rounded bg-muted/50" />
+                  <div className="size-4 rounded bg-[var(--brand)]/30" />
+                  <div className="size-4 rounded bg-[var(--brand)]/60" />
+                  <div className="size-4 rounded bg-[var(--brand)]" />
                 </div>
                 <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                   少 → 多
@@ -812,7 +810,7 @@ export default function ProgressPage() {
 
         {/* 收藏本 */}
         <TabsContent value="favorites" className="mt-6">
-          <Card className="rounded-[40px] border-border shadow-sm">
+          <Card className="rounded-[24px] border-border">
             <CardHeader className="pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -820,10 +818,10 @@ export default function ProgressPage() {
                     <Heart className="size-5.5" />
                   </div>
                   <div>
-                    <CardTitle className="text-xl font-[900] italic text-foreground">
+                    <CardTitle className="text-[17px] font-extrabold text-foreground">
                       收藏的地道表达
                     </CardTitle>
-                    <CardDescription className="text-sm font-medium mt-1">
+                    <CardDescription className="mt-0.5 text-[11px] font-medium">
                       共 {favorites.length} 条收藏
                     </CardDescription>
                   </div>
@@ -991,16 +989,16 @@ export default function ProgressPage() {
 
         {/* 成就徽章 */}
         <TabsContent value="achievements" className="mt-6">
-          <Card className="rounded-[40px] border-border shadow-sm">
+          <Card className="rounded-[24px] border-border">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
                 <div className="size-12 rounded-2xl bg-amber-50 dark:bg-amber-500/15 text-amber-500 flex items-center justify-center">
                   </div>
                 <div>
-                  <CardTitle className="text-xl font-[900] italic text-foreground">
+                  <CardTitle className="text-[17px] font-extrabold text-foreground">
                     成就徽章
                   </CardTitle>
-                  <CardDescription className="text-sm font-medium mt-1">
+                  <CardDescription className="mt-0.5 text-[11px] font-medium">
                     已解锁 {unlocked.length} / {definitions.length} 个成就
                   </CardDescription>
                 </div>

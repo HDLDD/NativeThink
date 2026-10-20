@@ -8,7 +8,7 @@ import {
   FileText,
   BookOpen,
   Heart,
-  BarChart3,
+  BarChart3,
   PenLine,
   SpellCheck, Film,
   GraduationCap,
@@ -73,24 +73,26 @@ export default function AppSidebar() {
   const dueCount = useGlobalDueCount();
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border/70 bg-card/85 backdrop-blur-md">
-      <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-3 px-2 py-4 group-data-[state=collapsed]:px-0 group-data-[state=collapsed]:justify-center">
-          <div className="size-10 shrink-0 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30">
-            </div>
+    <Sidebar collapsible="icon" className="border-r-0">
+      <SidebarHeader className="border-b border-white/[0.07]">
+        <div className="flex items-center gap-3 px-3 py-5 group-data-[state=collapsed]:px-0 group-data-[state=collapsed]:justify-center">
+          <div className="relative grid size-9 shrink-0 place-items-center rounded-[12px] bg-[var(--brand)] text-[17px] font-black leading-none text-[#06231A]">
+            N
+            <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-[var(--lime)] ring-2 ring-[#0C1712]" />
+          </div>
           <div className="flex-1 min-w-0 group-data-[state=collapsed]:hidden">
-            <div className="text-lg font-black italic tracking-tight text-foreground">
-              Native<span className="text-ink-teal not-italic">Think</span>
+            <div className="text-[17px] font-extrabold tracking-tight text-[#F2F6F2]">
+              Native<span className="text-[#3EDDB5]">Think</span>
             </div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
-              母语思维英语训练
+            <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.22em] text-white/35">
+              English, natively
             </div>
           </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup className="p-3">
-          <SidebarMenu className="space-y-1">
+        <SidebarGroup className="px-3 py-4">
+          <SidebarMenu className="space-y-0.5">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               const isActive =
@@ -110,14 +112,17 @@ export default function AppSidebar() {
                       // 用户必须再点一次遮罩才能操作新页面（桌面侧栏常驻，这行是空转）
                       onClick={() => setOpenMobile(false)}
                       className={cn(
-                        'flex items-center gap-3 transition-all duration-200 rounded-2xl',
+                        'flex h-9 items-center gap-3 rounded-[11px] px-3 transition-colors',
                         isActive
-                          ? 'bg-[var(--brand)] text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30 hover:bg-[var(--brand)] hover:text-white'
-                          : 'text-foreground/60 hover:bg-muted hover:text-foreground',
+                          ? 'bg-[#E9F1EA] text-[#0C1712] hover:bg-[#F1F6F2] hover:text-[#0C1712]'
+                          : 'text-white/50 hover:bg-white/[0.06] hover:text-white',
                       )}
                     >
-                      <Icon className="size-5 shrink-0" />
-                      <span className="group-data-[state=collapsed]:hidden text-xs font-bold uppercase tracking-wider">
+                      <Icon
+                        className={cn('size-[17px] shrink-0', isActive ? 'text-[#0C7C5C]' : 'text-white/40')}
+                        strokeWidth={isActive ? 2.4 : 1.9}
+                      />
+                      <span className="group-data-[state=collapsed]:hidden text-[13px] font-medium tracking-wide">
                         {item.label}
                       </span>
                       {/* 待复习角标 —— 入口处提示"还有 N 个到期"，是回访的主要动机之一 */}
@@ -125,7 +130,7 @@ export default function AppSidebar() {
                         <span
                           className={cn(
                             'group-data-[state=collapsed]:hidden ml-auto min-w-5 h-5 px-1.5 rounded-full text-[10px] font-black grid place-items-center tabular-nums',
-                            isActive ? 'bg-white/25 text-white' : 'bg-rose-500/15 text-rose-500',
+                            isActive ? 'bg-[#06231A] text-[#C8F26B]' : 'bg-white/10 text-[#C8F26B]',
                           )}
                           title={`${dueCount} 个单词待复习`}
                         >

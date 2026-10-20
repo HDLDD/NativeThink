@@ -227,7 +227,7 @@ export default function GlobalWordSearch() {
           variant="ghost"
           size="icon"
           aria-label="全局单词搜索"
-          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors"
+          className="bg-muted/70 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors"
         >
           <Search className="size-4.5" />
         </Button>

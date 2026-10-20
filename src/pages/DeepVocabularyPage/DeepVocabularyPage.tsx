@@ -141,19 +141,19 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook, curren
   const selectedBook = BOOKS.find((b) => b.key === chosenLevel);
 
   return (
-    <div className="min-h-[60vh] flex flex-col justify-center py-6 px-2">
+    <div className="px-2 py-2">
       {/* Step indicators（换书是一步生效，不需要三步进度条） */}
       <div className={cn('flex items-center justify-center gap-2 mb-8', onSwitchBook && 'hidden')}>
         {['词书', '方式', '开始'].map((label, i) => (
           <div key={i} className="flex items-center gap-2">
             <div className={cn(
-              'size-8 rounded-full flex items-center justify-center text-xs font-black transition-all',
-              i <= step ? 'bg-[var(--brand)] text-white shadow-lg shadow-emerald-200/50' : 'bg-muted text-muted-foreground',
+              'size-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-colors',
+              i <= step ? 'bg-[var(--ink)] text-white' : 'bg-muted text-muted-foreground',
             )}>
               {i < step ? '✓' : i + 1}
             </div>
             <span className={cn('text-xs font-bold', i <= step ? 'text-foreground' : 'text-muted-foreground')}>{label}</span>
-            {i < 2 && <div className={cn('w-8 h-0.5 rounded', i < step ? 'bg-[var(--brand)]' : 'bg-muted')} />}
+            {i < 2 && <div className={cn('h-px w-6 rounded', i < step ? 'bg-[var(--brand)]' : 'bg-muted')} />}
           </div>
         ))}
       </div>
@@ -176,42 +176,43 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook, curren
                 <X className="size-4" /><span className="text-xs font-bold">关闭</span>
               </button>
             )}
-            <h2 className="text-xl font-black italic text-foreground">{onSwitchBook ? '切换词书' : '选择你的词书'}</h2>
+            <h2 className="text-[17px] font-extrabold text-foreground">{onSwitchBook ? '切换词书' : '选择你的词书'}</h2>
             <p className="text-xs text-muted-foreground">
               {onSwitchBook ? '点一本直接切过去，学习方式保持不变' : '选择一本词书开始学习'}
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
-            {BOOKS.map(({ key, label, icon: BookIcon, color, desc, gradient }) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-lg mx-auto">
+            {BOOKS.map(({ key, label, icon: BookIcon, color, desc }) => (
               <button data-press="soft" key={key} onClick={() => handleBookSelect(key)}
-                className={cn('group rounded-[24px] p-4 text-left transition-all duration-300 bg-gradient-to-br border shadow-sm hover:shadow-lg hover:-translate-y-1',
-                  onSwitchBook && currentLevel === key ? 'border-[var(--brand)] ring-2 ring-[var(--brand)]/20' : 'border-border/50', gradient)}>
-                <div className="flex items-center gap-3">
-                  <span className="size-10 rounded-2xl grid place-items-center shrink-0" style={{ background: `${color}1a`, color }}>
-                    <BookIcon className="size-5" />
-                  </span>
-                  <div>
-                    <p className="flex items-center gap-1.5 text-sm font-black text-foreground">
+                className={cn('group relative overflow-hidden rounded-[16px] border bg-card px-4 py-3.5 text-left transition-colors hover:border-foreground/25',
+                  onSwitchBook && currentLevel === key ? 'border-[var(--brand)] ring-1 ring-[var(--brand)]/20' : 'border-border')}>
+                <span className="absolute inset-y-3 left-0 w-[3px] rounded-full" style={{ background: color }} aria-hidden />
+                <div className="flex items-center gap-3 pl-2">
+                  <BookIcon className="size-[17px] shrink-0" style={{ color }} strokeWidth={1.8} />
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
                       {label}
                       {onSwitchBook && currentLevel === key && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-[var(--brand)] text-white text-[9px] font-black leading-none">当前</span>
+                        <span className="rounded-full bg-[var(--brand)] px-1.5 py-0.5 text-[9px] font-bold leading-none text-[#06231A]">当前</span>
                       )}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">{desc}</p>
-                    <p className="text-[10px] font-bold mt-1 opacity-50">{counts[key]?.toLocaleString() || '—'} 词</p>
+                    <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{desc}</p>
                   </div>
+                  <span className="shrink-0 text-[11px] font-medium tabular-nums text-muted-foreground">
+                    {counts[key]?.toLocaleString() || '—'}
+                  </span>
                 </div>
               </button>
             ))}
             <button data-press="strong" onClick={() => handleBookSelect('all')}
-              className={cn('col-span-full rounded-[24px] p-4 text-center transition-all border-2 border-dashed hover:bg-emerald-50/30 dark:hover:bg-emerald-500/5',
-                onSwitchBook && currentLevel === 'all' ? 'border-[var(--brand)] bg-emerald-50/30' : 'border-border/50 hover:border-[var(--brand)]')}>
-              <p className="text-sm font-black text-muted-foreground flex items-center justify-center gap-1.5"><Library className="size-4" />全部词库 · {TOTAL_UNIQUE_WORDS.toLocaleString()} 词
+              className={cn('col-span-full rounded-[16px] border border-dashed px-4 py-3.5 text-center transition-colors',
+                onSwitchBook && currentLevel === 'all' ? 'border-[var(--brand)] bg-muted/40' : 'border-border hover:border-foreground/25 hover:bg-muted/30')}>
+              <p className="flex items-center justify-center gap-1.5 text-[12px] font-semibold text-muted-foreground"><Library className="size-4" />全部词库 · {TOTAL_UNIQUE_WORDS.toLocaleString()} 词
                 {onSwitchBook && currentLevel === 'all' && (
-                  <span className="px-1.5 py-0.5 rounded-full bg-[var(--brand)] text-white text-[9px] font-black leading-none">当前</span>
+                  <span className="rounded-full bg-[var(--brand)] px-1.5 py-0.5 text-[9px] font-bold leading-none text-[#06231A]">当前</span>
                 )}
               </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">加载较慢，建议选择单本词书</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">加载较慢，建议选择单本词书</p>
             </button>
           </div>
           <div className="text-center mt-4">
@@ -233,15 +234,15 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook, curren
             <div className="space-y-2">
               {MODES.map(({ key, label, icon: ModeIcon, color, desc }) => (
                 <button data-press="strong" key={key} onClick={() => handleModeSelect(key)}
-                  className={cn('w-full rounded-[20px] p-4 text-left transition-all border-2',
-                    chosenMode === key ? 'border-[var(--brand)] bg-emerald-50/50 dark:bg-emerald-500/10' : 'border-border hover:border-muted-foreground/30')}>
+                  className={cn('w-full rounded-[16px] border px-4 py-3 text-left transition-colors',
+                    chosenMode === key ? 'border-foreground/60 bg-muted/40' : 'border-border hover:border-foreground/20')}>
                   <div className="flex items-center gap-3">
-                    <span className="size-9 rounded-xl grid place-items-center shrink-0" style={{ background: `${color}1a`, color }}><ModeIcon className="size-4.5" /></span>
-                    <div>
-                      <p className="text-sm font-black text-foreground">{label}</p>
-                      <p className="text-[10px] text-muted-foreground">{desc}</p>
+                    <ModeIcon className="size-[17px] shrink-0" style={{ color }} strokeWidth={1.8} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-semibold text-foreground">{label}</p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">{desc}</p>
                     </div>
-                    {chosenMode === key && <div className="ml-auto size-5 rounded-full bg-[var(--brand)] text-white flex items-center justify-center text-[10px]">✓</div>}
+                    {chosenMode === key && <span className="size-1.5 shrink-0 rounded-full bg-[var(--brand)]" />}
                   </div>
                 </button>
               ))}
@@ -259,13 +260,13 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook, curren
         <div className="max-w-sm mx-auto space-y-6">
           <div className="text-center space-y-1">
             <p className="text-xs font-bold text-muted-foreground flex items-center justify-center gap-1.5">已选：{selectedBook && <selectedBook.icon className="size-3.5" style={{ color: selectedBook.color }} />}{selectedBook?.label}</p>
-            <p className="text-xl font-black text-foreground">每日学习量</p>
+            <p className="text-[17px] font-extrabold text-foreground">每日学习量</p>
           </div>
           <div className="flex gap-2 flex-wrap">
             {DAILY_COUNTS.map((n) => (
               <button data-press="strong" key={n} onClick={() => setDailyCount(n)}
                 className={cn('flex-1 py-3 rounded-2xl text-sm font-black whitespace-nowrap transition-all',
-                  dailyCount === n ? 'bg-[var(--brand)] text-white shadow-lg shadow-emerald-200/50' : 'bg-muted text-muted-foreground hover:bg-muted/80')}>{n}词</button>
+                  dailyCount === n ? 'bg-[var(--ink)] text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80')}>{n}词</button>
             ))}
           </div>
           {/* Custom input for no-limit daily count */}
@@ -286,7 +287,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook, curren
           </div>
           <div className="flex gap-2 pt-2">
             <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="rounded-2xl text-xs">← 返回</Button>
-            <Button onClick={handleComplete} className="flex-1 rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50 gap-1.5">
+            <Button onClick={handleComplete} className="flex-1 rounded-full bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-semibold text-sm gap-1.5">
               开始学习
             </Button>
           </div>
@@ -298,27 +299,27 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook, curren
         <div className="max-w-sm mx-auto space-y-6">
           <div className="text-center space-y-1">
             <p className="text-xs font-bold text-muted-foreground flex items-center justify-center gap-1.5">已选：{selectedBook && <selectedBook.icon className="size-3.5" style={{ color: selectedBook.color }} />}{selectedBook?.label}</p>
-            <p className="text-xl font-black text-foreground">复习方式</p>
+            <p className="text-[17px] font-extrabold text-foreground">复习方式</p>
           </div>
           <div className="space-y-2">
             {REVIEW_MODES.map(({ key, label, icon: ModeIcon, color, desc }) => (
               <button data-press="strong" key={key} onClick={() => setReviewMode(key)}
-                className={cn('w-full rounded-[20px] p-4 text-left transition-all border-2',
-                  reviewMode === key ? 'border-[#6C5CE7] bg-violet-50/50 dark:bg-violet-500/10' : 'border-border hover:border-muted-foreground/30')}>
+                className={cn('w-full rounded-[16px] border px-4 py-3 text-left transition-colors',
+                  reviewMode === key ? 'border-foreground/60 bg-muted/40' : 'border-border hover:border-foreground/20')}>
                 <div className="flex items-center gap-3">
-                  <span className="size-9 rounded-xl grid place-items-center shrink-0" style={{ background: `${color}1a`, color }}><ModeIcon className="size-4.5" /></span>
-                  <div>
-                    <p className="text-sm font-black text-foreground">{label}</p>
-                    <p className="text-[10px] text-muted-foreground">{desc}</p>
+                  <ModeIcon className="size-[17px] shrink-0" style={{ color }} strokeWidth={1.8} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-semibold text-foreground">{label}</p>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">{desc}</p>
                   </div>
-                  {reviewMode === key && <div className="ml-auto size-5 rounded-full bg-[#6C5CE7] text-white flex items-center justify-center text-[10px]">✓</div>}
+                  {reviewMode === key && <span className="size-1.5 shrink-0 rounded-full bg-[var(--brand)]" />}
                 </div>
               </button>
             ))}
           </div>
           <div className="flex gap-2 pt-2">
-            <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="rounded-2xl text-xs">← 返回</Button>
-            <Button onClick={handleComplete} className="flex-1 rounded-2xl bg-[#6C5CE7] hover:bg-[#5a4bd1] text-white font-black text-sm shadow-lg shadow-violet-200/50 gap-1.5">
+            <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="rounded-full text-xs">← 返回</Button>
+            <Button onClick={handleComplete} className="flex-1 rounded-full bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-semibold text-sm gap-1.5">
               <RotateCw className="size-4" />开始复习
             </Button>
           </div>
@@ -1789,7 +1790,7 @@ export default function DeepVocabularyPage() {
                 <Card className="rounded-[40px] border-border shadow-sm">
                   <CardContent className="p-16 text-center">
                     <div className="size-20 rounded-3xl bg-muted mx-auto mb-4 flex items-center justify-center text-muted-foreground"><BookOpen className="size-9" /></div>
-                    <h3 className="text-xl font-black text-foreground mb-2">选择一个单词</h3>
+                    <h3 className="text-[17px] font-extrabold text-foreground mb-2">选择一个单词</h3>
                     <p className="text-sm text-muted-foreground font-medium">从左侧列表中选择单词查看详细解析</p>
                   </CardContent>
                 </Card>

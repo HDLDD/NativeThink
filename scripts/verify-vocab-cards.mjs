@@ -327,7 +327,9 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(!/icon: '[^']*'/u.test(page.match(/const MODES[\s\S]*?\n\];/)?.[0] ?? ''), '模式图标不使用 emoji 字符串');
   check(!/icon: '[^']*'/u.test(page.match(/const REVIEW_MODES[\s\S]*?\n\];/)?.[0] ?? ''), '复习方式图标不使用 emoji 字符串');
   check(/icon: LucideIcon/.test(page), '图标字段声明为 LucideIcon 类型（TS 会拦住 emoji 混用）');
-  check(/background: `\$\{color\}1a`, color/.test(page), '图标块吃各自的强调色（深浅主题都稳）');
+  check(/<BookIcon[^>]*style=\{\{ color \}\}/.test(page) && /<ModeIcon[^>]*style=\{\{ color \}\}/.test(page)
+    && /style=\{\{ background: color \}\}/.test(page),
+    '强调色挂在图标与书脊上（不再用大面积淡色图标块；深浅主题都稳）');
   check(!/\{icon\}/.test(page) && !/\{m\.icon\}/.test(page), '没有把组件当 ReactNode 渲染的残留写法');
 
   // 本轮修的几个真实问题
@@ -379,7 +381,8 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   check(/\.safe-area-top \{ padding-top: env\(safe-area-inset-top/.test(css), '定义 safe-area-top 工具类');
   check(/\.safe-area-bottom \{ padding-bottom: env\(safe-area-inset-bottom/.test(css), '定义 safe-area-bottom（MobileBottomNav 一直在用但此前从未定义）');
   check(/className="safe-area-top safe-area-left safe-area-right"/.test(layout), '外壳补状态栏/侧边 inset');
-  check(/safe-area-bottom/.test(nav), '底部导航补手势条 inset');
+  check(/safe-area-bottom/.test(nav) || /env\(safe-area-inset-bottom/.test(nav),
+    '底部导航补手势条 inset（safe-area-bottom 类，或用 env() 直接抬底）');
 
   /**
    * 空 sticky 条会**压在内容上**（真机实测，别再犯）：

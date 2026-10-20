@@ -18,8 +18,7 @@ import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
 
 import { HeroCard } from './HeroCard';
-import { StatTile } from '@/components/StatTile';
-import { ProgressCard } from './ProgressCard';
+import { OverviewPanel } from './OverviewPanel';
 import { DailySentenceCard } from './DailySentenceCard';
 import { QuickStartGrid } from './QuickStartGrid';
 import { ModuleProgressCard } from './ModuleProgressCard';
@@ -310,8 +309,6 @@ export default function DashboardPage() {
     );
   }
 
-  const progressPercent = Math.min(100, (stats.todayMinutes / stats.dailyGoalMinutes) * 100);
-
   return (
     <div className="space-y-10">
       {/* 继续上次学习 + 今日待复习（窄屏堆叠，宽屏并排；都没有时该行不占位） */}
@@ -346,48 +343,28 @@ export default function DashboardPage() {
           dailyGoalMinutes={stats.dailyGoalMinutes}
         />
 
-        {/* 紧凑统计条 - 5/12（原四张大卡占半屏，现在压到 ~1/3 高度） */}
-        <div className="col-span-12 lg:col-span-5 grid grid-cols-2 gap-2 content-start">
-          <StatTile
-            label="连续天数"
-            value={`${stats.streakDays} 天`}
-            hint={`累计 ${stats.totalDays} 天`}
-            onClick={() => navigate('/progress')}
-          />
-          <StatTile
-            label="今日目标"
-            value={`${Math.round(stats.todayMinutes)}/${stats.dailyGoalMinutes}m`}
-            hint={`${Math.min(100, Math.round((stats.todayMinutes / Math.max(1, stats.dailyGoalMinutes)) * 100))}%`}
-            onClick={() => navigate('/progress')}
-          />
-          <StatTile
-            label="收藏表达"
-            value={`${favorites.filter(f => f.type === 'chunk' || f.type === 'expression').length} 条`}
-            onClick={() => navigate('/progress')}
-          />
-          <StatTile
-            label="收藏单词"
-            // 'vocabulary' = 词汇页收藏，'word' = 背单词/快速闪卡/阅读查词收藏 —— 两条线都算
-            value={`${favorites.filter(f => f.type === 'vocabulary' || f.type === 'word').length} 条`}
-            onClick={() => navigate('/progress')}
-          />
-
-          <ProgressCard
-            todayMinutes={stats.todayMinutes}
-            dailyGoalMinutes={stats.dailyGoalMinutes}
-            progressPercent={progressPercent}
-          />
-        </div>
+        {/* 学习档案：四张统计卡 + 墨色进度卡收成一块 */}
+        <OverviewPanel
+          streakDays={stats.streakDays}
+          totalDays={stats.totalDays}
+          todayMinutes={stats.todayMinutes}
+          dailyGoalMinutes={stats.dailyGoalMinutes}
+          expressionCount={favorites.filter(f => f.type === 'chunk' || f.type === 'expression').length}
+          wordCount={favorites.filter(f => f.type === 'vocabulary' || f.type === 'word').length}
+          onOpenProgress={() => navigate('/progress')}
+        />
       </div>
 
-      {/* 每日一句 + 快速开始 */}
-      <div className="grid grid-cols-12 gap-8">
+      {/* 每日一句 + 本周概览 + 快速开始 */}
+      <div className="grid grid-cols-12 items-start gap-8">
+        <div className="col-span-12 space-y-6 lg:col-span-5">
         <DailySentenceCard
           dailyChunk={dailyChunk}
           exampleZh={exampleZh}
           chunkLoading={chunkLoading}
           favorited={favorited}
           isExampleFavorited={isExampleFavorited}
+          recent={history.filter((h) => h.content !== dailyChunk.content).slice(0, 3)}
           onShowHistory={() => setShowHistory(true)}
           onShuffle={handleShuffleChunk}
           onAiGenerate={handleAiGenerateChunk}
@@ -397,11 +374,11 @@ export default function DashboardPage() {
           onToggleExampleFavorite={handleToggleExampleFavorite}
         />
 
+        <WeekGlanceCard calendar={calendar} dailyGoalMinutes={stats.dailyGoalMinutes} onNavigate={navigate} />
+        </div>
+
         <QuickStartGrid onNavigate={navigate} />
       </div>
-
-      {/* 本周学习概览（近 7 天分钟柱状） */}
-      <WeekGlanceCard calendar={calendar} dailyGoalMinutes={stats.dailyGoalMinutes} onNavigate={navigate} />
 
       {/* 模块进度 */}
       <ModuleProgressCard

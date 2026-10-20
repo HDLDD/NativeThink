@@ -16,7 +16,7 @@ export default function UserMenu() {
           variant="ghost"
           size="sm"
           onClick={() => setAuthOpen(true)}
-          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors gap-1.5 text-xs font-bold"
+          className="bg-muted/70 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors gap-1.5 text-xs font-bold"
         >
           <User className="size-4" />
           <span className="hidden sm:inline">登录</span>
@@ -33,7 +33,7 @@ export default function UserMenu() {
           variant="ghost"
           size="sm"
           onClick={() => setMenuOpen(!menuOpen)}
-          className="bg-muted hover:bg-muted/80 rounded-2xl text-muted-foreground hover:text-ink-teal transition-colors gap-1.5 text-xs font-bold"
+          className="bg-muted/70 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors gap-1.5 text-xs font-bold"
         >
           <div className="size-5 rounded-full bg-[var(--brand)]/20 text-ink-teal flex items-center justify-center text-[10px] font-black">
             {user?.email?.[0]?.toUpperCase() || 'U'}

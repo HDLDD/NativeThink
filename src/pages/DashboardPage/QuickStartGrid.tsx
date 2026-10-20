@@ -1,8 +1,7 @@
 import { memo } from 'react';
+import type { CSSProperties } from 'react';
 import { ArrowUpRight } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { QUICK_ENTRIES, COMING_SOON } from './constants';
-
 
 interface QuickStartGridProps {
   onNavigate: (path: string) => void;
@@ -11,66 +10,63 @@ interface QuickStartGridProps {
 function QuickStartGridInner({ onNavigate }: QuickStartGridProps) {
   return (
     <div className="col-span-12 lg:col-span-7">
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-4 flex items-end justify-between gap-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">
-            Quick Start
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+            All modules
           </p>
-          <h3 className="text-xl font-black italic text-foreground">快速开始</h3>
+          <h3 className="mt-1 text-[15px] font-bold text-foreground">
+            全部功能
+            <span className="ml-2 text-[11px] font-medium text-muted-foreground tabular-nums">
+              {QUICK_ENTRIES.length}
+            </span>
+          </h3>
         </div>
+        <span className="text-[10px] text-muted-foreground">按学习路径排序</span>
       </div>
-      <div className="stagger grid grid-cols-2 lg:grid-cols-3 gap-4">
-        {QUICK_ENTRIES.map((entry) => {
-          const Icon = entry.icon;
-          return (
-            <Card
-              key={entry.path}
-              className="cursor-pointer hover:shadow-md transition-all duration-300 hover:-translate-y-1 group rounded-[32px] border-border"
-              onClick={() => onNavigate(entry.path)}
-            >
-              <CardContent className="p-6">
-                <div
-                  className="size-12 rounded-2xl flex items-center justify-center mb-4 border border-border/60"
-                  style={{ backgroundColor: `${entry.tint}14`, color: entry.tint }}
-                >
-                  <Icon className="size-5" />
-                </div>
-                <h4 className="text-base font-black text-foreground mb-1">{entry.label}</h4>
-                <p className="text-xs text-muted-foreground font-medium mb-3">{entry.desc}</p>
-                <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-ink-teal">
-                  开始学习
-                  <ArrowUpRight className="size-3.5" />
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
 
-        {/* 即将上线：句子学习（功能开发中，暂不可点） */}
-        {COMING_SOON.map((it) => {
-          const Icon = it.icon;
-          return (
-            <div
-              key={it.label}
-              className="rounded-[32px] border-2 border-dashed border-border bg-muted/20 p-6 select-none"
-              aria-disabled="true"
-            >
-              <div
-                className="size-14 rounded-2xl flex items-center justify-center text-white mb-4 opacity-60"
-                style={{ backgroundColor: it.color }}
-              >
-                <Icon className="size-6" />
-              </div>
-              <div className="flex items-center gap-2 mb-1">
-                <h4 className="text-base font-black text-foreground">{it.label}</h4>
-                <span className="text-[9px] font-black uppercase tracking-wider text-amber-600 bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 rounded-full">
-                  即将上线
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground font-medium">{it.desc}</p>
+      <div className="stagger grid grid-cols-2 gap-2.5 lg:grid-cols-3">
+        {QUICK_ENTRIES.map((entry, index) => (
+          <button
+            key={entry.path}
+            type="button"
+            onClick={() => onNavigate(entry.path)}
+            style={{ '--tint': entry.tint } as CSSProperties}
+            className="group flex min-h-[124px] flex-col justify-between rounded-[20px] border border-border bg-card p-5 text-left transition-colors hover:border-transparent hover:bg-[var(--ink)]"
+          >
+            <div className="flex items-start justify-between">
+              <span className="flex items-center gap-2 text-[11px] font-extrabold tracking-[0.14em] text-[var(--tint)] tabular-nums transition-colors group-hover:text-[var(--lime)]">
+                <span className="size-1.5 rounded-full bg-current" aria-hidden />
+                {String(index + 1).padStart(2, '0')}
+              </span>
+              <ArrowUpRight className="size-4 text-muted-foreground/30 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[var(--lime)]" />
             </div>
-          );
-        })}
+            <div className="mt-5">
+              <h4 className="text-[16px] font-bold tracking-tight text-foreground group-hover:text-white">
+                {entry.label}
+              </h4>
+              <p className="mt-1 text-[11px] text-muted-foreground group-hover:text-white/45">
+                {entry.desc}
+              </p>
+            </div>
+          </button>
+        ))}
+
+        {COMING_SOON.map((it) => (
+          <div
+            key={it.label}
+            className="rounded-[20px] border border-dashed border-border bg-muted/20 p-5 select-none"
+            aria-disabled="true"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <h4 className="text-[16px] font-bold text-foreground">{it.label}</h4>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--warm)] bg-[var(--warm)]/10 px-2 py-0.5 rounded-full">
+                即将上线
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">{it.desc}</p>
+          </div>
+        ))}
       </div>
     </div>
   );

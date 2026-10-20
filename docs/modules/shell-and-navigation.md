@@ -85,9 +85,22 @@ AGENTS.md 说的"四件套"确实都还在，但**还有两处隐性要求**，�
 8. **`public/_redirects` 的顺序与语义不能想当然**：`/api/* /api/* 200` 必须先于 `/* /index.html 200`，否则函数请求会被 SPA 兜底吃掉（返回 HTML 200 而不是 JSON）。`/models/* /models/* 404` 也是刻意的：web 版没内置模型，404 让 transformers 回落远程源。`public/_headers` 的 COOP/COEP（`credentialless`）是多线程 WASM（离线模型）必需，去掉会让 wasm 线程失效。
 9. **`wrangler.toml` 里有真实 KV namespace id**（`id = "68391cb5…"`）。它是 binding 标识、不是密钥，但要清楚：**这个文件改错会让线上函数读不到 KV**，而本项目没有部署 workflow（`.github` 目录不存在），push 到 `main` 就由 Pages Git 集成构建上线。
 
-## 8. 顶栏与外观主题（2026-10-20）
+## 8. 顶栏与外观主题（2026-10-20；视觉外壳 2026-10-21 改版）
 
-**顶栏只留三件**：日期时间、全局搜索（`GlobalWordSearch`）、设置入口（齿轮 → `/settings`）+ 用户菜单。
+**视觉外壳（墨面 + 纸面）**：
+
+| 层 | 实现 | 约定 |
+|---|---|---|
+| 桌面侧栏 | `AppSidebar.tsx:76-145` + `index.css:253-281` | 底色固定在 `#0C1712`，不跟随四套主题；logo 是品牌色 `N` 方块 + 青柠圆点；激活项为品牌实色胶囊（`[data-slot="sidebar-menu-button"][data-active="true"]` 需要 `!important`，否则被组件自带的 `data-[active=true]:bg-sidebar-accent` 属性选择器盖住） |
+| 手机抽屉 | `index.css:255-268` 的 `[data-slot="sidebar"][data-mobile="true"]` | 与桌面共用同一组墨面 token；抽屉项与桌面同一套激活样式 |
+| 顶栏 | `Header.tsx:33-34` | 高度 64px，只留时间（含日期/星期，窄屏只留时间）、全局搜索、设置、用户菜单；原来的日期胶囊已删 |
+| 手机底部 dock | `MobileBottomNav.tsx:38-43` | 悬浮墨色圆角条，6 个入口；`bottom` 直接算 `env(safe-area-inset-bottom, 0px) + 10px`（不再用 `safe-area-bottom` 类，守卫已改为接受 `env()` 写法） |
+| 内容纸面 | `tailwind-theme.css` 的 `--background/--card/--border` + `index.css:235-251` | 暖白 `#F3F4EF`；卡片统一 24px 圆角、细边、短影，悬浮只加深边缘；彩色光晕（`shadow-emerald/violet/sky…`）统一清零 |
+| 标题 | `index.css:301` | `h1-h4` 强制正体 —— 原先满屏的斜体黑体是模板感最重的来源 |
+
+模块色不再铺在页面背景上（`index.css:541` 将 `main[data-module]` 的径向渐变置空）；模块辨识改由侧栏激活项、内容里的编号/强调色承担。
+
+**顶栏只留三件**：时间、全局搜索（`GlobalWordSearch`）、设置入口（齿轮 → `/settings`）+ 用户菜单。
 原先并排的 9 个图标（每日目标 / 更新日志 / 开发者主页 / 使用指南 / AI 设置 / 朗读设置 / 明暗切换）全部收进设置页，
 窄屏不再需要横向滚动。组件边界没变：`HelpGuide` / `AISettings` / `ChangelogDialog` / `TTSSettings` 都新增了
 `trigger?: ReactNode`，页面把整行按钮传进去当 `asChild` 的触发件 —— **自定义 trigger 必须把 Radix 注入的 props
@@ -97,11 +110,11 @@ AGENTS.md 说的"四件套"确实都还在，但**还有两处隐性要求**，�
 
 | 层 | 位置 | 约定 |
 |---|---|---|
-| 主题注册表 | `src/lib/ui-theme.ts` | `classic`（默认，**不覆盖任何 token**）/ `porcelain` 电蓝 / `graphite` 石墨 / `lime` 青柠；id 与 CSS 选择器一一对应 |
+| 主题注册表 | `src/lib/ui-theme.ts` | `classic`（默认，**不挂 `data-ui-theme`，直接用 `:root` 的墨壳/纸面基线**）/ `porcelain` 电蓝 / `graphite` 石墨 / `lime` 青柠；id 与 CSS 选择器一一对应 |
 | token 覆盖 | `src/index.css` 末尾 `html[data-ui-theme="…"]` | 只改 `--background/--card/--border/--primary/--ink-teal/--sidebar*` 等设计变量；暗色只换强调色 |
 | 品牌单点 | `--brand` / `--brand-strong` / `--brand-rgb` | 全站原 `#00B894` 已换成 `var(--brand)`（497 处 / 48 个 tsx），换主题时按钮、图标、阴影一起变；`--brand-rgb` 供透明度用法 |
 | 启动 | `src/index.tsx` 的 `initUiTheme()` | 在 `createRoot` 之前把 `data-ui-theme` 写到 `<html>`，刷新不闪回默认 |
-| 选择入口 | `/settings` → 外观 | 亮/暗 + 四套主题色卡；选择写 `localStorage.__nativethink_ui_theme` 并广播给其它实例 |
+| 选择入口 | `/settings` → 外观 | 亮/暗 + 四套主题色卡（当前主题用品牌色小点标出）；选择写 `localStorage.__nativethink_ui_theme` 并广播给其它实例 |
 
 **已知边界**：canvas（`celebrate.ts`）与 Recharts 的 `fill` 仍拿字面色，不跟随主题；
 `emerald-*` / `teal-*` 这类语义色（成功/正确）与品牌色是两回事，主题不会把它们染成主色 —— 这是刻意的。
