@@ -21,7 +21,7 @@ function HeroCardInner({ onStartLearning, dueCount, todayMinutes, dailyGoalMinut
 
   return (
     <Card className="col-span-12 lg:col-span-7 rounded-[32px] lg:rounded-[40px] border-border shadow-sm overflow-hidden">
-      <CardContent className="p-6 sm:p-10 lg:p-12 min-h-[280px] lg:min-h-[380px] flex flex-col justify-between gap-6">
+      <CardContent className="p-5 sm:p-8 lg:p-10 min-h-[220px] lg:min-h-[300px] flex flex-col justify-between gap-5">
         <div className="flex items-center justify-between gap-3">
           <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-ink-teal">
             今日学习

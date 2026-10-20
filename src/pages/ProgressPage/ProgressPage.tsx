@@ -25,6 +25,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { StatTile } from '@/components/StatTile';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -636,80 +637,28 @@ export default function ProgressPage() {
           </DialogContent>
         </Dialog>
 
-      {/* 顶部统计卡片 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="rounded-[32px] border-border shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 group">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="size-12 rounded-2xl bg-orange-50 dark:bg-orange-500/15 text-orange-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Flame className="size-5.5" />
-              </div>
-              <div className="flex items-center gap-1 text-[11px] font-black text-muted-foreground">
-                <TrendingUp className="size-3.5" />
-                累计 {stats.totalDays} 天
-              </div>
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
-              连续天数
-            </p>
-            <p className="text-2xl font-black text-foreground group-hover:text-ink-teal transition-colors">
-              {stats.streakDays} 天
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-[32px] border-border shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 group">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Target className="size-5.5" />
-              </div>
-              <div className="text-[11px] font-black text-emerald-500">
-                {Math.round((stats.todayMinutes / stats.dailyGoalMinutes) * 100)}%
-              </div>
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
-              今日目标
-            </p>
-            <p className="text-2xl font-black text-foreground group-hover:text-ink-teal transition-colors">
-              {Math.round(stats.todayMinutes)}/{stats.dailyGoalMinutes}m
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-[32px] border-border shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 group">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="size-12 rounded-2xl bg-indigo-50 dark:bg-indigo-500/15 text-indigo-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Clock className="size-5.5" />
-              </div>
-              <div className="text-[11px] font-black text-muted-foreground">打卡 {calendar.filter((r) => r.checkedIn).length} 天</div>
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
-              累计学习
-            </p>
-            <p className="text-2xl font-black text-foreground group-hover:text-ink-teal transition-colors">
-              {Math.round(calendar.reduce((sum, r) => sum + r.minutes, 0))} 分钟
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-[32px] border-border shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 group">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="size-12 rounded-2xl bg-pink-50 dark:bg-pink-500/15 text-pink-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Heart className="size-5.5" />
-              </div>
-              <div className="text-[11px] font-black text-muted-foreground">本周 +{favorites.filter((f) => Date.now() - f.createdAt < 7 * 86400000).length}</div>
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
-              地道表达
-            </p>
-            <p className="text-2xl font-black text-foreground group-hover:text-ink-teal transition-colors">
-              {favorites.length} 条
-            </p>
-          </CardContent>
-        </Card>
+      {/* 顶部统计：紧凑条（原四张 32px 大卡 + 彩色图标块，占掉近半屏） */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <StatTile
+          label="连续天数"
+          value={`${stats.streakDays} 天`}
+          hint={`累计 ${stats.totalDays} 天`}
+        />
+        <StatTile
+          label="今日目标"
+          value={`${Math.round(stats.todayMinutes)}/${stats.dailyGoalMinutes}m`}
+          hint={`${Math.round((stats.todayMinutes / Math.max(1, stats.dailyGoalMinutes)) * 100)}%`}
+        />
+        <StatTile
+          label="累计学习"
+          value={`${Math.round(calendar.reduce((sum, r) => sum + r.minutes, 0))} 分钟`}
+          hint={`打卡 ${calendar.filter((r) => r.checkedIn).length} 天`}
+        />
+        <StatTile
+          label="地道表达"
+          value={`${favorites.length} 条`}
+          hint={`本周 +${favorites.filter((f) => Date.now() - f.createdAt < 7 * 86400000).length}`}
+        />
       </div>
 
       <Tabs defaultValue="calendar" value={tab} onValueChange={setTab} className="w-full">

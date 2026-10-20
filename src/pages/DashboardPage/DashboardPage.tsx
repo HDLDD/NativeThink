@@ -1,13 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  History as HistoryIcon,
-  Flame,
-  Target,
-  Brain,
-  MessageSquare,
-  BookOpen,
-} from 'lucide-react';
+import { History as HistoryIcon, Brain } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +18,7 @@ import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
 
 import { HeroCard } from './HeroCard';
-import { KpiCard } from './KpiCard';
+import { StatTile } from '@/components/StatTile';
 import { ProgressCard } from './ProgressCard';
 import { DailySentenceCard } from './DailySentenceCard';
 import { QuickStartGrid } from './QuickStartGrid';
@@ -353,35 +346,29 @@ export default function DashboardPage() {
           dailyGoalMinutes={stats.dailyGoalMinutes}
         />
 
-        {/* KPI 四宫格 - 5/12 */}
-        <div className="col-span-12 lg:col-span-5 grid grid-cols-2 gap-4">
-          <KpiCard
-            icon={Flame}
+        {/* 紧凑统计条 - 5/12（原四张大卡占半屏，现在压到 ~1/3 高度） */}
+        <div className="col-span-12 lg:col-span-5 grid grid-cols-2 gap-2 content-start">
+          <StatTile
             label="连续天数"
             value={`${stats.streakDays} 天`}
-            color="#F97316"
+            hint={`累计 ${stats.totalDays} 天`}
             onClick={() => navigate('/progress')}
           />
-          <KpiCard
-            icon={Target}
+          <StatTile
             label="今日目标"
             value={`${Math.round(stats.todayMinutes)}/${stats.dailyGoalMinutes}m`}
-            color="var(--brand)"
+            hint={`${Math.min(100, Math.round((stats.todayMinutes / Math.max(1, stats.dailyGoalMinutes)) * 100))}%`}
             onClick={() => navigate('/progress')}
           />
-          <KpiCard
-            icon={MessageSquare}
+          <StatTile
             label="收藏表达"
             value={`${favorites.filter(f => f.type === 'chunk' || f.type === 'expression').length} 条`}
-            color="#EC4899"
             onClick={() => navigate('/progress')}
           />
-          <KpiCard
-            icon={BookOpen}
+          <StatTile
             label="收藏单词"
             // 'vocabulary' = 词汇页收藏，'word' = 背单词/快速闪卡/阅读查词收藏 —— 两条线都算
             value={`${favorites.filter(f => f.type === 'vocabulary' || f.type === 'word').length} 条`}
-            color="#6366F1"
             onClick={() => navigate('/progress')}
           />
 
