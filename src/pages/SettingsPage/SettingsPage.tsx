@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode, type ButtonHTMLAttributes } from 'react';
 import {
-  Sun, Moon, ChevronRight, Volume2, Cpu, HelpCircle, ScrollText, ExternalLink, Target, Palette, Info,
+  Sun, Moon, ChevronLeft, ChevronRight, Volume2, Cpu, HelpCircle, ScrollText, ExternalLink, Target, Palette, Info,
 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '@/lib/use-theme';
 import { UI_THEMES, useUiTheme } from '@/lib/ui-theme';
 import { useLearningStats } from '@/lib/use-learning-stats';
@@ -59,6 +60,8 @@ function Row({ icon: Icon, label, desc, ...rest }: {
 }
 
 export default function SettingsPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { theme, setTheme } = useTheme();
   const { uiTheme, setUiTheme } = useUiTheme();
   const { stats, setDailyGoal } = useLearningStats();
@@ -71,6 +74,17 @@ export default function SettingsPage() {
   return (
     <div className="max-w-3xl mx-auto pb-24">
       <header className="mb-6">
+        {/* 直接打开 /settings（没有来源页）时回首页；从其它页进来则原路返回 */}
+        <button
+          type="button"
+          aria-label="返回"
+          title="返回"
+          onClick={() => { if (location.key === 'default') navigate('/'); else navigate(-1); }}
+          className="-ml-2 mb-2 inline-flex items-center gap-1 rounded-full py-1.5 pl-1.5 pr-3 text-sm font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <ChevronLeft className="size-5" />
+          返回
+        </button>
         <h1 className="text-2xl font-black tracking-tight text-foreground">设置</h1>
         <p className="text-sm text-muted-foreground mt-1">外观、学习目标、朗读与 AI、帮助 —— 都收在这里。</p>
       </header>

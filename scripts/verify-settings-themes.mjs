@@ -94,6 +94,8 @@ ok(/UI_THEMES\.map/.test(PAGE) && /setUiTheme\(t\.id\)/.test(PAGE),
   '⑤ 外观区由注册表渲染色卡（新增主题只改注册表，不改页面）');
 ok(/GOAL_OPTIONS\.map/.test(PAGE) && /setDailyGoal\(min\)/.test(PAGE),
   '⑤ 每日目标在设置页直接生效（不再套一层弹窗）');
+ok(/aria-label="返回"/.test(PAGE) && /location\.key === 'default'[\s\S]{0,80}navigate\('\/'\)[\s\S]{0,60}navigate\(-1\)/.test(PAGE),
+  '⑤ 左上角有返回：没有来源页（location.key === default）回首页，从其它页进来则原路返回');
 
 /* ── ⑥ 路由与导航 ── */
 ok(/const SettingsPage = lazy\(\(\) => import\("@\/pages\/SettingsPage\/SettingsPage"\)\)/.test(APP)
