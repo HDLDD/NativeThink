@@ -620,7 +620,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
           </div>
           <div className="flex items-center gap-1 flex-wrap">
             {PHRASE_LEVELS.map((lv) => (
-              <button
+              <button data-press="soft"
                 key={lv}
                 onClick={() => setBank(lv)}
                 className={cn(
@@ -635,7 +635,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
           {bankFailed && (
             <div className="flex items-center justify-between pt-1 border-t border-border/50">
               <span className="text-[9px] font-bold text-rose-500">短语库加载失败</span>
-              <button onClick={() => setReloadTick((t) => t + 1)}
+              <button data-press="strong" onClick={() => setReloadTick((t) => t + 1)}
                 className="text-[9px] font-black uppercase tracking-wider text-ink-teal hover:text-[#0d9488]">
                 重试
               </button>
@@ -705,7 +705,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
           {suspendedInBank > 0 && (
             <div className="flex items-center justify-between pt-1 border-t border-border/50">
               <span className="text-[9px] font-bold text-muted-foreground">已屏蔽（不再出现）{suspendedInBank} 条</span>
-              <button onClick={restoreSuspended}
+              <button data-press="soft" onClick={restoreSuspended}
                 className="text-[9px] font-black uppercase tracking-wider text-ink-teal hover:text-[#0d9488]">
                 恢复全部
               </button>
@@ -721,7 +721,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
           </div>
           <div className="flex items-center gap-1.5">
             {[10, 20, 30, 50, 100].map((n) => (
-              <button key={n} onClick={() => setDailyQuota(n)}
+              <button data-press="soft" key={n} onClick={() => setDailyQuota(n)}
                 className={cn('flex-1 py-1.5 rounded-xl text-[10px] font-black transition-all border',
                   dailyQuota === n ? 'border-[#14B8A6] text-ink-teal bg-[#14B8A6]/10' : 'border-border text-muted-foreground hover:border-[#14B8A6]/40')}>
                 {n}
@@ -906,7 +906,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
                         </Badge>
                         <div className="flex items-center justify-center gap-2 mt-2">
                           <p className="text-lg font-black text-foreground">{cw.content}</p>
-                          <button onClick={(e) => { e.stopPropagation(); try { tts.speak(cw.content, { rate: 0.9 }); } catch { /* ignore */ } }}
+                          <button data-press="soft" onClick={(e) => { e.stopPropagation(); try { tts.speak(cw.content, { rate: 0.9 }); } catch { /* ignore */ } }}
                             className="text-muted-foreground hover:text-ink-teal"><Volume2 className="size-4" /></button>
                         </div>
                         <p className="text-lg font-black text-foreground mt-2">{cw.meaning}</p>
@@ -940,7 +940,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
                               : '首次学习 · 答对后 1 天再见')}
                           {relearnUsed(cw.content) > 0 && ` · 本轮已重排 ${relearnUsed(cw.content)} 次`}
                         </div>
-                        <button
+                        <button data-press="strong"
                           onClick={(e) => { e.stopPropagation(); suspendCurrent(); }}
                           className="shrink-0 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
                           title="已会 / 不感兴趣 —— 从学习队列移除（可撤销）"
@@ -967,7 +967,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
             { q: 4, label: '比较熟悉', color: 'bg-emerald-500 hover:bg-emerald-600' },
             { q: 5, label: '完全掌握', color: 'bg-[#14B8A6] hover:bg-[#0d9488]' },
           ].map(({ q, label, color }, i) => (
-            <button key={q} onClick={() => markWithQuality(q)}
+            <button data-press="soft" key={q} onClick={() => markWithQuality(q)}
               className={cn('relative px-3 py-2 rounded-2xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg transition-all hover:scale-105', color)}>
               {label}
               <span className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-black/25 text-[8px] font-black flex items-center justify-center">{i + 1}</span>
@@ -990,9 +990,9 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
       {/* 回看态必须有**可点**的继续出口（原为纯 span，手机点不了 —— 与复习检测同批修） */}
       {viewingPast && (
         <div className="flex justify-center">
-          <button
+          <button data-press="soft"
             onClick={() => advance()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#14B8A6] text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-teal-200/50 transition-all hover:bg-[#0FA795] active:scale-[0.98]"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#14B8A6] text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-teal-200/50 transition-all hover:bg-[#0FA795]"
           >
             已评过的卡 · 继续
             <ChevronRight className="size-3.5" />

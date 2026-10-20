@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>按压词汇表 · 原型</title>
+<style>
+  /* ── 就是 spec 第 1 节那张表，一个数没改 ── */
+  :root{
+    --fx-strong: 0.970;      /* 主按钮按下缩放 */
+    --fx-soft:   0.985;      /* 次级 / 图标 / 标签 */
+    --fx-in:  110ms;         /* 按下 */
+    --fx-out: 170ms;         /* 抬起回弹（不用 spring） */
+    --fx-ripple: 420ms;      /* 涟漪扩散 */
+    --fx-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --bg:#ffffff; --ink:#0F172A; --muted:#64748B; --line:#E2E8F0; --soft:#F1F5F9;
+    --primary:#00B894; --violet:#6C5CE7; --warn:#F59E0B; --bad:#E1709C;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--soft);color:var(--ink);
+    font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;
+    display:flex;justify-content:center;padding:18px 0 40px}
+  .app{width:393px;background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:16px 14px}
+  h1{font-size:15px;font-weight:900;margin:0 0 2px}
+  .sub{font-size:10px;font-weight:700;color:var(--muted);margin:0 0 12px}
+  h2{font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .card{border:1px solid var(--line);border-radius:16px;padding:12px;background:var(--bg)}
+
+  /* ── 词汇层：只用独立 scale 属性，不写 transform（避免与既有 translate 互相覆盖）── */
+  [data-press]{position:relative;z-index:0;border:0;cursor:pointer;font:inherit;
+    scale:1;transition:scale var(--fx-out) var(--fx-ease),background-color 140ms linear}
+  [data-press]:active{scale:var(--s,var(--fx-soft));transition:scale var(--fx-in) var(--fx-ease)}
+  [data-press][data-s="strong"]{--s:var(--fx-strong)}
+  /* 现状对照：只压暗，不缩不涟漪 */
+  .old-only{transition:background-color 140ms linear}
+  .old-only:active{background-color:#CBD5E1}
+
+  .fx-primary{background:var(--primary);color:#fff;border-radius:16px;padding:10px 16px;font-weight:900;font-size:12px}
+  .fx-outline{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:9px 14px;font-weight:900;font-size:12px}
+  .fx-ghost{background:transparent;color:var(--muted);border-radius:14px;padding:8px;font-weight:900;font-size:12px}
+  .fx-chip{background:var(--soft);color:var(--ink);border-radius:999px;padding:5px 11px;font-size:10px;font-weight:900}
+  .fx-violet{background:var(--violet);color:#fff;border-radius:16px;padding:10px 18px;font-weight:900;font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+
+  /* ── 涟漪：装在自有宿主里，不给按钮加 overflow:hidden（那会掐掉焦点环与浮层）──
+     近景取证改过一次：0.16 的 currentColor 填充在深色实心按钮上几乎看不见（11/12 两张图），
+     所以改成"浓中心 + 一圈同步扩散的描边环"——描边比填充在饱和底上可读得多。 */
+  .fx-ripple-host{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none;z-index:0}
+  /* 涟漪颜色**不能用 currentColor**（桌面合成器截图复验出来的：浅底上它是深墨 → 像"变灰/禁用"；
+     深底上它是白 → 几乎看不见）。改成按宿主底色亮度自动挑墨/白两档，一次算完缓在元素上。 */
+  :root{--fx-ink-ripple:rgba(15,23,42,.10);--fx-light-ripple:rgba(255,255,255,.26)}
+  .fx-ripple{position:absolute;border-radius:9999px;transform:translate(-50%,-50%) scale(0);will-change:transform,opacity;
+    background:radial-gradient(circle,var(--fx-ink-ripple) 0 42%,transparent 66%);
+    animation:fx-ripple var(--fx-ripple) var(--fx-ease) forwards}
+  .fx-ripple.on-dark{background:radial-gradient(circle,var(--fx-light-ripple) 0 42%,transparent 66%)}
+  .fx-ripple::after{content:"";position:absolute;inset:0;border-radius:9999px;border:1.5px solid currentColor;opacity:.10}
+  @keyframes fx-ripple{0%{transform:translate(-50%,-50%) scale(0);opacity:1}70%{opacity:.62}100%{transform:translate(-50%,-50%) scale(1);opacity:0}}
+
+  /* ── 结果层图形件：全部合成器属性，零文字 ── */
+  .arc{width:34px;height:34px;transform:rotate(-90deg)}
+  .arc circle{fill:none;stroke-width:3.5;stroke-linecap:round}
+  .arc .bgc{stroke:var(--soft)}
+  .arc .fgc{stroke:var(--primary);stroke-dasharray:94.2;stroke-dashoffset:94.2;animation:arc-in 320ms var(--fx-ease) forwards}
+  @keyframes arc-in{to{stroke-dashoffset:var(--to,18)}}
+  .fly{animation:fly 180ms cubic-bezier(0.22,1,0.36,1) forwards}
+  @keyframes fly{to{transform:translateX(150%) translateY(-12px);opacity:0}}
+  .fly-back{animation:fly-back 180ms cubic-bezier(0.22,1,0.36,1) forwards}
+  @keyframes fly-back{to{transform:translateX(-150%) translateY(-12px);opacity:0}}
+  .shake{animation:shake 200ms linear}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+  .ring{position:relative;width:34px;height:34px}
+  .ring::after{content:"";position:absolute;inset:0;border-radius:9999px;border:2px solid var(--warn);
+    transform:scale(.4);opacity:.9;animation:ring 520ms var(--fx-ease) forwards}
+  @keyframes ring{to{transform:scale(1.35);opacity:0}}
+  .word{font-size:26px;font-weight:900;letter-spacing:-.01em}
+  .hint{font-size:10px;font-weight:700;color:var(--muted)}
+  #burst{position:fixed;inset:0;pointer-events:none;z-index:9}
+
+  /* ── 读数：让"响应 ≤100ms / 不掉帧"变成看得见的东西 ── */
+  .meter{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+  .m{border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+  .m b{display:block;font-size:17px;font-weight:900;font-variant-numeric:tabular-nums}
+  .m span{font-size:9px;font-weight:800;color:var(--muted);letter-spacing:.02em}
+  .ok{color:var(--primary)} .no{color:var(--bad)}
+  label.sw{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;color:var(--muted);margin-top:7px}
+  .track{width:38px;height:22px;border-radius:999px;background:var(--line);position:relative;transition:background-color 160ms linear;flex:0 0 auto}
+  .knob{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:999px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform 170ms var(--fx-ease)}
+  [aria-checked="true"] .track{background:var(--primary)}
+  [aria-checked="true"] .knob{transform:translateX(16px)}
+  /* 故意不做第 3 条：尊重系统的减少动效偏好 */
+  .rm [data-press],.rm .fx-ripple,.rm .arc .fgc,.rm .fly,.rm .fly-back,.rm .shake,.rm .ring::after{animation:none!important;transition:none!important;scale:1!important}
+  .rm .fx-ripple-host{display:none}
+</style>
+</head>
+<body>
+<canvas id="burst"></canvas>
+<div class="app" id="app">
+  <h1>按压词汇表 · 原型</h1>
+  <p class="sub">数值 = spec 第 1 节那张表：按下 110ms / 抬起 170ms / 涟漪 420ms / 0.970 与 0.985 / 同一条 cubic-bezier</p>
+
+  <div class="row">
+    <label class="sw" style="margin:0"><button class="fx-ghost" id="cmp" style="padding:4px 8px">现状对照（只压暗）</button></label>
+  </div>
+
+  <h2>① 五个控件 · 同一套词汇</h2>
+  <div class="row">
+    <button class="fx-primary" data-press data-s="strong">开始本轮</button>
+    <button class="fx-outline" data-press>返回概览</button>
+    <button class="fx-violet" data-press data-s="strong">去拼写</button>
+    <button class="fx-chip" data-press>四六级 · 高频</button>
+    <button class="fx-ghost" data-press aria-label="朗读">&#128266;</button>
+  </div>
+
+  <h2>② 开关：只有 translate，不与缩放打架</h2>
+  <div class="row">
+    <button class="fx-ghost" data-press id="sw1" role="switch" aria-checked="true" style="display:flex;align-items:center;gap:8px">
+      自动朗读<span class="track"><span class="knob"></span></span>
+    </button>
+    <button class="fx-ghost" data-press id="sw2" role="switch" aria-checked="false" style="display:flex;align-items:center;gap:8px">
+      只用离线音色<span class="track"><span class="knob"></span></span>
+    </button>
+  </div>
+
+  <h2>③ 卡面：结果不靠文字</h2>
+  <div class="card">
+    <div id="kfc" style="text-align:center;padding:6px 0 10px">
+      <div class="word">inevitable</div>
+      <div class="hint"> adj. 不可避免的 · 音标 /ɪnˈevɪtəbl/</div>
+    </div>
+    <div class="row" style="justify-content:center">
+      <button class="fx-chip" data-press id="r1">完全忘了</button>
+      <button class="fx-chip" data-press id="r2">有点印象</button>
+      <button class="fx-chip" data-press id="r3">基本记得</button>
+      <button class="fx-chip" data-press id="r4">很熟悉</button>
+    </div>
+    <div class="row" style="justify-content:center;margin-top:12px">
+      <svg class="arc" id="arc" viewBox="0 0 36 36"><circle class="bgc" cx="18" cy="18" r="15"/><circle class="fgc" cx="18" cy="18" r="15"/></svg>
+      <div class="ring" id="ring"><svg class="arc" viewBox="0 0 36 36"><circle class="bgc" cx="18" cy="18" r="15"/><circle cx="18" cy="18" r="15" fill="none" stroke="#F59E0B" stroke-width="3.5" stroke-dasharray="94.2" stroke-dashoffset="60"/></svg></div>
+      <button class="fx-outline" data-press id="again" style="font-size:11px;padding:6px 12px">重放这三个</button>
+      <span class="hint">← 收口弧 / 连击环 / 卡片飞走</span>
+    </div>
+    <p class="hint" style="margin:10px 0 0"><b>故意不做第 1 条</b>：卡面整张（滑动评分区）不给缩放 —— 它跟手势拖拽共存，按下一缩 + 手指一动就抖。</p>
+  </div>
+
+  <h2>④ 两个奖励时刻（程序化 canvas）</h2>
+  <div class="row">
+    <button class="fx-primary" data-press data-s="strong" id="c1" style="flex:1">本轮全对</button>
+    <button class="fx-outline" data-press id="c2" style="flex:1">连击达成 7</button>
+  </div>
+
+  <h2>⑤ 实测读数（这就是可证伪的那部分）</h2>
+  <div class="meter">
+    <div class="m"><b id="m1">—</b><span>pointerdown → 首帧（ms）</span></div>
+    <div class="m"><b id="m2">—</b><span>上帧间隔（ms）</span></div>
+    <div class="m"><b id="m3">0</b><span>在飞涟漪数（上限 3/元素）</span></div>
+    <div class="m"><b id="m4">0</b><span>键盘触发画出的涟漪</span></div>
+  </div>
+  <label class="sw"><input type="checkbox" id="rm"> 模拟 prefers-reduced-motion（涟漪与缩放全关，只剩压暗）</label>
+  <p class="hint" style="margin-top:8px"><b>故意不做第 2 条</b>：Tab 聚焦后按 Enter/Space 不画涟漪（没有触点坐标），只走 <code>:active</code> 缩放 —— 所以第 4 格必须是 0。用键盘按一次上面的按钮试试。</p>
+</div>
+
+<script>
+(function(){
+  var app=document.getElementById('app'), live=true, inflight=new WeakMap(), kbRipple=0;
+  var m1=el('m1'),m2=el('m2'),m3=el('m3'),m4=el('m4');
+  function el(i){return document.getElementById(i)}
+
+  /* 帧间隔探针：掉帧会在这一格里冒头（60fps ≈ 16.7ms） */
+  var last=performance.now(), worst=0;
+  (function tick(t){var d=t-last;last=t;if(d>worst)worst=Math.min(d,999);setTimeout(function(){requestAnimationFrame(tick)},0)})(last);
+
+  /* ── 词汇层唯一入口：一处事件委托，306 处裸按钮不用改代码 ── */
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  app.addEventListener('pointerdown',function(e){
+    if(!live) return;
+    var host=e.target.closest('[data-press]');
+    if(!host||host.disabled) return;
+    var t0=performance.now();
+    requestAnimationFrame(function(){ m1.textContent=Math.round(performance.now()-t0); m1.className=performance.now()-t0<=100?'ok':'no'; });
+    if(e.pointerType==='keyboard'){ /* 故意不做第 2 条 */ kbRipple++; m4.textContent=kbRipple; return; }
+    /* 降级要在这一层判，不是靠 CSS 藏：实测勾上 reduced-motion 后 DOM 里仍留了 1 个涟漪节点 */
+    if(reduce.matches||document.getElementById('app').parentElement.classList.contains('rm')) return;
+    ripple(host,e.clientX,e.clientY);
+  });
+
+  /* 底色亮度决定涟漪用墨还是用白；算一次缓在元素上（getComputedStyle 不便宜，别每次按下都算） */
+  function toneOf(node){
+    if(node.__fxTone) return node.__fxTone;
+    var c=getComputedStyle(node).backgroundColor||'', m=c.match(/[\d.]+/g), lum=null;
+    if(m&&m.length>=3&&!(m.length===4&&+m[3]===0)) lum=(0.299*(+m[0])+0.587*(+m[1])+0.114*(+m[2]))/255;
+    if(lum===null){ var up=node.parentElement; if(up&&up!==document.body) return toneOf(up); return 'light'; }
+    node.__fxTone = lum<0.55?'dark':'light';
+    return node.__fxTone;
+  }
+  function ripple(host,x,y){
+    var wrap=host.querySelector(':scope > .fx-ripple-host');
+    if(!wrap){ var r0=host.getBoundingClientRect();
+      if(r0.width<2||r0.height<2) return;          /* 拿不到尺寸就不画，绝不猜坐标 */
+      wrap=document.createElement('span'); wrap.className='fx-ripple-host'; host.appendChild(wrap); }
+    var box=host.getBoundingClientRect(), d=Math.max(box.width,box.height)*2.2;
+    var n=inflight.get(host)||0;
+    if(n>=3){ var old=wrap.firstElementChild; if(old) old.remove(); n--; }   /* 不无界增长 */
+    var s=document.createElement('span'); s.className='fx-ripple'+(toneOf(host)==='dark'?' on-dark':'');
+    s.style.left=(x-box.left)+'px'; s.style.top=(y-box.top)+'px';
+    s.style.width=s.style.height=d+'px';
+    s.addEventListener('animationend',function(){ s.remove(); inflight.set(host,(inflight.get(host)||1)-1); m3.textContent=count(); });
+    wrap.appendChild(s); inflight.set(host,n+1); m3.textContent=count();
+  }
+  function count(){ var c=0; document.querySelectorAll('.fx-ripple').forEach(function(x){ if(!x.finished||x.playState==='running') c++; }); return c; }
+  setInterval(function(){ m2.textContent=worst.toFixed(1); m2.className=worst<34?'ok':'no'; worst=0; },600);
+
+  /* 现状对照 */
+  document.getElementById('cmp').addEventListener('click',function(){
+    live=!live; this.style.opacity=live?'.55':'1';
+    document.querySelectorAll('[data-press]').forEach(function(b){
+      b.classList.toggle('old-only',!live); if(!live) b.setAttribute('data-nofx','1'); else b.removeAttribute('data-nofx');
+    });
+  });
+  document.getElementById('sw1').addEventListener('click',function(){ this.setAttribute('aria-checked',this.getAttribute('aria-checked')==='true'?'false':'true'); });
+  document.getElementById('sw2').addEventListener('click',function(){ this.setAttribute('aria-checked',this.getAttribute('aria-checked')==='true'?'false':'true'); });
+
+  /* ── 结果层：卡片飞走 / 收口弧 / 错点抖 / 连击环 ── */
+  var kfc=document.getElementById('kfc');
+  function fly(dir){ kfc.classList.remove('fly','fly-back'); void kfc.offsetWidth; kfc.classList.add(dir>0?'fly':'fly-back');
+    kfc.addEventListener('animationend',function h(){ kfc.classList.remove('fly','fly-back'); kfc.removeEventListener('animationend',h); },{once:true}); }
+  function arc(v){ var c=document.querySelector('#arc .fgc'); c.style.setProperty('--to',(94.2*(1-v))+''); c.style.animation='none'; void c.offsetWidth; c.style.animation=''; }
+  ['r1','r2','r3','r4'].forEach(function(id,i){ document.getElementById(id).addEventListener('click',function(){ fly(i<2?-1:1); arc([0.15,0.45,0.75,0.95][i]); if(i<2) shakeWord(); }); });
+  function shakeWord(){ var w=kfc.querySelector('.word'); w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake'); }
+  function ring(){ var r=document.getElementById('ring'); r.style.animation='none'; void r.offsetWidth; r.style.animation=''; }
+  document.getElementById('again').addEventListener('click',function(){ arc(0.75); ring(); setTimeout(function(){fly(1)},420); });
+
+  /* ── 奖励时刻：程序化 canvas。第一版从视口中心炸开、铺满全屏，把正文压住了（07 那张图），
+        所以改成**从触发元素中心**起、半径收在元素对角线内、只走一个色系、700ms 自己收干净。 ── */
+  var cv=document.getElementById('burst'), ctx=cv.getContext&&cv.getContext('2d');
+  document.getElementById('c1').addEventListener('click',function(){ burstFrom(this,'teal'); });
+  document.getElementById('c2').addEventListener('click',function(){ burstFrom(this,'amber'); });
+  function burstFrom(node,kind){
+    if(!ctx||!live) return;                     /* 拿不到 2d context 就 no-op，绝不回退成 toast */
+    if(reduce.matches||document.getElementById('app').parentElement.classList.contains('rm')) return;
+    var dpr=Math.min(devicePixelRatio||1,2), w=innerWidth, h=innerHeight;
+    cv.width=w*dpr; cv.height=h*dpr; cv.style.width=w+'px'; cv.style.height=h+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    var b=node.getBoundingClientRect(), ox=b.left+b.width/2, oy=b.top+b.height/2;
+    var R=Math.min(Math.hypot(b.width,b.height)*0.9,240);   /* 半径封顶：不许跑出这一块内容 */
+    var cols=kind==='amber'?['#F59E0B','#FBBF24','#FDE68A']:['#00B894','#4DD0B0','#99F6E4'];
+    var ps=[],N=46;
+    for(var i=0;i<N;i++){ var a=(i/N)*6.2832+Math.random()*0.4, sp=R*(0.55+Math.random()*0.6);
+      ps.push({x:ox,y:oy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-R*0.22,r:1.3+Math.random()*2.2,c:i%3,t:0}); }
+    var LIFE=0.7, t0=performance.now();
+    (function loop(t){
+      var dt=Math.min((t-t0)/1000,0.033),alive=0; ctx.clearRect(0,0,w,h);
+      ps.forEach(function(p){ p.t+=dt; if(p.t>LIFE)return; alive++;
+        p.vy+=380*dt; p.x+=p.vx*dt; p.y+=p.vy*dt;
+        ctx.globalAlpha=Math.max(0,1-p.t/LIFE); ctx.fillStyle=cols[+p.c];
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.2832); ctx.fill(); });
+      if(alive) requestAnimationFrame(loop); else ctx.clearRect(0,0,w,h);
+    })(t0);
+  }
+
+  document.getElementById('rm').addEventListener('change',function(){ document.body.classList.toggle('rm',this.checked); });
+})();
+</script>
+</body>
+</html>

@@ -215,7 +215,7 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
                   <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">本轮词数（已学 {learnedEntries.length} 词）</p>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {ROUND_SIZES.map((n) => (
-                      <button
+                      <button data-press="strong"
                         key={n}
                         onClick={() => setRoundSize(n)}
                         className={cn(
@@ -237,7 +237,7 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
                       { k: 'choice', label: '四选一', icon: ListChecks },
                       { k: 'spell', label: '拼写', icon: Keyboard },
                     ] as const).map(({ k, label, icon: Icon }) => (
-                      <button
+                      <button data-press="strong"
                         key={k}
                         onClick={() => setAnswerType(k)}
                         className={cn(
@@ -252,9 +252,9 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
                     ))}
                   </div>
                 </div>
-                <button
+                <button data-press="strong"
                   onClick={startRound}
-                  className="w-full py-3 rounded-2xl bg-sky-500 text-white text-sm font-black shadow-lg shadow-sky-200/50 hover:bg-sky-600 transition-all active:scale-[0.99]"
+                  className="w-full py-3 rounded-2xl bg-sky-500 text-white text-sm font-black shadow-lg shadow-sky-200/50 hover:bg-sky-600 transition-all"
                 >
                   开始中译英（{Math.min(roundSize === 0 ? learnedEntries.length : roundSize, learnedEntries.length)} 题）
                 </button>
@@ -291,13 +291,13 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
               </p>
             </div>
             <div className="flex items-center justify-center gap-2">
-              <button
+              <button data-press="strong"
                 onClick={() => { setStarted(false); setFinished(false); }}
                 className="px-5 py-2.5 rounded-2xl bg-sky-500 text-white text-xs font-black shadow-lg shadow-sky-200/50 hover:bg-sky-600"
               >
                 再来一轮
               </button>
-              <button
+              <button data-press="soft"
                 onClick={() => { setStarted(false); setFinished(false); }}
                 className="px-5 py-2.5 rounded-2xl bg-muted text-muted-foreground text-xs font-black hover:bg-muted/80"
               >
@@ -314,7 +314,7 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
                   : <X className="size-3.5 text-rose-400 shrink-0" />}
                 <span className="text-[11px] font-black italic text-foreground">{w.word}</span>
                 <span className="text-[10px] text-muted-foreground truncate flex-1">{w.meaning}</span>
-                <button onClick={() => tts.speak(w.word, { rate: 0.9 })} className="shrink-0 text-muted-foreground hover:text-ink-teal" title="朗读">
+                <button data-press="soft" onClick={() => tts.speak(w.word, { rate: 0.9 })} className="shrink-0 text-muted-foreground hover:text-ink-teal" title="朗读">
                   <Volume2 className="size-3.5" />
                 </button>
               </div>
@@ -333,14 +333,14 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
     <div className="space-y-4">
       {/* 顶栏：返回 / 进度 / 正确数 / 切作答形式 */}
       <div className="flex items-center gap-2">
-        <button onClick={() => { setStarted(false); setFinished(false); }} className="p-2 rounded-xl bg-muted text-muted-foreground hover:bg-muted/80" title="返回">
+        <button data-press="soft" onClick={() => { setStarted(false); setFinished(false); }} className="p-2 rounded-xl bg-muted text-muted-foreground hover:bg-muted/80" title="返回">
           <ArrowLeft className="size-4" />
         </button>
         <span className="text-xs font-black text-muted-foreground tabular-nums">{answered}/{queue.length}</span>
         <span className="text-xs font-black text-emerald-500 tabular-nums">✓{goodCount}</span>
         <div className="ml-auto flex items-center gap-1.5">
           {([['choice', ListChecks, '四选一'], ['spell', Keyboard, '拼写']] as const).map(([k, Icon, label]) => (
-            <button
+            <button data-press="strong"
               key={k}
               onClick={() => setAnswerType(k)}
               className={cn(
@@ -373,7 +373,7 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
                 )}
                 {/* 手动朗读：听音拼写/校对 —— 用户主动点，不算泄露答案 */}
                 {!revealed && (
-                  <button
+                  <button data-press="soft"
                     onClick={() => tts.speak(cw.word, { rate: 0.9 })}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 text-muted-foreground text-[10px] font-black hover:bg-muted"
                     title="朗读单词（听音辅助拼写）"
@@ -389,7 +389,7 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
                     const isCorrect = normalize(opt) === normalize(cw.word);
                     const isChosen = chosen === opt;
                     return (
-                      <button
+                      <button data-press="strong"
                         key={opt}
                         onClick={() => submitChoice(opt)}
                         disabled={revealed}
@@ -429,7 +429,7 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
                   />
                   {!revealed && (
                     <>
-                      <button
+                      <button data-press="strong"
                         onClick={submitSpell}
                         disabled={!typed.trim()}
                         className="w-full py-2.5 rounded-2xl bg-sky-500 text-white text-xs font-black hover:bg-sky-600 disabled:opacity-40"
@@ -437,7 +437,7 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
                         提交（Enter）
                       </button>
                       {/* 不会的出口：按答错计（q1），亮出答案后照常前进 —— 拼写卡不许有死路 */}
-                      <button
+                      <button data-press="strong"
                         onClick={() => settle(false)}
                         className="w-full py-2 rounded-2xl border border-dashed border-border text-muted-foreground text-[10px] font-black hover:bg-muted/40"
                       >
@@ -469,7 +469,7 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
                       {results[idx] !== true && (
                         <span className="text-base font-black italic text-foreground">{cw.word}</span>
                       )}
-                      <button onClick={() => tts.speak(cw.word, { rate: 0.9 })} className="ml-auto text-muted-foreground hover:text-ink-teal" title="朗读">
+                      <button data-press="soft" onClick={() => tts.speak(cw.word, { rate: 0.9 })} className="ml-auto text-muted-foreground hover:text-ink-teal" title="朗读">
                         <Volume2 className="size-4" />
                       </button>
                     </div>
@@ -481,9 +481,9 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
                       </p>
                     )}
                   </div>
-                  <button
+                  <button data-press="strong"
                     onClick={next}
-                    className="w-full py-3 rounded-2xl bg-sky-500 text-white text-sm font-black shadow-lg shadow-sky-200/50 hover:bg-sky-600 transition-all active:scale-[0.99]"
+                    className="w-full py-3 rounded-2xl bg-sky-500 text-white text-sm font-black shadow-lg shadow-sky-200/50 hover:bg-sky-600 transition-all"
                   >
                     {idx + 1 >= queue.length ? '看结果' : '下一个'}（Enter）
                   </button>

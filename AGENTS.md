@@ -44,10 +44,11 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 视频精听 `/video` | [modules/video-lab.md](./docs/modules/video-lab.md) | 导入字幕（+可选媒体）逐句学：SRT/VTT/转录 JSON 三解析、IDB `media` 独立表三键分片、索引封顶连媒体一起删、点词查词、跟读用 LCS 且**无识别通道时不许假分数**、AI 双语三档降级、**三形态统一走导入（不接本机转录服务）** |
 | 首页 / 记录 / 收藏 / 备份 | [modules/dashboard-progress-favorites.md](./docs/modules/dashboard-progress-favorites.md) | 每日一句、分项重置、收藏判重口径、三张首页横幅（待复习 / 纠偏待重考 + `?tab=` 深链）；整书译文随备份导出由 `verify:backup-idb` 守 |
 | 外壳与导航 | [modules/shell-and-navigation.md](./docs/modules/shell-and-navigation.md) | 启动顺序、双层 ErrorBoundary、预取时机、**新增页面实际是六处** |
+| 交互反馈层（跨模块） | [modules/interaction-fx.md](./docs/modules/interaction-fx.md) | 全站"按下去有什么反应"的唯一答案：按压词汇（`scale` 独立属性 / 两档涟漪按底色挑色）、结果图形件（纯 CSS，不碰 motion）、奖励时刻（唯一 canvas 出口）、reduce 在委托层判 |
 | 存储与学习统计 | [modules/storage-and-stats.md](./docs/modules/storage-and-stats.md) | 四套存储、safeStorage 前缀自愈、`addStudyMinutes` 真实语义、同步边界 |
 | 云同步与账号 | [modules/cloud-sync.md](./docs/modules/cloud-sync.md) | 两条上行口径不同；回声抑制/失败提示/按需补推由 `verify:cloud-sync` 守；下行重读订阅收进 `sync-down.ts`（13 个 hook 已接；三个模块缓存库的重读必须先作废缓存） |
 | 构建与发布 | [modules/build-release.md](./docs/modules/build-release.md) | 脚本地图与重复 bump、**缺资产静默出残包**、APK 版本线与产物命名、产物版本核对走构建期 meta |
-| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 27 条可跑的契约守卫（含元守卫 `verify-guard-shape`：扫守卫自身的恒真断言）+ verify:all 全量跑法 + 无头 Chrome/CDP + 真机通道 + **电脑侧 AVD 模拟器通道**（`scripts/phone-emu.mjs`）+ 写守卫四条硬规矩 |
+| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 29 条可跑的契约守卫（含元守卫 `verify-guard-shape`：扫守卫自身的恒真断言）+ verify:all 全量跑法 + 无头 Chrome/CDP + 真机通道 + **电脑侧 AVD 模拟器通道**（`scripts/phone-emu.mjs`）+ 写守卫四条硬规矩 |
 
 ---
 
@@ -123,6 +124,7 @@ node scripts/verify-ai-parse.mjs                  # 10   AI 解析约定：25 �
 node scripts/verify-dashboard-glance.mjs            # 25   首页内容扩展：续学标签表穷举（/sentences 漏过）+ 三张横幅 0 义务整卡不渲染（待复习 / 纠偏待重考，行门控含第三张）+ 本周柱状日期与高度 + ?tab= 深链三道门（只认 MODES key / 不强进向导 / 走 enterMode 并抹参数）
 node scripts/verify-correction-notes.mjs            # 90   表达纠偏本：Markdown 表格抽取真跑（三源列序/表头噪声/错=对跳过）+ store 整段真跑（去重/review 记账/删除/只拒不裁/写失败可见）+ orderForDrill 排序真跑 + 三处收集接线 + 收藏页折叠列表 + 第 9 模式接线总闸（MODES 每个 key 必须有 TabsContent）与重考卡面契约（不写 SM-2、零 toast、干扰项取自整本）+ ⑦ 送进句子拼写（correctionToSpellingItem 真跑、两处入口接线、纠偏桶不许走词库加载路、空收藏也要有纠偏本入口）+ ⑨ 错点归纳（十类规则各自命中、规则顺序与证据优先级两条口径、计数之和=条目数、两处按类筛选接线）
 node scripts/verify-guard-shape.mjs                 # 7    元守卫：AST 扫全部 verify-*.mjs，抓"恒真断言"（`ok(/re/, src, name)` 这种第一实参是字面量本体的写法）与漏名字的断言；自带双向自证 + inspectedTotal 防空转
+node scripts/verify-interaction-fx.mjs              # 65   交互反馈层：token 单点定义与数值、缩放必须走独立 `scale`（含反向断言）、transition 白名单要带颜色项（否则顶掉 hover 变色）、9 个练习面不许有 ad-hoc active:scale 且 data-press 覆盖数只许涨、基座档位由 variant 推导、委托层四条边界（键盘不画/reduce 不建节点/无尺寸不画/在飞上限 3）、涟漪两档不许回到 currentColor、奖励层全仓唯一出口、结果层不引 motion 不弹 toast、闪卡接线 4 条（含两条正对照）。⚠️ 变异 M3/M11 第一次是绿的（断言假绿），改钉"顺序"与"cleanup 两件事"才真红
 node scripts/verify-app-version.mjs                 # 11   版本号单一载体：meta 注入链路 + 产物一致性（产物段先 build:web）
 node scripts/verify-brand-fonts.mjs                 # 26   品牌资产自托管：字体与 favicon 外链零残留 + woff2 结构自洽 + 生效栈正对照（产物段先 build:web）
 npm run verify:rv-articles                        # 104  复习词汇文章：选词/分篇/覆盖出队/体裁主题/原位重写（含旧 slice(0,10) 正对照）
@@ -158,6 +160,8 @@ node scripts/phone-emu.mjs install           # 装 NativeThink-emu-x86_64.apk（
 node scripts/phone-emu.mjs launch && node scripts/phone-emu.mjs smoke
 node scripts/walk-phone.mjs                # 装机四条走查（4 收藏 + 5 纠偏夹具，含"四级 6827 句 vs 纠偏 1 句"正对照）
 node scripts/walk-video.mjs --port 9226 --base https://localhost   # 视频精听 56 条走查在 APK 上重跑（本机版：--port 9222 --base http://127.0.0.1:8001）
+node scripts/walk-interaction-fx.mjs              # 交互层 12 条运行时走查（无头 Chrome）：pointerdown→下一帧毫秒、按下前后 rect 逐位相等、涟漪自清、键盘不画、reduce 不建节点、连点上限、奖励 canvas 唯一
+node scripts/check-interaction-on-phone.mjs --port 9223   # 真机按压词汇 8 条：用 CDP Input.dispatchTouchEvent 发**真触摸**量 scale 真变了（合成事件不产生激活，:active 不生效，电脑侧量不到这一条）+ 抬手回 1 + 涟漪自清
 node scripts/probe-real-media.mjs [--media 路径 --subs 路径 --short-subs 路径]   # 视频精听 52 条（两遍×26）：真媒体（blob→IDB→<video> 解码→逐词高亮→**停在中段时当前句正是那一句**→A-B 越过出点真回跳→单句与 A-B 双向互斥→学习时长按课分键 0.2→0.3→0.3→换页读回→两段式删除清干净 + **吸顶悬浮的几何判据**（这一屏收在一屏内由自己的框滚、两个不同 scrollTop 下 sticky 元素 top 一致、画面缩档、滑回顶部复原、吸住时点词释义卡整张落在播放器下方））+ 负对照（同一段媒体配一份短得多的字幕 → 必须说破假时长）；素材自动拷进 dist/client/__probe__/，期望时长与句数现算
 node scripts/check-video-lab-packs.mjs [目录名关键字]   # 逐课**实测**素材包能不能用：ffprobe 读画面轨/音轨/媒体末秒 + 那份 JSON 的字幕末秒与句数 + ffmpeg volumedetect 峰值。判红四条：没画面轨（用户硬要求）、没音轨或峰值< -60dB、字幕比媒体长（播放器空转）、媒体比字幕长 >3s（片尾空白会被当成"时间线乱跳"）。当前二十二课全绿（07-22 为真实新闻/演讲/对话/纪录片/长访谈/发布会问答），差值 0–2 秒；18 课是源被平台截断的前 10 分钟，说明里已写破
 node scripts/make-video-lab-packs.mjs [--add 名字关键字 [--dir 目录 --title 标题 --note 说明]] [--model small]   # 把转录伴侣的产物做成可导入的素材包（**无画面轨直接拒绝出包**；有画面的统一压到 ≤480p H.264 + faststart 并裁到字幕区间；已裁好的成品媒体会被沿用；+ 质检数字），输出 B:/nt-materials/video-lab
@@ -335,13 +339,14 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening 21 · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · **video-lab 154** · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit **80** · chain-verdict 36 · dashboard-glance 25 · correction-notes **90** · guard-shape **7**；合计 **7,924**，2026-10-19 第 46 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening 21 · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · **video-lab 154** · ai-parse 10 · app-version 11 · brand-fonts 26 · char-hygiene 9 · rv-articles 104 · study-credit **80** · chain-verdict 36 · dashboard-glance 25 · correction-notes **90** · guard-shape **7** · **interaction-fx 65**；合计 **7,989**，2026-10-20 第 47 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs` + `node scripts/verify-char-hygiene.mjs`（清了坏字符还要递增 `CACHE_VERSION`，否则老缓存挡住修复）
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过 `android/app/build.gradle` 的 `abiFilters` 或任何打包脚本 → 至少跑一次 `npm run package:apk:emu`（它收尾会读 APK 自己的 zip 中央目录自证：x86_64 的 sherpa `.so` 在、www/books/piper/tts 资产在、arm 0 条）；模拟器装机走 `node scripts/phone-emu.mjs check`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级**或内置引擎的入队顺序** → `verify-tts-hardening`（裸跑，它没有 npm script）；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`
 - [ ] 改过 `ui/dialog` 基座或设置面板 → `verify-overlay-fit`
+- [ ] 改过 `src/index.css` 的 `--fx-*` 段 / `ui/button` 基座 / `lib/press-fx.ts` / `CelebrateLayer` / 任何练习页的按钮 class → `node scripts/verify-interaction-fx.mjs` + `node scripts/walk-interaction-fx.mjs`（改基座=全站共享，务必再跑 `verify:all`）；真机侧凭据走 `node scripts/check-interaction-on-phone.mjs`（**只有 CDP 真触摸才会触发 `:active`**，合成事件不产生激活）
 - [ ] 改过 `functions/` → 想清楚网页/APK/桌面三条路；改过 index.html 版本 meta 或 `version.properties` → `node scripts/verify-app-version.mjs`（产物段先 build:web）
 - [ ] 改过 index.html 的字体/图标引用或 `public/fonts/` → `node scripts/verify-brand-fonts.mjs`（产物段先 build:web；**不许再引入外链字体域名与 icon**）
 - [ ] 新增/修改模块行为 → 同步更新 `docs/modules/` 对应那篇（**带 `文件:行号`**）

@@ -426,7 +426,7 @@ export default function ChunkFlashcards({ allChunks }: { allChunks: IChunk[] }) 
               onClick={() => { if (!revealed) setRevealed(true); }}
               className={cn(
                 'rounded-[32px] border-2 shadow-lg transition-all min-h-[220px] flex flex-col justify-center',
-                !revealed && 'cursor-pointer active:scale-[0.995]',
+                !revealed && 'cursor-pointer',   /* 卡面整张不给按压缩放：它和手势拖拽共存，缩一下 + 手指一动就抖 */
                 revealed
                   ? 'border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/10'
                   : 'border-border bg-card',
@@ -477,10 +477,11 @@ export default function ChunkFlashcards({ allChunks }: { allChunks: IChunk[] }) 
       {/* 操作按钮 */}
       <div className="flex justify-center gap-3">
         <button
+          data-press="soft"
           onClick={prev}
           disabled={idx === 0}
           className={cn(
-            'shrink-0 px-4 py-4 rounded-2xl border-2 border-border text-muted-foreground font-black text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5',
+            'shrink-0 px-4 py-4 rounded-2xl border-2 border-border text-muted-foreground font-black text-sm flex items-center justify-center gap-1.5',
             idx === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:border-amber-400/40 hover:text-amber-600',
           )}
           title="上一个 (Backspace)"
@@ -488,20 +489,23 @@ export default function ChunkFlashcards({ allChunks }: { allChunks: IChunk[] }) 
           <ChevronLeft className="size-4" />上一个
         </button>
         <button
+          data-press="strong"
           onClick={handleUnknown}
-          className="flex-1 max-w-[150px] py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+          className="flex-1 max-w-[150px] py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-lg flex items-center justify-center gap-2"
         >
           <X className="size-4" />不认识 <span className="text-[9px] opacity-70">1</span>
         </button>
         <button
+          data-press="strong"
           onClick={handleFuzzy}
-          className="flex-1 max-w-[130px] py-4 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-black text-sm shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+          className="flex-1 max-w-[130px] py-4 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-black text-sm shadow-lg flex items-center justify-center gap-2"
         >
           模糊 <span className="text-[9px] opacity-70">2</span>
         </button>
         <button
+          data-press="strong"
           onClick={handleKnown}
-          className="flex-1 max-w-[150px] py-4 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+          className="flex-1 max-w-[150px] py-4 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg flex items-center justify-center gap-2"
         >
           <Check className="size-4" />认识 <span className="text-[9px] opacity-70">→</span>
         </button>

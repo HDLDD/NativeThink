@@ -968,7 +968,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               const lc = LEVEL_COLORS[l.key] || LEVEL_COLORS.all;
               const active = level === l.key;
               return (
-                <button
+                <button data-press="soft"
                   key={l.key}
                   onClick={() => handleLevelChange(l.key)}
                   className={cn(
@@ -1017,7 +1017,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
       <Card className="rounded-2xl border-border shadow-sm">
         <CardContent className="p-3 space-y-3">
           {/* 摘要行（始终显示） */}
-          <button
+          <button data-press="soft"
             className="w-full flex items-center justify-between gap-2 group"
             onClick={() => setSetupOpen((v) => !v)}
           >
@@ -1039,7 +1039,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                 const mc = MODE_COLORS[key];
                 const active = reviewMode === key;
                 return (
-                  <button
+                  <button data-press="soft"
                     key={key}
                     onClick={() => handleModeChange(key)}
                     className={cn(
@@ -1067,7 +1067,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               </span>
               <div className="flex items-center gap-1">
                 {[10, 20, 50, 100, 200].map((n) => (
-                  <button
+                  <button data-press="strong"
                     key={n}
                     onClick={() => setDailyQuota(n)}
                     className={cn(
@@ -1154,9 +1154,9 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
             <span className="shrink-0 text-[9px] font-black uppercase tracking-wider text-muted-foreground/70">
               上一个单词
             </span>
-            <button
+            <button data-press="strong"
               onClick={() => setDetailWord(prevWord)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-border bg-card max-w-[62%] transition-colors hover:border-[#00B894]/40 hover:bg-[#00B894]/5 active:scale-[0.98]"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-border bg-card max-w-[62%] transition-colors hover:border-[#00B894]/40 hover:bg-[#00B894]/5"
               title={`查看「${prevWord.word}」详情`}
             >
               <ChevronLeft className="size-3 shrink-0 text-muted-foreground" />
@@ -1263,7 +1263,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                                     const zh = collocZh(c);
                                     return (
                                       <div key={c} className="flex items-center justify-center gap-2 text-center">
-                                        <button
+                                        <button data-press="soft"
                                           onClick={(e) => { e.stopPropagation(); tts.speak(c, { rate: 0.85 }); }}
                                           className="text-sm font-bold text-ink-violet hover:underline underline-offset-2 transition-colors"
                                           title="朗读搭配"
@@ -1273,7 +1273,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                                         {zh ? (
                                           <span className="text-xs text-muted-foreground">{zh}</span>
                                         ) : (
-                                          <button
+                                          <button data-press="soft"
                                             onClick={(e) => { e.stopPropagation(); translateCollocBatch(currentWord.collocations.slice(0, 3)); }}
                                             className="text-[9px] font-bold text-muted-foreground/60 hover:text-ink-teal transition-colors shrink-0"
                                             title="AI 翻译该搭配"
@@ -1290,7 +1290,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
 
                             {/* 不再出现出口 —— 与复习检测对齐：熟练用户被简单词反复占时间的出口 */}
                             <div className="pt-3 border-t border-indigo-100 dark:border-indigo-500/20">
-                              <button
+                              <button data-press="soft"
                                 onClick={(e) => { e.stopPropagation(); suspendCurrent(); }}
                                 className="text-[9px] font-black uppercase tracking-wider text-muted-foreground hover:text-rose-500 transition-colors"
                                 title="已会 / 不感兴趣 —— 移出学习队列（可撤销）"
@@ -1316,7 +1316,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                     { q: 4, label: '比较熟悉', color: 'bg-emerald-500 hover:bg-emerald-600' },
                     { q: 5, label: '完全掌握', color: 'bg-[#00B894] hover:bg-[#00A080]' },
                   ].map(({ q, label, color }, i) => (
-                    <button key={q} onClick={() => handleRate(q)}
+                    <button data-press="soft" key={q} onClick={() => handleRate(q)}
                       className={cn('relative px-3 py-2 rounded-2xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg transition-all hover:scale-105', color)}>
                       {label}
                       <span className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-black/25 text-[8px] font-black flex items-center justify-center">{i + 1}</span>
@@ -1370,7 +1370,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                         borderClass = 'border-[#00B894] bg-[#00B894]/5';
                       }
                       return (
-                        <button
+                        <button data-press="soft"
                           key={opt.word}
                           onClick={() => handleChoiceSelect(opt.word)}
                           disabled={!!choiceSelected}
@@ -1541,9 +1541,9 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                   </p>
 
                   <div className="flex flex-col items-center gap-4 mb-6">
-                    <button
+                    <button data-press="strong"
                       onClick={() => tts.speak(currentWord.word, { rate: 0.85 })}
-                      className="size-20 rounded-3xl bg-gradient-to-br from-[#6C5CE7] to-violet-400 text-white flex items-center justify-center shadow-lg hover:scale-105 transition-transform active:scale-95"
+                      className="size-20 rounded-3xl bg-gradient-to-br from-[#6C5CE7] to-violet-400 text-white flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
                     >
                       <Headphones className="size-9" />
                     </button>
@@ -1679,7 +1679,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                         const isMatched = matchedWordSet.has(word);
                         const isSelected = selectedMatchWord === word;
                         return (
-                          <button
+                          <button data-press="strong"
                             key={word}
                             onClick={() => handleMatchSelectWord(word)}
                             disabled={isMatched}
@@ -1705,7 +1705,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                         const isError = matchFlashError === meaning;
                         const isSelected = selectedMatchMeaning === meaning;
                         return (
-                          <button
+                          <button data-press="strong"
                             key={meaning}
                             onClick={() => handleMatchSelectMeaning(meaning)}
                             disabled={isMatched}

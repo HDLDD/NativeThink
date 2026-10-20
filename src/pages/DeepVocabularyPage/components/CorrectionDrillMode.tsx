@@ -154,7 +154,7 @@ export default function CorrectionDrillMode() {
                 {/* 按错点类别限定重考：一类犯了好几次，就集中把这一类认透 */}
                 {drillSummaries.length >= 2 && (
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <button
+                    <button data-press="strong"
                       onClick={() => setDrillCat(null)}
                       className={cn('px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
                         drillCat === null ? 'border-orange-400/60 bg-orange-500/10 text-orange-600' : 'border-border text-muted-foreground hover:bg-muted/50')}
@@ -162,7 +162,7 @@ export default function CorrectionDrillMode() {
                       全部 {notes.length}
                     </button>
                     {drillSummaries.map((s) => (
-                      <button
+                      <button data-press="strong"
                         key={s.category}
                         onClick={() => setDrillCat((cur) => (cur === s.category ? null : s.category))}
                         className={cn('px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
@@ -177,9 +177,9 @@ export default function CorrectionDrillMode() {
                 {drillCat && (
                   <p className="text-[10px] font-bold text-orange-600 leading-relaxed">{CATEGORY_TIPS[drillCat]}</p>
                 )}
-                <button
+                <button data-press="strong"
                   onClick={start}
-                  className="w-full py-3 rounded-2xl bg-orange-500 text-white text-sm font-black shadow-lg shadow-orange-200/50 hover:bg-orange-600 transition-all active:scale-[0.99]"
+                  className="w-full py-3 rounded-2xl bg-orange-500 text-white text-sm font-black shadow-lg shadow-orange-200/50 hover:bg-orange-600 transition-all"
                 >
                   开始重考（{drillPool.length} 题）
                 </button>
@@ -194,7 +194,7 @@ export default function CorrectionDrillMode() {
                     </div>
                   ))}
                   {drillPool.length > 5 && (
-                    <button
+                    <button data-press="soft"
                       onClick={() => setShowAll((v) => !v)}
                       className="w-full py-1.5 rounded-xl border border-dashed border-border text-[10px] font-black text-muted-foreground hover:bg-muted/40"
                     >
@@ -245,7 +245,7 @@ export default function CorrectionDrillMode() {
               </div>
             )}
             <div className="flex items-center justify-center gap-2">
-              <button
+              <button data-press="strong"
                 onClick={() => { setStarted(false); setFinished(false); }}
                 className="px-5 py-2.5 rounded-2xl bg-orange-500 text-white text-xs font-black shadow-lg shadow-orange-200/50 hover:bg-orange-600"
               >
@@ -280,7 +280,7 @@ export default function CorrectionDrillMode() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <button
+        <button data-press="soft"
           onClick={() => { setStarted(false); setFinished(false); }}
           className="p-2 rounded-xl bg-muted text-muted-foreground hover:bg-muted/80" title="返回"
         >
@@ -316,7 +316,7 @@ export default function CorrectionDrillMode() {
                   const isCorrect = opt === cw.right;
                   const isChosen = chosen === opt;
                   return (
-                    <button
+                    <button data-press="strong"
                       key={opt}
                       onClick={() => submit(opt)}
                       disabled={revealed}
@@ -367,16 +367,16 @@ export default function CorrectionDrillMode() {
                       );
                     })()}
                   </div>
-                  <button
+                  <button data-press="strong"
                     onClick={next}
-                    className="w-full py-3 rounded-2xl bg-orange-500 text-white text-sm font-black shadow-lg shadow-orange-200/50 hover:bg-orange-600 transition-all active:scale-[0.99]"
+                    className="w-full py-3 rounded-2xl bg-orange-500 text-white text-sm font-black shadow-lg shadow-orange-200/50 hover:bg-orange-600 transition-all"
                   >
                     {idx + 1 >= queue.length ? '看结果' : '下一个'}（Enter）
                   </button>
                   {/* 认出 ≠ 写得出：把这句地道说法送进句子拼写。练习界面零提示口径 ——
                       反馈挂在按钮自己的态上（在库里就变样），不弹 toast。 */}
                   <div className="flex gap-2">
-                    <button
+                    <button data-press="strong"
                       onClick={() => addSentence(correctionToSpellingItem(cw))}
                       disabled={inSpellingLib}
                       className={cn(
@@ -390,7 +390,7 @@ export default function CorrectionDrillMode() {
                       <Keyboard className="size-3.5 inline mr-1" />
                       {inSpellingLib ? '已进句子拼写' : '拼写这句'}
                     </button>
-                    <button
+                    <button data-press="strong"
                       onClick={() => navigate('/spelling')}
                       className="flex-1 py-2.5 rounded-2xl border-2 border-border bg-muted/30 text-[11px] font-black hover:border-sky-400/50 hover:bg-sky-500/5 transition-all"
                       title="打开句子拼写（词库下拉里选「纠偏表达」）"

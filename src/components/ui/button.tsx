@@ -50,17 +50,30 @@ function Button({
   variant,
   size,
   asChild = false,
+  fx,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    /** 按压词汇档位：默认按 variant 挑（实心=strong，其余=soft）；"none" 完全不参与 */
+    fx?: "strong" | "soft" | "none"
   }) {
   const Comp = asChild ? Slot : "button"
+  /**
+   * 词汇本身在 index.css（`[data-press]` + `--fx-*`），涟漪在 press-fx 的一处事件委托里。
+   * asChild 时不能往别人家的节点里塞涟漪宿主，所以只留缩放。
+   */
+  const tone = fx ?? ((variant === "default" || variant === "destructive") ? "strong" : "soft")
+  const fxA = fx === "none" ? {} : {
+    "data-press": tone,
+    ...(asChild ? { "data-fx-ripple": "0" } : {}),
+  }
 
   return (
     <Comp
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      {...fxA}
       {...props}
     />
   )

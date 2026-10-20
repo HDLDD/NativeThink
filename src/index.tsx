@@ -6,6 +6,8 @@ import { AuthProvider } from "./lib/auth-provider";
 import CloudSyncProvider from "./components/CloudSyncProvider";
 import { FocusModeProvider } from "./lib/focus-mode";
 import { Toaster } from "@/components/ui/sonner";
+import CelebrateLayer from "./components/CelebrateLayer";
+import { initPressFx } from "./lib/press-fx";
 import App from "./app";
 import "./index.css";
 import { checkBundledEngineHealth } from "./lib/sherpa-tts";
@@ -13,6 +15,8 @@ import { checkBundledEngineHealth } from "./lib/sherpa-tts";
 // 内置朗读引擎是原生代码，崩起来直接杀进程 —— 启动时检查上次是否崩过，
 // 崩过就自动停用它（朗读回退到系统/云端），避免反复闪退。
 checkBundledEngineHealth();
+// 按压词汇的涟漪：一处事件委托覆盖全站 306 处裸 <button>，必须在 createRoot 之前挂上
+initPressFx();
 
 /** Simple error fallback — works on all platforms without Lark dependencies */
 function GlobalErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
@@ -97,6 +101,8 @@ createRoot(document.getElementById("root")!).render(
         mobileOffset={{ top: 'calc(env(safe-area-inset-top, 0px) + 84px)', right: 12, left: 12 }}
       />
       <SafeShell>
+        {/* 奖励时刻的唯一出口（与 <Toaster /> 同层）：页面只调 celebrate()，不各自引 canvas */}
+        <CelebrateLayer />
         <FocusModeProvider>
         <AuthProvider>
           <CloudSyncProvider>

@@ -915,7 +915,8 @@ export default function QuickCardMode({ level }: { level: string }) {
           </span>
           <button
             onClick={() => setDetailWord(prevWord)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-border bg-card max-w-[62%] transition-colors hover:border-[#00B894]/40 hover:bg-[#00B894]/5 active:scale-[0.98]"
+            data-press="soft"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-border bg-card max-w-[62%] transition-colors hover:border-[#00B894]/40 hover:bg-[#00B894]/5"
             title={`查看「${prevWord.word}」详情`}
           >
             <ChevronLeft className="size-3 shrink-0 text-muted-foreground" />
@@ -969,7 +970,7 @@ export default function QuickCardMode({ level }: { level: string }) {
               onClick={() => { if (!revealed) setRevealed(true); }}
               className={cn(
                 'rounded-[32px] border-2 shadow-lg transition-all min-h-[220px] flex flex-col justify-center',
-                !revealed && 'cursor-pointer active:scale-[0.995]',
+                !revealed && 'cursor-pointer',   /* 卡面整张不给按压缩放：它和手势拖拽共存，缩一下 + 手指一动就抖 */
                 revealed ? 'border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/10' : 'border-border bg-card',
               )}
             >
@@ -1063,10 +1064,11 @@ export default function QuickCardMode({ level }: { level: string }) {
       {/* 三个操作：上一个 / 不认识 / 认识 */}
       <div className="flex justify-center gap-3">
         <button
+          data-press="soft"
           onClick={prev}
           disabled={idx === 0}
           className={cn(
-            'shrink-0 px-4 py-4 rounded-2xl border-2 border-border text-muted-foreground font-black text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5',
+            'shrink-0 px-4 py-4 rounded-2xl border-2 border-border text-muted-foreground font-black text-sm flex items-center justify-center gap-1.5',
             idx === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:border-[#00B894]/40 hover:text-ink-teal',
           )}
           title="上一个 (Backspace)"
@@ -1074,14 +1076,16 @@ export default function QuickCardMode({ level }: { level: string }) {
           <ArrowLeft className="size-4" />上一个
         </button>
         <button
+          data-press="strong"
           onClick={markUnknown}
-          className="flex-1 max-w-[150px] py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+          className="flex-1 max-w-[150px] py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-lg flex items-center justify-center gap-2"
         >
           <X className="size-4" />不认识 <span className="text-[9px] opacity-70">1</span>
         </button>
         <button
+          data-press="strong"
           onClick={markKnown}
-          className="flex-1 max-w-[150px] py-4 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+          className="flex-1 max-w-[150px] py-4 rounded-2xl bg-[#00B894] hover:bg-[#00a882] text-white font-black text-sm shadow-lg flex items-center justify-center gap-2"
         >
           <Check className="size-4" />认识 <span className="text-[9px] opacity-70">2</span>
         </button>

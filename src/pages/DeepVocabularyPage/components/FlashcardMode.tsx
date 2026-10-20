@@ -19,6 +19,8 @@ import { cn, cleanText } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTTS } from '@/lib/use-tts';
 import { sfxComplete } from '@/lib/sfx';
+import { celebrate } from '@/lib/celebrate';
+import { StreakRing } from '@/components/fx/ResultFx';
 import { decideSwipe, SWIPE_THRESHOLD } from '@/lib/vocab-swipe';
 import { createSessionOrder, scheduleRelearn, nextIndex, forecastByDay, MAX_RELEARN, type ISessionOrder } from '@/lib/vocab-session';
 import { useCustomWords, toWordEntry } from '@/lib/custom-words';
@@ -90,6 +92,14 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   // 连对连击：连续 quality>=3 的计数，答错清零（即时正反馈）
   const [combo, setCombo] = useState(0);
   const [bestCombo, setBestCombo] = useState(0);
+  /**
+   * 奖励时刻要判"这一轮是不是全对"，而 `sessionRated/sessionGood` 是 state ——
+   * 在 `advance` 的 useCallback 里读到的是**闭包旧值**（这个坑本仓踩过：ref/闭包不随重挂载归零）。
+   * 所以另开两个 ref 跟着评分同步更新，并在 startSession 里显式清零。
+   */
+  const ratedRef = useRef(0);
+  const goodRef = useRef(0);
+  const comboChipRef = useRef<HTMLSpanElement | null>(null);
   /** 已评分过的词集合（按 key）—— rated 由它派生：回看上一张时状态才不会错乱 */
   const [ratedKeys, setRatedKeys] = useState<Set<string>>(() => new Set());
   // 本轮统计：已评分张数 / 其中记得的（quality>=3）—— 用于顶部进度条与正确率
@@ -390,8 +400,10 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     lastQualityRef.current = quality;
     setSessionReviewCount((p) => p + 1);
     setSessionRated((p) => p + 1);
+    ratedRef.current += 1;
     if (quality >= 3) {
       setSessionGood((p) => p + 1);
+      goodRef.current += 1;
       // 连击：连续答对累加；每 5 连给一次反馈。
       // 注意不能把 toast/sfx 放进 setState 更新函数里 —— StrictMode 下更新函数会被调用两次，
       // 会弹两次提示、响两次音（答错重排那里踩过同一个坑）。
@@ -401,6 +413,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       if (next > 0 && next % 5 === 0) {
         sfxComplete();
       }
+      // 奖励时刻只在**达成那一格**响一次（>=7 会每帧重放，动画就变成噪声）
+      if (next === 7) celebrate('streak-7', comboChipRef.current);
     } else {
       setCombo(0);
     }
@@ -478,6 +492,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
       // 不弹 toast（2026-09-30 用户要求练习界面零提示）；音效保留（那是声音，不是弹窗）。
       sfxComplete();
       setFinished(true);
+      // 本轮一张没错 → 奖励时刻。锚点传 null：完成页是整屏的事，不是某个按钮的
+      if (ratedRef.current > 0 && goodRef.current === ratedRef.current) celebrate('perfect-round', null);
       return;
     }
     setIdx(applies ? currentIdx : next);
@@ -509,6 +525,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
     setRatedKeys(new Set()); setRatedNow(null);   // 必须清空：否则新一轮里这些卡会被当成"已评"，评分按钮不出现
     setFinished(false);   // 上一轮的完成页不跨轮
     setSessionRated(0); setSessionGood(0);
+    ratedRef.current = 0; goodRef.current = 0;   // 与上面两个 state 同步归零，否则上一轮的"全对"会带进这一轮
     setCombo(0); setBestCombo(0);
     clearSession(currentLevel); // 新开一轮就丢掉旧断点
     lastSpokenKey.current = '';  // 新一轮必须忘掉上一轮的朗读记录，否则第一张卡不出声
@@ -1047,9 +1064,12 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
               <span className="tabular-nums">已评 {sessionRated}</span>
               {sessionRated > 0 && <span className={cn('tabular-nums', accuracy >= 70 ? 'text-emerald-600' : 'text-amber-600')}>记得 {accuracy}%</span>}
               {combo >= 3 && (
-                <span className="flex items-center gap-0.5 text-amber-500 tabular-nums animate-pulse" title="连续答对">
-                  <Flame className="size-3" />连对 {combo}
-                </span>
+                /* 连击环替掉了原来的 animate-pulse：一个元素上叠两种动效只会互相抢注意力 */
+                <StreakRing n={combo} className="px-1">
+                  <span ref={comboChipRef} className="flex items-center gap-0.5 text-amber-500 tabular-nums" title="连续答对">
+                    <Flame className="size-3" />连对 {combo}
+                  </span>
+                </StreakRing>
               )}
             </div>
           </div>
@@ -1317,8 +1337,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             { q: 4, label: '比较熟悉', color: 'bg-emerald-500 hover:bg-emerald-600' },
             { q: 5, label: '完全掌握', color: 'bg-[#6C5CE7] hover:bg-[#5A4BD1]' },
           ].map(({ q, label, color }, i) => (
-            <button key={q} onClick={() => markWithQuality(q)}
-              className={cn('relative px-3 py-2 rounded-2xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg transition-all hover:scale-105', color)}>
+            <button key={q} data-press="strong" onClick={() => markWithQuality(q)}
+              className={cn('relative px-3 py-2 rounded-2xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg', color)}>
               {label}
               <span className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-black/25 text-[8px] font-black flex items-center justify-center">{i + 1}</span>
             </button>
@@ -1353,7 +1373,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
         <div className="flex justify-center">
           <button
             onClick={() => advance()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#6C5CE7] text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-violet-200/50 transition-all hover:bg-[#5A4BD1] active:scale-[0.98]"
+            data-press="strong"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#6C5CE7] text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-violet-200/50 transition-all hover:bg-[#5A4BD1]"
           >
             已评过的卡 · 继续
             <ChevronRight className="size-3.5" />

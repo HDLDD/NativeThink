@@ -341,3 +341,21 @@ typecheck + eslint + `npm run verify:all` **28 项全绿**，断言合计 **7,88
 ② **RTF 真机 1.18–1.25，仍然 >1**：比四核模拟器的 1.38–1.75 好看，但越不过 1.0 ⇒ 设置面板那句"Kokoro 长文每句之间会有停顿"**保持不放宽**。**"量到了更小的数"不等于可以撤警告** —— 这条如果只盯"比模拟器快"就会写成"真机上连续了"，那是假话：慢于播放这件事在两个形态上同向成立，只是程度不同。
 
 ③ 重量级合成期间**通道真的会断**：第一次跑就是跑到一半 `adb devices` 变空（`ECONNREFUSED 127.0.0.1:9223`），第二次接回来才跑完。延续第 44 测⑤那条口径 —— **测完的数当场抄进文档**，别指望下一轮还能复现同一个会话；另外这条也说明 `--quick`（两音色各三档 + A/B + 冷热）值得保留成默认档位，它能在一次断连风险内跑完。
+
+2026-10-20 第 47 测（交互反馈层：动效必须看像素，而"看像素"这条路本身有三个坑）：需求是"按键交互不要文字，要图像和动画，让软件更高级"。四层（手感/结果/语言/氛围）用户全选 —— 但四层共用同一个内核，所以按"一份 spec + 三档交付"设计，不拆成互不相干的工程。
+
+① **动手前先量现状**，路线是自己长出来的：全站 **306 处裸 `<button>` + 395 处 `<Button>`**，基座只有一层压暗（`hover-elevate active-elevate-2`）外加**散落 22 处各页自己挑的 `active:scale-*`**；framer-motion 已经在首屏壳里（540KB 基线含 motion），但按钮**一次 `whileTap` 都没用过**。这三条数一出，"逐页上 motion 组件"直接出局（306 处调用点改动 + 每处都要包 `LazyFramerProvider`），换成 **`<Button>` 基座一处改动 + 一处指针事件委托**。
+
+② **浏览器把我三处设定当场推翻**（都写进了 `docs/modules/interaction-fx.md`）：涟漪用 `currentColor` 在浅底上像"变灰/禁用"、深底上几乎看不见 → 改按底色亮度挑墨/白两档；奖励粒子从视口中心炸开、铺满整屏压住正文 → 改成从触发元素中心起、半径封顶；reduced-motion 靠 CSS 藏 → DOM 里仍留着一个涟漪节点，改成委托层直接不建。**只看 DOM 与计算值这三条全都是"对的"，只有像素会告诉你错。**
+
+③ **测法自己骗自己两次**：(a) 上一轮脚本把模拟开关的 `.rm` 类留在页面上，下一轮据此判定"涟漪根本不渲染"——差点把设计当缺陷改；(b) 可见窗口被遮挡时 Chrome 节流 rAF，读数自己招了（`pointerdown→首帧 200ms` 还标红，而干净状态下是 3.7ms）。口径：**每帧前先断言状态干净**（`rm` 不在、`reduce.matches` 为假），不干净就不拍。
+
+④ **新增一条通道口径：CDP 截图判不了半透明层。** 同一份 DOM，`opacity:1` 的子元素抓得到、`.35` 整层丢，`captureBeyondViewport` 也一样 —— 与项目里"CDP 截不到视频硬表面、必须 `adb exec-out screencap -p`"同族。要看动画像素就走 OS 桌面合成器（PowerShell `CopyFromScreen`）或真机 screencap。
+
+⑤ **合成事件不产生用户激活**：`dispatchEvent(new PointerEvent('pointerdown'))` 能让委托层建涟漪，但 **`:active` 不会生效** —— 所以电脑侧走查量不到"按下去真的缩了"。这条凭据只能来自 `Input.dispatchTouchEvent`（真触摸），已写成 `check-interaction-on-phone.mjs`。
+
+⑥ **CSS 的 `transition-property` 是整体覆盖**：给 `[data-press]` 只写 `scale` 会把元素原有的 `transition-colors` 顶掉（快速闪卡的词面 chip 就中招，hover 变色变瞬变）。修法是把白名单一起列出（`scale, background-color, border-color, color, fill, stroke, box-shadow, opacity`），守卫有一条专门钉它 —— 这类"新契约悄悄吃掉旧行为"的坑，静态看 diff 看不出来。
+
+⑦ **两条变异第一次是绿的，暴露守卫自己假绿**：`/prefers-reduced-motion/.test(FX)` 只要那行 `matchMedia` 还在就过，把早退删掉照样绿；`/cancelAnimationFrame\(rafRef\.current\)/` 匹配到的是循环内那处，cleanup 里删掉也不红。**形状**：断言不能匹配"那行字还在"，要匹配"行为发生了" —— 改成钉「reduce 早退排在 `ripple(host,` **之前**」与「cleanup 里 sink 与 rAF **两件一起**撤」，两条才真红。10 条变异最终逐条点名。
+
+⑧ 计数：新守卫 `verify-interaction-fx` **65 条**、`walk-interaction-fx` **12 条**运行时、真机探针 `check-interaction-on-phone` **8 条**（装机后跑）；`verify:all` **29 项全绿**，断言合计 **7,989**。首屏预算没动（不新增依赖、涟漪节点按下才建）。

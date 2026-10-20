@@ -297,3 +297,73 @@ h1, h2, h3 { letter-spacing: -0.015em; }
 .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
 .safe-area-left { padding-left: env(safe-area-inset-left, 0px); }
 .safe-area-right { padding-right: env(safe-area-inset-right, 0px); }
+/* ══════════════════════════════════════════════════════════════════════
+   交互反馈层 · 按压词汇表（2026-10-20 起，全站唯一一套数值）
+
+   为什么缩放用独立 `scale` 属性而不是 `transform`：现有代码在按钮与卡面上已经写了
+   `transform: translate(...)`（滑动跟手、图标居中、`-translate-y-1/2` 的浮层），
+   两者写在一起会互相覆盖 —— 独立属性各自合成，天生不打架。
+   为什么不用 currentColor 画涟漪：桌面合成器截图复验出来的 —— 浅底上它是深墨，
+   看着像"变灰/禁用"；深底上它是白色，几乎看不见。改成按宿主底色亮度挑两档。
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --fx-press-strong: 0.970;   /* 实心主按钮：真机 393 CSS + textZoom 120% 下"按得下去" */
+  --fx-press-soft: 0.985;     /* 次级 / 图标 / 标签：小控件缩太狠像塌陷 */
+  --fx-in: 110ms;             /* 按下：判据「响应 ≤100ms 开始」的形变窗口 */
+  --fx-out: 170ms;            /* 抬起回弹：定长 tween，不用 spring（spring 尾巴≈400ms 才算完） */
+  --fx-ripple: 420ms;         /* 涟漪扩散 */
+  --fx-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --fx-ink-ripple: rgba(15, 23, 42, 0.10);
+  --fx-light-ripple: rgba(255, 255, 255, 0.26);
+}
+
+/* 只给显式声明 data-press 的元素；值是档位（strong / soft）。
+   ⚠️ transition-property 必须把颜色那几项一起列出来：CSS 没有"追加"这回事，
+   只写 scale 会把元素原有的 transition-colors / transition-all **整个顶掉**
+   （实测候选：快速闪卡的词面 chip 带着 transition-colors，接上词汇后 hover 会变成瞬变）。
+   时长按属性各给一档：缩放 170ms 回弹，颜色 140ms。 */
+[data-press] {
+  scale: 1;
+  transition-property: scale, background-color, border-color, color, fill, stroke, box-shadow, opacity;
+  transition-duration: var(--fx-out), 140ms, 140ms, 140ms, 140ms, 140ms, 140ms, 140ms;
+  transition-timing-function: var(--fx-ease);
+}
+[data-press]:active { scale: var(--fx-press-soft); transition-duration: var(--fx-in), 140ms, 140ms, 140ms, 140ms, 140ms, 140ms, 140ms; }
+[data-press="strong"]:active { scale: var(--fx-press-strong); }
+
+/* 涟漪装在自有的宿主层里：不给按钮加 overflow:hidden —— 那会掐掉焦点环与内部浮层 */
+.fx-ripple-host { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; z-index: 0; }
+.fx-ripple {
+  position: absolute; border-radius: 9999px; pointer-events: none;
+  transform: translate(-50%, -50%) scale(0);
+  background: radial-gradient(circle, var(--fx-ink-ripple) 0 42%, transparent 66%);
+  animation: fx-ripple var(--fx-ripple) var(--fx-ease) forwards;
+}
+.fx-ripple[data-on-dark] { background: radial-gradient(circle, var(--fx-light-ripple) 0 42%, transparent 66%); }
+@keyframes fx-ripple {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+  70%  { opacity: 0.62; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+
+/* ── 结果层图形件：反馈不写字，靠形状 ── */
+.fx-arc { transform: rotate(-90deg); }
+.fx-arc circle { fill: none; stroke-width: 3.5; stroke-linecap: round; }
+.fx-arc .fx-arc-bg { stroke: var(--fx-arc-track, rgba(100, 116, 139, 0.18)); }
+.fx-arc .fx-arc-fg { stroke: var(--fx-arc-color, #00B894); stroke-dasharray: var(--fx-arc-c, 94.2);
+  stroke-dashoffset: var(--fx-arc-c, 94.2); animation: fx-arc-in 320ms var(--fx-ease) forwards; }
+@keyframes fx-arc-in { to { stroke-dashoffset: var(--fx-arc-to, 0); } }
+.fx-ring::after { content: ""; position: absolute; inset: 0; border-radius: 9999px;
+  border: 2px solid var(--fx-ring-color, #F59E0B); transform: scale(0.4); opacity: 0.9;
+  animation: fx-ring 520ms var(--fx-ease) forwards; pointer-events: none; }
+@keyframes fx-ring { to { transform: scale(1.35); opacity: 0; } }
+.fx-shake { animation: fx-shake 200ms linear; }
+@keyframes fx-shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-4px)} 40%{transform:translateX(4px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(2px)} }
+.fx-dot { width: 8px; height: 8px; border-radius: 9999px; background: var(--fx-dot-color, #00B894); }
+
+/* 降级：减少动效偏好下**不画涟漪、不缩放**（委托层直接不建节点，这里再兜一层） */
+@media (prefers-reduced-motion: reduce) {
+  [data-press], [data-press]:active { scale: 1 !important; transition: none !important; }
+  .fx-ripple, .fx-ring::after, .fx-shake { animation: none !important; }
+  .fx-arc .fx-arc-fg { animation-duration: 0.01ms !important; }
+}

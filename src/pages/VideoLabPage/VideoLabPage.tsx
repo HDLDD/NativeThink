@@ -725,7 +725,7 @@ export default function VideoLabPage() {
               {pendingName && (
                 <div className="flex items-center gap-2 rounded-xl bg-muted/40 px-2.5 py-1.5">
                   <span className="text-[10px] font-black text-foreground truncate flex-1">已选视频：{pendingName}</span>
-                  <button onClick={() => { pendingMedia.current = null; setPendingName(''); }}
+                  <button data-press="soft" onClick={() => { pendingMedia.current = null; setPendingName(''); }}
                     className="text-[9px] font-black text-muted-foreground hover:text-rose-400">不要了</button>
                 </div>
               )}
@@ -766,7 +766,7 @@ export default function VideoLabPage() {
                 ))}
                 {/* 折叠必须有展开入口（AGENTS「长列表」那条口径，不许切成看不见的 12 课） */}
                 {list.length > 12 && (
-                  <button onClick={() => setShowAllList((v) => !v)}
+                  <button data-press="soft" onClick={() => setShowAllList((v) => !v)}
                     className="text-[10px] font-bold text-teal-600 hover:underline">
                     {showAllList ? '收回前 12 课' : `展开全部 ${list.length} 课`}
                   </button>
@@ -827,17 +827,17 @@ export default function VideoLabPage() {
           {note && <p className="px-3 pt-2 text-[10px] font-bold text-amber-600 leading-relaxed">{note}</p>}
           <div className="p-3 space-y-2.5">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <button onClick={toggle} className="size-9 rounded-2xl bg-teal-500 text-white flex items-center justify-center shrink-0"
+              <button data-press="strong" onClick={toggle} className="size-9 rounded-2xl bg-teal-500 text-white flex items-center justify-center shrink-0"
                 title={lesson.url ? (playing ? '暂停' : '播放') : '朗读本句'}>
                 {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
               </button>
               <span className="text-[10px] font-black text-muted-foreground tabular-nums w-20 shrink-0">{fmt(time)} / {fmt(lesson.meta.duration)}</span>
-              <button onClick={toggleLoop} title="单句循环（F，与 A-B 互斥）"
+              <button data-press="soft" onClick={toggleLoop} title="单句循环（F，与 A-B 互斥）"
                 className={cn('px-2 py-1 rounded-xl text-[10px] font-black border shrink-0',
                   loopOne ? 'border-teal-400/60 bg-teal-500/10 text-teal-600' : 'border-border text-muted-foreground')}>
                 <Repeat className="size-3 inline mr-0.5" />单句
               </button>
-              <button onClick={toggleAb} title="A-B 复读当前句区间（与单句循环互斥）"
+              <button data-press="soft" onClick={toggleAb} title="A-B 复读当前句区间（与单句循环互斥）"
                 className={cn('px-2 py-1 rounded-xl text-[10px] font-black border shrink-0',
                   ab ? 'border-teal-400/60 bg-teal-500/10 text-teal-600' : 'border-border text-muted-foreground')}>
                 A-B {ab ? `${fmt(ab.a)}–${fmt(ab.b)}` : ''}
@@ -847,19 +847,19 @@ export default function VideoLabPage() {
                 {RATES.map((r) => <option key={r} value={r}>{r}×</option>)}
               </select>
               {cur && (
-                <button onClick={() => tts.speak(cur.text)} title="朗读本句"
+                <button data-press="soft" onClick={() => tts.speak(cur.text)} title="朗读本句"
                   className="px-2 py-1 rounded-xl border border-border text-[10px] font-black text-muted-foreground shrink-0 hover:text-teal-600">
                   <Volume2 className="size-3 inline mr-0.5" />朗读
                 </button>
               )}
               {cur && (
-                <button onClick={shadowThis} title="跟读这句并比对"
+                <button data-press="soft" onClick={shadowThis} title="跟读这句并比对"
                   className={cn('px-2 py-1 rounded-xl border text-[10px] font-black shrink-0',
                     recording ? 'border-teal-400/60 bg-teal-500/10 text-teal-600' : 'border-border text-muted-foreground hover:text-teal-600')}>
                   <Mic className="size-3 inline mr-0.5" />{recording ? '正在听…' : '跟读'}
                 </button>
               )}
-              <button onClick={translateLesson} disabled={!!zhBusy} title="把这课字幕翻成中文"
+              <button data-press="soft" onClick={translateLesson} disabled={!!zhBusy} title="把这课字幕翻成中文"
                 className="px-2 py-1 rounded-xl border border-border text-[10px] font-black text-muted-foreground shrink-0 hover:text-teal-600 disabled:opacity-50">
                 <Sparkles className="size-3 inline mr-0.5" />{zhBusy || '翻译字幕'}
               </button>
@@ -891,15 +891,15 @@ export default function VideoLabPage() {
                 </p>
                 {cur.zh && <p className="text-[11px] font-bold text-muted-foreground leading-relaxed">{cur.zh}</p>}
                 <div className="flex items-center gap-2 pt-0.5">
-                  <button onClick={() => toggleFavSentence(cur)} title="收藏这句"
+                  <button data-press="soft" onClick={() => toggleFavSentence(cur)} title="收藏这句"
                     className={cn('p-1', isFavorited(cleanText(cur.text), 'video') ? 'text-rose-500' : 'text-muted-foreground/50 hover:text-rose-400')}>
                     <Heart className={cn('size-3.5', isFavorited(cleanText(cur.text), 'video') && 'fill-current')} />
                   </button>
-                  <button onClick={() => addSpelling(videoToSpellingItem({ en: cur.text, zh: cur.zh || '' }))}
+                  <button data-press="soft" onClick={() => addSpelling(videoToSpellingItem({ en: cur.text, zh: cur.zh || '' }))}
                     disabled={inSpellingBook}
                     title={inSpellingBook ? '这句已经在听写本里' : '送进句子拼写（听写这句）'}
                     className={cn('p-1', inSpellingBook ? 'text-sky-500' : 'text-muted-foreground/50 hover:text-sky-500')}><Keyboard className="size-3.5" /></button>
-                  <button onClick={replayCur} title="重播本句（Enter）" className="p-1 text-muted-foreground/50 hover:text-teal-600"><Play className="size-3.5" /></button>
+                  <button data-press="soft" onClick={replayCur} title="重播本句（Enter）" className="p-1 text-muted-foreground/50 hover:text-teal-600"><Play className="size-3.5" /></button>
                   <span className="ml-auto text-[9px] font-bold text-muted-foreground/70 tabular-nums">{fmt(cur.t0)}–{fmt(cur.t1)}</span>
                 </div>
                 {/* 已听到第几句 + 听完的反馈：只有 x/y 计数时，听到最后一句是没有任何"这课完事了"的信号 */}
@@ -954,7 +954,7 @@ export default function VideoLabPage() {
               <Search className="size-3.5 text-teal-600" />
               <span className="text-[13px] font-black text-foreground">{lookup.word}</span>
               {lookup.entry && <span className="text-[10px] font-bold text-muted-foreground">{lookup.entry.phonetic} · {lookup.entry.partOfSpeech}</span>}
-              <button onClick={() => setLookup(null)} className="ml-auto text-[9px] font-black text-muted-foreground">收起</button>
+              <button data-press="soft" onClick={() => setLookup(null)} className="ml-auto text-[9px] font-black text-muted-foreground">收起</button>
             </div>
             {lookup.entry ? (
               <>
@@ -966,18 +966,18 @@ export default function VideoLabPage() {
                   <p className="text-[10px] font-black italic text-teal-700">{cleanText(lookup.entry.examples[0].en)}</p>
                 )}
                 <div className="flex items-center gap-2 pt-0.5">
-                  <button onClick={() => { addCustomWord({ word: lookup.entry.word, phonetic: lookup.entry.phonetic, partOfSpeech: lookup.entry.partOfSpeech, meaning: lookup.entry.meaning, source: `视频精听：${lesson?.meta.title || ''}` });
+                  <button data-press="soft" onClick={() => { addCustomWord({ word: lookup.entry.word, phonetic: lookup.entry.phonetic, partOfSpeech: lookup.entry.partOfSpeech, meaning: lookup.entry.meaning, source: `视频精听：${lesson?.meta.title || ''}` });
                     setLookup({ ...lookup }); }}
                     className="px-2 py-1 rounded-xl border border-border text-[10px] font-black text-muted-foreground hover:text-teal-600">
                     <BookPlus className="size-3 inline mr-0.5" />
                     {isCustomWord(lookup.entry.word) ? '已在生词本' : '加进生词本（进 SM-2 复习）'}
                   </button>
-                  <button onClick={() => toggleFavWord(lookup.entry, lookup.word)}
+                  <button data-press="soft" onClick={() => toggleFavWord(lookup.entry, lookup.word)}
                     className={cn('px-2 py-1 rounded-xl border text-[10px] font-black',
                       isWordFavorited(lookup.entry.word) ? 'border-rose-300 text-rose-500' : 'border-border text-muted-foreground')}>
                     <Heart className="size-3 inline mr-0.5" />收藏这个词
                   </button>
-                  <button onClick={() => tts.speak(lookup.entry.word)} className="px-2 py-1 rounded-xl border border-border text-[10px] font-black text-muted-foreground">
+                  <button data-press="soft" onClick={() => tts.speak(lookup.entry.word)} className="px-2 py-1 rounded-xl border border-border text-[10px] font-black text-muted-foreground">
                     <Volume2 className="size-3 inline mr-0.5" />读
                   </button>
                 </div>
@@ -998,7 +998,7 @@ export default function VideoLabPage() {
             <Sparkles className="size-3 text-teal-600" />
             <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">字幕 · {sentences.length} 句</span>
             {sentences.length > WINDOW && (
-              <button onClick={() => setShowAll((v) => !v)} className="ml-auto text-[9px] font-black text-teal-600">
+              <button data-press="soft" onClick={() => setShowAll((v) => !v)} className="ml-auto text-[9px] font-black text-teal-600">
                 {showAll ? '收回收音窗口' : `展开全部（当前只渲染 ${windowed.length} 条）`}
               </button>
             )}
@@ -1006,7 +1006,7 @@ export default function VideoLabPage() {
           <ol className="space-y-1">
             {windowed.map(({ s, i }) => (
               <li key={`${s.i}-${i}`}>
-                <button onClick={() => seekTo(i)}
+                <button data-press="soft" onClick={() => seekTo(i)}
                   className={cn('w-full text-left px-2.5 py-2 rounded-2xl transition-colors',
                     i === idx ? 'bg-teal-500/10 border border-teal-400/40' : 'hover:bg-muted/50 border border-transparent')}>
                   <div className="flex items-start gap-2">
