@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
-  X, ChevronLeft, ChevronRight, BookOpen, Heart, Globe,
-  Sparkles, Hash, Wand2, Loader2, Volume2, ChevronDown, ChevronUp, ListTree, Repeat, Copy, Type, Brain, Languages,
+  X, ChevronLeft, ChevronRight, BookOpen, Heart, Globe, Hash, Wand2, Loader2, Volume2, ChevronDown, ChevronUp, ListTree, Repeat, Copy, Type, Brain, Languages,
   Pause, Play, Square, LocateFixed,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

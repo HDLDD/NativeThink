@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
-import { Heart, Volume2, Sparkles, CheckCircle2, XCircle, RotateCw, ArrowLeft, ExternalLink, Mic } from 'lucide-react';
+import { Heart, Volume2, CheckCircle2, XCircle, RotateCw, ArrowLeft, ExternalLink, Mic } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -135,8 +135,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
         <Card className="rounded-[32px] border-2 border-emerald-200/50 shadow-sm overflow-hidden">
           <CardContent className="p-8 text-center space-y-6">
             <div className="size-20 rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-500/20 dark:to-teal-500/20 flex items-center justify-center mx-auto">
-              <Sparkles className="size-10 text-ink-teal" />
-            </div>
+              </div>
             <div>
               <h3 className="text-2xl font-black italic text-foreground">太棒了！</h3>
               <p className="text-sm text-muted-foreground font-medium mt-1">你已经完成了所有收藏内容的回顾</p>
@@ -390,7 +389,6 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
                         <p className="text-xs font-bold text-muted-foreground mt-2">{cw.category}</p>
                       )}
                       <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-4">
-                        <Sparkles className="size-3.5 inline mr-1 text-ink-teal" />
                         点击翻转查看释义
                       </p>
                     </>

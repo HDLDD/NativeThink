@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
-import { Search, Lightbulb, Target, CheckCircle2, RotateCw, Sparkles, Volume2, BookOpen, ArrowRight, ArrowLeft, XCircle, Edit3, Shuffle, Headphones, Link2, PenLine, ChevronDown, ChevronLeft, Eye, Flame } from 'lucide-react';
+import { Search, Lightbulb, Target, CheckCircle2, RotateCw, Volume2, BookOpen, ArrowRight, ArrowLeft, XCircle, Edit3, Shuffle, Headphones, Link2, PenLine, ChevronDown, ChevronLeft, Eye, Flame } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -1237,7 +1237,7 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                             <p className="text-sm font-bold text-ink-violet mb-1">{currentWord.partOfSpeech}</p>
                             <p className="text-base text-muted-foreground font-medium">{currentWord.phonetic}</p>
                             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-6">
-                              <Sparkles className="size-3.5 inline mr-1 text-ink-teal" />点击翻转查看释义
+                              点击翻转查看释义
                             </p>
                           </>
                         ) : (

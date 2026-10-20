@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import {
-  Sparkles,
   Key,
   Eye,
   EyeOff,
@@ -216,7 +215,6 @@ export default function AISettings({ trigger }: { trigger?: ReactNode } = {}) {
         <div className="p-6 border-b border-border shrink-0 bg-gradient-to-r from-emerald-50 to-indigo-50 dark:from-emerald-500/10 dark:to-indigo-500/10">
           <DialogHeader>
             <DialogTitle className="text-xl font-black italic text-foreground flex items-center gap-2">
-              <Sparkles className="size-5 text-ink-teal" />
               AI 模型设置
             </DialogTitle>
             <p className="text-sm text-muted-foreground font-medium mt-1">
@@ -364,7 +362,6 @@ export default function AISettings({ trigger }: { trigger?: ReactNode } = {}) {
                         </>
                       ) : (
                         <>
-                          <Sparkles className="size-3 mr-1" />
                           测试
                         </>
                       )}

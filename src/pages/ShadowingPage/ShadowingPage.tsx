@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   Clock,
   BookOpen,
-  Sparkles,
   Heart,
   Bot,
   Wand2,
@@ -1028,7 +1027,6 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                   {currentSentence.annotatedText && (
                     <div className="p-4 rounded-[24px] bg-gradient-to-br from-[var(--brand)]/5 to-emerald-50 dark:from-[var(--brand)]/10 dark:to-emerald-500/10 border border-[var(--brand)]/10 mb-6">
                       <div className="flex items-center gap-2 mb-2">
-                        <Sparkles className="size-4 text-ink-teal" />
                         <span className="text-xs font-black uppercase tracking-wider text-ink-teal">语音标注</span>
                       </div>
                       <p className="text-sm text-foreground/80 italic">

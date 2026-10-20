@@ -39,7 +39,7 @@ export default function Header() {
               Welcome back
             </div>
             <h1 className="text-xl font-black italic tracking-tight text-foreground">
-              NativeThink ✨
+              NativeThink
             </h1>
           </div>
         </div>

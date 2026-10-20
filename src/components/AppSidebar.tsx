@@ -8,8 +8,7 @@ import {
   FileText,
   BookOpen,
   Heart,
-  BarChart3,
-  Sparkles,
+  BarChart3,
   PenLine,
   SpellCheck, Film,
   GraduationCap,
@@ -78,8 +77,7 @@ export default function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-4 group-data-[state=collapsed]:px-0 group-data-[state=collapsed]:justify-center">
           <div className="size-10 shrink-0 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30">
-            <Sparkles className="size-5" />
-          </div>
+            </div>
           <div className="flex-1 min-w-0 group-data-[state=collapsed]:hidden">
             <div className="text-lg font-black italic tracking-tight text-foreground">
               Native<span className="text-ink-teal not-italic">Think</span>

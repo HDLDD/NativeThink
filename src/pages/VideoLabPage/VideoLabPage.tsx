@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Play, Pause, Film, Upload, Heart, Volume2, Trash2, Search, BookPlus,
-  Repeat, ListVideo, Keyboard, ChevronLeft, Sparkles, FileText, Loader2, Mic,
+  Repeat, ListVideo, Keyboard, ChevronLeft, FileText, Loader2, Mic,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -861,7 +861,7 @@ export default function VideoLabPage() {
               )}
               <button data-press="soft" onClick={translateLesson} disabled={!!zhBusy} title="把这课字幕翻成中文"
                 className="px-2 py-1 rounded-xl border border-border text-[10px] font-black text-muted-foreground shrink-0 hover:text-teal-600 disabled:opacity-50">
-                <Sparkles className="size-3 inline mr-0.5" />{zhBusy || '翻译字幕'}
+                {zhBusy || '翻译字幕'}
               </button>
             </div>
           </div>
@@ -995,7 +995,6 @@ export default function VideoLabPage() {
       <Card className="rounded-[28px] border-border shadow-sm">
         <CardContent className="p-3 space-y-1.5">
           <div className="flex items-center gap-2 px-1">
-            <Sparkles className="size-3 text-teal-600" />
             <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">字幕 · {sentences.length} 句</span>
             {sentences.length > WINDOW && (
               <button data-press="soft" onClick={() => setShowAll((v) => !v)} className="ml-auto text-[9px] font-black text-teal-600">

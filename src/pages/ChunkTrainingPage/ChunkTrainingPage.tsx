@@ -12,7 +12,6 @@ import {
   Lightbulb,
   Loader2,
   BookOpen,
-  Sparkles,
   ExternalLink,
   Volume2,
   Bot,
@@ -1338,7 +1337,6 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
               {/* 今日复习推荐 — SM-2 based due-for-review */}
               <div className="mb-6 p-5 rounded-[28px] bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/10 border border-orange-100">
                 <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="size-4 text-orange-500" />
                   <span className="text-xs font-black uppercase tracking-wider text-orange-600">
                     今日待复习 · {phraseStats.dueNow} 个
                   </span>

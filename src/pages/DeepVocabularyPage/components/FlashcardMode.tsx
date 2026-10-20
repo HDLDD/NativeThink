@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import {
-  RotateCw, Volume2, Sparkles, XCircle, ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
+  RotateCw, Volume2, XCircle, ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Link2, BookOpen, Gauge, Flame, PenLine, History, Target, Star,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
@@ -1154,7 +1154,7 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                     <p className="text-sm font-bold text-ink-violet mb-1">{shown!.partOfSpeech}</p>
                     <p className="text-sm text-muted-foreground font-medium">{shown!.phonetic}</p>
                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-4">
-                      <Sparkles className="size-3.5 inline mr-1 text-ink-violet" />点击翻转查看释义
+                      点击翻转查看释义
                     </p>
                     <p className="text-[9px] text-muted-foreground/70 font-bold mt-1.5">手机：滑动翻面 · 键盘：空格 / 1-5 / S</p>
                   </>

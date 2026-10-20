@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BookOpen, Heart, Search, Volume2, Sparkles, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, ArrowRight, Notebook, NotebookPen, BookMarked, Plane, GraduationCap, Briefcase, Award, TrendingUp, Trophy, Zap, Library, Layers, Globe, Languages, type LucideIcon } from 'lucide-react';
+import { BookOpen, Heart, Search, Volume2, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, ArrowRight, Notebook, NotebookPen, BookMarked, Plane, GraduationCap, Briefcase, Award, TrendingUp, Trophy, Zap, Library, Layers, Globe, Languages, type LucideIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -287,7 +287,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook, curren
           <div className="flex gap-2 pt-2">
             <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="rounded-2xl text-xs">← 返回</Button>
             <Button onClick={handleComplete} className="flex-1 rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50 gap-1.5">
-              <Sparkles className="size-4" />开始学习
+              开始学习
             </Button>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Bot, Loader2, RefreshCw, Send, Sparkles, Volume2, Eye, EyeOff } from 'lucide-react';
+import { Bot, Loader2, RefreshCw, Send, Volume2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -198,7 +198,7 @@ export function BuildPractice() {
                     });
                     toast.success('已收藏这次造句');
                   }}>
-                  <Sparkles className="size-3.5" /> 收藏
+                  收藏
                 </Button>
               </div>
             </div>

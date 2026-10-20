@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
-  Sparkles,
   RefreshCw,
   Brain,
   Heart,
@@ -736,7 +735,6 @@ The chineseText should subtly embed English thinking patterns so learners discov
             value="nativeTranslate"
             className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
-            <Sparkles className="size-4 mr-2" />
             思维还原
           </TabsTrigger>
         </TabsList>
@@ -804,7 +802,6 @@ The chineseText should subtly embed English thinking patterns so learners discov
                       </>
                     ) : (
                       <>
-                        <Sparkles className="size-4 mr-2" />
                         开始检测
                       </>
                     )}
@@ -932,7 +929,6 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   {translationExercises[currentExerciseIdx].prompt}
                 </p>
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-4 flex items-center gap-2">
-                  <Sparkles className="size-3.5 text-ink-teal" />
                   提示：闭上眼睛想象画面，用英语直接描述你看到的场景
                 </p>
               </div>
@@ -1199,8 +1195,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
             <CardHeader className="pb-4 flex flex-row items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="size-12 rounded-2xl bg-violet-50 dark:bg-violet-500/15 text-violet-500 flex items-center justify-center">
-                  <Sparkles className="size-5.5" />
-                </div>
+                  </div>
                 <div>
                   <CardTitle className="text-xl font-[900] italic text-foreground">
                     思维还原
@@ -1272,7 +1267,6 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   {nativeExercises[currentNativeIdx].chineseText}
                 </p>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-4 flex items-center gap-2">
-                  <Sparkles className="size-3.5 text-violet-500" />
                   提示：这句中文是用英语母语者的思维方式写的，试着还原成地道的英语
                 </p>
               </div>

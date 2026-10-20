@@ -1,6 +1,5 @@
 import {
-  HelpCircle, Brain, Puzzle, MessageSquare, Mic, BookOpen, BarChart3, PenLine,
-  Sparkles, Lightbulb, Target, ChevronRight, ExternalLink, Zap, Key,
+  HelpCircle, Brain, Puzzle, MessageSquare, Mic, BookOpen, BarChart3, PenLine, Lightbulb, Target, ChevronRight, ExternalLink, Zap, Key,
   CheckCircle2, RotateCw, Link2, Shuffle, Edit3, Headphones, Coffee,
 } from 'lucide-react';
 import { useState, useEffect, type ReactNode } from 'react';
@@ -291,8 +290,7 @@ export default function HelpGuide({ defaultOpen, trigger }: { defaultOpen?: bool
           <DialogHeader>
             <DialogTitle className="text-2xl font-black italic text-foreground flex items-center gap-2.5">
               <div className="size-10 rounded-2xl bg-[var(--brand)]/15 text-ink-teal flex items-center justify-center">
-                <Sparkles className="size-5.5" />
-              </div>
+                </div>
               使用指南
             </DialogTitle>
           </DialogHeader>

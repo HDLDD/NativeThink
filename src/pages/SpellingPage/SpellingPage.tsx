@@ -11,7 +11,6 @@ import {
   StarOff,
   SkipForward,
   RefreshCw,
-  Sparkles,
   BookOpen,
   PanelRightOpen,
   PanelRightClose,
@@ -1091,7 +1090,7 @@ export default function SpellingPage() {
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--brand)]/10 text-ink-teal text-[10px] font-black uppercase tracking-wider">
-            <Sparkles className="size-3.5" /> Spelling Practice
+            Spelling Practice
           </div>
           <h1 className="text-3xl font-black italic text-foreground">句子拼写</h1>
           <p className="text-sm text-muted-foreground">选择一本词书，立即开始随机拼写练习</p>
@@ -1131,7 +1130,6 @@ export default function SpellingPage() {
             variant="outline"
             className="rounded-xl font-bold gap-2"
           >
-            <Sparkles className="size-4" />
             AI 添加句子
           </Button>
         </div>
@@ -1403,7 +1401,6 @@ export default function SpellingPage() {
               onClick={() => setShowAIDialog(true)}
               className="rounded-xl h-8 text-xs font-bold gap-1.5"
             >
-              <Sparkles className="size-3.5" />
               <span className="hidden sm:inline">AI 添加</span>
             </Button>
             <Button
@@ -1928,7 +1925,6 @@ function AIBatchAddDialog({
       <DialogContent className="rounded-2xl sm:max-w-md" aria-describedby="ai-dialog-desc">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base font-black">
-            <Sparkles className="size-5 text-ink-teal" />
             AI 批量添加句子
           </DialogTitle>
           <p id="ai-dialog-desc" className="text-xs text-muted-foreground">
@@ -2024,7 +2020,7 @@ function AIBatchAddDialog({
               {loading ? (
                 <>生成中...</>
               ) : (
-                <><Sparkles className="size-4" /> 生成句子</>
+                <>生成句子</>
               )}
             </Button>
           )}

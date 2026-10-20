@@ -8,7 +8,6 @@ import { Lightbulb,
   ArrowUpDown,
   Tag,
   BookOpen,
-  Sparkles,
   X,
   Hash,
   Layers,
@@ -43,7 +42,7 @@ const PATTERN_LABELS: Record<CollocPattern, { label: string; icon: LucideIcon; c
   'adj+noun':     { label: '形容词+名词', icon: Tag,       color: '#EC4899' },
   'noun+prep':    { label: '名词+介词', icon: Link2,       color: 'var(--brand)' },
   'adv+adj':      { label: '副词+形容词', icon: Layers,    color: '#8B5CF6' },
-  'phrasal_verb': { label: '短语动词',   icon: Sparkles,   color: '#F59E0B' },
+  'phrasal_verb': { label: '短语动词',   icon: Layers,   color: '#F59E0B' },
   'fixed_phrase': { label: '固定短语',   icon: BookOpen,   color: '#14B8A6' },
   'other':        { label: '其他',       icon: Tag,        color: '#94A3B8' },
 };
@@ -527,7 +526,6 @@ export default function CollocationsTab({
                     className="shrink-0 rounded-xl text-[9px] font-black uppercase tracking-wider bg-violet-50 dark:bg-violet-500/10 text-violet-500 hover:bg-violet-100 gap-1"
                     title="自动翻译本页所有未翻译搭配"
                   >
-                    <Sparkles className="size-3" />
                     {batchTranslating ? '翻译中…' : '翻译本页'}
                   </Button>
                 )}

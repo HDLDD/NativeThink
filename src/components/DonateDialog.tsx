@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Coffee, Heart, Star, Sparkles, Copy, Edit3, QrCode, Smartphone, ChevronDown } from 'lucide-react';
+import { Coffee, Heart, Star, Copy, Edit3, QrCode, Smartphone, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -28,7 +28,7 @@ const DONATION_TIERS = [
   { amount: '¥6', label: '一杯咖啡', icon: Coffee, emoji: '☕', color: '#8B4513' },
   { amount: '¥12', label: '一杯奶茶', icon: Heart, emoji: '🧋', color: '#F59E0B' },
   { amount: '¥18', label: '一顿午饭', icon: Star, emoji: '🍱', color: '#EC4899' },
-  { amount: '¥30', label: '强力支持', icon: Sparkles, emoji: '✨', color: '#6C5CE7' },
+  { amount: '¥30', label: '强力支持', icon: Star, emoji: '✨', color: '#6C5CE7' },
 ];
 
 type PayMethod = 'wechat' | 'alipay';

@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import {
   PenLine,
   Send,
-  Sparkles,
   Loader2,
   Clock,
   BarChart3,
@@ -15,6 +14,7 @@ import {
   RefreshCw,
   Bot,
   Wand2,
+  Plus,
   Volume2,
   X,
 } from 'lucide-react';
@@ -714,9 +714,10 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
           <Dialog open={showGenDialog} onOpenChange={setShowGenDialog}>
             <DialogTrigger asChild>
               <Button
-                className="rounded-2xl bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white shadow-lg shadow-purple-200/50 dark:shadow-purple-900/30 text-xs font-black uppercase tracking-wider"
+                variant="outline"
+                className="rounded-2xl border-border text-xs font-black uppercase tracking-wider"
               >
-                <Wand2 className="size-4 mr-1.5" />
+                <Plus className="size-4 mr-1.5" />
                 AI 生成题目
               </Button>
             </DialogTrigger>
@@ -1046,7 +1047,6 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
                     </>
                   ) : (
                     <>
-                      <Sparkles className="size-4 mr-2" />
                       提交并获取反馈
                     </>
                   )}
@@ -1062,8 +1062,7 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
                 <div className="size-10 rounded-2xl bg-indigo-50 dark:bg-indigo-500/15 text-indigo-500 flex items-center justify-center">
-                  <Sparkles className="size-5" />
-                </div>
+                  </div>
                 <div>
                   <CardTitle className="text-lg font-[900] italic text-foreground">
                     AI 写作反馈

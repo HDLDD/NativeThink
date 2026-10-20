@@ -24,7 +24,7 @@ import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import {
   Zap, Check, X, RefreshCw, ArrowRight, ArrowLeft, Volume2, VolumeX, Shuffle, Target,
   BookOpen, History, RotateCcw, Trash2, ChevronDown, ChevronUp, ListChecks,
-  ChevronLeft, Eye, Link2, Sparkles, Quote, Star,
+  ChevronLeft, Eye, Link2, Quote, Star,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1222,7 +1222,7 @@ export function WordInfoDialog({
 
               {entry.synonyms.length > 0 && (
                 <div className="space-y-1.5">
-                  {section(<Sparkles className="size-3" />, '近义 ≈')}
+                  {section(null, '近义 ≈')}
                   <div className="flex flex-wrap gap-1.5">
                     {entry.synonyms.slice(0, 8).map((s) => (
                       <span key={s} className="px-2 py-1 rounded-lg bg-emerald-500/10 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">{s}</span>
@@ -1233,7 +1233,7 @@ export function WordInfoDialog({
 
               {entry.antonyms.length > 0 && (
                 <div className="space-y-1.5">
-                  {section(<Sparkles className="size-3" />, '反义 ≠')}
+                  {section(null, '反义 ≠')}
                   <div className="flex flex-wrap gap-1.5">
                     {entry.antonyms.slice(0, 8).map((s) => (
                       <span key={s} className="px-2 py-1 rounded-lg bg-rose-500/10 text-[11px] font-bold text-rose-600 dark:text-rose-400">{s}</span>
@@ -1244,7 +1244,7 @@ export function WordInfoDialog({
 
               {entry.wordFamily.length > 0 && (
                 <div className="space-y-1.5">
-                  {section(<Sparkles className="size-3" />, '词族')}
+                  {section(null, '词族')}
                   <div className="flex flex-wrap gap-1.5">
                     {entry.wordFamily.slice(0, 8).map((s) => (
                       <span key={s} className="px-2 py-1 rounded-lg bg-muted text-[11px] font-bold text-foreground/80">{s}</span>
@@ -1255,7 +1255,7 @@ export function WordInfoDialog({
 
               {entry.deepExplanation && (
                 <div className="space-y-1.5">
-                  {section(<Sparkles className="size-3" />, '深度解释')}
+                  {section(null, '深度解释')}
                   <p className="text-xs leading-relaxed text-foreground/80 whitespace-pre-wrap">{cleanText(entry.deepExplanation)}</p>
                 </div>
               )}

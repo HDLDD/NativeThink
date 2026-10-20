@@ -15,7 +15,7 @@ import {
   Legend,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { BarChart3, Target, TrendingUp, Flame, BookOpen, Sparkles } from 'lucide-react';
+import { BarChart3, Target, TrendingUp, Flame, BookOpen } from 'lucide-react';
 
 // ── Props ──
 interface ProgressChartsProps {
@@ -289,8 +289,7 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
                 连续学习天数
               </p>
             </CardContent>
-            <Sparkles className="absolute top-0 right-0 p-6 size-32 text-white opacity-5 group-hover:scale-110 transition-transform duration-700" />
-          </Card>
+            </Card>
 
           <Card className="rounded-[32px] border-border shadow-sm">
             <CardContent className="p-6">
@@ -305,7 +304,7 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
                 <span className="text-lg font-black text-ink-teal ml-1">天</span>
               </p>
               <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                坚持就是胜利 ✨
+                坚持就是胜利
               </p>
             </CardContent>
           </Card>

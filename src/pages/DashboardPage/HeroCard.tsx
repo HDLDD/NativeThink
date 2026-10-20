@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Brain, Sparkles, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -16,17 +16,8 @@ function HeroCardInner({ onStartLearning }: HeroCardProps) {
           THINK
         </div>
 
-        {/* 右侧装饰图标 */}
-        <div className="absolute right-[-20px] lg:right-[-30px] top-1/2 -translate-y-1/2 w-1/3 lg:w-2/5 opacity-40 lg:opacity-95">
-          <Brain
-            className="w-full h-auto text-ink-teal -rotate-[12deg] drop-shadow-[0_35px_35px_rgba(0_184_148_0.15)]"
-            strokeWidth={1.5}
-          />
-        </div>
-
         <div className="relative z-10 w-full sm:w-3/5">
-          <div className="inline-flex items-center gap-2 bg-emerald-50 text-ink-teal px-3 py-1 lg:px-4 lg:py-1.5 rounded-full text-[9px] lg:text-[10px] font-black uppercase tracking-widest mb-4 lg:mb-8">
-            <Sparkles className="size-3 lg:size-3.5" />
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-ink-teal px-3 py-1 lg:px-4 lg:py-1.5 rounded-full text-[9px] lg:text-[10px] font-black uppercase tracking-widest mb-4 lg:mb-8">
             Daily Learning
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-5xl font-black text-foreground mb-2 lg:mb-4 leading-[1.1] tracking-tight">
@@ -40,7 +31,7 @@ function HeroCardInner({ onStartLearning }: HeroCardProps) {
           <Button
             size="lg"
             onClick={onStartLearning}
-            className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl text-[10px] lg:text-xs font-black uppercase tracking-wider shadow-xl shadow-emerald-200/50 dark:shadow-emerald-900/30 hover:scale-105 transition-all gap-2"
+            className="bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl text-[10px] lg:text-xs font-black uppercase tracking-wider shadow-sm transition-all gap-2"
           >
             <Play className="size-3.5 lg:size-4" />
             开始今日学习

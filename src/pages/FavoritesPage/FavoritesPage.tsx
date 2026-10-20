@@ -405,7 +405,7 @@ export default function FavoritesPage() {
                         )}>
                           {item.category === 'book' ? '📖 书籍' :
                            item.category === 'speech' ? '🎙 演讲' :
-                           item.category === 'ai' ? '✨ AI' :
+                           item.category === 'ai' ? 'AI' :
                            item.category === 'publication' ? '📰 刊物' : item.category}
                         </span>
                         <Button

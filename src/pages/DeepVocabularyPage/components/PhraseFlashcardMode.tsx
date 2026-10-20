@@ -18,7 +18,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useFramerMotion } from '@/lib/lazy-framer-motion';
 import {
-  Layers, RotateCw, Volume2, Sparkles, XCircle, ArrowLeft, ChevronLeft, ChevronRight,
+  Layers, RotateCw, Volume2, XCircle, ArrowLeft, ChevronLeft, ChevronRight,
   BookOpen, Gauge, Flame, History, Loader2, Target,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -893,7 +893,7 @@ export default function PhraseFlashcardMode({ level }: { level?: string }) {
                       </div>
                       <p className="text-sm font-bold text-ink-teal mb-1">{PHRASE_LEVEL_LABELS[bank]}短语库</p>
                       <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-4">
-                        <Sparkles className="size-3.5 inline mr-1 text-ink-teal" />点击翻转查看释义
+                        点击翻转查看释义
                       </p>
                       <p className="text-[9px] text-muted-foreground/70 font-bold mt-1.5">手机：左右滑动 · 键盘：空格 / 1-5 / S</p>
                     </>

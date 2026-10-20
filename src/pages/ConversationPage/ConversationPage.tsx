@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import {
   MessageSquare,
   Send,
-  Sparkles,
   Loader2,
   Users,
   Coffee,
@@ -675,18 +674,18 @@ export default function ConversationPage() {
                     <Trash2 className="size-3.5" />
                   </Button>
                 )}
-                <CardContent className={`p-6 bg-gradient-to-br ${scenario.bg}`}>
+                <CardContent className="p-6 bg-card">
                   <div
-                    className="size-14 rounded-2xl flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform shadow-lg"
-                    style={{ backgroundColor: scenario.color }}
+                    className="size-12 rounded-2xl flex items-center justify-center mb-4 border border-border/60"
+                    style={{ backgroundColor: `${scenario.color}14`, color: scenario.color }}
                   >
-                    <Icon className="size-6" />
+                    <Icon className="size-5" />
                   </div>
                   <h3 className="text-xl font-black text-foreground mb-2">{scenario.name}</h3>
                   <p className="text-sm text-muted-foreground font-medium mb-4">
                     {scenario.description}
                   </p>
-                  <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider" style={{ color: scenario.color }}>
+                  <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">
                     开始对话
                     <Plus className="size-3.5" />
                   </div>
@@ -701,7 +700,7 @@ export default function ConversationPage() {
             className="cursor-pointer hover:shadow-md transition-all duration-300 hover:-translate-y-1 group rounded-[32px] border-2 border-dashed border-muted-foreground/30 overflow-hidden bg-transparent"
           >
             <CardContent className="p-6 flex flex-col items-center justify-center text-center min-h-[200px]">
-              <div className="size-14 rounded-2xl flex items-center justify-center bg-muted text-muted-foreground mb-4 group-hover:scale-110 group-hover:bg-[var(--brand)] group-hover:text-white transition-all shadow-lg">
+              <div className="size-12 rounded-2xl flex items-center justify-center bg-muted text-muted-foreground mb-4 group-hover:bg-muted/70 transition-colors">
                 <Plus className="size-7" />
               </div>
               <h3 className="text-xl font-black text-muted-foreground mb-2 group-hover:text-foreground transition-colors">
@@ -918,7 +917,6 @@ export default function ConversationPage() {
               <div className="p-6 border-b border-border">
                 <DialogHeader>
                   <DialogTitle className="text-xl font-black italic text-foreground flex items-center gap-2">
-                    <Sparkles className="size-5 text-ink-teal" />
                     地道度分析报告
                   </DialogTitle>
                 </DialogHeader>

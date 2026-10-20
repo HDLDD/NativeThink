@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Upload, Sparkles, BookOpen, Loader2,
+  Upload, BookOpen, Loader2,
   Search, ExternalLink, X, Globe, Library, Mic, Wand2, BookMarked,
   Clock, History, Newspaper, HelpCircle, ShieldAlert,
   Heart, ChevronDown, Check, RefreshCw,
@@ -80,7 +80,7 @@ const MAINTABS: { key: MainTab; label: string; icon: typeof BookOpen }[] = [
   { key: 'webnovels', label: '网文推荐', icon: BookMarked },
   { key: 'scp', label: 'SCP 基金会', icon: ShieldAlert },
   { key: 'publications', label: '刊物', icon: Newspaper },
-  { key: 'ai', label: 'AI 生成', icon: Sparkles },
+  { key: 'ai', label: 'AI 生成', icon: BookOpen },
   { key: 'speeches', label: '演讲', icon: Mic },
   { key: 'wikipedia', label: '维基百科', icon: Globe },
 ];
@@ -1385,7 +1385,7 @@ export default function ArticlePage() {
                 disabled={!aiTopicInput.trim() || aiLoading || !isConfigured}
                 className="rounded-xl bg-[var(--brand)] hover:bg-[#00a882] text-white text-[10px] font-bold px-4"
               >
-                {aiLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                {aiLoading && <Loader2 className="size-3.5 animate-spin" />}
                 <span className="ml-1">生成</span>
               </Button>
             </div>
@@ -1811,7 +1811,7 @@ export default function ArticlePage() {
 
               {/* AI */}
               <div className="space-y-2">
-                <h3 className="font-black text-foreground flex items-center gap-2"><Sparkles className="size-4 text-ink-teal" />AI 生成</h3>
+                <h3 className="font-black text-foreground flex items-center gap-2">AI 生成</h3>
                 <p className="text-muted-foreground text-xs leading-relaxed">按主题/等级生成文章或书籍章节。AI 自动附中文翻译。需先配置 AI API Key。</p>
                 <p className="text-amber-600 text-[11px] font-medium">⚠ AI 生成依赖网络和 API 可用性，偶有格式异常需重试。</p>
               </div>

@@ -1,22 +1,8 @@
 import { memo } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
 import { QUICK_ENTRIES, COMING_SOON } from './constants';
 
-/** 品牌色 → 柔和投影色 */
-function shadowFor(color: string): string {
-  const v = color.includes('emerald') ? 'rgba(0,184,148,0.3)'
-    : color.includes('pink') ? 'rgba(236,72,153,0.28)'
-    : color.includes('cyan') ? 'rgba(14,165,233,0.28)'
-    : color.includes('indigo') ? 'rgba(99,102,241,0.3)'
-    : color.includes('amber') ? 'rgba(245,158,11,0.3)'
-    : color.includes('violet') ? 'rgba(139,92,246,0.3)'
-    : color.includes('teal') ? 'rgba(20,184,166,0.3)'
-    : color.includes('gray') ? 'rgba(31,41,55,0.2)'
-    : 'rgba(249,115,22,0.3)';
-  return v;
-}
 
 interface QuickStartGridProps {
   onNavigate: (path: string) => void;
@@ -44,13 +30,10 @@ function QuickStartGridInner({ onNavigate }: QuickStartGridProps) {
             >
               <CardContent className="p-6">
                 <div
-                  className={cn(
-                    'size-14 rounded-2xl flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform shadow-lg',
-                    `bg-gradient-to-br ${entry.color}`,
-                  )}
-                  style={{ boxShadow: `0 10px 25px -5px ${shadowFor(entry.color)}` }}
+                  className="size-12 rounded-2xl flex items-center justify-center mb-4 border border-border/60"
+                  style={{ backgroundColor: `${entry.tint}14`, color: entry.tint }}
                 >
-                  <Icon className="size-6" />
+                  <Icon className="size-5" />
                 </div>
                 <h4 className="text-base font-black text-foreground mb-1">{entry.label}</h4>
                 <p className="text-xs text-muted-foreground font-medium mb-3">{entry.desc}</p>

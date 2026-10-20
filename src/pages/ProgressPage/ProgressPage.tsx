@@ -13,7 +13,6 @@ import {
   BookOpen,
   Trash2,
   Filter,
-  Sparkles,
   Puzzle,
   MessageSquare,
   Volume2,
@@ -453,7 +452,7 @@ export default function ProgressPage() {
                     { key: 'history', label: '每日一句历史', desc: '首页每日一句的30天历史记录', icon: Calendar, color: 'text-amber-500', action: handleResetDailyHistory },
                     { key: 'spelling', label: '句子拼写进度', desc: '拼写练习记录、已完成标记、出题队列', icon: SpellCheck, color: 'text-orange-500', action: handleResetSpelling },
                     { key: 'reading', label: '阅读进度与批注', desc: '每本书阅读位置、对照翻译缓存、段落批注', icon: BookMarked, color: 'text-sky-500', action: handleResetReading },
-                    { key: 'aicache', label: 'AI 生成内容缓存', desc: '单词例句/解析、搭配翻译、插图缓存', icon: Sparkles, color: 'text-violet-500', action: handleResetAiCaches },
+                    { key: 'aicache', label: 'AI 生成内容缓存', desc: '单词例句/解析、搭配翻译、插图缓存', icon: Trash2, color: 'text-violet-500', action: handleResetAiCaches },
                   ].map((item) => (
                     <div key={item.key} className="flex items-center justify-between p-3 rounded-2xl bg-muted/30">
                       <div className="flex items-center gap-3">
@@ -530,8 +529,7 @@ export default function ProgressPage() {
                   <div className="flex items-center justify-between p-3 rounded-2xl bg-muted/30">
                     <div className="flex items-center gap-3">
                       <div className="size-9 rounded-xl bg-muted flex items-center justify-center">
-                        <Sparkles className="size-4 text-violet-500" />
-                      </div>
+                        </div>
                       <div>
                         <p className="text-sm font-bold text-foreground">所有AI生成内容</p>
                         <p className="text-[10px] text-muted-foreground">AI例句、短语库、影子跟读、写作提示等</p>
@@ -741,7 +739,6 @@ export default function ProgressPage() {
             value="achievements"
             className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
-            <Sparkles className="size-4 mr-2" />
             成就徽章
           </TabsTrigger>
         </TabsList>
@@ -1049,8 +1046,7 @@ export default function ProgressPage() {
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
                 <div className="size-12 rounded-2xl bg-amber-50 dark:bg-amber-500/15 text-amber-500 flex items-center justify-center">
-                  <Sparkles className="size-5.5" />
-                </div>
+                  </div>
                 <div>
                   <CardTitle className="text-xl font-[900] italic text-foreground">
                     成就徽章

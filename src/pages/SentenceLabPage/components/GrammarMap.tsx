@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BookMarked, Lightbulb, Volume2, Sparkles } from 'lucide-react';
+import { AlertTriangle, BookMarked, Lightbulb, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useTTS } from '@/lib/use-tts';
@@ -163,7 +163,7 @@ export function GrammarMap({ onJumpToPattern, jumpToTopic }: { onJumpToPattern?:
             {active.relatedPatterns && active.relatedPatterns.length > 0 && onJumpToPattern && (
               <div className="flex items-center gap-2 flex-wrap pt-1">
                 <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Sparkles className="size-3" /> 去句型库练
+                  去句型库练
                 </span>
                 {active.relatedPatterns.map((pid) => {
                   const nm = patternName(pid);

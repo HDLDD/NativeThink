@@ -436,12 +436,11 @@ export default function DashboardPage() {
                   key={opt.path}
                   onClick={() => { navigate(opt.path); setShowLearnDialog(false); }}
                   className={cn(
-                    'group p-4 rounded-2xl border-2 border-border hover:border-[var(--brand)]/30 text-left transition-all duration-200',
-                    'hover:shadow-md hover:-translate-y-0.5',
-                    opt.bg,
+                    'group p-4 rounded-2xl border border-border bg-card text-left transition-colors',
+                    'hover:bg-muted/50',
                   )}
                 >
-                  <div className={cn('size-10 rounded-xl flex items-center justify-center text-white mb-3 group-hover:scale-110 transition-transform shadow-lg bg-gradient-to-br', opt.color)}>
+                  <div className="size-10 rounded-xl flex items-center justify-center mb-3 border border-border/60" style={{ backgroundColor: `${opt.tint}14`, color: opt.tint }}>
                     <Icon className="size-5" />
                   </div>
                   <h4 className="text-sm font-black text-foreground mb-0.5">{opt.label}</h4>
