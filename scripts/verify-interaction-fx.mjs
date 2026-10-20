@@ -200,12 +200,23 @@ ok(/\.fx-ripple[\s\S]{0,120}animation:\s*none !important/.test(rmBlock),
    CDP 设备级真触摸（Input.dispatchTouchEvent，不是合成事件）按下时：pointerdown 带着
    pointerType:"touch" 到了元素、涟漪也建了节点，但按下期间整页
    document.querySelectorAll(':active').length 恒为 0 —— 这台 WebView 触摸下根本不进 :active。
-   所以缩放必须由委托层挂 data-pressing，:active 只作为真鼠标的并列来源。 */
-ok(/\[data-press\]:active,\s*\[data-press\]\[data-pressing\]\s*\{[^}]*scale:\s*var\(--fx-press-soft\)/.test(CSS),
-  '⑩ CSS 的 soft 档把 `:active` 与 `[data-pressing]` **并列**在同一条规则里（只留 :active = APK 上没有手感）；' +
-  '正则钉到 `var(--fx-press-soft)` 那一身，否则降级块里那条同形的选择器会替它蒙过去');
-ok(/\[data-press="strong"\]:active,\s*\[data-press="strong"\]\[data-pressing\]\s*\{[^}]*scale:\s*var\(--fx-press-strong\)/.test(CSS),
-  '⑩ strong 档同样两条来源并列，且都指到同一个 token（不许各写一个数）');
+   所以缩放必须由委托层挂 data-pressing，:active 只作为真鼠标的并列来源。
+   2026-10-20 真机 2.0.93 又补一刀：**触摸抬手后 :active 会被平台多按住 ~400ms**（up100ms 仍 active、
+   up300ms 才掉），按钮表现为"回弹晚"。所以 `:active` 收进 `@media (hover: hover) and (pointer: fine)` ——
+   这台真机报 `hover:none / pointer:coarse`；桌面报 `hover:hover / pointer:fine`。 */
+ok(/\[data-press\]\[data-pressing\]\s*\{[^}]*scale:\s*var\(--fx-press-soft\)/.test(CSS),
+  '⑩ `[data-press][data-pressing]` 这一档指回 `var(--fx-press-soft)` 那一身（正则钉 token，否则降级块里同形的选择器会替它蒙过去）');
+ok(/\[data-press="strong"\]\[data-pressing\]\s*\{[^}]*scale:\s*var\(--fx-press-strong\)/.test(CSS),
+  '⑩ strong 档同样指到同一个 token（不许各写一个数）');
+const HOVER_GATE = '@media (hover: hover) and (pointer: fine)';
+const 显式active位 = [...CSS.matchAll(/\[data-press\]:active/g)].map((m) => m.index);
+const 鼠标门位 = CSS.indexOf(HOVER_GATE);
+ok(/\[data-press\]:active\s*\{[^}]*scale:\s*var\(--fx-press-soft\)/.test(CSS) && 鼠标门位 >= 0,
+  '⑩ 鼠标那条 `:active` 仍然在（零延迟路径不丢），但它必须在 hover/pointer 媒体查询里');
+ok(显式active位.length > 0 && 显式active位.every((i) => i > 鼠标门位),
+  '⑩ 反向：媒体查询之外不许出现 `[data-press]:active` —— 真机实测触摸抬手后 :active 被平台多按住 ~400ms，' +
+  '留在外面就是"回弹晚"（这条断言的来历见 index.css 同处注释）',
+  JSON.stringify({ 鼠标门位, 显式active位 }));
 ok(/host\.setAttribute\('data-pressing', ''\)/.test(FX),
   '⑩ 委托层在 pointerdown 上挂 data-pressing');
 ok(/aria-disabled[\s\S]{0,120}host\.setAttribute\('data-pressing'[\s\S]{0,240}const reduce[\s\S]{0,160}if \(reduce\)\s*return;[\s\S]{0,240}ripple\(host,/.test(FX),
@@ -238,15 +249,20 @@ ok(/\[data-press\]\[data-pressing\][\s\S]{0,400}scale:\s*1 !important/.test(rmBl
 const DEF_SEL = ':where(button, a[href], [role="button"]):not([data-press])';
 const defBlocks = [...CSS.matchAll(/([^{}]*:where\(button[^{}]*?)\{([^{}]*)\}/g)]
   .map((m) => ({ sel: m[1].trim(), body: m[2].trim() }));
-ok(defBlocks.length === 2,
-  `⑪ 默认层恰好两条规则块：按下态一条 + 降级一条（当前 ${defBlocks.length}）` +
+ok(defBlocks.length === 3,
+  `⑪ 默认层恰好三条规则块：`+"`[data-pressing]`"+` 按下态一条 + 鼠标 :active 一条（在 hover 门里）+ 降级一条（当前 ${defBlocks.length}）` +
   defBlocks.map((b) => `〔${b.sel.replace(/\s+/g, ' ').slice(0, 46)}→${b.body}〕`).join(''));
 ok(CSS.includes(DEF_SEL + ':active') && CSS.includes(DEF_SEL + '[data-pressing]'),
-  '⑪ 默认层的选择器就是这一条，且 :active / [data-pressing] 两条来源并列；`:not([data-press])` 是退出钥匙' +
+  '⑪ 默认层的选择器就是这一条，按下态与鼠标态都在；`:not([data-press])` 是退出钥匙' +
   '（显式声明档位的宿主由上面那套完整待遇接管，两条规则同特异性会互相顶）');
+const 默认active位 = [...CSS.matchAll(new RegExp(DEF_SEL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':active', 'g'))].map((m) => m.index);
+ok(默认active位.length >= 2 && 默认active位.every((i) => i > 鼠标门位),
+  '⑪ 默认层每一处 `:active` 都在 hover/pointer 媒体查询之后（一处是鼠标态、一处是降级态；' +
+  '触摸设备只走 [data-pressing]，真机实测不被门住的 :active 会在抬手后多按住 ~400ms）',
+  JSON.stringify({ 鼠标门位, 默认active位 }));
 const defPressed = defBlocks.filter((b) => !/!important/.test(b.body));
-ok(defPressed.length === 1 && /scale:\s*var\(--fx-press-soft\)/.test(defPressed[0]?.body || ''),
-  `⑪ 默认层的按下态指回同一个 soft token（当前 ${defPressed.length} 块）—— 写死数字就是第二套词汇`);
+ok(defPressed.length === 2 && defPressed.every((b) => /scale:\s*var\(--fx-press-soft\)/.test(b.body)),
+  `⑪ 默认层的两条按下态（[data-pressing] 与鼠标 :active）都指回同一个 soft token（当前 ${defPressed.length} 块）—— 写死数字就是第二套词汇`);
 ok(defBlocks.every((b) => !/transition-property/.test(b.body)),
   '⑪ 反向：默认层不许写 transition-property —— 层外规则会顶掉全站 219 处 transition-all / 142 处 transition-colors');
 ok(defBlocks.every((b) => /:active|\[data-pressing\]/.test(b.sel)),

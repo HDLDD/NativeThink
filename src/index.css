@@ -332,16 +332,24 @@ h1, h2, h3 { letter-spacing: -0.015em; }
   transition-timing-function: var(--fx-ease);
 }
 /* 按压态有两个来源，缺一不可：
-   `:active` —— 真鼠标的零延迟路径；
-   `[data-pressing]` —— 由 press-fx 的 pointerdown 委托挂上。
+   `[data-pressing]` —— 由 press-fx 的 pointerdown 委托挂上；
+   `:active` —— 真鼠标的零延迟路径。
    ⚠️ 为什么不能只靠 `:active`：2026-10-20 模拟器 APK 上用 CDP `Input.dispatchTouchEvent`
    （设备级真触摸，不是合成事件）实测——`pointerdown` 带着 `pointerType:"touch"` 到了元素、
    涟漪也建了节点，但整页 `document.querySelectorAll(':active').length` 恒为 **0**，
    也就是说这个 WebView 在触摸下根本不进 `:active`。把手感挂在一个平台可能不给的伪类上，
    发出去的 APK 就没有按压反馈（而且自动化通道根本测不到）。JS 挂属性这条路三种形态都成立，
-   并且测得到——所以两条都留、以 `[data-pressing]` 为准。 */
-[data-press]:active, [data-press][data-pressing] { scale: var(--fx-press-soft); transition-duration: var(--fx-in), 140ms, 140ms, 140ms, 140ms, 140ms, 140ms, 140ms; }
-[data-press="strong"]:active, [data-press="strong"][data-pressing] { scale: var(--fx-press-strong); }
+   并且测得到——所以以 `[data-pressing]` 为准。
+   ⚠️ 反过来，`:active` 在**触摸设备上留着反而有害**：真机 2.0.93 实测抬手后平台还把 :active
+   多按住 ~400ms（`up100ms` 仍是 active、`up300ms` 才掉），按钮表现为"回弹晚"；
+   而这台机器报告 `hover: none` / `pointer: coarse`。所以 `:active` 只留给
+   「有悬浮能力的精确指针」（桌面鼠标），触摸设备只走 `[data-pressing]`。 */
+[data-press][data-pressing] { scale: var(--fx-press-soft); transition-duration: var(--fx-in), 140ms, 140ms, 140ms, 140ms, 140ms, 140ms, 140ms; }
+[data-press="strong"][data-pressing] { scale: var(--fx-press-strong); }
+@media (hover: hover) and (pointer: fine) {
+  [data-press]:active { scale: var(--fx-press-soft); transition-duration: var(--fx-in), 140ms, 140ms, 140ms, 140ms, 140ms, 140ms, 140ms; }
+  [data-press="strong"]:active { scale: var(--fx-press-strong); }
+}
 
 /* 默认可点：裸 `<button>` / `<a href>` / `[role=button]` **不用写 data-press 就参与**，
    不想参与的必须显式 `data-press="off"`（属性本身就是退出默认层的钥匙，见 `:not([data-press])`）。
@@ -353,8 +361,11 @@ h1, h2, h3 { letter-spacing: -0.015em; }
    transition 与 hover 缩放（实测计数：transition-all 219、transition-colors 142、
    transition-transform 28、hover:scale-* 21）。显式 data-press 的宿主才走上面那套完整待遇 ——
    那些是逐个核过的。 */
-:where(button, a[href], [role="button"]):not([data-press]):active,
 :where(button, a[href], [role="button"]):not([data-press])[data-pressing] { scale: var(--fx-press-soft); }
+/* `:active` 那半条同样只在"有悬浮能力的精确指针"下留（触摸设备抬手后 :active 会被平台多按住 ~400ms，见上面那段实测） */
+@media (hover: hover) and (pointer: fine) {
+  :where(button, a[href], [role="button"]):not([data-press]):active { scale: var(--fx-press-soft); }
+}
 
 /* 涟漪装在自有的宿主层里：不给按钮加 overflow:hidden —— 那会掐掉焦点环与内部浮层 */
 .fx-ripple-host { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; z-index: 0; }

@@ -82,8 +82,13 @@ framer-motion 已经在**首屏壳里**（`verify-bundle-budget` 的 540KB 基�
 
 也就是说这台 Android WebView 在触摸下**根本不进 `:active`**。第一版把缩放只挂在 `:active` 上，
 等于"网页版有手感、发出去的 APK 没有"，而且**自动化通道还测不到**（合成事件同样不激活）。
-所以按压态改由委托层投递：`pointerdown` → `host.setAttribute('data-pressing','')`，
-CSS 里 `:active` 与 `[data-pressing]` **并列**在同一条规则（鼠标那条留着，白捡零延迟）。
+所以按压态改由委托层投递：`pointerdown` → `host.setAttribute('data-pressing','')`。
+
+**`:active` 随后又被降级成"只有鼠标才走"**（2026-10-20 真机 2.0.93 实测，`tmp/press-fixture-phone.mjs` 注入夹具 + CDP 真触摸）：
+抬手后平台还会把 `:active` **多按住 ~400ms**（`up100ms` 仍 `active:true`、`up300ms` 才掉，scale 那段时间停在 0.985），
+按钮表现为"回弹晚"；而这台真机报 `hover:none / pointer:coarse`，桌面报 `hover:hover / pointer:fine`。
+所以现在的规则是：**`[data-pressing]` 无条件生效，`:active` 收进
+`@media (hover: hover) and (pointer: fine)`**。这样鼠标仍有零延迟路径，触摸设备只走 JS 投递那条（实测响应 0–32ms）。
 
 收回路径是四条，缺一条就会留下一个"永久按着"的按钮：`pointerup` / `pointercancel` / `window blur` /
 `initPressFx` 的卸载函数。收回写的是"清全站 `[data-pressing]`"而不是"记住刚才挂了谁" ——
@@ -114,7 +119,7 @@ strong 档 115px 宽的按钮缩到 0.97 时，视觉左边自己就动了 1.7px
 
 | 面 | 规则 | 位置 |
 |---|---|---|
-| CSS | `:where(button, a[href], [role="button"]):not([data-press])` 的 `:active` / `[data-pressing]` 两态 → `var(--fx-press-soft)` | `index.css:356-357`（降级那条在 `:392-394`） |
+| CSS | 默认层：`[data-pressing]` 一条（`index.css:364`）+ 鼠标 `:active` 一条收在 `@media (hover: hover) and (pointer: fine)` 里（`:366-368`）→ `var(--fx-press-soft)`；降级两条在 `:401-404` | 显式宿主同构：`:347`（`[data-pressing]`）与 `:349-352`（鼠标门里的 `:active`） |
 | 委托 | `closest('button, a[href], [role="button"], [data-press]')`，`data-press="off"` 整块退出 | `press-fx.ts:86-88` |
 | 例外 | 全站目前**只有一处** `off`：侧边栏 16px 隐形拖拽把手（`ui/sidebar.tsx` `SidebarRail`） | 守卫 ⑪ 钉"off ≤ 5 处"，多了就是有人在绕开契约 |
 
@@ -167,15 +172,17 @@ strong 档 115px 宽的按钮缩到 0.97 时，视觉左边自己就动了 1.7px
 
 ## 6. 验证
 
-- `node scripts/verify-interaction-fx.mjs` —— **104 条**：token 单点定义与数值、`scale` 而非 `transform`（含反向断言）、
+- `node scripts/verify-interaction-fx.mjs` —— **107 条**：token 单点定义与数值、`scale` 而非 `transform`（含反向断言）、
   颜色过渡白名单、9 个练习面 `active:scale` 计数为 0 且 `data-press` 覆盖数只许涨不许跌、基座档位推导、
   委托层四条边界（键盘/reduce/无尺寸/上限）、涟漪两档且不许回到 `currentColor`、奖励层唯一出口（剥注释全仓扫描）、
-  结果层不引 motion 不弹 toast、闪卡接线四条（含两条正对照）、**⑩ 按压态投递机制十条**（两条 CSS 选择器并列、
+  结果层不引 motion 不弹 toast、闪卡接线四条（含两条正对照）、**⑩ 按压态投递机制十二条**
+  （`[data-press][data-pressing]` 钉到 token、**`:active` 必须收在 `@media (hover: hover) and (pointer: fine)` 里 +
+  反向"媒体门之外不许出现 `[data-press]:active`"**（真机实测触摸抬手后 :active 被平台多按住 ~400ms → 回弹晚）、
   挂属性、门槛→挂→降级→涟漪的**顺序**、收回按"清全站"、pointerup/pointercancel 既挂又撤、失焦也撤、
   反向"除委托层全站不许自己写 data-pressing"、降级块覆盖新机制）、
-  **⑪ 默认可点层十三条**（默认层恰好两个规则块、`:not([data-press])` 退出钥匙、反向钉"默认层不许写
-  `transition-property`/基态 scale"、委托 `closest` 与 CSS 同源、off 门的位置、涟漪宿主的 inline/static 两条兜底
-  排在量尺寸之前、侧边栏把手那处 off、off 总数 ≤5、两条走查脚本的参与者选择器同源）、
+  **⑪ 默认可点层十五条**（默认层恰好三个规则块、`:not([data-press])` 退出钥匙、默认层的 `:active` 也在 hover 门里、
+  反向钉"默认层不许写 `transition-property`/基态 scale"、委托 `closest` 与 CSS 同源、off 门的位置、
+  涟漪宿主的 inline/static 两条兜底排在量尺寸之前、侧边栏把手那处 off、off 总数 ≤5、两条走查脚本的参与者选择器同源）、
   **⑫ 入场档六条**（曲线字面量全站只许一次、组件里不许自带曲线、`.page-enter`/`.stagger > *` 用 `var(--fx-ease)`
   且 fill 是 `backwards`、reduce 停入场、全站 ≥10 个挂载点、路由级入场挂在 Layout 的 keyed 包装上）。
   ⚠️ 全仓扫描那五条判据**共用一次转译**（`codeOf()` 记忆化）：各扫各的会把这条守卫拖到 3 分钟以上
@@ -194,7 +201,8 @@ strong 档 115px 宽的按钮缩到 0.97 时，视觉左边自己就动了 1.7px
   `/\[data-press\]:active,\s*\[data-press\]\[data-pressing\]/` 被**降级块里同形的那条选择器**替它答了，
   正则必须钉到 `var(--fx-press-soft)` 那一身才红。M17/M21 则是变异锚点用错了（源码带 `as EventListener`、
   以及"插入"而不是"搬移"）—— 实验本身无效，重做后才红。
-- `node scripts/walk-interaction-fx.mjs` —— **23 条**运行时（无头 Chrome + CDP）：`pointerdown→下一帧 ≤100ms`、
+- `node scripts/walk-interaction-fx.mjs` —— **23 条**（设备通道）/ **24 条**（本机通道多一条：hover/pointer 门必须命中，
+  否则鼠标那条 `:active` 路径等于不存在）运行时（无头 Chrome + CDP）：`pointerdown→下一帧 ≤100ms`、
   **合成 pointerdown 现在也能量到缩放在发生**（换成 JS 挂属性之前这条测不到）、`data-pressing` 挂上且 pointerup 收回、
   **布局盒** `offsetLeft/offsetTop` 按下前后不动、涟漪自清、reduce 下既不建节点也 scale 1、键盘 0 个、
   连点 6 次在飞 ≤3 且宿主只 1 个、canvas 唯一且 `pointer-events:none`、三屏参与者计数（≥15/80/12，实测 31/112/18）、
@@ -223,8 +231,13 @@ strong 档 115px 宽的按钮缩到 0.97 时，视觉左边自己就动了 1.7px
 
 ## 7. 已知边界（别当成已完成）
 
-- **设备侧凭据还欠一轮**：批 2 的默认可点层与批 1 的结果图形件目前只有①本机无头 Chrome 23 条 +
-  ②本机构建产物上的装机走查 36 条。`--tier soft` 在模拟器/真机上挑到的就是裸按钮，那一轮跑完才算装机成立（排在打包之前）。
+- **设备侧凭据已经齐了，但要按通道分工说**：①本机无头 Chrome 23 条（鼠标/合成事件）；②模拟器 APK 上
+  `check-interaction-on-phone` strong / soft / **default** 各 13/13 + `walk-phone` 36/36；③真机 d0e47380（2.0.93）
+  上用**注入夹具 + CDP 真触摸**跑 `tmp/press-fixture-phone.mjs` 10/10（默认层、off、静态宿主补 relative、行内不画、布局盒不动），
+  跑完删夹具、不碰 App 状态。**别再写"设备侧欠一轮"**。
+- **`:active` 在触摸设备上一律不参与**（`@media (hover: hover) and (pointer: fine)` 之外没有它）——
+  所以"按住时鼠标悬停变色 + 缩放同时发生"这类组合**只在桌面成立**，真机上只有 `[data-pressing]` 那一条。
+  反过来，桌面上的 `:active` 路径**没有设备级证据**（合成 pointerdown 不产生 `:active`），只有本机走查的动态读数兜着。
 - 弧与色点的运行时凭据取自**纠偏重考**那一处；`FlashcardMode` 的头部弧与 `DailyLearningMode` 的连击环
   仍只有静态守卫（连击环要连对 3 张才出现，走查没走到那一步）。同源同组件，但**别把它写成"四处都实测过"**。
 - `.stream-in`、`toast-in` 这些旧动画仍带着自己的曲线与 fill-mode —— 本轮只把 `page-enter` / `stagger > *` /

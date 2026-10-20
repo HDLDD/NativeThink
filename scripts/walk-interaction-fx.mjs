@@ -236,6 +236,13 @@ const 卡片 = JO(`(()=>{const st=document.querySelector('.stagger');const kid=s
 ok(/cubic-bezier\(0\.22, 1, 0\.36, 1\)/.test(String(卡片.曲线)) && 卡片.名 === 'card-enter',
   '⑪ 卡片逐张入场与路由入场同一条曲线、同一个动画名（首页 QuickStartGrid 那一屏实测）', JSON.stringify(卡片));
 
+/* ⑫ 本机通道必须命中 hover/pointer 门 —— 鼠标那条 `:active` 规则写在门里，门不开就等于不存在。
+   （设备通道门本来就是关的：真机实测抬手后 :active 会被平台多按住 ~400ms，所以那条路故意只给鼠标。） */
+if (!BASE.startsWith('https://localhost')) {
+  const gate = String(ev(`(()=>matchMedia('(hover: hover) and (pointer: fine)').matches)()`));
+  ok(gate === 'true', '⑫ 本机通道命中 hover/pointer 门（鼠标那条 :active 路径在桌面上真的生效）', `matchMedia=${gate}`);
+}
+
 const fails = results.filter((x) => !x).length;
 console.log(`\n交互层走查 ${results.length - fails}/${results.length} 通过${fails ? '' : ' ✓'}`);
 process.exit(fails ? 1 : 0);
