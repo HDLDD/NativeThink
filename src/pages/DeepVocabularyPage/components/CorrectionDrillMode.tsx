@@ -25,6 +25,7 @@ import { useSpellingSentences, correctionToSpellingItem, normSentenceKey } from 
 import { sfxTick, sfxComplete } from '@/lib/sfx';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { cn } from '@/lib/utils';
+import { ScoreArc, VerdictDot } from '@/components/fx/ResultFx';
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -287,7 +288,13 @@ export default function CorrectionDrillMode() {
           <ArrowLeft className="size-4" />
         </button>
         <span className="text-xs font-black text-muted-foreground tabular-nums">{answered}/{queue.length}</span>
-        <span className="text-xs font-black text-emerald-500 tabular-nums">✓{goodCount}</span>
+        {/* 与中译英同一口径：正确率交给弧长；一题没答不画弧（0% 的弧是个假判定） */}
+        {answered > 0 && (
+          <span className="flex items-center gap-1 text-xs font-black tabular-nums" title={`本轮答对 ${goodCount}/${answered}`}>
+            <ScoreArc value={goodCount / answered} size={18} color={goodCount / answered >= 0.7 ? '#00B894' : '#F59E0B'} />
+            ✓{goodCount}
+          </span>
+        )}
         {cw && (
           <span className="ml-auto px-2 py-0.5 rounded-full bg-muted text-[9px] font-black text-muted-foreground">
             {SOURCE_LABEL[cw.source]}
@@ -328,7 +335,11 @@ export default function CorrectionDrillMode() {
                         revealed && !isCorrect && !isChosen && 'border-border/40 bg-muted/20 text-muted-foreground/50',
                       )}
                     >
-                      {opt}
+                      {/* 判定色点只在揭晓后出现；干扰项是中性点，不许蹭"答对"的绿 */}
+                      <span className="flex items-center gap-2">
+                        {revealed && <VerdictDot state={isCorrect ? 'ok' : isChosen ? 'miss' : 'pending'} />}
+                        <span className="min-w-0">{opt}</span>
+                      </span>
                     </button>
                   );
                 })}

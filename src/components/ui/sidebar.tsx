@@ -283,9 +283,12 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   const { toggleSidebar } = useSidebar()
 
   return (
+    // 16px 宽的隐形拖拽把手：它没有任何"按钮"外观（只在 hover 时现出一条 2px 边线），
+    // 是全站少数需要显式退出按压词汇的裸按钮 —— 默认层覆盖 `<button>`，退出要写 `data-press="off"`
     <button
       data-sidebar="rail"
       data-slot="sidebar-rail"
+      data-press="off"
       aria-label="Toggle Sidebar"
       tabIndex={-1}
       onClick={toggleSidebar}

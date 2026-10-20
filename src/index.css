@@ -27,15 +27,18 @@ body {
   80%  { opacity: 1; transform: translate(-50%, 0)    scale(1); }
   100% { opacity: 0; transform: translate(-50%, -10px) scale(0.9); }
 }
-/* ── Page transition: subtle fade + rise on every route change ──
-   注意：不能用 fill-mode: both/forwards —— 结束帧的 transform 会永久保留，
-   使祖先元素成为 fixed 定位的包含块，把阅读器等 fixed 覆盖层困在内容列里。 */
+/* ── 第三档「入场 / 转场」（2026-10-20 收口，不是新造）──
+   这两条早就在跑（12 处界面挂着），本轮做的是把它并进同一套词汇：**缓动只认 var(--fx-ease)**，
+   字面量全站只许出现在 :root 那一行（守卫 ⑫ 数次数）。时长各留自己的数（240 / 320 / 220 各有用途，
+   重复的不是时长是曲线）。
+   ⚠️ fill-mode 必须是 backwards，不许 both/forwards —— 结束帧的 transform 会永久保留，
+   使祖先成为 fixed 定位的包含块，把阅读器等 fixed 覆盖层困在内容列里（实测过的坑）。 */
 @keyframes page-enter {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: none; }
 }
 .page-enter {
-  animation: page-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: page-enter 240ms var(--fx-ease) backwards;
 }
 
 /* Staggered card entrance — apply to card grids via .stagger */
@@ -44,7 +47,7 @@ body {
   to   { opacity: 1; transform: none; }
 }
 .stagger > * {
-  animation: card-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: card-enter 320ms var(--fx-ease) backwards;
 }
 
 /* Session-complete celebration emoji pop */
@@ -125,8 +128,8 @@ main ::-webkit-scrollbar-track { background: transparent; }
   from { opacity: 0; transform: translateX(-40px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-.page-turn-next { animation: page-turn-next 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-.page-turn-prev { animation: page-turn-prev 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.page-turn-next { animation: page-turn-next 220ms var(--fx-ease) both; }
+.page-turn-prev { animation: page-turn-prev 220ms var(--fx-ease) both; }
 @media (prefers-reduced-motion: reduce) {
   .page-turn-next, .page-turn-prev { animation: none; }
 }
@@ -340,6 +343,19 @@ h1, h2, h3 { letter-spacing: -0.015em; }
 [data-press]:active, [data-press][data-pressing] { scale: var(--fx-press-soft); transition-duration: var(--fx-in), 140ms, 140ms, 140ms, 140ms, 140ms, 140ms, 140ms; }
 [data-press="strong"]:active, [data-press="strong"][data-pressing] { scale: var(--fx-press-strong); }
 
+/* 默认可点：裸 `<button>` / `<a href>` / `[role=button]` **不用写 data-press 就参与**，
+   不想参与的必须显式 `data-press="off"`（属性本身就是退出默认层的钥匙，见 `:not([data-press])`）。
+   为什么翻成默认：全站 307 处裸 `<button>` 加 395 处 `<Button>`，手抄属性一定会漏，
+   而这条判据要的是"一套词汇覆盖所有可点东西"，不是"量过的都合格"。
+   ⚠️ 这一层**只给按下态**，既不给 base `scale: 1` 也不写 `transition-property`：
+   Tailwind v4 把 utilities 装进 `@layer`，而本文件这些规则在层外 —— 层外规则无视特异性
+   一律赢过层内（已在产物 CSS 复核）。所以在这里写上面那两样，会**静默顶掉**宿主自己的
+   transition 与 hover 缩放（实测计数：transition-all 219、transition-colors 142、
+   transition-transform 28、hover:scale-* 21）。显式 data-press 的宿主才走上面那套完整待遇 ——
+   那些是逐个核过的。 */
+:where(button, a[href], [role="button"]):not([data-press]):active,
+:where(button, a[href], [role="button"]):not([data-press])[data-pressing] { scale: var(--fx-press-soft); }
+
 /* 涟漪装在自有的宿主层里：不给按钮加 overflow:hidden —— 那会掐掉焦点环与内部浮层 */
 .fx-ripple-host { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; z-index: 0; }
 .fx-ripple {
@@ -373,6 +389,9 @@ h1, h2, h3 { letter-spacing: -0.015em; }
 /* 降级：减少动效偏好下**不画涟漪、不缩放**（委托层直接不建节点，这里再兜一层） */
 @media (prefers-reduced-motion: reduce) {
   [data-press], [data-press]:active, [data-press][data-pressing] { scale: 1 !important; transition: none !important; }
+  /* 默认可点那一层也要一起收掉 —— 只写上面那条的话，裸按钮在降级偏好下照样缩 */
+  :where(button, a[href], [role="button"]):not([data-press]):active,
+  :where(button, a[href], [role="button"]):not([data-press])[data-pressing] { scale: 1 !important; }
   .fx-ripple, .fx-ring::after, .fx-shake { animation: none !important; }
   .fx-arc .fx-arc-fg { animation-duration: 0.01ms !important; }
 }

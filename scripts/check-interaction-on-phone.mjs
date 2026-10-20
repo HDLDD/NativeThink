@@ -12,7 +12,9 @@
  *   而且按坐标 `elementFromPoint().closest('[data-press]')` 取宿主 —— 不按索引，
  *   免得点一下把侧栏/卡片列表改动后，第 N 个元素已经换成了别的东西（第一版就这么假红过）。
  *
- * 前置：App 在前台且停在有 `[data-press]` 的界面（背单词练习面最好，那里是 strong 档）；
+ * 前置：App 在前台且停在有参与者的界面（背单词练习面最好，那里是 strong 档；
+ *       浏览/配置面的裸按钮走的是批 2 的默认可点层 —— 要专门量它就 `--tier default`
+ *       （只挑 `data-press` 为空的元素，否则挑到的永远是基座那批显式接线的）；
  *       转发已建：真机 `adb forward tcp:9223 localabstract:webview_devtools_remote_<pid>`
  *                 / 模拟器 `node scripts/phone-emu.mjs cdp`（9226）。
  * 用法：node scripts/check-interaction-on-phone.mjs [--port 9223] [--tier strong] [--nth 6]
@@ -51,12 +53,18 @@ const ok = (c, n, d = '') => { results.push(c); console.log(`${c ? '✓' : '✗'
 
 await send('Runtime.enable');
 
-/** 按坐标取"按下时该被影响的那个 [data-press]"，与页面结构变化无关 */
-const READ = (x, y) => `(()=>{const el=document.elementFromPoint(${x},${y})?.closest?.('[data-press]');
+/** 参与者口径与 index.css 的默认层、press-fx 的 closest 同源（守卫 ⑪ 盯着这三处一致）：
+ *  批 2 之后裸 `<button>` / `<a href>` / `[role=button]` 不写属性也参与，
+ *  这里还按 `[data-press]` 数的话，这一层新覆盖的那一片在设备上全都量不到（覆盖假绿）。 */
+const PSEL = 'button, a[href], [role="button"], [data-press]';
+
+/** 按坐标取"按下时该被影响的那个参与者"，与页面结构变化无关 */
+const READ = (x, y) => `(()=>{const el=document.elementFromPoint(${x},${y})?.closest?.(${JSON.stringify(PSEL)});
   if(!el)return JSON.stringify({e:'NO_HOST'})
   ;const r=el.getBoundingClientRect();const cs=getComputedStyle(el);
   return JSON.stringify({标签:(el.innerText||el.getAttribute('title')||el.tagName).replace(/\\s+/g,' ').trim().slice(0,16),
-    宽:Math.round(r.width),高:Math.round(r.height),档位:el.getAttribute('data-press'),
+    宽:Math.round(r.width),高:Math.round(r.height),档位:el.getAttribute('data-press')||'soft',
+    默认参与:!el.hasAttribute('data-press'),
     scale:cs.scale,按压态:el.hasAttribute('data-pressing'),active:el.matches(':active'),
     左:+r.left.toFixed(2),顶:+r.top.toFixed(2),布局左:el.offsetLeft,布局顶:el.offsetTop,
     涟漪:el.querySelectorAll('.fx-ripple').length,涟漪全站:document.querySelectorAll('.fx-ripple').length,
@@ -69,9 +77,11 @@ const read = async (x, y) => J(await ev(READ(x, y)));
  * 所以三重门：尺寸够、elementFromPoint 命中它或它的后代、自身与祖先链都不许 pointer-events:none。
  * 先要 --tier 那一档（练习面评分行是 strong，那是手感最需要成立的地方），拿不到再退到任意档。
  */
-const pickJS = (tier) => `(()=>{const T=${JSON.stringify(tier)};const want=(T==='strong'||T==='soft')?T:null;
+const pickJS = (tier) => `(()=>{const T=${JSON.stringify(tier)};const want=(T==='strong'||T==='soft'||T==='default')?T:null;
+  const P=${JSON.stringify(PSEL)};
   const overlay=document.querySelector('[data-slot="dialog-overlay"][data-state="open"]');
-  const els=[...document.querySelectorAll('[data-press]')];
+  const 档=(el)=>el.getAttribute('data-press')||'soft';
+  const els=[...document.querySelectorAll(P)].filter((e)=>e.getAttribute('data-press')!=='off');
   const fits=(el)=>{const r=el.getBoundingClientRect();if(r.width<28||r.height<20||r.top<0||r.bottom>innerHeight)return null;
     const x=Math.round(r.left+r.width/2),y=Math.round(r.top+r.height/2);
     let p=el;while(p){if(getComputedStyle(p).pointerEvents==='none')return null;p=p.parentElement}
@@ -81,12 +91,12 @@ const pickJS = (tier) => `(()=>{const T=${JSON.stringify(tier)};const want=(T===
     return {x,y};};
   for(const only of (want?[true,false]:[false])){
     for(const el of els){
-      if(only&&el.getAttribute('data-press')!==want)continue;
+      if(only&&档(el)!==want&&(want!=='default'||el.getAttribute('data-press')!==null))continue;
       const c=fits(el);if(!c)continue;
-      return JSON.stringify({i:els.indexOf(el),n:els.length,tier:el.getAttribute('data-press'),x:c.x,y:c.y});}}
-  return JSON.stringify({err:'没有可点得到的 [data-press]',n:els.length,
+      return JSON.stringify({i:els.indexOf(el),n:els.length,tier:档(el),默认:el.getAttribute('data-press')===null,x:c.x,y:c.y});}}
+  return JSON.stringify({err:'没有可点得到的参与者',n:els.length,
     挡着的:overlay?'dialog-overlay（先走完向导）':'无',
-    这一档有几个:els.filter(e=>e.getAttribute('data-press')===T).length});})()`;
+    这一档有几个:els.filter((e)=>(T==='default'?e.getAttribute('data-press')===null:档(e)===T)).length});})()`;
 
 let a = null, AT = null;
 for (const tier of (TIER === 'any' ? ['any'] : [TIER, 'any'])) {
@@ -95,7 +105,7 @@ for (const tier of (TIER === 'any' ? ['any'] : [TIER, 'any'])) {
   if (tier === 'any') { console.log(`✗ 挑目标失败：${p.err}（${p.挡着的}；界面共 ${p.n} 个，${TIER} 档 ${p.这一档有几个} 个）`); ws.close(); process.exit(1); }
 }
 const want = a.tier === 'strong' ? 0.970 : 0.985;
-ok(true, `⓪ 挑到一个真的点得到的目标：第 ${a.i} 个，档位 ${a.tier}（界面共 ${a.n} 个 [data-press]，${AT === 'any' ? '兜底到任意档' : '按 --tier ' + TIER + ' 挑'}）`);
+ok(true, `⓪ 挑到一个真的点得到的目标：第 ${a.i} 个，档位 ${a.tier}${a.默认 ? '（默认可点，没写 data-press）' : '（显式接线）'}（界面共 ${a.n} 个参与者，${AT === 'any' ? '兜底到任意档' : '按 --tier ' + TIER + ' 挑'}）`);
 
 /* ── 真触摸按下：CDP Input.dispatchTouchEvent 是设备级事件 ── */
 await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: a.x, y: a.y }] });
@@ -123,7 +133,13 @@ const c = await read(a.x, a.y);
 ok(c.按压态 === false, `⑦ 移开再抬手后 data-pressing 收回（实测 ${c.按压态}）`);
 await sleep(120);
 const c2 = await read(a.x, a.y);
-ok(Number(String(c2.scale).replace(/[^0-9.]/g, '')) === 1 || c2.scale === '', `⑧ 抬手后 scale 回到 1（实测 "${c2.scale}"）`);
+/**
+ * "不缩"有**两种合法读数**：显式接线的宿主有基态 `scale: 1`，而默认可点那一层故意不给基态
+ * （给了会顶掉宿主的 `hover:scale-*`，见 index.css 同处注释）→ 抬手后 computed 是初始值 `none`。
+ * 所以判"收回"要看"是不是还在缩"（≥0.999），不是死盯字面量 1 —— 停在 0.985 照样红。
+ */
+const 收后 = ['', 'none'].includes(String(c2.scale).trim()) ? 1 : parseFloat(String(c2.scale));
+ok(收后 >= 0.999, `⑧ 抬手后回到"不缩"那一态（实测 "${c2.scale}"）`, `换算 ${收后}`);
 ok(c2.布局左 === b.布局左 && c2.布局顶 === b.布局顶,
   '⑨ 按下前后**布局盒**逐位不动（offsetLeft/offsetTop —— 缩放不占位，不会把下面的字幕/卡片推得跳一下）',
   `布局 Δ${c2.布局左 - b.布局左},${c2.布局顶 - b.布局顶}；视觉 rect Δ${(c2.左 - b.左).toFixed(2)}（含 scale，本来就该动）`);
@@ -138,7 +154,7 @@ for (let k = 0; k < NTH; k++) {
   await sleep(20);
 }
 await sleep(80);
-const cap = J(await ev(`(()=>{const el=document.elementFromPoint(${a.x},${a.y})?.closest?.('[data-press]');
+const cap = J(await ev(`(()=>{const el=document.elementFromPoint(${a.x},${a.y})?.closest?.(${JSON.stringify(PSEL)});
   return JSON.stringify({在飞:el.querySelectorAll('.fx-ripple').length,宿主:el.querySelectorAll('.fx-ripple-host').length})})()`));
 ok(cap.在飞 >= 1 && cap.在飞 <= 3 && cap.宿主 === 1, `⑩ 连点 ${NTH} 次：在飞 ${cap.在飞}（上限 3）且宿主只 ${cap.宿主} 个（复用不堆叠）`);
 await sleep(600);

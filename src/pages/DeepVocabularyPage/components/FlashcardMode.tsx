@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import { useTTS } from '@/lib/use-tts';
 import { sfxComplete } from '@/lib/sfx';
 import { celebrate } from '@/lib/celebrate';
-import { StreakRing } from '@/components/fx/ResultFx';
+import { StreakRing, ScoreArc } from '@/components/fx/ResultFx';
 import { decideSwipe, SWIPE_THRESHOLD } from '@/lib/vocab-swipe';
 import { createSessionOrder, scheduleRelearn, nextIndex, forecastByDay, MAX_RELEARN, type ISessionOrder } from '@/lib/vocab-session';
 import { useCustomWords, toWordEntry } from '@/lib/custom-words';
@@ -1062,7 +1062,13 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
             <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-wider text-muted-foreground">
               <span className="tabular-nums">{currentIdx + 1}/{session.order.length}</span>
               <span className="tabular-nums">已评 {sessionRated}</span>
-              {sessionRated > 0 && <span className={cn('tabular-nums', accuracy >= 70 ? 'text-emerald-600' : 'text-amber-600')}>记得 {accuracy}%</span>}
+              {/* 正确率交给弧长说（ScoreArc 是结果层的图形件）；数字留着当刻度，不写"记得"这种句子 */}
+              {sessionRated > 0 && (
+                <span className="flex items-center gap-1 tabular-nums" title={`本轮 ${sessionGood}/${sessionRated} 评在记得及以上`}>
+                  <ScoreArc value={accuracy / 100} size={18} color={accuracy >= 70 ? '#00B894' : '#F59E0B'} />
+                  {accuracy}%
+                </span>
+              )}
               {combo >= 3 && (
                 /* 连击环替掉了原来的 animate-pulse：一个元素上叠两种动效只会互相抢注意力 */
                 <StreakRing n={combo} className="px-1">

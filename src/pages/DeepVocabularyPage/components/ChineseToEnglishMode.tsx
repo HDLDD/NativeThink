@@ -27,6 +27,7 @@ import { useLearningStats } from '@/lib/use-learning-stats';
 import { sfxTick, sfxComplete } from '@/lib/sfx';
 import { safeStorage } from '@/lib/safe-storage';
 import { cn } from '@/lib/utils';
+import { ScoreArc, VerdictDot } from '@/components/fx/ResultFx';
 
 const ROUND_SIZES = [10, 20, 50, 0] as const;
 
@@ -337,7 +338,13 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
           <ArrowLeft className="size-4" />
         </button>
         <span className="text-xs font-black text-muted-foreground tabular-nums">{answered}/{queue.length}</span>
-        <span className="text-xs font-black text-emerald-500 tabular-nums">✓{goodCount}</span>
+        {/* 正确率交给弧长，不写"答对了几个"这种句子；一题没答就不画弧（0% 的弧是一个假判定） */}
+        {answered > 0 && (
+          <span className="flex items-center gap-1 text-xs font-black tabular-nums" title={`本轮答对 ${goodCount}/${answered}`}>
+            <ScoreArc value={goodCount / answered} size={18} color={goodCount / answered >= 0.7 ? '#00B894' : '#F59E0B'} />
+            ✓{goodCount}
+          </span>
+        )}
         <div className="ml-auto flex items-center gap-1.5">
           {([['choice', ListChecks, '四选一'], ['spell', Keyboard, '拼写']] as const).map(([k, Icon, label]) => (
             <button data-press="strong"
@@ -401,7 +408,11 @@ export default function ChineseToEnglishMode({ level }: { level: string }) {
                           revealed && !isCorrect && !isChosen && 'border-border/40 bg-muted/20 text-muted-foreground/50',
                         )}
                       >
-                        {opt}
+                        {/* 判定色点只在揭晓后出现；没被选的干扰项是中性点，不许蹭"答对"的绿 */}
+                        <span className="flex items-center justify-center gap-1.5">
+                          {revealed && <VerdictDot state={isCorrect ? 'ok' : isChosen ? 'miss' : 'pending'} />}
+                          {opt}
+                        </span>
                       </button>
                     );
                   })}

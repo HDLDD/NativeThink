@@ -769,3 +769,17 @@ typecheck + eslint + `npm run verify:all` **28 项全绿**，断言合计 **7,88
 ④ 修法 = 取消改**代际号** `chainGenRef`（`speak`/`cancel` 各 `++`，且 `++` 排在 `abortedRef=true` 之前；五处续链把 `gen` 传下去；链入口与 `playUrl` 的 onended/onerror/25s 看门狗/`play().catch`/入口五条退出都比代际；`stopAudio` 先摘 `onplay/onended/onerror/onpause` 再 `pause(); src=''`）。**E4 当场抓到一处漏传**：原生"暂停后恢复重播"那条 `nativeReplayRef` 没带 `gen`，默认形参会取"调用那一刻"的当代 —— 那不是恒真断言，是它自己会错。守卫 `verify-tts-hardening` 21→**31**（E 节 10 条），**八条变异 N1-N8 逐条验红**（N2 用"搬位置"而不是"删掉"来验顺序判定，N4 专门验 bump 与取消的先后）。
 
 ⑤ 修后同一夹具：点喇叭 **13/13**、点例句 **13/13**（含两片的 `appliance` 两片都响）、自动朗读不再有 AbortError。`verify:all` **30 项全绿**（断言合计 **8,017**）。教训一条：**"部分"类投诉要用形状去撞，不要用随机去等**；而"这次和上次症状一样所以原因一样"这种推理，必须被读数推翻过才算数。
+
+2026-10-20 第 50 测（交互层二、三档：把"一套词汇"从"我接过的地方"变成"所有可点的东西"）：第 47 测那份三档交付的后两批 —— 批 1 结果图形件接进四个练习面、批 2 按压词汇**翻成默认可点**、批 3 入场/转场收口。三条值得单独记的读数：
+
+① **Tailwind v4 的层叠层次了两次，方向相反**。（a）`src/index.css` 里这些规则**在 `@layer` 之外**，而 v4 把 utilities 装进 `@layer utilities`（产物 CSS 复核）—— **层外规则无视特异性一律赢过层内**。所以默认层里如果写 `transition-property` 或基态 `scale: 1`，会静默顶掉宿主的 `transition-all` 219 处 / `transition-colors` 142 处 / `transition-transform` 28 处 / `hover:scale-*` 21 处（数字是 grep 出来的，写进守卫注释，改动要重新推导）。默认层因此**只给按下态**。（b）同一条性质反过来救了一次：`<Button data-press="strong">` 本身也是 `button`，若默认层排在 strong 档之后且同特异性，strong 会被 soft 顶掉 —— 所以退出钥匙写成 `:not([data-press])` 而不是只判 `off`。守卫 ⑪ 有两条反向断言专门盯这两件事（变异 M-B 加 `transition-property`、M-C 补基态 scale 都当场红）。
+
+② **CSS 直觉第三次不是证据**（同族见第 26 测）：判"行内 `<a>` 会不会被默认层缩到"，computed `scale` 写着 **0.985**，而 `getBoundingClientRect().width` 64→64 一动不动 —— 非替换行内盒根本不可 transform。所以：正文链接天然不参与（不用逐条写 `off`），但**涟漪必须显式不画**（`.fx-ripple-host` 是 `absolute inset:0`，行内盒不能当包含块，硬画会甩到某个祖先的框里），静态定位的宿主则就地补 `relative`。三条都做成注入夹具量 rect，不靠页面"正好有没有这种元素"。
+
+③ 这一轮**四条红全是我的量尺**、没有一条是产品：(a) 页面表达式自己 `return JSON.stringify(...)` 时 `ev()` 只解一次，拿到的是字符串 → 断言拿字符串比属性，三条同时红；(b) 判"看得见"用了 `offsetParent`，而 **SVG 元素的 `offsetParent` 恒为 null** → `ScoreArc` 被冤枉一次；(c) computed 的 `stroke-dasharray` 带单位（`"94.25px"`），`Number()` 得 NaN → 比较恒假；(d) 单帧读数会抖（紧接导航后转场还没拿到第一个 tick，实测抖出 `scale=1` 一次，重跑三次不复现）→ 改成逐帧取最小值。**顺序必须是：先证伪测法，再报缺陷**。
+
+④ **变异实验自己也要能被证伪**：`tmp/mut-press-default.mjs` 第一版用 `s !== R(file)` 判"替换有没有命中"，而 `s` 就是从那个文件读出来的 —— 于是 11 条变异全部"无效"（替换其实成功了，判定永远假）。改成比较 `replace` 前后同一份字符串才成立；另外被中途杀掉的实验会在源码里留下变异（这次留了一个 `fill-mode: both`），所以脚本现在 `process.on('exit')` 无条件按 sha256 还原。17 条变异（M-A…M-K 批 2 + N-A…N-F 批 3 + 批 1 的 P1-P6 另算）**全部一次命中红**。
+
+⑤ 一条性能债顺手还掉：全仓扫描的判据从 3 条涨到 5 条，各扫各的把 `verify-interaction-fx` 拖到 **3m40s**（`src/data` 下有单个几 MB 的词典文件，每条判据都重新转译一遍）→ 改成 `codeOf()` 记忆化，**同一文件只转译一次**，回到 **23s**；同时把 `off` 计数从"裸读文件"改成"剥注释后读"（注释里提一句 `data-press="off"` 也算数过一次，是假计数）。
+
+⑥ 计数（本轮实测）：`verify-interaction-fx` 75→**104**（+⑪ 默认层 13、+⑫ 入场档 6）、`walk-interaction-fx` 16→**23**（+裸按钮 2、+注入夹具 3、+参与者口径 3、+入场曲线 2）、`walk-phone` 34→**36**（+⑤ 结果图形件画在界面上：答前弧与点全 0、答后弧有尺寸有描边已收口、四颗点恰好一颗成功绿三颗未判定灰；+⑥ 收藏页 53 个参与者里 28 个是裸元素）。三屏参与者实测 31 / 112 / 18。批 3 是**收口不是新造**：`.page-enter` / `.stagger > *` 本来就挂在 12 处界面上，本轮只把重复四次的曲线字面量指回 `--fx-ease`（逐字符同值 → 零视觉变化）并补守卫。**设备侧凭据仍欠一轮**（`check-interaction-on-phone --tier soft` 挑的就是裸按钮），排在打包装机之前。

@@ -36,6 +36,7 @@ const CEL = stripTs(read('src/lib/celebrate.ts'));
 const LAYER = stripTs(read('src/components/CelebrateLayer.tsx'));
 const RESULT = stripTs(read('src/components/fx/ResultFx.tsx'));
 const ROOT_TSX = stripTs(read('src/index.tsx'));
+const LAYOUT = stripTs(read('src/components/Layout.tsx'));
 const BTN = stripTs(read('src/components/ui/button.tsx'));
 const FC = stripTs(read('src/pages/DeepVocabularyPage/components/FlashcardMode.tsx'));
 const QC = stripTs(read('src/pages/DeepVocabularyPage/components/QuickCardMode.tsx'));
@@ -119,10 +120,20 @@ ok(/data-on-dark/.test(FX) && /0\.299/.test(FX), '⑤ 委托层按亮度挑档�
 /* ── ⑥ 奖励时刻：唯一出口 + 不许假成功 ── */
 const allTs = fs.readdirSync(path.join(ROOT, 'src'), { recursive: true })
   .map((f) => String(f)).filter((f) => /\.tsx?$/.test(f));
+/**
+ * 全仓扫描有五条判据要用同一批文件（⑥⑩⑫），每条都重新转译一遍会把这条守卫拖到分钟级
+ * （src/data 下有几个几 MB 的词典文件）。**同一个文件只转译一次**，并且一律用剥过注释的版本 ——
+ * 注释里写着 `data-press="off"` 也算数过一次，是假计数。
+ */
+const 码 = new Map();
+const codeOf = (rel) => {
+  const k = rel.replace(/\\/g, '/');
+  if (!码.has(k)) 码.set(k, stripTs(read(path.join('src', rel))));
+  return 码.get(k);
+};
 const mounts = [];
 for (const rel of allTs) {
-  const code = stripTs(read(path.join('src', rel)));
-  if (/<CelebrateLayer\b/.test(code)) mounts.push(rel.replace(/\\/g, '/'));
+  if (/<CelebrateLayer\b/.test(codeOf(rel))) mounts.push(rel.replace(/\\/g, '/'));
 }
 ok(mounts.length === 1 && /index\.tsx$/.test(mounts[0]),
   '⑥ 全仓只许 src/index.tsx 一处挂载 <CelebrateLayer />（重复挂载=双份动画）', JSON.stringify(mounts));
@@ -158,6 +169,25 @@ ok(/ratedRef\.current = 0;\s*goodRef\.current = 0;/.test(FC),
   '⑧ 开新一轮时两个 ref 显式归零（ref 不随重挂载归零是本仓的老坑）');
 ok(/<StreakRing n=\{combo\}/.test(FC), '⑧ 连对计数外面套了环（反馈交给界面，不弹提示）');
 ok(!/animate-pulse/.test(FC), '⑧ 反向：同一个元素不许叠两种动效（原来的 animate-pulse 已撤）');
+ok(!/animate-pulse/.test(DL), '⑧ 反向：每日学习不许再有 animate-pulse（连对 chip 换 StreakRing，配对选错换一次性 fx-shake）');
+ok(/<StreakRing n=\{combo\}/.test(DL), '⑧b 每日学习的连对环也挂 n={combo}（换 n 才重播，与复习检测同一条形状）');
+ok(/fx-shake/.test(DL), '⑧b 每日学习配对选错用一次性轻抖（无限脉冲会和这颗按钮的按压缩放抢同一个元素）');
+
+/* ── ⑧b 结果图形件的第二批消费者（spec 第二档："ScoreArc / VerdictDot 接进会话计数"）──
+   这条存在的意义：组件、关键帧、守卫都在，但**没有消费者**=用户看不见。判据必须逐个渲染点点名。 */
+ok(/<ScoreArc value=\{accuracy \/ 100\}/.test(FC), '⑧b 复习检测的正确率交给 ScoreArc（不再是"记得 70%"那种句子）');
+for (const [name, src] of [['中译英', C2E], ['纠偏重考', CD]]) {
+  ok(new RegExp(`answered > 0 &&[\\s\\S]{0,220}<ScoreArc value=\\{goodCount / answered\\}`).test(src),
+    `⑧b ${name} 的收口弧挂在**已答题数**上，并且一题没答就不画弧（0% 的弧是一个假判定）`);
+  ok(/revealed && <VerdictDot state=\{isCorrect \? 'ok' : isChosen \? 'miss' : 'pending'\}/.test(src),
+    `⑧b ${name} 的判定色点只在揭晓后出现，且三档齐全（干扰项是中性点，不许蹭答对的绿）`);
+}
+const 硬编码判定 = [];
+for (const [name, src] of [['中译英', C2E], ['纠偏重考', CD], ['复习检测', FC]]) {
+  if (/<VerdictDot state=\{?['"]ok['"]/.test(src) || !/revealed && <VerdictDot/.test(src) && /<VerdictDot/.test(src)) 硬编码判定.push(name);
+}
+ok(硬编码判定.length === 0,
+  '⑧b 反向：判定色点不许写死成常量，也不许在揭晓前就渲染（未判定冒绿点=把没判的说成判对）', 硬编码判定.join('、'));
 
 /* ── ⑨ 降级 CSS ── */
 const rmBlock = (CSS.match(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\n\}/g) || []).join('\n');
@@ -191,12 +221,85 @@ ok(/window\.addEventListener\('blur', release\)/.test(FX),
 const stray = [];
 for (const rel of allTs) {
   if (/press-fx\.ts$/.test(rel)) continue;
-  const code = stripTs(read(path.join('src', rel)));
-  if (/data-pressing/.test(code)) stray.push(rel.replace(/\\/g, '/'));
+  if (/data-pressing/.test(codeOf(rel))) stray.push(rel.replace(/\\/g, '/'));
 }
 ok(stray.length === 0, '⑩ 反向：除委托层之外，全站不许有任何地方自己写 data-pressing（属性就是接口，两处写就会漂移）', JSON.stringify(stray));
 ok(/\[data-press\]\[data-pressing\][\s\S]{0,400}scale:\s*1 !important/.test(rmBlock),
   '⑩ 降级块也把新机制那档强制回 1（漏了这条 = 减少动效偏好下仍然缩放）');
+
+/* ── ⑪ 默认可点层（批 2）：裸 `<button>` / `<a href>` / `[role=button]` 不写属性就参与 ──
+   翻默认的原因：全站 307 处裸 `<button>` + 395 处 `<Button>`，手抄 data-press 一定会漏，
+   而这条判据要的是覆盖，不是"量过的都合格"。
+   ⚠️ 本层只给按下态：index.css 这些规则在 @layer 之外，而 Tailwind v4 把 utilities 装在
+   `@layer utilities` 里（产物 CSS 复核过），**层外规则无视特异性一律赢过层内**。
+   所以在这里写 base `scale: 1` 或 `transition-property` 会静默顶掉宿主自己的
+   transition-all 219 处 / transition-colors 142 处 / transition-transform 28 处 /
+   hover:scale-* 21 处（数字是 2026-10-20 grep 出来的，改之前重新推导，不要放宽）。 */
+const DEF_SEL = ':where(button, a[href], [role="button"]):not([data-press])';
+const defBlocks = [...CSS.matchAll(/([^{}]*:where\(button[^{}]*?)\{([^{}]*)\}/g)]
+  .map((m) => ({ sel: m[1].trim(), body: m[2].trim() }));
+ok(defBlocks.length === 2,
+  `⑪ 默认层恰好两条规则块：按下态一条 + 降级一条（当前 ${defBlocks.length}）` +
+  defBlocks.map((b) => `〔${b.sel.replace(/\s+/g, ' ').slice(0, 46)}→${b.body}〕`).join(''));
+ok(CSS.includes(DEF_SEL + ':active') && CSS.includes(DEF_SEL + '[data-pressing]'),
+  '⑪ 默认层的选择器就是这一条，且 :active / [data-pressing] 两条来源并列；`:not([data-press])` 是退出钥匙' +
+  '（显式声明档位的宿主由上面那套完整待遇接管，两条规则同特异性会互相顶）');
+const defPressed = defBlocks.filter((b) => !/!important/.test(b.body));
+ok(defPressed.length === 1 && /scale:\s*var\(--fx-press-soft\)/.test(defPressed[0]?.body || ''),
+  `⑪ 默认层的按下态指回同一个 soft token（当前 ${defPressed.length} 块）—— 写死数字就是第二套词汇`);
+ok(defBlocks.every((b) => !/transition-property/.test(b.body)),
+  '⑪ 反向：默认层不许写 transition-property —— 层外规则会顶掉全站 219 处 transition-all / 142 处 transition-colors');
+ok(defBlocks.every((b) => /:active|\[data-pressing\]/.test(b.sel)),
+  '⑪ 反向：默认层只许存在于按下态/降级态，不许有基态规则（base scale:1 会顶掉宿主的 hover:scale-*）');
+ok(/closest\?\.\(\s*['"]button, a\[href\], \[role="button"\], \[data-press\]['"]/.test(FX),
+  '⑪ 委托层的 closest 与 CSS 默认层同源（少了默认三种 = 裸按钮挂不上按压态，界面静默没手感）');
+ok(/closest\?\.\([\s\S]{0,140}if \(!host\)[\s\S]{0,24}return;[\s\S]{0,90}getAttribute\(['"]data-press['"]\) === ['"]off['"]/.test(FX),
+  '⑪ off 这道门排在取到宿主之后、且在挂按压态之前（翻默认之后 off 就是唯一的例外口子，位置错了它就不生效）');
+ok(/display === 'inline'[\s\S]{0,40}return;[\s\S]{0,200}position === 'static'[\s\S]{0,120}host\.style\.position = 'relative'[\s\S]{0,200}getBoundingClientRect\(\)/.test(FX),
+  '⑪ 涟漪宿主的两个兜底都排在量尺寸之前：行内盒直接不画（inset:0 会甩到别人的框里），' +
+  '静态定位补 relative —— 默认可点覆盖 307 处裸按钮，不可能要求每处都带 relative');
+ok(/:where\(button[\s\S]{0,120}scale:\s*1 !important/.test(rmBlock),
+  '⑪ 降级块里也有默认层那一条（只写 [data-press] 的话，裸按钮在减少动效偏好下照样缩）');
+const RAIL_SRC = codeOf('components/ui/sidebar.tsx');
+ok(/data-sidebar="rail"[\s\S]{0,200}data-press="off"/.test(RAIL_SRC),
+  '⑪ 侧边栏那条 16px 隐形拖拽把手显式退出词汇（它是全站少数"不该有按钮手感"的裸 button）');
+const offs = [];
+for (const rel of allTs) {
+  const n = (codeOf(rel).match(/data-press="off"/g) || []).length;   // 只看代码：注释里提一句不算挂了一个例外
+  if (n) offs.push(`${rel.replace(/\\/g, '/')}=${n}`);
+}
+ok(offs.reduce((s, x) => s + Number(x.split('=').pop()), 0) <= 5,
+  '⑪ 反向：off 是稀缺例外，不是逃生口（超过 5 处就是有人在绕过"一套词汇"这条契约，要在文档里逐条登记）', offs.join(' '));
+for (const [f, why] of [['scripts/walk-interaction-fx.mjs', '本机走查'], ['scripts/check-interaction-on-phone.mjs', '设备凭据']]) {
+  const s = read(f);
+  ok(/button, a\[href\], \[role="button"\]/.test(s),
+    `⑪ ${why}的参与者选择器与默认层同源（还按 [data-press] 数的话，这一层新覆盖的裸按钮全都量不到 = 覆盖假绿）`);
+}
+
+/* ── ⑫ 第三档「入场 / 转场」：这一档不是新造的，是把已有的收进同一套词汇 ──
+   `.page-enter`（路由级淡入+上浮）与 `.stagger > *`（卡片逐张入场）早就挂在 12 处界面上，
+   缺的是同源：曲线字面量在四个地方各写一遍，改一次要撞四处。 */
+const easeLiterals = (CSS.match(/cubic-bezier\(/g) || []).length;
+ok(easeLiterals === 1,
+  `⑫ 全站缓动字面量 cubic-bezier(...) 只许出现一次（就是 --fx-ease 那行定义；当前 ${easeLiterals} 次）`);
+const 外部曲线 = [];
+for (const rel of allTs) {
+  if (/cubic-bezier\(/.test(codeOf(rel))) 外部曲线.push(rel.replace(/\\/g, '/'));
+}
+ok(外部曲线.length === 0, '⑫ 反向：组件里不许再自带曲线（要缓动就指 var(--fx-ease)）', JSON.stringify(外部曲线));
+for (const [name, re] of [
+  ['.page-enter', /\.page-enter\s*\{\s*animation:\s*page-enter\s+\d+ms\s+var\(--fx-ease\)\s+backwards/],
+  ['.stagger > *', /\.stagger\s*>\s*\*\s*\{\s*animation:\s*card-enter\s+\d+ms\s+var\(--fx-ease\)\s+backwards/],
+]) {
+  ok(re.test(CSS), `⑫ ${name} 用 var(--fx-ease) 且 fill-mode 是 backwards` +
+    '（both/forwards 会把结束帧的 transform 留在祖先上 → 祖先变成 fixed 的包含块 → 阅读器整层被关进内容列）');
+}
+ok(/\.page-enter,[\s\S]{0,60}\.stagger > \*[\s\S]{0,60}animation:\s*none !important/.test(rmBlock),
+  '⑫ reduce 偏好下入场动画整条停掉（这档也要过降级这道门，不只是按压层）');
+const 挂点数 = allTs.reduce((s, rel) => s + ((codeOf(rel).match(/page-enter|stagger/g) || []).length), 0);
+ok(挂点数 >= 10, `⑫ 这一档真的接在界面上：全站 ≥10 个挂载点（当前 ${挂点数}）—— 只在 CSS 里定义、没人挂 = 空气`);
+ok(/key=\{location\.pathname\} className="page-enter"/.test(LAYOUT),
+  '⑫ 路由级入场挂在 Layout 的 keyed 包装上（换页重挂载才会重播；写在页面内部就会随每个组件重挂载反复播）');
 
 /* ── 收尾 ── */
 const pass = results.filter((r) => r.pass).length;

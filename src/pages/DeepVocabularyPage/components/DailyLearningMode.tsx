@@ -20,6 +20,7 @@ import STATIC_COLLOC_TRANSLATIONS from '@/data/wordbank/collocation-translations
 import { translateWithLocalMt, isLocalMtReady } from '@/lib/local-mt';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
+import { StreakRing } from '@/components/fx/ResultFx';
 import { cn, cleanText, extractJson } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -1129,9 +1130,12 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
               {currentModeLabel}
             </Badge>
             {combo >= 3 && (
-              <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black tabular-nums animate-pulse" title="连续答对">
-                <Flame className="size-3" />连对 {combo}
-              </span>
+              /* 与复习检测同一口径：连对交给一圈扩散环，不叠 animate-pulse（一个元素两种动效互相抢注意力） */
+              <StreakRing n={combo} className="px-1">
+                <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black tabular-nums" title="连续答对">
+                  <Flame className="size-3" />连对 {combo}
+                </span>
+              </StreakRing>
             )}
           </div>
           <Button
@@ -1712,7 +1716,9 @@ export default function DailyLearningMode({ level, onLevelChange, levels, counts
                             className={cn(
                               'w-full p-3 rounded-2xl border-2 text-center font-bold text-xs transition-all',
                               isMatched && 'border-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 cursor-default',
-                              isError && 'border-rose-400 bg-rose-50 dark:bg-rose-500/15 text-rose-500 animate-pulse',
+                              /* 配对选错：一次性轻抖 + 红边，不用 animate-pulse —— 这颗按钮带 data-press，
+                                 无限脉冲会和按压缩放抢同一个元素的注意力 */
+                              isError && 'border-rose-400 bg-rose-50 dark:bg-rose-500/15 text-rose-500 fx-shake',
                               isSelected && !isError && 'border-[#6C5CE7] bg-violet-50 dark:bg-violet-500/15 text-ink-violet',
                               !isMatched && !isError && !isSelected && 'border-border bg-card hover:border-[#6C5CE7]/40 text-foreground',
                             )}
