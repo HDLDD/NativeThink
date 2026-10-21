@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
  * 可切换的外观主题（与明暗是两个正交维度）。
  *
  * classic 是默认值，**不覆盖任何 token** —— 选它就是现在的界面，一个像素都不变。
- * 其余三套只改 shadcn 的设计变量（背景/卡片/描边/主色/品牌文字色），
+ * 其余五套只改 shadcn 的设计变量（背景/卡片/描边/主色/品牌文字色/墨面与信号色），
  * 不动布局、不动组件结构；暗色模式只换强调色，背景沿用现有深色。
  */
 const UI_THEME_KEY = '__nativethink_ui_theme';
 const UI_THEME_EVENT = 'nativethink:ui-theme-change';
 
-export type UiThemeId = 'classic' | 'porcelain' | 'graphite' | 'lime';
+export type UiThemeId = 'classic' | 'porcelain' | 'graphite' | 'lime' | 'sand' | 'berry';
 
 export interface IUiThemeDef {
   id: UiThemeId;
@@ -21,10 +21,12 @@ export interface IUiThemeDef {
 }
 
 export const UI_THEMES: IUiThemeDef[] = [
-  { id: 'classic', name: '原生青绿', desc: '当前主题（默认）', swatch: ['#00B894', '#FFFFFF', '#F6F8F9'] },
-  { id: 'porcelain', name: '白 · 电蓝', desc: '冷静、精确，像专业工具', swatch: ['#2F6BFF', '#FFFFFF', '#F4F7FC'] },
-  { id: 'graphite', name: '白 · 石墨', desc: '近乎黑白，一点热色催行动', swatch: ['#0A0A0A', '#FFFFFF', '#F6F6F7'] },
-  { id: 'lime', name: '白 · 青柠', desc: '有能量，进度感强', swatch: ['#0FA968', '#D9F86A', '#F5F7F3'] },
+  { id: 'classic', name: '原生青绿', desc: '墨绿外壳 · 青绿行动', swatch: ['#00B894', '#0D1A14', '#F3F4EF'] },
+  { id: 'porcelain', name: '电蓝', desc: '海军蓝外壳 · 电蓝行动', swatch: ['#2F6BFF', '#0A1A33', '#F4F7FC'] },
+  { id: 'graphite', name: '石墨', desc: '石墨外壳 · 黑白极简', swatch: ['#0A0A0A', '#0C0C0E', '#F6F6F7'] },
+  { id: 'lime', name: '青柠', desc: '墨绿外壳 · 青柠行动', swatch: ['#0FA968', '#0C1A12', '#F5F7F3'] },
+  { id: 'sand', name: '暖沙', desc: '棕墨外壳 · 暖沙纸面', swatch: ['#A76A34', '#221710', '#F7F1E6'] },
+  { id: 'berry', name: '莓果', desc: '深莓外壳 · 莓果纸面', swatch: ['#B23A6B', '#201016', '#FBF3F5'] },
 ];
 
 function isThemeId(v: unknown): v is UiThemeId {

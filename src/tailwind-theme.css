@@ -56,6 +56,12 @@
   --ink-2: #16241D;
   --lime: #C8F26B;
   --warm: #C98A2E;
+  --on-brand: #06231A;
+  --on-lime: #0D1A14;
+  --nav-bg: var(--brand);
+  --nav-fg: var(--on-brand);
+  --nav-bg: var(--brand);
+  --nav-fg: var(--on-brand);
 
   /* Computed borders using hsl relative color syntax */
   --primary-border: hsl(from hsl(221 83% 53%) h s calc(l + var(--opaque-button-border-intensity)));
@@ -150,6 +156,8 @@
   --ink-2: #16241D;
   --lime: #C8F26B;
   --warm: #D9A441;
+  --on-brand: #06231A;
+  --on-lime: #0D1A14;
 
   --primary-border: hsl(from hsl(160 100% 40%) h s calc(l + var(--opaque-button-border-intensity)));
   --secondary-border: hsl(from hsl(215 28% 15%) h s calc(l + var(--opaque-button-border-intensity)));

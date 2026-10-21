@@ -33,8 +33,8 @@ const SIDEBAR = code('src/components/AppSidebar.tsx');
 
 /* ── ① 注册表 ── */
 const ids = [...THEME.matchAll(/id:\s*'([a-z-]+)'/g)].map((m) => m[1]);
-ok(ids.length === 4 && ids.includes('classic') && new Set(ids).size === 4,
-  '① 主题注册表恰好四套且含 classic（默认）', JSON.stringify(ids));
+ok(ids.length === 6 && ids.includes('classic') && new Set(ids).size === 6,
+  '① 主题注册表恰好六套且含 classic（默认）', JSON.stringify(ids));
 ok(/const UI_THEME_KEY = '__nativethink_ui_theme'/.test(THEME),
   '① 主题落盘的键是单点常量（不许各处手写字符串）');
 ok(/UI_THEMES\.some\(\(t\) => t\.id === v\)/.test(THEME),

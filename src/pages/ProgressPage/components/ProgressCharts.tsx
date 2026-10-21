@@ -273,7 +273,7 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
 
         {/* 暗色迷你统计卡 */}
         <div className="col-span-12 lg:col-span-4 space-y-4">
-          <Card className="rounded-[32px] bg-[#1F2937] border-none shadow-xl relative overflow-hidden group">
+          <Card className="rounded-[32px] bg-[var(--ink)] border-none shadow-xl relative overflow-hidden group">
             <CardContent className="p-6 relative z-10">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">

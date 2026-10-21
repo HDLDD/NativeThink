@@ -19,6 +19,7 @@ import { useGlobalDueCount } from '@/lib/use-word-learning';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarGroup,
   SidebarMenu,
@@ -27,6 +28,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
+import { UI_THEMES, useUiTheme } from '@/lib/ui-theme';
 import { preloadCoreOnly } from '@/data/wordbank';
 
 // Route chunk prefetch map — triggers dynamic import() on hover to warm the browser cache
@@ -66,23 +68,33 @@ const NAV_ITEMS = [
   { path: '/settings', label: '设置', icon: Settings },
 ];
 
+const THEME_DOT_ALT: Record<string, string> = {
+  classic: '#C8F26B',
+  porcelain: '#8FE7FF',
+  graphite: '#F2F2F2',
+  lime: '#D9F86A',
+  sand: '#F0C46C',
+  berry: '#F6B6CC',
+};
+
 export default function AppSidebar() {
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
   // 待复习角标（扫全部等级；学习状态变更会广播刷新）
   const dueCount = useGlobalDueCount();
+  const { uiTheme, setUiTheme } = useUiTheme();
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarHeader className="border-b border-white/[0.07]">
         <div className="flex items-center gap-3 px-3 py-5 group-data-[state=collapsed]:px-0 group-data-[state=collapsed]:justify-center">
-          <div className="relative grid size-9 shrink-0 place-items-center rounded-[12px] bg-[var(--brand)] text-[17px] font-black leading-none text-[#06231A]">
+          <div className="relative grid size-9 shrink-0 place-items-center rounded-[12px] bg-[var(--nav-bg)] text-[17px] font-black leading-none text-[var(--nav-fg)]">
             N
-            <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-[var(--lime)] ring-2 ring-[#0C1712]" />
+            <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-[var(--lime)] ring-2 ring-[var(--ink)]" />
           </div>
           <div className="flex-1 min-w-0 group-data-[state=collapsed]:hidden">
             <div className="text-[17px] font-extrabold tracking-tight text-[#F2F6F2]">
-              Native<span className="text-[#3EDDB5]">Think</span>
+              Native<span className="text-[var(--lime)]">Think</span>
             </div>
             <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.22em] text-white/35">
               English, natively
@@ -114,7 +126,7 @@ export default function AppSidebar() {
                       className={cn(
                         'flex h-9 items-center gap-3 rounded-[11px] px-3 transition-colors',
                         isActive
-                          ? 'bg-[#E9F1EA] text-[#0C1712] hover:bg-[#F1F6F2] hover:text-[#0C1712]'
+                          ? 'bg-[var(--nav-bg)] text-[var(--nav-fg)] hover:bg-[var(--nav-bg)] hover:text-[var(--nav-fg)]'
                           : 'text-white/50 hover:bg-white/[0.06] hover:text-white',
                       )}
                     >
@@ -130,7 +142,7 @@ export default function AppSidebar() {
                         <span
                           className={cn(
                             'group-data-[state=collapsed]:hidden ml-auto min-w-5 h-5 px-1.5 rounded-full text-[10px] font-black grid place-items-center tabular-nums',
-                            isActive ? 'bg-[#06231A] text-[#C8F26B]' : 'bg-white/10 text-[#C8F26B]',
+                            isActive ? 'bg-[var(--nav-fg)] text-[var(--nav-bg)]' : 'bg-white/10 text-[var(--lime)]',
                           )}
                           title={`${dueCount} 个单词待复习`}
                         >
@@ -145,6 +157,26 @@ export default function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="border-t border-white/[0.07] p-3 group-data-[state=collapsed]:hidden">
+        <p className="px-1 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/30">Appearance</p>
+        <div className="mt-2 flex items-center gap-2 px-1">
+          {UI_THEMES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              title={t.name}
+              aria-label={`切换到${t.name}`}
+              aria-pressed={uiTheme === t.id}
+              onClick={() => setUiTheme(t.id)}
+              className={cn(
+                'size-6 rounded-full ring-1 ring-white/20 transition-all',
+                uiTheme === t.id ? 'ring-2 ring-[var(--lime)]' : 'hover:scale-110',
+              )}
+              style={{ background: `linear-gradient(135deg, ${t.swatch[0]} 0 52%, ${THEME_DOT_ALT[t.id] || t.swatch[1]} 52% 100%)` }}
+            />
+          ))}
+        </div>
+      </SidebarFooter>
     </Sidebar>
   );
 }

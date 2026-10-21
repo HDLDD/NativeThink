@@ -250,18 +250,18 @@ body {
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
 }
 
-/* 墨面外壳：侧栏与手机抽屉共用一块深墨绿，内容区才是纸。
-   固定在颜色上（不随主题走），保证四套主题都有同一个"框"。 */
+/* 墨面外壳：侧栏与手机抽屉共用一块墨面，内容区才是纸。
+   底色走 --ink，六套主题各自换壳色；导航选中色另走 --nav-bg/--nav-fg。 */
 [data-slot="sidebar-container"],
 [data-slot="sidebar"][data-mobile="true"] {
-  --sidebar: #0C1712;
+  --sidebar: var(--ink);
   --sidebar-foreground: #E8EFEA;
   --sidebar-border: rgb(255 255 255 / 0.08);
   --sidebar-accent: rgb(255 255 255 / 0.07);
   --sidebar-accent-foreground: #FFFFFF;
   --sidebar-primary: var(--brand);
-  --sidebar-primary-foreground: #06231A;
-  background: #0C1712;
+  --sidebar-primary-foreground: var(--on-brand);
+  background: var(--ink);
   color: #E8EFEA;
 }
 [data-slot="sidebar-container"] { border-right: 1px solid rgb(255 255 255 / 0.06); }
@@ -270,14 +270,14 @@ body {
 /* 激活项用品牌实色（与手机 dock 同一套语言）：SidebarMenuButton 自带的
    data-[active=true]:bg-sidebar-accent 属性选择器权重更高，这里必须覆盖。 */
 [data-slot="sidebar-menu-button"][data-active="true"] {
-  background-color: var(--brand) !important;
-  color: #06231A !important;
+  background-color: var(--nav-bg) !important;
+  color: var(--nav-fg) !important;
 }
 [data-slot="sidebar-menu-button"][data-active="true"]:hover {
-  background-color: color-mix(in srgb, var(--brand) 88%, #000) !important;
+  background-color: color-mix(in srgb, var(--nav-bg) 88%, #000) !important;
 }
 [data-slot="sidebar-menu-button"][data-active="true"] svg {
-  color: #06231A !important;
+  color: var(--nav-fg) !important;
 }
 
 /* 主色不再做渐变与光晕：一块纯色比"果冻按钮"更像工具 */
@@ -456,6 +456,12 @@ html[data-ui-theme="porcelain"] {
   --sidebar-primary: #2F6BFF;
   --sidebar-ring: #2F6BFF;
   --chart-1: #2F6BFF;
+  --ink: #0A1A33;
+  --ink-2: #122A4A;
+  --lime: #8FE7FF;
+  --warm: #E9A15C;
+  --on-brand: #FFFFFF;
+  --on-lime: #06121F;
 }
 html[data-ui-theme="graphite"] {
   --background: #F6F6F7;
@@ -481,6 +487,14 @@ html[data-ui-theme="graphite"] {
   --sidebar-primary: #0A0A0A;
   --sidebar-ring: #0A0A0A;
   --chart-1: #0A0A0A;
+  --ink: #0C0C0E;
+  --ink-2: #18181B;
+  --lime: #F2F2F2;
+  --warm: #E9B36A;
+  --on-brand: #FFFFFF;
+  --on-lime: #0C0C0E;
+  --nav-bg: #F2F2F2;
+  --nav-fg: #0A0A0B;
 }
 html[data-ui-theme="lime"] {
   --background: #F5F7F3;
@@ -506,24 +520,108 @@ html[data-ui-theme="lime"] {
   --sidebar-primary: #0FA968;
   --sidebar-ring: #0FA968;
   --chart-1: #0FA968;
+  --ink: #0C1A12;
+  --ink-2: #16281B;
+  --lime: #D9F86A;
+  --warm: #F0A93A;
+  --on-brand: #0D0F0C;
+  --on-lime: #0D0F0C;
+}
+html[data-ui-theme="sand"] {
+  --background: #F7F1E6;
+  --foreground: #241A10;
+  --card: #FFFDF9;
+  --card-foreground: #241A10;
+  --popover: #FFFDF9;
+  --popover-foreground: #241A10;
+  --border: #E6D9C4;
+  --input: #E6D9C4;
+  --muted: #F0E6D6;
+  --muted-foreground: #7A6A58;
+  --primary: #A76A34;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F0E6D6;
+  --accent: #A76A34;
+  --accent-foreground: #FFFFFF;
+  --ring: #A76A34;
+  --ink-teal: #8A5528;
+  --chart-1: #A76A34;
+  --ink: #221710;
+  --ink-2: #31221A;
+  --lime: #F0C46C;
+  --warm: #B4522A;
+  --on-brand: #FFF9F2;
+  --on-lime: #221710;
+}
+html[data-ui-theme="berry"] {
+  --background: #FBF3F5;
+  --foreground: #241018;
+  --card: #FFFFFF;
+  --card-foreground: #241018;
+  --popover: #FFFFFF;
+  --popover-foreground: #241018;
+  --border: #EFDCE2;
+  --input: #EFDCE2;
+  --muted: #F5E7EB;
+  --muted-foreground: #7C6470;
+  --primary: #B23A6B;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F5E7EB;
+  --accent: #B23A6B;
+  --accent-foreground: #FFFFFF;
+  --ring: #B23A6B;
+  --ink-teal: #A02E5E;
+  --chart-1: #B23A6B;
+  --ink: #201016;
+  --ink-2: #301A23;
+  --lime: #F6B6CC;
+  --warm: #C96A2E;
+  --on-brand: #FFFFFF;
+  --on-lime: #201016;
 }
 /* 暗色：背景仍用现有深色体系，只把强调色换成对应主题 */
 html.dark[data-ui-theme="porcelain"] {
   --primary: #7EA8FF; --ring: #7EA8FF; --accent: #7EA8FF; --ink-teal: #8FB4FF;
   --sidebar-primary: #7EA8FF; --sidebar-ring: #7EA8FF; --chart-1: #7EA8FF;
+  --ink: #071427; --ink-2: #0E2138; --lime: #8FE7FF; --warm: #E9A15C;
+  --on-brand: #FFFFFF; --on-lime: #06121F;
+  --nav-bg: #6A98F0; --nav-fg: #FFFFFF;
 }
 html.dark[data-ui-theme="graphite"] {
   --primary: #E7E7EA; --primary-foreground: #0A0A0A; --ring: #E7E7EA; --accent: #E7E7EA;
   --accent-foreground: #0A0A0A; --ink-teal: #E7E7EA; --sidebar-primary: #E7E7EA; --chart-1: #E7E7EA;
+  --ink: #0A0A0B; --ink-2: #141416; --lime: #EDEDED; --warm: #E9B36A;
+  --on-brand: #FFFFFF; --on-lime: #0A0A0B;
+  --nav-bg: #F2F2F2; --nav-fg: #0A0A0B;
 }
 html.dark[data-ui-theme="lime"] {
   --primary: #D9F86A; --primary-foreground: #0D0F0C; --ring: #D9F86A; --accent: #3ECF8E;
   --ink-teal: #3ECF8E; --sidebar-primary: #D9F86A; --chart-1: #3ECF8E;
+  --ink: #0C1A12; --ink-2: #16281B; --lime: #D9F86A; --warm: #F0A93A;
+  --on-brand: #0D0F0C; --on-lime: #0D0F0C;
+}
+html.dark[data-ui-theme="sand"] {
+  --background: #14100C; --card: #1D1812; --foreground: #F0E7DA; --border: #332A20;
+  --muted: #231C15; --muted-foreground: #A69580;
+  --primary: #E0A065; --primary-foreground: #1A120B; --ring: #E0A065; --accent: #E0A065;
+  --accent-foreground: #1A120B; --ink-teal: #E8B37B; --sidebar-primary: #E0A065; --chart-1: #E0A065;
+  --ink: #14100C; --ink-2: #1F1811; --lime: #F0C46C; --warm: #E09A5A;
+  --on-brand: #1A120B; --on-lime: #14100C;
+}
+html.dark[data-ui-theme="berry"] {
+  --background: #140B0F; --card: #1D1116; --foreground: #F5E6EC; --border: #33202A;
+  --muted: #24161C; --muted-foreground: #B39AA5;
+  --primary: #E06A9A; --primary-foreground: #1A0C12; --ring: #E06A9A; --accent: #E06A9A;
+  --accent-foreground: #1A0C12; --ink-teal: #E58AAE; --sidebar-primary: #E06A9A; --chart-1: #E06A9A;
+  --ink: #140B0F; --ink-2: #1F1218; --lime: #F6B6CC; --warm: #D98A4F;
+  --on-brand: #1A0C12; --on-lime: #140B0F;
 }
 /* 选中文字跟随主色（原主题保留青绿） */
 html[data-ui-theme="porcelain"] ::selection { background: #2F6BFF; color: #FFFFFF; }
 html[data-ui-theme="graphite"] ::selection { background: #0A0A0A; color: #FFFFFF; }
 html[data-ui-theme="lime"] ::selection { background: #0FA968; color: #FFFFFF; }
+html[data-ui-theme="sand"] ::selection { background: #A76A34; color: #FFF9F2; }
+html[data-ui-theme="berry"] ::selection { background: #B23A6B; color: #FFFFFF; }
 
 /* 品牌色的单一来源：主题切换时只换这三个变量，所有用 var(--brand) 的地方一起变。
    --brand-rgb 供 alpha 用法（rgb(var(--brand-rgb) / .15)）—— 直接写 rgba(0,184,148,·)
@@ -532,9 +630,13 @@ html[data-ui-theme="lime"] ::selection { background: #0FA968; color: #FFFFFF; }
 html[data-ui-theme="porcelain"] { --brand: #2F6BFF; --brand-strong: #2559E0; --brand-rgb: 47 107 255; }
 html[data-ui-theme="graphite"] { --brand: #0A0A0A; --brand-strong: #000000; --brand-rgb: 10 10 10; }
 html[data-ui-theme="lime"] { --brand: #0FA968; --brand-strong: #0C8A54; --brand-rgb: 15 169 104; }
+html[data-ui-theme="sand"] { --brand: #A76A34; --brand-strong: #8C5526; --brand-rgb: 167 106 52; }
+html[data-ui-theme="berry"] { --brand: #B23A6B; --brand-strong: #933054; --brand-rgb: 178 58 107; }
 html.dark[data-ui-theme="porcelain"] { --brand: #7EA8FF; --brand-strong: #6A98F0; --brand-rgb: 126 168 255; }
 html.dark[data-ui-theme="graphite"] { --brand: #E7E7EA; --brand-strong: #FFFFFF; --brand-rgb: 231 231 234; }
 html.dark[data-ui-theme="lime"] { --brand: #3ECF8E; --brand-strong: #D9F86A; --brand-rgb: 62 207 142; }
+html.dark[data-ui-theme="sand"] { --brand: #D99455; --brand-strong: #C07D40; --brand-rgb: 217 148 85; }
+html.dark[data-ui-theme="berry"] { --brand: #D45A8B; --brand-strong: #BB4777; --brand-rgb: 212 90 139; }
 
 /* 功能区分：不再用整屏的彩色环境光（它会把纸面染成粉/绿/黄）。
    模块辨识交给导航激活项与内容本身；页面保持一块干净的纸。 */

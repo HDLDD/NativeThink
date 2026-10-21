@@ -53,7 +53,7 @@ export default function MobileBottomNav() {
               className={cn(
                 'flex h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-[15px] transition-colors',
                 isActive
-                  ? 'bg-[var(--brand)] text-[#06231A]'
+                  ? 'bg-[var(--nav-bg)] text-[var(--nav-fg)]'
                   : 'text-white/45 hover:text-white',
               )}
             >

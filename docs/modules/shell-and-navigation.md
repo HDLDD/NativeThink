@@ -91,7 +91,8 @@ AGENTS.md 说的"四件套"确实都还在，但**还有两处隐性要求**，�
 
 | 层 | 实现 | 约定 |
 |---|---|---|
-| 桌面侧栏 | `AppSidebar.tsx:76-145` + `index.css:253-281` | 底色固定在 `#0C1712`，不跟随四套主题；logo 是品牌色 `N` 方块 + 青柠圆点；激活项为品牌实色胶囊（`[data-slot="sidebar-menu-button"][data-active="true"]` 需要 `!important`，否则被组件自带的 `data-[active=true]:bg-sidebar-accent` 属性选择器盖住） |
+| 桌面侧栏 | `AppSidebar.tsx:76-175` + `index.css:253-281` | 底色走 `var(--ink)`，**六套主题各自换壳色**；logo 方块用 `--nav-bg/--nav-fg`；激活项用独立的导航色 `--nav-bg/--nav-fg`（石墨主题的 brand 是黑色，直接用 brand 会和侧栏糊在一起）。`[data-slot="sidebar-menu-button"][data-active="true"]` 仍需 `!important`，否则被组件自带的 `data-[active=true]:bg-sidebar-accent` 属性选择器盖住 |
+| 侧栏主题快捷切换 | `AppSidebar.tsx:145-171` | 侧栏底部 6 个双色圆点，点一下直接 `setUiTheme`；和 `/settings` 的主题卡共用注册表与 localStorage |
 | 手机抽屉 | `index.css:255-268` 的 `[data-slot="sidebar"][data-mobile="true"]` | 与桌面共用同一组墨面 token；抽屉项与桌面同一套激活样式 |
 | 顶栏 | `Header.tsx:33-34` | 高度 64px，只留时间（含日期/星期，窄屏只留时间）、全局搜索、设置、用户菜单；原来的日期胶囊已删 |
 | 手机底部 dock | `MobileBottomNav.tsx:38-43` | 悬浮墨色圆角条，6 个入口；`bottom` 直接算 `env(safe-area-inset-bottom, 0px) + 10px`（不再用 `safe-area-bottom` 类，守卫已改为接受 `env()` 写法） |
@@ -110,11 +111,11 @@ AGENTS.md 说的"四件套"确实都还在，但**还有两处隐性要求**，�
 
 | 层 | 位置 | 约定 |
 |---|---|---|
-| 主题注册表 | `src/lib/ui-theme.ts` | `classic`（默认，**不挂 `data-ui-theme`，直接用 `:root` 的墨壳/纸面基线**）/ `porcelain` 电蓝 / `graphite` 石墨 / `lime` 青柠；id 与 CSS 选择器一一对应 |
-| token 覆盖 | `src/index.css` 末尾 `html[data-ui-theme="…"]` | 只改 `--background/--card/--border/--primary/--ink-teal/--sidebar*` 等设计变量；暗色只换强调色 |
+| 主题注册表 | `src/lib/ui-theme.ts` | `classic`（默认，**不挂 `data-ui-theme`，直接用 `:root` 的墨壳/纸面基线**）/ `porcelain` 电蓝 / `graphite` 石墨 / `lime` 青柠 / `sand` 暖沙 / `berry` 莓果；id 与 CSS 选择器一一对应 |
+| token 覆盖 | `src/index.css` 末尾 `html[data-ui-theme="…"]` | 只改设计变量：`--background/--card/--border/--primary/--ink-teal`，以及外壳的 `--ink/--ink-2/--lime/--warm/--on-brand/--on-lime/--nav-bg/--nav-fg/--brand*`；暗色单独一套 |
 | 品牌单点 | `--brand` / `--brand-strong` / `--brand-rgb` | 全站原 `#00B894` 已换成 `var(--brand)`（497 处 / 48 个 tsx），换主题时按钮、图标、阴影一起变；`--brand-rgb` 供透明度用法 |
 | 启动 | `src/index.tsx` 的 `initUiTheme()` | 在 `createRoot` 之前把 `data-ui-theme` 写到 `<html>`，刷新不闪回默认 |
-| 选择入口 | `/settings` → 外观 | 亮/暗 + 四套主题色卡（当前主题用品牌色小点标出）；选择写 `localStorage.__nativethink_ui_theme` 并广播给其它实例 |
+| 选择入口 | `/settings` → 外观 + 侧栏底部 | 亮/暗 + 六套主题色卡（当前主题用品牌色小点标出）；侧栏底部 6 个双色圆点可直接切换；选择写 `localStorage.__nativethink_ui_theme` 并广播给其它实例 |
 
 **已知边界**：canvas（`celebrate.ts`）与 Recharts 的 `fill` 仍拿字面色，不跟随主题；
 `emerald-*` / `teal-*` 这类语义色（成功/正确）与品牌色是两回事，主题不会把它们染成主色 —— 这是刻意的。

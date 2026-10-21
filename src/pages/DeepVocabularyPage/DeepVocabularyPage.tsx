@@ -193,7 +193,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook, curren
                     <p className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
                       {label}
                       {onSwitchBook && currentLevel === key && (
-                        <span className="rounded-full bg-[var(--brand)] px-1.5 py-0.5 text-[9px] font-bold leading-none text-[#06231A]">当前</span>
+                        <span className="rounded-full bg-[var(--brand)] px-1.5 py-0.5 text-[9px] font-bold leading-none text-[var(--on-brand)]">当前</span>
                       )}
                     </p>
                     <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{desc}</p>
@@ -209,7 +209,7 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook, curren
                 onSwitchBook && currentLevel === 'all' ? 'border-[var(--brand)] bg-muted/40' : 'border-border hover:border-foreground/25 hover:bg-muted/30')}>
               <p className="flex items-center justify-center gap-1.5 text-[12px] font-semibold text-muted-foreground"><Library className="size-4" />全部词库 · {TOTAL_UNIQUE_WORDS.toLocaleString()} 词
                 {onSwitchBook && currentLevel === 'all' && (
-                  <span className="rounded-full bg-[var(--brand)] px-1.5 py-0.5 text-[9px] font-bold leading-none text-[#06231A]">当前</span>
+                  <span className="rounded-full bg-[var(--brand)] px-1.5 py-0.5 text-[9px] font-bold leading-none text-[var(--on-brand)]">当前</span>
                 )}
               </p>
               <p className="mt-1 text-[10px] text-muted-foreground">加载较慢，建议选择单本词书</p>

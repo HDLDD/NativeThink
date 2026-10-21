@@ -66,7 +66,7 @@ function HeroCardInner({ onStartLearning, dueCount, todayMinutes, dailyGoalMinut
             <Button
               size="lg"
               onClick={onStartLearning}
-              className="h-12 w-full gap-2 rounded-full bg-[var(--lime)] px-7 text-[13px] font-bold text-[#0C1712] hover:bg-[#D8FA93] sm:w-auto"
+              className="h-12 w-full gap-2 rounded-full bg-[var(--lime)] px-7 text-[13px] font-bold text-[var(--on-lime)] hover:brightness-105 sm:w-auto"
             >
               开始今日学习
               <ArrowRight className="size-4" />
