@@ -6,20 +6,24 @@
  * Plus Jakarta Sans + Noto Sans SC。大陆直连该域名不可达 —— 每条路由控制台报一次
  * 资源错误，字体从未生效。改为自托管 @fontsource 的 latin 子集。
  *
- * 背景二（2026-10-21，真机 141）：Onyx 25053RT47C 把系统所有中文字体族
+ * 背景二（2026-10-21，真机 141→143）：Onyx 25053RT47C 把系统所有中文字体族
  * （PingFang SC / Microsoft YaHei / Noto Sans CJK / sans-serif / system-ui）
  * 全部映射成书法体 `WDNSSMJS (Non-Commercial Use)`（CDP CSS.getPlatformFontsForNode
- * 实测），显式指定字体名无效 —— 只能随包带一份中文字体。现在自托管
- * Noto Sans SC 简体子集 400/500/600/700，并用 unicode-range 只吃 CJK，
- * 英文继续走 Plus Jakarta Sans。
+ * 实测），显式指定字体名无效 —— 只能随包带一份中文字体。
+ * 真机 A/B 进一步实测：家族列表 [英文webfont, Noto] 在这台 WebView 上**不走家族间
+ * 逐字回退**（第一个家族缺 CJK 就直接掉进系统书法体）；只有把 Noto 放在第一位才生效。
+ * 而 Noto Sans SC 简体子集自带完整 Basic Latin（U+0020-00FF，fontTools 验证），
+ * 所以最终方案：去掉 4 条 Noto face 的 unicode-range，让 'Noto Sans SC' 成为唯一
+ * 首选家族 —— 中英文都直取 webfont，不做家族间回退。Plus Jakarta Sans 的 3 条
+ * face 保留（36KB，供字标等显式场合用，但不进 --font-sans）。
  *
  * 本脚本钉住三段契约：
  *   A. 源侧：index.html 零外链字体域名；7 条 @font-face（品牌 3 + 中文 4）
- *      全部指向本地 /fonts/*.woff2；中文 4 条带 CJK unicode-range；
- *      woff2 是真文件（magic + header 声明长度与文件长度自洽）；两份 OFL 许可证随附；
- *      icon 链接零 http 外链（2026-10-05 清理的惰性残留）。
- *   B. 字体栈：tailwind-theme.css 两处 --font-sans 都以 Plus Jakarta Sans 开头、
- *      **紧接 'Noto Sans SC'**（必须先于系统字体，否则被 ROM 书法体截走）。
+ *      全部指向本地 /fonts/*.woff2；中文 4 条**不带 unicode-range**（子集自带拉丁，
+ *      带 range 会让英文掉进系统书法体）；woff2 是真文件（magic + header 声明长度
+ *      与文件长度自洽）；两份 OFL 许可证随附；icon 链接零 http 外链。
+ *   B. 字体栈：tailwind-theme.css 两处 --font-sans 都以 'Noto Sans SC' 开头、
+ *      且不含 Plus Jakarta Sans（家族间逐字回退在这台 ROM 上不可靠）。
  *   C. 产物侧（先 npm run build:web）：dist/client 的 index/404 无外链字体域名、
  *      无外链 icon、@font-face 7 条在位、fonts/ 7 个 woff2 齐、构建出的 CSS
  *      生效栈同时含 Plus Jakarta Sans 与 Noto Sans SC。
@@ -76,8 +80,8 @@ check(brandFaces.every(isLocalWoff), '品牌字体 src 全部走本地 /fonts/*.
 check(cnFaces.length === 4, '中文字体恰 4 条 @font-face（Noto Sans SC）', `faces=${cnFaces.length}`);
 const cnWeights = cnFaces.map((f) => (f.match(/font-weight:\s*(\d+)/) || [])[1]).sort().join(',');
 check(cnWeights === '400,500,600,700', '中文字体权重为 400/500/600/700', cnWeights);
-check(cnFaces.every((f) => isLocalWoff(f) && /unicode-range:[^;]*4E00-9FFF/.test(f)),
-  '中文字体 src 全部本地，且每条都声明 CJK unicode-range（英文不重复下载）');
+check(cnFaces.every((f) => isLocalWoff(f) && !/unicode-range/.test(f)),
+  '中文字体 src 全部本地，且不带 unicode-range（简体子集自带拉丁；带 range 会让英文直掉系统书法体）');
 
 const faceSrcs = faces.map((f) => (f.match(/url\(([^)]+)\)/) || [])[1] || '');
 check(faceSrcs.length === 7 && faceSrcs.every((u) => /^\/fonts\/[\w.-]+\.woff2$/.test(u)),
@@ -123,12 +127,11 @@ check(/Noto Sans SC/.test(css),
 const stacks = [...css.matchAll(/--font-sans:\s*([^;]+);/g)]
   .map((m) => m[1].replace(/\s+/g, ' ').trim());
 check(stacks.length === 2, '抓到两处 --font-sans 声明（Lark 栈 + @theme 栈）', `stacks=${stacks.length}`);
-check(stacks.every((s) => s.startsWith("'Plus Jakarta Sans'")),
-  '两处 --font-sans 都以 Plus Jakarta Sans 开头（正对照：品牌字仍是首选）',
+check(stacks.every((s) => s.startsWith("'Noto Sans SC'")),
+  '两处 --font-sans 都以 Noto Sans SC 开头（唯一首选家族，中英文都直取 webfont）',
   JSON.stringify(stacks.map((s) => s.slice(0, 40))));
-check(stacks.every((s) => /^'Plus Jakarta Sans', 'Noto Sans SC'/.test(s)),
-  '两处 --font-sans 都把 Noto Sans SC 紧排在品牌字之后（必须先于系统字体，否则被 ROM 书法体截走）',
-  JSON.stringify(stacks.map((s) => s.slice(0, 50))));
+check(stacks.every((s) => !/Plus Jakarta Sans/.test(s)),
+  '反向：--font-sans 不再引用 Plus Jakarta Sans（这台 ROM 的 WebView 不做家族间逐字回退，英文排在中文后面等于没写）');
 
 /* ── C. 产物侧：dist/client（先 npm run build:web） ── */
 const DIST = join(ROOT, 'dist', 'client');
@@ -157,9 +160,9 @@ if (!existsSync(join(DIST, 'index.html'))) {
   check(cssFiles.length > 0, 'C 产物找到构建出的 CSS', `files=${cssFiles.length}`);
   const goodCss = cssFiles.filter((f) => {
     const c = readFileSync(join(DIST, 'assets', f), 'utf8');
-    return /--font-sans:[^;]*Plus Jakarta Sans/.test(c) && /--font-sans:[^;]*Noto Sans SC/.test(c);
+    return /--font-sans:\s*["']?Noto Sans SC/.test(c) && !/--font-sans:[^;]*Plus Jakarta Sans/.test(c);
   });
-  check(goodCss.length > 0, 'C 构建产物 CSS 的 --font-sans 同时含 Plus Jakarta Sans 与 Noto Sans SC（正对照）');
+  check(goodCss.length > 0, 'C 构建产物 CSS 的 --font-sans 以 Noto Sans SC 开头且不含品牌英文字体（正对照）');
 }
 
 /* ── 汇总 ── */

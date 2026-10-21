@@ -70,7 +70,7 @@
   --accent-border: hsl(from hsl(220 14% 96%) h s calc(l + var(--opaque-button-border-intensity)));
   --muted-border: hsl(from hsl(220 14% 96%) h s calc(l + var(--opaque-button-border-intensity)));
   --font-sans:
-    'Plus Jakarta Sans', 'Noto Sans SC', 'LarkHackSafariFont', 'LarkEmojiFont',
+    'Noto Sans SC', 'LarkHackSafariFont', 'LarkEmojiFont',
     'LarkChineseQuote', '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue',
     'Tahoma', 'PingFang SC', 'Microsoft Yahei', 'Arial', 'Hiragino Sans GB',
     'sans-serif', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
@@ -221,9 +221,10 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* 中文字体：自托管 Noto Sans SC 必须排在系统字体之前 —— 部分 ROM（Onyx 实测）
-     把 PingFang/YaHei/sans-serif 全部映射成书法体，只有自带 @font-face 能盖住。 */
-  --font-sans: 'Plus Jakarta Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  /* 字体栈首选 Noto Sans SC（一个家族同时覆盖中英文，见 index.html 注释）：
+     部分 ROM（Onyx 实测）在第一个家族缺字时直接走系统回退，不尝试后面的 CSS 家族，
+     所以中文不能排在英文 webfont 之后。 */
+  --font-sans: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
 

@@ -128,7 +128,7 @@ node scripts/verify-interaction-fx.mjs              # 107  交互反馈层：tok
 node scripts/verify-settings-themes.mjs             # 35   设置页与外观主题：六套主题注册表 + 左上角返回（无来源页回首页） + classic 必须零覆盖 + initUiTheme 在 createRoot 之前 + 每个非 classic 主题都有 token/暗色/--brand 覆盖 + 全站 tsx 不再硬编码 #00B894 + 顶栏只剩搜索/设置/用户菜单 + 四个设置面板挂在 /settings + Row 把 asChild 注入的 props 展开到真按钮 + 路由与侧边栏登记；变异 M1-M5 逐条验红
 node scripts/verify-imports-tracked.mjs             # 8    仓库完整性：src/ 下每条 @/ 与相对 import 都必须解析到真实文件**并且被 git 跟踪**（7295b55 漏提交 ResultFx —— 仓库里留了一条指向不存在文件的 import，而本机 typecheck/build/其他守卫在有完整工作目录的机器上全是绿的）；三条自证：不存在的模块必须解析失败、跟踪判定必须给出两种答案、注释里的 import 不算数
 node scripts/verify-app-version.mjs                 # 11   版本号单一载体：meta 注入链路 + 产物一致性（产物段先 build:web）
-node scripts/verify-brand-fonts.mjs                 # 35   品牌字体与中文自托管：7 条 @font-face（品牌 3 + Noto 4）+ CJK unicode-range + 外链/favicon 零残留 + woff2 结构自洽 + 生效栈正对照（产物段先 build:web）
+node scripts/verify-brand-fonts.mjs                 # 35   品牌字体与中文自托管：7 条 @font-face（Noto 4 条不带 unicode-range、一家族贯通中英文）+ 品牌英文 3 条备用 + 字体栈以 Noto 开头且不含品牌英文字体 + 外链/favicon 零残留 + woff2 结构自洽（产物段先 build:web）
 npm run verify:rv-articles                        # 104  复习词汇文章：选词/分篇/覆盖出队/体裁主题/原位重写（含旧 slice(0,10) 正对照）
 npm run verify:study-credit                       # 80   学习时长记账：闸门真跑 + 提交点接线（含精听按课去重）+ 口径双向锁（本地动作不许套闸门，含短语闪卡翻面直计时）
 npm run verify:all                                # —    收尾必跑：typecheck + 全部 verify-*（自动发现，新增守卫不用登记）
@@ -276,6 +276,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 设计系统（不可漂移）
 
 - 主色青蓝/青绿：主按钮、激活导航、进度环；品牌锚点 `#00B894`（CSS 里只走 `--brand` / `--brand-strong` / `--brand-rgb`）
+- 字体：`--font-sans` 唯一首选 `Noto Sans SC`（一个家族贯通中英文；部分 ROM 的 WebView 不做家族间逐字回退，英文排前面会让中文掉进系统书法体）；Plus Jakarta Sans 的 face 保留但不进字体栈
 - 外壳是墨面、内容是纸面：侧栏/手机抽屉固定 `#0C1712`（不随主题），桌面主区暖白 `#F3F4EF`；墨面信号色 `--lime`、暖色强调 `--warm`
 - 一屏只留一处饱和：主行动块或当前导航，二者不要同时抢
 - 圆角：卡片统一 `24px`（`index.css` 的 `[data-slot="card"]` 单点），按钮 `rounded-full`/`rounded-2xl`，dock 20px；标题一律正体（`h1-h4` 在 `index.css` 强制 `font-style: normal`）

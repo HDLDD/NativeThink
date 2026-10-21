@@ -138,8 +138,8 @@
 
 ## 4. 字体与节奏
 
-- Plus Jakarta Sans（英文）+ 自托管 Noto Sans SC 400/500/600/700（中文，OFL）；标题 600-800，正文 400-500
-- 中文必须自托管：部分 ROM（Onyx 实测）把 PingFang/YaHei/Noto/sans-serif 全部映射成书法体，系统字体栈不可信
+- `--font-sans` 唯一首选自托管 Noto Sans SC 400/500/600/700（OFL，简体子集自带拉丁，中英文一个家族）；标题 600-800，正文 400-500
+- 不能依赖家族间逐字回退：部分 ROM（Onyx 实测）第一个家族缺字就直接掉进系统书法体；Plus Jakarta Sans face 保留但不进字体栈
 - 标题一律正体（`h1-h4` 由 `index.css` 强制 `font-style: normal`）；数字用 `tabular-nums`
 - 卡片统一 `24px` 圆角（`[data-slot="card"]` 单点），按钮 `rounded-full` / `rounded-2xl`，导航圆角 11-15px
 

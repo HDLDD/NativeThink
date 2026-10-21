@@ -13,22 +13,23 @@
     <!-- 构建期由 vite.config.ts 的 fixHtmlPlaceholders 把 {{appVersion}} 换成版本号（读 android/version.properties）；
          scripts/ensure-web-build.mjs 靠这处标记拦「打进上次产物」，占位符形态不许手改。 -->
     <meta name="app-version" content="{{appVersion}}" />
-    <!-- 品牌字体自托管（大陆可达）：Plus Jakarta Sans latin 子集 400/600/700，共约 36KB。
-         文件来自 @fontsource/plus-jakarta-sans@5.3.0（与 fonts.googleapis.com 同一份 woff2），
-         放 public/fonts/，OFL 许可证随附见 public/fonts/LICENSE.txt。原外链 fonts.googleapis.com
-         对大陆不可达 —— 每条路由报一次资源错误且字体从未生效（ROADMAP #7，2026-10-05 落地）。
-         中文也自托管：部分 ROM（实测 Onyx 25053RT47C）把系统所有中文字体族映射成书法体
-         "WDNSSMJS"，显式指定 Noto/思源也无效 —— 只能随包带一份。用 Noto Sans SC 简体子集
-         400/500/600/700（@fontsource/noto-sans-sc@5.3.1，OFL 见 LICENSE-noto-sans-sc.txt），
-         unicode-range 只吃 CJK，英文继续走 Plus Jakarta Sans。 -->
+    <!-- 字体自托管（大陆可达）。
+         英文：Plus Jakarta Sans latin 子集 400/600/700（@fontsource，OFL 见 LICENSE.txt）。
+         中文：Noto Sans SC 简体子集 400/500/600/700（@fontsource/noto-sans-sc@5.3.1，
+         OFL 见 LICENSE-noto-sans-sc.txt）。该子集自带完整 Basic Latin（U+0020-00FF）与常用标点，
+         因此 Noto 是唯一首选家族 —— 中英文都直取 webfont，不做家族间逐字回退。
+         原因（2026-10-21 真机 A/B）：这台 Onyx ROM 的 WebView 在"第一个家族缺字"时直接走
+         系统回退（= 用户装的书法体），不尝试后面的 CSS 字体家族；把 Noto 放第一、
+         且不去掉 unicode-range 都会复现书法体。 -->
+
     <style>
       @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-display: swap; font-weight: 400; src: url(/fonts/plus-jakarta-sans-latin-400-normal.woff2) format('woff2'); }
       @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-display: swap; font-weight: 600; src: url(/fonts/plus-jakarta-sans-latin-600-normal.woff2) format('woff2'); }
       @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-display: swap; font-weight: 700; src: url(/fonts/plus-jakarta-sans-latin-700-normal.woff2) format('woff2'); }
-      @font-face { font-family: 'Noto Sans SC'; font-style: normal; font-display: swap; font-weight: 400; src: url(/fonts/noto-sans-sc-400-normal.woff2) format('woff2'); unicode-range: U+2E80-2FFF, U+3000-303F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF; }
-      @font-face { font-family: 'Noto Sans SC'; font-style: normal; font-display: swap; font-weight: 500; src: url(/fonts/noto-sans-sc-500-normal.woff2) format('woff2'); unicode-range: U+2E80-2FFF, U+3000-303F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF; }
-      @font-face { font-family: 'Noto Sans SC'; font-style: normal; font-display: swap; font-weight: 600; src: url(/fonts/noto-sans-sc-600-normal.woff2) format('woff2'); unicode-range: U+2E80-2FFF, U+3000-303F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF; }
-      @font-face { font-family: 'Noto Sans SC'; font-style: normal; font-display: swap; font-weight: 700; src: url(/fonts/noto-sans-sc-700-normal.woff2) format('woff2'); unicode-range: U+2E80-2FFF, U+3000-303F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF; }
+      @font-face { font-family: 'Noto Sans SC'; font-style: normal; font-display: swap; font-weight: 400; src: url(/fonts/noto-sans-sc-400-normal.woff2) format('woff2'); }
+      @font-face { font-family: 'Noto Sans SC'; font-style: normal; font-display: swap; font-weight: 500; src: url(/fonts/noto-sans-sc-500-normal.woff2) format('woff2'); }
+      @font-face { font-family: 'Noto Sans SC'; font-style: normal; font-display: swap; font-weight: 600; src: url(/fonts/noto-sans-sc-600-normal.woff2) format('woff2'); }
+      @font-face { font-family: 'Noto Sans SC'; font-style: normal; font-display: swap; font-weight: 700; src: url(/fonts/noto-sans-sc-700-normal.woff2) format('woff2'); }
     </style>
   </head>
   <body>
