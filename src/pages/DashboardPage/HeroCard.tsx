@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Brain } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -12,16 +12,22 @@ interface HeroCardProps {
 }
 
 /**
- * 首页主行动卡：标题直接说"今天要做什么"，不再放营销标语。
- * 数据来自 SM-2 队列与今日统计；进度条是今天的时间目标，不是假进度。
+ * 首页主行动卡：墨面上的"母语思维"主视觉（大脑水印 + 标语），
+ * 右上角是今天的时间目标；到期数作为一条真实状态挂在路径链前面。
  */
 function HeroCardInner({ onStartLearning, dueCount, todayMinutes, dailyGoalMinutes }: HeroCardProps) {
   const goal = dailyGoalMinutes > 0 ? dailyGoalMinutes : 30;
   const pct = Math.min(100, Math.round((todayMinutes / goal) * 100));
 
   return (
-    <Card className="col-span-12 lg:col-span-7 overflow-hidden rounded-[26px] border-0 bg-[var(--ink)] text-[#F2F6F2]">
-      <CardContent className="flex min-h-[280px] flex-col justify-between gap-7 p-6 sm:p-8 lg:min-h-[324px] lg:p-10">
+    <Card className="relative col-span-12 overflow-hidden rounded-[26px] border-0 bg-[var(--ink)] text-[#F2F6F2] lg:col-span-7">
+      {/* 母语思维主视觉：大脑水印（纯装饰） */}
+      <Brain
+        aria-hidden
+        className="pointer-events-none absolute -right-8 top-1/2 size-44 -translate-y-1/2 rotate-[-12deg] text-[var(--lime)] opacity-[0.07] sm:size-52 lg:-right-10 lg:size-64"
+        strokeWidth={1.2}
+      />
+      <CardContent className="relative z-10 flex min-h-[300px] flex-col justify-between gap-7 p-6 sm:p-8 lg:min-h-[340px] lg:p-10">
         <div className="flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/55">
             <span className="size-1.5 rounded-full bg-[var(--lime)]" />
@@ -33,24 +39,25 @@ function HeroCardInner({ onStartLearning, dueCount, todayMinutes, dailyGoalMinut
         </div>
 
         <div>
-          <h2 className="max-w-[15em] text-[28px] font-extrabold leading-[1.18] tracking-tight sm:text-[38px] lg:text-[46px]">
-            {dueCount > 0 ? (
-              <>
-                还有 <span className="text-[var(--lime)] tabular-nums">{dueCount}</span> 个词到期，
-                <br />
-                先复习，再学新的。
-              </>
-            ) : (
-              <>
-                今天没有到期词，
-                <br />
-                直接学 20 个新词。
-              </>
-            )}
+          <h2 className="max-w-[14em] text-[30px] font-extrabold leading-[1.16] tracking-tight sm:text-[40px] lg:text-[46px]">
+            用母语思维，
+            <br />
+            <span className="text-[var(--lime)]">说地道英语。</span>
           </h2>
+          <p className="mt-3 max-w-[26em] text-[12px] leading-relaxed text-white/50 sm:text-[13px]">
+            摆脱中式英语，建立像 native speaker 一样的英语思维。每天 {goal} 分钟，让英语成为你的本能。
+          </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[11px] font-medium text-white/45">
-            <span className="rounded-full bg-white/[0.07] px-2.5 py-1 text-white/70">复习</span>
+            <span
+              className={
+                dueCount > 0
+                  ? 'rounded-full bg-[var(--lime)] px-2.5 py-1 font-bold text-[#0C1712]'
+                  : 'rounded-full bg-white/[0.07] px-2.5 py-1 text-white/70'
+              }
+            >
+              {dueCount > 0 ? `${dueCount} 个词到期` : '今天没有到期词'}
+            </span>
             <span className="text-white/20">→</span>
             <span className="rounded-full bg-white/[0.07] px-2.5 py-1 text-white/70">新词</span>
             <span className="text-white/20">→</span>
