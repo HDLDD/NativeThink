@@ -1,8 +1,8 @@
 /**
  * verify-think-patterns.mjs — /think 模式库的数据契约（第一批）。
  *
- * 模式库是「思维模式复习」的内容底座（docs/superpowers/specs/2026-10-23-think-pattern-loop-design.md §4）：
- * 8 个模式，每个模式 3 道识别题 + 2 个迁移场景，共 40 个内容项。
+ * 模式库是「思维模式复习」的内容底座（docs/superpowers/specs/2026-10-24-think-pattern-core-v1-design.md）：
+ * 12 个模式（四层），每个模式 3 道识别题 + 3 个迁移场景（2 新情境 + 1 换措辞），共 72 个内容项。
  * 识别题的三个选项都必须**语法成立**，差在思维模式 —— 所以这里钉结构（数量 / 下标 / 唯一性 /
  * 非空 / 答案分布），不钉「哪个选项更像母语者」的语义判断（那由内容评审负责）。
  *
@@ -26,7 +26,7 @@ const ts = require('typescript');
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FILE = 'src/data/think-patterns.ts';
 
-/** 设计文档 §4.1 的 8 个 id，顺序也钉住（模式卡按此顺序渲染）。 */
+/** 12 个 id，顺序也钉住（新模式按数据顺序引入；概览另按 layer 分组渲染）。 */
 const EXPECTED_PATTERN_IDS = [
   'subject-first',
   'verb-driven',
@@ -36,7 +36,12 @@ const EXPECTED_PATTERN_IDS = [
   'make-logic-explicit',
   'polite-request',
   'fill-references',
+  'hedge-stance',
+  'register-shift',
+  'compliment-response',
+  'result-state',
 ];
+const EXPECTED_LAYER_IDS = ['structure', 'verb', 'clarity', 'pragmatics'];
 const ANSWER_INDICES = [0, 1, 2];
 
 let pass = 0, fail = 0;
@@ -65,20 +70,35 @@ const patterns = mod.THINK_PATTERNS;
 check(Array.isArray(patterns), '数据：THINK_PATTERNS 是数组', typeof patterns);
 const list = asArray(patterns);
 
-check(list.length === 8, '数据：恰好 8 个模式', `实际 ${list.length}`);
+check(list.length === 12, '数据：恰好 12 个模式', `实际 ${list.length}`);
 
 const patternIds = list.map((p) => p?.id);
 check(patternIds.every(filled), '数据：每个模式都有非空 id', patternIds.filter((id) => !filled(id)).join(','));
 check(patternIds.join(',') === EXPECTED_PATTERN_IDS.join(','),
-  '数据：模式 id 与设计 §4.1 的 8 个 id 逐一对应（含顺序）', patternIds.join(','));
+  '数据：模式 id 与 12 个预期 id 逐一对应（含顺序）', patternIds.join(','));
 check(new Set(patternIds).size === patternIds.length, '数据：模式 id 唯一', patternIds.join(','));
+
+/* 四层元数据：每层有名字/描述，每个模式落在合法层里，四层各至少 2 个模式。 */
+const layerMeta = mod.THINK_PATTERN_LAYERS;
+check(Array.isArray(layerMeta) && layerMeta.length === 4,
+  '数据：THINK_PATTERN_LAYERS 恰好 4 层', `实际 ${asArray(layerMeta).length}`);
+check(asArray(layerMeta).map((layer) => layer?.id).join(',') === EXPECTED_LAYER_IDS.join(','),
+  '数据：四层 id 与预期逐一对应（含顺序）', asArray(layerMeta).map((layer) => layer?.id).join(','));
+check(asArray(layerMeta).every((layer) => filled(layer?.name) && filled(layer?.description)),
+  '数据：每层都有名称与描述');
+const layerIds = asArray(layerMeta).map((layer) => layer?.id);
+check(list.every((pattern) => layerIds.includes(pattern?.layer)),
+  '数据：每个模式的 layer 都是合法层', list.filter((pattern) => !layerIds.includes(pattern?.layer)).map((pattern) => pattern?.id).join(','));
+const perLayerCounts = layerIds.map((layerId) => list.filter((pattern) => pattern?.layer === layerId).length);
+check(perLayerCounts.every((count) => count >= 2),
+  '数据：四层各至少 2 个模式', perLayerCounts.join('/'));
 
 /* 内容项 id 会被当作 React key，必须全局唯一且非空。 */
 const contentIds = list.flatMap((p) => [
   ...asArray(p?.recognition).map((q) => q?.id),
   ...asArray(p?.transfer).map((t) => t?.id),
 ]);
-check(contentIds.length === 40, '数据：内容项共 40 个（24 识别 + 16 迁移）', `实际 ${contentIds.length}`);
+check(contentIds.length === 72, '数据：内容项共 72 个（36 识别 + 36 迁移）', `实际 ${contentIds.length}`);
 check(contentIds.every(filled), '数据：识别题/迁移题 id 全部非空',
   contentIds.filter((id) => !filled(id)).join(','));
 check(new Set(contentIds).size === contentIds.length, '数据：内容项 id 全局唯一',
@@ -116,7 +136,12 @@ for (const p of list) {
 
   const transfer = asArray(p?.transfer);
   check(Array.isArray(p?.transfer), `数据：${pid} transfer 是数组`, typeof p?.transfer);
-  check(transfer.length === 2, `数据：${pid} 恰好 2 道迁移题`, `实际 ${transfer.length}`);
+  check(transfer.length === 3, `数据：${pid} 恰好 3 道迁移题`, `实际 ${transfer.length}`);
+  const transferKinds = transfer.map((t) => t?.kind ?? 'scenario');
+  check(transferKinds.every((kind) => kind === 'scenario' || kind === 'wording'),
+    `数据：${pid} 迁移 kind 合法`, transferKinds.join(','));
+  check(transferKinds.filter((kind) => kind === 'wording').length === 1,
+    `数据：${pid} 恰好 1 条换措辞迁移`, transferKinds.join(','));
   for (const t of transfer) {
     const tid = filled(t?.id) ? t.id : `${pid}/(缺 id)`;
     check(filled(t?.situation) && filled(t?.rubricFocus) && filled(t?.why) && filled(t?.modelAnswer),
@@ -126,11 +151,27 @@ for (const p of list) {
   }
 }
 
+/* 思维体检：每模式一道识别题，题面引用必须真实存在且不重复。 */
+const diagnosticItems = mod.THINK_PATTERN_DIAGNOSTIC;
+check(Array.isArray(diagnosticItems) && diagnosticItems.length === 12,
+  '诊断：恰好 12 道体检题', `实际 ${asArray(diagnosticItems).length}`);
+const diagnosticPatternIds = asArray(diagnosticItems).map((item) => item?.patternId);
+const diagnosticChoiceIds = asArray(diagnosticItems).map((item) => item?.choiceId);
+check(new Set(diagnosticPatternIds).size === 12 && EXPECTED_PATTERN_IDS.every((id) => diagnosticPatternIds.includes(id)),
+  '诊断：12 个模式各被抽到一次', diagnosticPatternIds.join(','));
+check(new Set(diagnosticChoiceIds).size === diagnosticChoiceIds.length,
+  '诊断：识别题 id 不重复', diagnosticChoiceIds.join(','));
+for (const item of asArray(diagnosticItems)) {
+  const pattern = list.find((candidate) => candidate?.id === item?.patternId);
+  const choice = asArray(pattern?.recognition).find((candidate) => candidate?.id === item?.choiceId);
+  check(!!choice, `诊断：${item?.patternId} 的题目 ${item?.choiceId} 存在`);
+}
+
 /* 固定顺序展示时，答案不能全压在一个下标上，否则用户能靠位置蒙对。 */
 const allChoices = list.flatMap((p) => asArray(p?.recognition));
 const answerCounts = ANSWER_INDICES.map((index) => allChoices.filter((q) => q?.answer === index).length);
-check(allChoices.length === 24 && answerCounts.every((count) => count === 8),
-  '数据：24 道识别题的答案下标均衡分布（0/1/2 各 8 道）', answerCounts.join('/'));
+check(allChoices.length === 36 && answerCounts.every((count) => count === 12),
+  '数据：36 道识别题的答案下标均衡分布（0/1/2 各 12 道）', answerCounts.join('/'));
 
 /* 逐项说明：每个选项都要说清“这句英文怎么样”，不能只给一个整体解释。 */
 const optionNotes = mod.THINK_PATTERN_OPTION_NOTES;
@@ -158,7 +199,7 @@ for (const q of allChoices) {
   });
 }
 check(noteKeys.length === allChoices.length && allChoices.every((q) => noteKeys.includes(q.id)),
-  '数据：逐项说明覆盖全部 24 道识别题', `keys=${noteKeys.length}`);
+  '数据：逐项说明覆盖全部 36 道识别题', `keys=${noteKeys.length}`);
 check(noteIssues.length === 0, '数据：每个选项都有逐项说明且 best 落在正确项',
   noteIssues.slice(0, 10).join(' | '));
 
@@ -255,6 +296,98 @@ check(!pure.isDue(p('subject-first', { lastAttempt: { at: now, on: today, pass: 
 
 const pruned = pure.pruneDaily({ '2026-09-01': ['a'], '2026-10-23': ['b'] }, today, 31);
 check(!pruned['2026-09-01'] && pruned['2026-10-23'], 'daily：只保留最近 31 天');
+
+/* 闭卷迁移：第 3 次及以后复习收起“先想三步”；失败会重置 repetitions，重试自动开卷。 */
+check(!pure.isClosedBook(undefined) && !pure.isClosedBook(null) &&
+  !pure.isClosedBook({ repetitions: 0 }) && !pure.isClosedBook({ repetitions: 1 }),
+  '闭卷：第 1-2 次复习保持开卷');
+check(pure.isClosedBook({ repetitions: 2 }) && pure.isClosedBook({ repetitions: 5 }),
+  '闭卷：第 3 次及以后复习进入闭卷');
+
+/* 四层地图：total / mastered / due 口径。 */
+const layerProgress = {
+  'subject-first': p('subject-first', { status: 'mastered' }),
+  'verb-driven': p('verb-driven', { nextReview: now - 1 }),
+  'hedge-stance': p('hedge-stance', {
+    lastAttempt: { at: now, on: today, pass: true, recognitionCorrect: true, answer: '', feedback: '', source: 'ai' },
+  }),
+};
+const layerSnapshot = JSON.stringify(layerProgress);
+const layerSummary = pure.summarizeLayers(patterns, layerProgress, EXPECTED_LAYER_IDS, now, today);
+const layerById = Object.fromEntries(layerSummary.map((row) => [row.layerId, row]));
+check(layerSummary.length === 4 && layerSummary.map((row) => row.layerId).join(',') === EXPECTED_LAYER_IDS.join(','),
+  '层统计：四层各返回一行且顺序稳定', JSON.stringify(layerSummary));
+check(layerById.structure?.total === 3 && layerById.structure?.mastered === 1 && layerById.structure?.due === 0,
+  '层统计：信息结构 3 个、已掌握 1、到期 0', JSON.stringify(layerById.structure));
+check(layerById.verb?.total === 2 && layerById.verb?.due === 1,
+  '层统计：动词与焦点 2 个、到期 1', JSON.stringify(layerById.verb));
+check(layerById.clarity?.total === 3 && layerById.clarity?.due === 0,
+  '层统计：今天已通过的模式不算到期', JSON.stringify(layerById.clarity));
+check(layerById.pragmatics?.total === 4 && layerById.pragmatics?.due === 0,
+  '层统计：语域与语用 4 个、未开始不算到期', JSON.stringify(layerById.pragmatics));
+check(JSON.stringify(layerProgress) === layerSnapshot, '层统计：不修改入参（纯函数）');
+
+/* 思维体检计分：全对 → 无建议；错一题 → 只建议那一个模式；层分按真实模式数。 */
+const diagItems = mod.THINK_PATTERN_DIAGNOSTIC;
+const diagCorrectAnswers = {};
+for (const item of diagItems) {
+  const pattern = patterns.find((candidate) => candidate.id === item.patternId);
+  const choice = pattern?.recognition.find((candidate) => candidate.id === item.choiceId);
+  if (choice) diagCorrectAnswers[item.choiceId] = choice.answer;
+}
+const allCorrect = pure.scoreDiagnostic(patterns, diagItems, diagCorrectAnswers, EXPECTED_LAYER_IDS);
+check(allCorrect.correct === 12 && allCorrect.total === 12,
+  '诊断：全对 12/12', JSON.stringify(allCorrect));
+check(allCorrect.recommendedPatternIds.length === 0 && allCorrect.missedPatternIds.length === 0,
+  '诊断：全对时没有建议模式', JSON.stringify(allCorrect.recommendedPatternIds));
+check(allCorrect.layers.map((layer) => layer.total).join('/') === '3/2/3/4',
+  '诊断：四层题量按真实模式数（3/2/3/4）', allCorrect.layers.map((layer) => layer.total).join('/'));
+
+const firstDiag = diagItems[0];
+const wrongAnswers = {
+  ...diagCorrectAnswers,
+  [firstDiag.choiceId]: (diagCorrectAnswers[firstDiag.choiceId] + 1) % 3,
+};
+const oneWrong = pure.scoreDiagnostic(patterns, diagItems, wrongAnswers, EXPECTED_LAYER_IDS);
+check(oneWrong.correct === 11 && oneWrong.recommendedPatternIds.join(',') === firstDiag.patternId,
+  '诊断：错一题只建议对应模式', JSON.stringify(oneWrong.recommendedPatternIds));
+check(oneWrong.layers.find((layer) => layer.layerId === 'structure')?.correct === 2,
+  '诊断：结构层错一题 → 2/3', JSON.stringify(oneWrong.layers));
+check(pure.scoreDiagnostic(patterns, diagItems, {}, EXPECTED_LAYER_IDS).correct === 0,
+  '诊断：没作答不猜对（空答案 → 0/12）');
+
+/* 按体检结果组队：去重、跳过已掌握/今天已通过、封顶 10。 */
+const diagnosticProgress = {
+  'verb-driven': p('verb-driven', { status: 'mastered' }),
+  'end-focus': p('end-focus', {
+    lastAttempt: { at: now, on: today, pass: true, recognitionCorrect: true, answer: '', feedback: '', source: 'ai' },
+  }),
+};
+const diagnosticQueue = pure.buildDiagnosticQueue(
+  ['subject-first', 'subject-first', 'verb-driven', 'end-focus'],
+  diagnosticProgress,
+  today,
+  10,
+);
+check(JSON.stringify(diagnosticQueue) === JSON.stringify(['subject-first']),
+  '诊断队列：去重并跳过已掌握/今天已通过', JSON.stringify(diagnosticQueue));
+check(pure.buildDiagnosticQueue(EXPECTED_PATTERN_IDS, {}, today, 10).length === 10,
+  '诊断队列：最多 10 个模式');
+
+/* 延迟探测：7/21/60 天阈值；没有迁移通过记录时不标延迟。 */
+const probeBase = { firstReviewedAt: now, transferPasses: 1 };
+check(pure.delayedProbeDay({ ...probeBase, firstReviewedAt: now - 6 * 86400000 }, now) === null,
+  '延迟：第 6 天还不算延迟');
+check(pure.delayedProbeDay({ ...probeBase, firstReviewedAt: now - 7 * 86400000 }, now) === 7,
+  '延迟：第 7 天 → 7');
+check(pure.delayedProbeDay({ ...probeBase, firstReviewedAt: now - 20 * 86400000 }, now) === 7,
+  '延迟：第 20 天仍是 7 天档');
+check(pure.delayedProbeDay({ ...probeBase, firstReviewedAt: now - 21 * 86400000 }, now) === 21,
+  '延迟：第 21 天 → 21');
+check(pure.delayedProbeDay({ ...probeBase, firstReviewedAt: now - 60 * 86400000 }, now) === 60,
+  '延迟：第 60 天 → 60');
+check(pure.delayedProbeDay({ ...probeBase, transferPasses: 0, firstReviewedAt: now - 60 * 86400000 }, now) === null,
+  '延迟：没有迁移通过记录 → 不标延迟');
 
 /* ── 补充断言 ────────────────────────────────────────────────────────────
  * 上面那批用例有几条「实现改坏也仍然绿」：自评只练 4 次时间隔还没到 21 天、
@@ -667,6 +800,10 @@ check(/formatDate\(new Date\(/.test(hookCode) && !/toISOString\(\)\.slice/.test(
 check(/due: all\.filter\(\(p\) => isDue\(p, now, today\)\)\.length/.test(hookCode),
   'store：stats.due 只数 isDue（新引入项由 dueQueue 负责，不能算进 due）');
 check(/buildReviewQueue\(/.test(hookCode), 'store：dueQueue 走 buildReviewQueue（新引入项可以进队）');
+check(/diagnostic:\s*sanitizeDiagnostic\(/.test(hookCode), 'store：load 时清洗 diagnostic（不把坏体检记录带进界面）');
+check(/saveDiagnostic\s*=\s*useCallback/.test(hookCode) && /diagnostic:\s*\{/.test(hookCode) &&
+  /recommendedPatternIds/.test(hookCode) && /completedOn/.test(hookCode),
+  'store：saveDiagnostic 只写汇总（completedOn / 分数 / 层 / 建议）');
 
 // 读盘清洗（task-2 审查追加）：幽灵/错配记录会让同一个模式既算到期又被当新模式，还可能在界面上崩。
 check(/function sanitizeProgress\(/.test(hookCode) && (hookCode.match(/sanitizeProgress\(/g) ?? []).length >= 2,
@@ -728,6 +865,45 @@ check(typeof sanitizeProgress === 'function' &&
   JSON.stringify(sanitizeProgress('nope', knownIds)) === '{}' &&
   JSON.stringify(sanitizeProgress([1, 2], knownIds)) === '{}',
   'store 读盘真跑：整份不是对象（null/字符串/数组）→ 空 progress，不抛错');
+
+/* 体检记录清洗：只留已知层/已知模式，坏形状整份丢弃。 */
+const sanitizeDiagSrc = (hookCode.match(/function sanitizeDiagnostic\([\s\S]*?\n\}/) ?? [''])[0];
+check(sanitizeDiagSrc.length > 0, 'store 读盘：能抽出 sanitizeDiagnostic 纯函数段（供真跑）');
+let sanitizeDiagnostic = null;
+if (sanitizeDiagSrc) {
+  const js = ts.transpileModule(`${sanitizeDiagSrc}\nexport { sanitizeDiagnostic };`, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const file = join(mkdtempSync(join(tmpdir(), 'nt-pattern-diag-')), 'sanitize-diag.mjs');
+  writeFileSync(file, js, 'utf8');
+  sanitizeDiagnostic = (await import(pathToFileURL(file).href)).sanitizeDiagnostic;
+}
+const validDiagnostic = {
+  completedOn: today,
+  correct: 10,
+  total: 12,
+  layers: [
+    { layerId: 'structure', correct: 2, total: 3 },
+    { layerId: 'verb', correct: 1, total: 2 },
+    { layerId: 'clarity', correct: 3, total: 3 },
+    { layerId: 'pragmatics', correct: 4, total: 4 },
+  ],
+  recommendedPatternIds: ['subject-first', 'ghost-not-in-data'],
+};
+const cleanDiagnostic = sanitizeDiagnostic?.(validDiagnostic, knownIds, EXPECTED_LAYER_IDS);
+check(cleanDiagnostic?.correct === 10 && cleanDiagnostic?.layers.length === 4 &&
+  cleanDiagnostic?.recommendedPatternIds.join(',') === 'subject-first',
+  'store 体检清洗：保留汇总，过滤未知模式建议', JSON.stringify(cleanDiagnostic));
+check(sanitizeDiagnostic?.({ ...validDiagnostic, correct: 13 }, knownIds, EXPECTED_LAYER_IDS) === undefined,
+  'store 体检清洗：correct > total → 整份丢弃');
+check(sanitizeDiagnostic?.({
+  ...validDiagnostic,
+  layers: [{ layerId: 'unknown', correct: 1, total: 1 }],
+}, knownIds, EXPECTED_LAYER_IDS) === undefined,
+  'store 体检清洗：层全坏 → 整份丢弃');
+check(sanitizeDiagnostic?.(null, knownIds, EXPECTED_LAYER_IDS) === undefined &&
+  sanitizeDiagnostic?.('nope', knownIds, EXPECTED_LAYER_IDS) === undefined,
+  'store 体检清洗：非对象 → undefined');
 
 /* ── 首次读盘也要打「来自 storage」标记（task-4-review.md 的 Important fix）────
  * 只在 useSyncDown 回调里打标记不够：fresh device 首次挂载读到空 state 时，落盘 effect
@@ -792,6 +968,7 @@ const readUi = (rel) => {
 const modeSrc = readUi('src/pages/ThinkInEnglishPage/PatternReviewMode.tsx');
 const overviewSrc = readUi('src/pages/ThinkInEnglishPage/PatternOverview.tsx');
 const sessionSrc = readUi('src/pages/ThinkInEnglishPage/PatternReviewSession.tsx');
+const diagnosticSrc = readUi('src/pages/ThinkInEnglishPage/PatternDiagnostic.tsx');
 
 /* 静态接线一律跑在**剥注释源码**上：注释里出现 `silent: true` / `applySessionResult` 之类的同形
  * 文字不许替实现答话（AI 判定那批变异实验抓过一次）。 */
@@ -800,13 +977,15 @@ const stripComments = (s) => s
   .replace(/^\s*\/\/.*$/gm, '');
 const modeCode = stripComments(modeSrc);
 const sessionCode = stripComments(sessionSrc);
+const diagnosticCode = stripComments(diagnosticSrc);
 
-check(modeSrc.length > 0 && overviewSrc.length > 0 && sessionSrc.length > 0,
-  'UI：概览/会话/状态机三个组件文件都存在');
+check(modeSrc.length > 0 && overviewSrc.length > 0 && sessionSrc.length > 0 && diagnosticSrc.length > 0,
+  'UI：概览/会话/状态机/体检四个组件文件都存在');
 check(/useThinkPatterns\(/.test(modeSrc), 'UI：顶层使用 useThinkPatterns');
-check(/<PatternOverview\b/.test(modeSrc) && /<PatternReviewSession\b/.test(modeSrc),
-  'UI：概览与复习会话分离（两个组件都被渲染，不是只 import）');
-check(/'overview' \| 'review' \| 'complete'/.test(modeSrc), 'UI：三态状态机');
+check(/<PatternOverview\b/.test(modeSrc) && /<PatternReviewSession\b/.test(modeSrc) &&
+  /<PatternDiagnostic\b/.test(modeSrc),
+  'UI：概览、复习会话、体检分离（三个组件都被渲染，不是只 import）');
+check(/'overview' \| 'diagnostic' \| 'review' \| 'complete'/.test(modeSrc), 'UI：四态状态机');
 check(modeSrc.includes('key={`${pattern.id}-${session.index}`}'),
   'UI：换卡用「pattern.id + 会话下标」的 key 重挂载（否则重试会带着上一题阶段）');
 check(/applySessionResult\(/.test(modeCode) && /advanceSession\(/.test(modeCode) &&
@@ -834,7 +1013,35 @@ check(/ReactMarkdown/.test(sessionSrc) && /remarkGfm/.test(sessionSrc),
   'UI：解释含反引号，必须走 Markdown 渲染');
 check((overviewSrc.match(/formatDate\(new Date\(/g) ?? []).length >= 2,
   'UI：到期日期走 formatDate（模式卡 + 完成页两处，不是裸日期字符串）');
-check(!/toast\./.test(modeSrc + overviewSrc + sessionSrc), 'UI：练习界面不弹 toast');
+check(/THINK_PATTERN_LAYERS/.test(overviewSrc) && /summarizeLayers\(/.test(overviewSrc) &&
+  /模式地图/.test(overviewSrc) && /layerSummaries\.map/.test(overviewSrc),
+  'UI：概览渲染四层模式地图与层统计');
+check(/THINK_PATTERN_LAYERS\.map/.test(overviewSrc) && /pattern\.layer === layer\.id/.test(overviewSrc),
+  'UI：展开全部时模式库按 layer 分组，不是平铺');
+check(/今日先练/.test(overviewSrc) && /hero\.name/.test(overviewSrc) &&
+  /showMap/.test(overviewSrc) && /全部 \$\{THINK_PATTERNS\.length\} 个模式/.test(overviewSrc),
+  'UI：概览只有一个「今日先练」焦点卡；体检/地图/模式库降为文字入口');
+check(/到期 \{stats\.due\} · 今日已练 \{stats\.reviewedToday\}/.test(overviewSrc),
+  'UI：概览统计收成一行，不再占三张卡');
+check(/isClosedBook\(progress\)/.test(sessionSrc) && /closedBook \?/.test(sessionCode) &&
+  /这次闭卷/.test(sessionSrc),
+  'UI：迁移卡按 isClosedBook 切换闭卷提示');
+check(/delayedProbeDay\(progress/.test(sessionSrc) && /延迟 \$\{probeDay\} 天/.test(sessionSrc) &&
+  /probeDay \? '延迟迁移' : '闭卷'/.test(sessionSrc),
+  'UI：迁移卡标出 7/21/60 天延迟探测');
+check(/transferKind === 'wording' \? '换措辞' : '新情境'/.test(sessionSrc),
+  'UI：迁移卡标出新情境/换措辞');
+check(/closedBook && \(/.test(sessionCode) && /回看：这次/.test(sessionSrc),
+  'UI：闭卷/延迟反馈卡回看三步');
+check(/mode === 'diagnostic'/.test(modeCode) && /items=\{THINK_PATTERN_DIAGNOSTIC\}/.test(modeSrc),
+  'UI：diagnostic 模式渲染体检题表');
+check(/思维体检/.test(overviewSrc) && /onDiagnostic/.test(overviewSrc) && /diagnostic=/.test(modeSrc),
+  'UI：概览有思维体检入口且接到状态机');
+check(/scoreDiagnostic\(/.test(diagnosticCode) && /onComplete\(next\)/.test(diagnosticCode),
+  'UI：体检完成时只算 profile 并保存一次');
+check(!/grade\(|onGrade|applyPatternResult|setState\(\(prev\)[^)]*progress/.test(diagnosticCode),
+  'UI：体检不写 SM-2 进度（不调 grade / applyPatternResult）');
+check(!/toast\./.test(modeSrc + overviewSrc + sessionSrc + diagnosticSrc), 'UI：练习界面不弹 toast');
 
 /* ── AI 判定接线（Task 6）───────────────────────────────────────────────────
  * 迁移提交先走非流式 aiChat，成功直接落 source='ai'；空串/解析失败/没配 Key 才
@@ -1039,7 +1246,7 @@ const runPureMutation = async (label, before, after, expectFn) => {
   check(broken, `${label}：变异后行为必须变红`, detail || '基线行为在变异体上仍然成立 —— 断言没在管事');
 };
 
-// M1：每日 10 上限（用 12 个合成模式，避免受真实 8 个模式限制）。
+// M1：每日 10 上限（用 12 个合成模式，避免受真实 12 个模式限制）。
 // 注意 map 参数不能叫 p —— 会遮住上面那个「建进度」的工厂函数 p()。
 const synthetic = Array.from({ length: 12 }, (_, i) => ({ id: `p${i}` }));
 const manyProgress = Object.fromEntries(synthetic.map((pat) => [
@@ -1063,7 +1270,7 @@ await runPureMutation(
   (m) => m.pushRetry(['a'], 'a', {}, 2).queue.length === 1,
 );
 
-// M3：每天 2 个新模式上限（8 个全新模式只许引入 2 个）。
+// M3：每天 2 个新模式上限（12 个全新模式只许引入 2 个）。
 await runPureMutation(
   'M3 新模式上限',
   'slice(0, newBudget)',
@@ -1183,6 +1390,43 @@ await runPureMutation(
   (m) => m.sessionCounts({
     queue: [], index: 0, retries: {}, results: { a: 'pass', b: 'fail' },
   }).failed === 2,
+);
+
+// M14：闭卷阈值被改成不可能触发 —— 第 3 次复习仍然展示“先想三步”。
+await runPureMutation(
+  'M14 闭卷阈值',
+  'return (progress?.repetitions ?? 0) >= 2;',
+  'return (progress?.repetitions ?? 0) >= 99;',
+  (m) => m.isClosedBook({ repetitions: 3 }) === false,
+);
+
+// M15：体检计分恒真 —— 没作答也显示全对。
+await runPureMutation(
+  'M15 诊断计分恒真',
+  'const isCorrect = answers[item.choiceId] === choice.answer;',
+  'const isCorrect = true;',
+  (m) => m.scoreDiagnostic(patterns, diagItems, {}, EXPECTED_LAYER_IDS).correct > 0,
+);
+
+// M16：诊断队列不再跳过已掌握 —— 已掌握的模式又被建议重练。
+await runPureMutation(
+  'M16 诊断队列跳过已掌握',
+  "record.status === 'mastered' ||",
+  'false ||',
+  (m) => m.buildDiagnosticQueue(
+    ['verb-driven'],
+    { 'verb-driven': p('verb-driven', { status: 'mastered' }) },
+    today,
+    10,
+  ).length === 1,
+);
+
+// M17：延迟 7 天阈值失效 —— 第 7 天不再标延迟。
+await runPureMutation(
+  'M17 延迟 7 天阈值',
+  'if (days >= 7) return 7;',
+  'if (days >= 99) return 7;',
+  (m) => m.delayedProbeDay({ firstReviewedAt: now - 7 * 86400000, transferPasses: 1 }, now) === null,
 );
 
 console.log('');

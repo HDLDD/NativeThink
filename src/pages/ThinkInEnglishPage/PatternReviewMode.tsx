@@ -22,7 +22,12 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAI } from '@/hooks/use-ai';
 import { Card, CardContent } from '@/components/ui/card';
-import { THINK_PATTERNS, type IThinkPattern, type IThinkPatternTransfer } from '@/data/think-patterns';
+import {
+  THINK_PATTERN_DIAGNOSTIC,
+  THINK_PATTERNS,
+  type IThinkPattern,
+  type IThinkPatternTransfer,
+} from '@/data/think-patterns';
 import { creditKey, useStudyCredit } from '@/lib/study-credit';
 import {
   buildPatternJudgePrompt,
@@ -32,6 +37,7 @@ import {
 import {
   advanceSession,
   applySessionResult,
+  buildDiagnosticQueue,
   createPatternSession,
   getWeakPatterns,
   sessionCounts,
@@ -39,17 +45,18 @@ import {
   type PatternSessionState,
 } from '@/lib/think-patterns';
 import { useThinkPatterns } from '@/lib/use-think-patterns';
-import { extractJson } from '@/lib/utils';
+import { extractJson, formatDate } from '@/lib/utils';
+import { PatternDiagnostic } from './PatternDiagnostic';
 import { PatternOverview } from './PatternOverview';
 import { PatternReviewSession } from './PatternReviewSession';
 
-type Mode = 'overview' | 'review' | 'complete';
+type Mode = 'overview' | 'diagnostic' | 'review' | 'complete';
 
 /** 判定最长等 15 秒：超时按「AI 不可用」处理，练习界面不永久停在「正在判定」 */
 const JUDGE_TIMEOUT_MS = 15_000;
 
 export function PatternReviewMode() {
-  const { loaded, progress, stats, dueQueue, grade } = useThinkPatterns();
+  const { loaded, progress, stats, dueQueue, diagnostic, grade, saveDiagnostic } = useThinkPatterns();
   const { isConfigured, chat: aiChat } = useAI();
   const { creditOnce } = useStudyCredit();
   const [mode, setMode] = useState<Mode>('overview');
@@ -59,9 +66,27 @@ export function PatternReviewMode() {
   // 完成页按不同模式计数：重试通过后 results 只剩一条 pass，不会把同一模式数两次
   const { passed, failed } = sessionCounts(session);
 
-  const start = () => {
-    setSession(createPatternSession(dueQueue));
-    setMode(dueQueue.length ? 'review' : 'overview');
+  const startWith = (ids: string[]) => {
+    const queue = ids.length ? ids : dueQueue;
+    setSession(createPatternSession(queue));
+    setMode(queue.length ? 'review' : 'overview');
+  };
+
+  const start = (firstPatternId?: string) => {
+    const queue = firstPatternId
+      ? [firstPatternId, ...dueQueue.filter((id) => id !== firstPatternId)]
+      : dueQueue;
+    startWith(queue);
+  };
+
+  /** 体检建议先练的模式：去掉已掌握/今天已通过；全被过滤就回落到正常到期队列 */
+  const startFromDiagnostic = (recommendedPatternIds: string[]) => {
+    const now = Date.now();
+    startWith(buildDiagnosticQueue(
+      recommendedPatternIds,
+      progress,
+      formatDate(new Date(now)),
+    ));
   };
 
   const current = session.queue[session.index];
@@ -133,6 +158,18 @@ export function PatternReviewMode() {
     );
   }
 
+  if (mode === 'diagnostic') {
+    return (
+      <PatternDiagnostic
+        patterns={THINK_PATTERNS}
+        items={THINK_PATTERN_DIAGNOSTIC}
+        onComplete={saveDiagnostic}
+        onStart={startFromDiagnostic}
+        onExit={() => setMode('overview')}
+      />
+    );
+  }
+
   if (mode === 'review' && pattern) {
     return (
       <PatternReviewSession
@@ -156,7 +193,9 @@ export function PatternReviewMode() {
       mode={mode}
       passed={passed}
       failed={failed}
+      diagnostic={diagnostic}
       onStart={start}
+      onDiagnostic={() => setMode('diagnostic')}
       onBack={() => setMode('overview')}
     />
   );

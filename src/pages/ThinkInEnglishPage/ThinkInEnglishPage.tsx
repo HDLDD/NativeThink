@@ -7,7 +7,6 @@ import {
   XCircle,
   Loader2,
   RefreshCw,
-  Brain,
   Heart,
   Wand2,
   Volume2,
@@ -749,7 +748,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
             母语思维训练
           </h1>
           <p className="text-muted-foreground mt-2 text-sm font-medium">
-            摆脱中式英语，建立像 native speaker 一样的英语思维
+            把中文默认换成可切换的英语默认，练清晰、自然的表达
           </p>
         </div>
       </div>
@@ -765,30 +764,31 @@ The chineseText should subtly embed English thinking patterns so learners discov
           </TabsTrigger>
           <TabsTrigger
             value="detector"
+            aria-label="中式英语检测"
             className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
-            <Search className="size-4 mr-2" />
-            中式英语检测
+            检测
           </TabsTrigger>
           <TabsTrigger
             value="translation"
+            aria-label="思维转译"
             className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
-            <ArrowRight className="size-4 mr-2" />
-            思维转译
+            转译
           </TabsTrigger>
           <TabsTrigger
             value="backTranslation"
+            aria-label="反翻译训练"
             className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
-            <Brain className="size-4 mr-2" />
-            反翻译训练
+            反翻译
           </TabsTrigger>
           <TabsTrigger
             value="nativeTranslate"
+            aria-label="思维还原"
             className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
-            思维还原
+            还原
           </TabsTrigger>
         </TabsList>
 

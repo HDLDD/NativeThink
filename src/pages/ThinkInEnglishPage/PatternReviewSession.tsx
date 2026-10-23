@@ -14,7 +14,7 @@
  *     否则它会把上一题的结果写进下一张卡（或已卸载的组件）。
  */
 import { useEffect, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { THINK_PATTERN_OPTION_NOTES, type IThinkPattern, type IThinkPatternTransfer } from '@/data/think-patterns';
 import {
+  delayedProbeDay,
+  isClosedBook,
   pickRecognitionIndex,
   pickTransferIndex,
   type IThinkPatternProgress,
@@ -95,6 +97,11 @@ export function PatternReviewSession({
   const choice = pattern.recognition[recognitionIndex];
   const transfer = pattern.transfer[transferIndex];
   const recognitionCorrect = selected !== null && selected === choice?.answer;
+  /** 距首次练习 ≥7/21/60 天时标成延迟迁移；延迟探测同样闭卷 */
+  const probeDay = delayedProbeDay(progress, Date.now());
+  /** 第 3 次及以后复习闭卷；失败会重置 repetitions，重试卡自动回到开卷 */
+  const closedBook = isClosedBook(progress) || probeDay !== null;
+  const transferKind = transfer?.kind ?? 'scenario';
   const stageIndex = STAGES.findIndex((s) => s.key === stage);
 
   if (!choice || !transfer) {
@@ -372,28 +379,54 @@ export function PatternReviewSession({
       {stage === 'transfer' && (
         <Card className="rounded-3xl border-border shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-xs font-black uppercase tracking-wider text-muted-foreground">
-              迁移：轮到你说了
-            </CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-xs font-black uppercase tracking-wider text-muted-foreground">
+                迁移：轮到你说了
+              </CardTitle>
+              <Badge variant="outline" className="border-border text-muted-foreground">
+                {transferKind === 'wording' ? '换措辞' : '新情境'}
+              </Badge>
+              {closedBook && (
+                <Badge variant="outline" className="border-amber-500/40 text-amber-700">
+                  {probeDay ? `延迟 ${probeDay} 天` : '闭卷'}
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm font-semibold text-foreground break-words">{transfer.situation}</p>
-            <div className="rounded-2xl border border-border bg-muted/20 p-4 space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                写之前先想三步
-              </p>
-              <ol className="space-y-1.5">
-                {transfer.thinkingSteps.map((step, i) => (
-                  <li key={step} className="flex gap-2 text-sm text-foreground/80">
-                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--brand)]/10 text-[10px] font-black text-ink-teal">
-                      {i + 1}
-                    </span>
-                    <span className="break-words">{step}</span>
-                  </li>
-                ))}
-              </ol>
-              <p className="text-xs text-muted-foreground">不要逐字翻译；先把动作和对象想清楚，再写。</p>
-            </div>
+            {closedBook ? (
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+                <p className="text-xs font-black text-amber-700">
+                  {probeDay ? `延迟迁移 · 第 ${probeDay} 天` : '这次闭卷：先自己组织'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {probeDay
+                    ? `距首次练习已超过 ${probeDay} 天；这次不看三步提示，先自己组织，提交后再对照。`
+                    : '你已经在前面复习过这个模式；这次不看三步提示，提交后再对照。'}
+                </p>
+              </div>
+            ) : (
+              <details className="group rounded-2xl border border-border bg-muted/20">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-[10px] font-black uppercase tracking-wider text-muted-foreground [&::-webkit-details-marker]:hidden">
+                  <span>写之前先想三步（可展开）</span>
+                  <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
+                </summary>
+                <div className="space-y-2 px-4 pb-4">
+                  <ol className="space-y-1.5">
+                    {transfer.thinkingSteps.map((step, i) => (
+                      <li key={step} className="flex gap-2 text-sm text-foreground/80">
+                        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--brand)]/10 text-[10px] font-black text-ink-teal">
+                          {i + 1}
+                        </span>
+                        <span className="break-words">{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  <p className="text-xs text-muted-foreground">不要逐字翻译；先把动作和对象想清楚，再写。</p>
+                </div>
+              </details>
+            )}
             <Textarea
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
@@ -525,6 +558,23 @@ export function PatternReviewSession({
               </p>
               <p className="text-sm text-foreground/80 break-words">{transfer.why}</p>
             </div>
+            {closedBook && (
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+                <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">
+                  回看：这次{probeDay ? '延迟迁移' : '闭卷'}，可以先想的三步
+                </p>
+                <ol className="space-y-1.5">
+                  {transfer.thinkingSteps.map((step, i) => (
+                    <li key={step} className="flex gap-2 text-sm text-foreground/80">
+                      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--brand)]/10 text-[10px] font-black text-ink-teal">
+                        {i + 1}
+                      </span>
+                      <span className="break-words">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
             <div className="rounded-2xl border border-border bg-muted/20 p-4">
               <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">
                 本模式的判断线索

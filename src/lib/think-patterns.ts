@@ -14,7 +14,7 @@
  *   通过后间隔 1 → 3 → interval×easeFactor 天，easeFactor 最低 1.3。
  *   mastered 额外要求 aiTransferPasses >= 2 —— 纯自评不能把模式刷成已掌握。
  */
-import type { IThinkPattern } from '@/data/think-patterns';
+import type { IThinkPattern, IThinkPatternDiagnosticItem, ThinkPatternLayer } from '@/data/think-patterns';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -56,6 +56,8 @@ export interface IThinkPatternState {
   progress: Record<string, IThinkPatternProgress>;
   /** 日期 → 当天练过的模式 id（用于今日计数与去重） */
   daily: Record<string, string[]>;
+  /** 最近一次思维体检；只存汇总与建议，不存逐题答案 */
+  diagnostic?: IThinkPatternDiagnosticRecord;
 }
 
 export interface PatternResultInput {
@@ -207,6 +209,158 @@ export function pickRecognitionIndex(total: number, length: number): number {
 /** 迁移题轮换：按累计迁移尝试次数取模。 */
 export function pickTransferIndex(total: number, length: number): number {
   return length > 0 ? total % length : 0;
+}
+
+/**
+ * 闭卷迁移：同一模式第 3 次及以后复习收起“先想三步”。
+ * 失败会把 repetitions 重置为 0，所以当轮重试和下一次失败后的复习自动回到开卷。
+ */
+export function isClosedBook(
+  progress?: Pick<IThinkPatternProgress, 'repetitions'> | null,
+): boolean {
+  return (progress?.repetitions ?? 0) >= 2;
+}
+
+export type DelayedProbeDay = 7 | 21 | 60;
+
+/**
+ * 延迟探测的“已过阈值”标识：距首次练习 ≥7 / ≥21 / ≥60 天。
+ * 只做标识，不另建排期 —— 实际什么时候复习仍由 SM-2 的 nextReview 决定。
+ */
+export function delayedProbeDay(
+  progress: Pick<IThinkPatternProgress, 'firstReviewedAt' | 'transferPasses'> | null | undefined,
+  now: number,
+): DelayedProbeDay | null {
+  if (!progress || progress.transferPasses <= 0) return null;
+  const days = Math.floor((now - progress.firstReviewedAt) / DAY_MS);
+  if (days >= 60) return 60;
+  if (days >= 21) return 21;
+  if (days >= 7) return 7;
+  return null;
+}
+
+export interface DiagnosticLayerScore {
+  layerId: ThinkPatternLayer;
+  correct: number;
+  total: number;
+}
+
+export interface DiagnosticResult {
+  correct: number;
+  total: number;
+  layers: DiagnosticLayerScore[];
+  /** 这次识别没抓住的模式，按四层顺序排列 */
+  missedPatternIds: string[];
+  /** 建议接下来练的模式；当前与 missedPatternIds 同源 */
+  recommendedPatternIds: string[];
+}
+
+export interface IThinkPatternDiagnosticRecord {
+  completedOn: string;
+  correct: number;
+  total: number;
+  layers: DiagnosticLayerScore[];
+  recommendedPatternIds: string[];
+}
+
+/**
+ * 思维体检计分：只算识别对错，不写进度、不生成“思维分”。
+ * 缺失/拼错的 patternId 或 choiceId 直接跳过，不让坏数据把整份体检打崩。
+ */
+export function scoreDiagnostic(
+  patterns: IThinkPattern[],
+  items: readonly IThinkPatternDiagnosticItem[],
+  answers: Record<string, number>,
+  layerIds: readonly ThinkPatternLayer[],
+): DiagnosticResult {
+  const byId = new Map(patterns.map((pattern) => [pattern.id, pattern]));
+  const layerOrder = new Map(layerIds.map((layerId, index) => [layerId, index]));
+  const perLayer = new Map<ThinkPatternLayer, DiagnosticLayerScore>(
+    layerIds.map((layerId) => [layerId, { layerId, correct: 0, total: 0 }]),
+  );
+  const missed = new Set<string>();
+  let correct = 0;
+
+  for (const item of items) {
+    const pattern = byId.get(item.patternId);
+    const choice = pattern?.recognition.find((candidate) => candidate.id === item.choiceId);
+    if (!pattern || !choice) continue;
+    const isCorrect = answers[item.choiceId] === choice.answer;
+    const layer = perLayer.get(pattern.layer);
+    if (layer) {
+      layer.total += 1;
+      if (isCorrect) layer.correct += 1;
+    }
+    if (isCorrect) correct += 1;
+    else missed.add(pattern.id);
+  }
+
+  const missedPatterns = patterns
+    .filter((pattern) => missed.has(pattern.id))
+    .sort((a, b) => (layerOrder.get(a.layer) ?? 0) - (layerOrder.get(b.layer) ?? 0));
+  return {
+    correct,
+    total: items.length,
+    layers: layerIds.map((layerId) => perLayer.get(layerId)!).filter(Boolean),
+    missedPatternIds: missedPatterns.map((pattern) => pattern.id),
+    recommendedPatternIds: missedPatterns.map((pattern) => pattern.id),
+  };
+}
+
+/**
+ * 按体检结果组一轮复习：去掉已掌握与今天已通过的模式。
+ * 返回空数组时由调用方回落到正常的到期队列，不把“全对”变成“今天不用练”。
+ */
+export function buildDiagnosticQueue(
+  recommendedPatternIds: readonly string[],
+  progress: Record<string, IThinkPatternProgress>,
+  today: string,
+  maxPatterns = 10,
+): string[] {
+  const seen = new Set<string>();
+  const queue: string[] = [];
+  for (const id of recommendedPatternIds) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const record = progress[id];
+    if (record && (
+      record.status === 'mastered' ||
+      (record.lastAttempt?.pass === true && record.lastAttempt.on === today)
+    )) continue;
+    queue.push(id);
+    if (queue.length >= maxPatterns) break;
+  }
+  return queue;
+}
+
+export interface PatternLayerSummary {
+  layerId: ThinkPatternLayer;
+  total: number;
+  mastered: number;
+  due: number;
+}
+
+/**
+ * 四层模式地图的只读汇总。due 沿用 isDue 口径：未开始的模式不算到期，
+ * 今天已通过的模式也不算到期（与概览三格保持一致）。
+ */
+export function summarizeLayers(
+  patterns: IThinkPattern[],
+  progress: Record<string, IThinkPatternProgress>,
+  layerIds: readonly ThinkPatternLayer[],
+  now: number,
+  today: string,
+): PatternLayerSummary[] {
+  return layerIds.map((layerId) => {
+    const items = patterns.filter((p) => p.layer === layerId);
+    const records = items.map((p) => progress[p.id]).filter((p): p is IThinkPatternProgress => !!p);
+    return {
+      layerId,
+      total: items.length,
+      mastered: records.filter((p) => p.status === 'mastered').length,
+      due: records.filter((p) => isDue(p, now, today)).length,
+    };
+  });
 }
 
 /**

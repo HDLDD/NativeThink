@@ -21,19 +21,24 @@ import { safeStorage } from '@/lib/safe-storage';
 import { useSyncDown } from '@/lib/sync-down';
 import { formatDate } from '@/lib/utils';
 import { warnStorageFull } from '@/lib/capped-cache';
-import { THINK_PATTERNS } from '@/data/think-patterns';
+import { THINK_PATTERN_LAYERS, THINK_PATTERNS } from '@/data/think-patterns';
 import {
   THINK_PATTERN_STORAGE_KEY,
   applyPatternResult,
   buildReviewQueue,
   isDue,
   pruneDaily,
+  type DiagnosticLayerScore,
+  type DiagnosticResult,
+  type IThinkPatternDiagnosticRecord,
   type IThinkPatternProgress,
   type IThinkPatternState,
   type PatternGradeInput,
 } from '@/lib/think-patterns';
+import type { ThinkPatternLayer } from '@/data/think-patterns';
 
 const KNOWN_PATTERN_IDS: ReadonlySet<string> = new Set(THINK_PATTERNS.map((p) => p.id));
+const KNOWN_LAYER_IDS: readonly ThinkPatternLayer[] = THINK_PATTERN_LAYERS.map((layer) => layer.id);
 
 export interface IThinkPatternStats {
   tracked: number;
@@ -49,7 +54,10 @@ export interface IThinkPatternsApi {
   stats: IThinkPatternStats;
   /** 本轮复习顺序：到期项在前、新引入项在后（新引入不算 due，见 stats.due） */
   dueQueue: string[];
+  /** 最近一次思维体检；没有就是 null */
+  diagnostic: IThinkPatternDiagnosticRecord | null;
   grade: (input: PatternGradeInput) => void;
+  saveDiagnostic: (result: DiagnosticResult) => void;
   getProgress: (patternId: string) => IThinkPatternProgress | null;
   resetAll: () => void;
 }
@@ -104,6 +112,52 @@ function sanitizeDaily(raw: unknown): Record<string, string[]> {
   return out;
 }
 
+/**
+ * 体检记录的读盘清洗：只保留汇总与建议，不存逐题答案。
+ * 坏形状、未知层、未知模式 id 一律丢掉；整份坏掉时回退 undefined，不影响复习进度。
+ */
+function sanitizeDiagnostic(
+  raw: unknown,
+  knownPatternIds: ReadonlySet<string>,
+  layerIds: readonly ThinkPatternLayer[],
+): IThinkPatternDiagnosticRecord | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const entry = raw as Record<string, unknown>;
+  if (typeof entry.completedOn !== 'string' || !entry.completedOn) return undefined;
+  if (typeof entry.correct !== 'number' || !Number.isFinite(entry.correct)) return undefined;
+  if (typeof entry.total !== 'number' || !Number.isFinite(entry.total)) return undefined;
+  if (entry.correct < 0 || entry.total < 0 || entry.correct > entry.total) return undefined;
+  if (!Array.isArray(entry.layers)) return undefined;
+
+  const layers: DiagnosticLayerScore[] = [];
+  for (const layer of entry.layers) {
+    if (!layer || typeof layer !== 'object' || Array.isArray(layer)) continue;
+    const row = layer as Record<string, unknown>;
+    if (typeof row.layerId !== 'string' || !layerIds.includes(row.layerId as ThinkPatternLayer)) continue;
+    if (typeof row.correct !== 'number' || !Number.isFinite(row.correct)) continue;
+    if (typeof row.total !== 'number' || !Number.isFinite(row.total)) continue;
+    layers.push({
+      layerId: row.layerId as ThinkPatternLayer,
+      correct: row.correct,
+      total: row.total,
+    });
+  }
+  if (layers.length === 0) return undefined;
+
+  const recommendedPatternIds = Array.isArray(entry.recommendedPatternIds)
+    ? entry.recommendedPatternIds.filter(
+      (id): id is string => typeof id === 'string' && knownPatternIds.has(id),
+    )
+    : [];
+  return {
+    completedOn: entry.completedOn,
+    correct: entry.correct,
+    total: entry.total,
+    layers,
+    recommendedPatternIds,
+  };
+}
+
 function load(): IThinkPatternState {
   try {
     const raw = safeStorage.getItem(THINK_PATTERN_STORAGE_KEY);
@@ -113,6 +167,7 @@ function load(): IThinkPatternState {
       progress: sanitizeProgress(parsed?.progress, KNOWN_PATTERN_IDS),
       // 用本地 today 裁 daily：设备时钟回拨/时区切换留下的未来键不能当成今天的历史
       daily: pruneDaily(sanitizeDaily(parsed?.daily), formatDate(new Date())),
+      diagnostic: sanitizeDiagnostic(parsed?.diagnostic, KNOWN_PATTERN_IDS, KNOWN_LAYER_IDS),
     };
   } catch {
     return createEmptyState();
@@ -200,6 +255,20 @@ export function useThinkPatterns(): IThinkPatternsApi {
     };
   }, [state.progress, state.daily]);
 
+  const saveDiagnostic = useCallback((result: DiagnosticResult) => {
+    const today = formatDate(new Date());
+    setState((prev) => ({
+      ...prev,
+      diagnostic: {
+        completedOn: today,
+        correct: result.correct,
+        total: result.total,
+        layers: result.layers,
+        recommendedPatternIds: result.recommendedPatternIds,
+      },
+    }));
+  }, []);
+
   const getProgress = useCallback(
     (patternId: string) => state.progress[patternId] ?? null,
     [state.progress],
@@ -213,7 +282,9 @@ export function useThinkPatterns(): IThinkPatternsApi {
     progress: state.progress,
     stats,
     dueQueue,
+    diagnostic: state.diagnostic ?? null,
     grade,
+    saveDiagnostic,
     getProgress,
     resetAll,
   };
