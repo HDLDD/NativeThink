@@ -18,7 +18,7 @@
 
 ## 2. 路由与错误边界
 
-`src/app.tsx`：14 个页面 + `*` 兜底，全部 `lazy()`（`:6-21`），路由表 `:47-63`。
+`src/app.tsx`：14 个页面 + `*` 兜底，全部 `lazy()`（`:6-20`），路由表 `:46-62`。
 
 **每条 lazy 路由自己没有 Suspense**，只有一个 `ErrorBoundary`（`react-error-boundary` + `PageErrorFallback`，`:21-39`，带「刷新页面」按钮）。真正的懒加载兜底在 `Layout.tsx:121`：
 
@@ -38,9 +38,9 @@
 | 位置 | 内容 |
 |------|------|
 | `AppSidebar.tsx:33-47` | `ROUTE_PREFETCH`，13 条 |
-| `AppSidebar.tsx:49-63` | `NAV_ITEMS`，13 条 |
-| `AppSidebar.tsx:99-100` | 触发时机 = **`onMouseEnter` + `onTouchStart`**，不是 mount |
-| `AppSidebar.tsx:99-100` | `/vocabulary` 额外 `preloadCoreOnly(['cet4'])` |
+| `AppSidebar.tsx:51-65` | `NAV_ITEMS`，14 条 |
+| `AppSidebar.tsx:113-114` | 触发时机 = **`onMouseEnter` + `onTouchStart`**，不是 mount |
+| `AppSidebar.tsx:113-114` | `/vocabulary` 额外 `preloadCoreOnly(['cet4'])` |
 | `MobileBottomNav.tsx:14-22` | **自己复制的第二份 `ROUTE_PREFETCH`，只有 7 条**（AppSidebar 那份没 export） |
 | `MobileBottomNav.tsx:25-30` | 移动端底栏只 6 项，`:49` 仅 `onTouchStart` |
 
@@ -56,9 +56,9 @@ AGENTS.md 说的"四件套"确实都还在，但**还有两处隐性要求**，�
 
 | # | 位置 | 漏掉的后果 |
 |---|------|-----------|
-| 1 | `app.tsx:46-58` 路由 + `:6-19` lazy | 路由 404 |
-| 2 | `AppSidebar.tsx:32` `ROUTE_PREFETCH` + `:48` `NAV_ITEMS` | 进不去 / 不预取 |
-| 3 | `DashboardPage/constants.ts:103-112` `MODULES`（9 个 key，`as const`） | 首页进度环少一格 |
+| 1 | `app.tsx:46-61` 路由 + `:6-20` lazy | 路由 404 |
+| 2 | `AppSidebar.tsx:34` `ROUTE_PREFETCH` + `:51` `NAV_ITEMS` | 进不去 / 不预取 |
+| 3 | `DashboardPage/constants.ts:112-123` `MODULES`（10 个 key，`as const`） | 首页进度环少一格 |
 | 4 | `use-learning-stats.ts:16-29` 类型 + `:45-55` 默认值 | 写不进去 |
 | 5 | **`use-learning-stats.ts:70-80` `MODULE_PROGRESS_KEYS` 白名单** | **`mergeStats`（`:84-90`）把它静默丢弃** —— 进度永远不显示 |
 | 6 | **`ProgressPage/components/ProgressCharts.tsx:33-42` `MODULE_COLORS` + `:44-53` `MODULE_NAMES`** | 图例回落成 key 名、颜色回落灰 `#94A3B8` |
