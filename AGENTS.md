@@ -204,7 +204,6 @@ node scripts/check-video-on-phone.mjs <课名关键字>   # 真机侧 11 条行�
 | `/sentences` | `SentenceLabPage` | `sentences` | sentence-lab |
 | `/spelling` | `SpellingPage` | `spelling` | spelling |
 | `/video` | `VideoLabPage` | `video` | video-lab |
-| `/cet` | `CetExamPage`（外链 CetThink，不在包内） | — | — |
 | `/progress` | `ProgressPage` | — | dashboard-progress-favorites |
 | `/settings` | `SettingsPage` | — | shell-and-navigation §8（设置页与外观主题） |
 

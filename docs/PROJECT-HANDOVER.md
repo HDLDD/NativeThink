@@ -40,7 +40,6 @@
 | `/writing` | WritingPage | `writing` |
 | `/sentences` | SentenceLabPage | `sentences` |
 | `/spelling` | SpellingPage | `spelling` |
-| `/cet` | CetExamPage（外链 CetThink，不在包内） | — |
 | `/progress` | ProgressPage | — |
 
 **新增页面要同步四处**（否则侧边栏/进度环/统计会缺项）：

@@ -14,7 +14,7 @@
 - **导航模式**: 路径导航
 - **导航布局**: Sidebar（左侧导航栏 + 主内容区）
 
-> **现状补充（以代码为准）**：产品已扩展出文章阅读 `/articles`、AI 写作 `/writing`、句子学习 `/sentences`、句子拼写 `/spelling`、收藏 `/favorites`、四六级入口 `/cet`（独立 CetThink App）。下文页面表为最初需求，实现以 `src/app.tsx` 与 AGENTS.md 路由地图为准。
+> **现状补充（以代码为准）**：产品已扩展出文章阅读 `/articles`、AI 写作 `/writing`、句子学习 `/sentences`、句子拼写 `/spelling`、收藏 `/favorites`。下文页面表为最初需求，实现以 `src/app.tsx` 与 AGENTS.md 路由地图为准。
 
 ---
 

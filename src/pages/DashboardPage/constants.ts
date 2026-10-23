@@ -9,7 +9,6 @@ import {
   BookMarked,
   SpellCheck, Film,
   MessagesSquare,
-  GraduationCap,
 } from 'lucide-react';
 
 export const WEEK_DAYS = ['日', '一', '二', '三', '四', '五', '六'] as const;
@@ -104,15 +103,6 @@ export const QUICK_ENTRIES = [
     tint: '#6A4C93',
     bg: 'bg-violet-50 dark:bg-violet-500/15',
     desc: 'AI 批改提升写作',
-  },
-  {
-    path: '/cet',
-    label: '四六级备考',
-    icon: GraduationCap,
-    color: 'from-[#0F6B78] to-cyan-600',
-    tint: '#0F6B78',
-    bg: 'bg-cyan-50 dark:bg-cyan-500/15',
-    desc: '模考 · 听力 · 错题本',
   },
 ];
 
