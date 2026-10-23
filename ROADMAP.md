@@ -55,6 +55,8 @@
     - ~~**云同步下行剩余订阅者未接全**~~（**已修 2026-10-05**）：订阅者 7 → **13**（新增快速闪卡留档 `quickcard-history.ts:234`、句子复习 `use-sentence-review.ts:98`、成就 `use-achievements.ts:138`、自定义场景 `use-custom-scenarios.ts:72`、TTS 设置 `tts-settings.ts:125`、拼写句子库 `use-spelling-learning.ts:135`）；并实修三处**订阅了等于没订阅**：`custom-words` / `word-notes` / `quickcard-history` 的模块级 `_cache` 让 `useSyncDown(() => read())` 命中陈旧值，重读变摆设、下次写入还会把云端新值盖回去 —— 三处改成先作废缓存再经 getter 重读。拼写句子库两个**挂载即写**的 effect 按 SM-2 同一套配全回声守卫（引用比对 + 序列化比对）。`verify-cloud-sync` 43 → **70** 断言（统计 + 逐项点名，另把三个缓存库编译后真跑"不作废拿旧值 → 作废拿新值"的正对照），4 组变异 10 条红点全部命中。刻意不订阅的清单（`services/ai-config` 裸 localStorage 故意不同步、`use-page-memory` 视图瞬时态等）与理由见 `docs/modules/cloud-sync.md` §2 第 2 条。
 
 
+11. **影子跟读音频评测（2026-10-23）**：路线 2 **已落地** —— `MediaRecorder` 录音 → 16k 单声道 WAV → `/api/ai/transcribe`（multipart，GLM/Groq/硅基流动）→ `scoreSpeech` 词级命中 + `speechPace` 语速 + 基于转写文本的 AI 反馈。路线 1 **已落地** —— `src/lib/speech-analysis.ts` 共享离线分析（语速/停顿/音量与爆音/音高趋势），影子跟读在 ASR 失败时仍有本地反馈并保留 A/B，句子精讲 SpeakBack 同步接入。`verify-shadowing-asr` 51 + `verify-speech-analysis` 39 断言 + 真界面验收通过。下一步路线 3（Azure/讯飞/腾讯音素级）；细节见 [shadowing.md §4](./docs/modules/shadowing.md)。
+
 ## 打包
 
 用 `npm run package:all` —— web 只构建一次，APK 与桌面版并行；878MB 离线模型与 Electron 运行时走硬链接（毫秒级）。全程约 45 秒（原先串行全量拷贝约 9 分钟）。

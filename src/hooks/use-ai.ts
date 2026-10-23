@@ -67,7 +67,8 @@ export function useAI(): UseAIReturn {
       } catch (err: any) {
         if (err?.name === 'AbortError') return;
         const message = err?.message || 'AI 服务连接失败';
-        toast.error(message);
+        // silent（练习界面）：错误由调用方内联展示，不弹全局 toast；默认行为不变
+        if (!options?.silent) toast.error(message);
         yield { content: '', done: true };
       }
     },
@@ -81,7 +82,8 @@ export function useAI(): UseAIReturn {
       } catch (err: any) {
         if (err?.name === 'AbortError') return '';
         const message = err?.message || 'AI 服务连接失败';
-        toast.error(message);
+        // silent（练习界面）：错误由调用方内联展示，不弹全局 toast；默认行为不变
+        if (!options?.silent) toast.error(message);
         return '';
       }
     },

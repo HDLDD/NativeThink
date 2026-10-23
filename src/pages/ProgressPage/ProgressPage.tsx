@@ -275,6 +275,7 @@ export default function ProgressPage() {
       '__nativethink_colloc_ai_tranlations',
       '__nativethink_colloc_state', '__nativethink_colloc_memorized',
       '__nativethink_level_memory', '__nativethink_feedback_list',
+      '__nativethink_think_pattern_progress',
       'vocab-page', 'vocab-search', 'chunk-page', 'chunk-search',
       'shadowing-rate', 'shadowing-filter',
       '__nativethink_example_trans',

@@ -36,9 +36,12 @@ const strip = (s) => ts.transpileModule(s, {
 
 const libRaw = read('src/lib/video-lab.ts');
 // 去掉 idb 依赖与那个直连 IDB 的单例（守卫用假 API 跑 createVideoStore）
+// scoreSpeech 已抽到 speech-score.ts：把那份源码并进来，并去掉 video-lab 的再导出语句
 const lib = strip(libRaw)
   .replace(/import \{[^}]*\} from '\.\/idb';?/g, '')
-  .replace(/export const videoStore[\s\S]*?\}\);\s*/g, '');
+  .replace(/export\s*\{[^}]*tokenizeSpeech[^}]*\}\s*from\s*['"]\.\/speech-score['"];?/g, '')
+  .replace(/export const videoStore[\s\S]*?\}\);\s*/g, '')
+  + '\n' + strip(read('src/lib/speech-score.ts'));
 
 /* ── 载入被测模块（整段转译真跑，不抄第二份实现） ── */
 const js = ts.transpileModule(lib + '\nmodule.exports={INDEX_KEY,parseTimestamp,stripCueTags,parseSrt,parseVtt,parseDshJson,detectSubtitleFormat,parseSubtitle,lessonId,guessLang,createVideoStore,mergeProgress,tokenizeSpeech,scoreSpeech,runBatchTranslation,splitImportFiles};',

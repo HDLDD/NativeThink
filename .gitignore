@@ -29,3 +29,8 @@ android/app/src/main/assets/tts/
 
 # Cloudflare Pages 本地构建残留（wrangler 生成，不入库）
 .wrangler/
+
+scripts/.xfyun.json
+
+# 本地一次性验证脚本（变异实验等，不入库）
+/tmp/

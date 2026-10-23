@@ -14,7 +14,10 @@
  *      `useSyncDown(() => setWords(read()))` 里 read() 命中陈旧缓存 —— 下行重读变摆设，
  *      且本机旧内存会在下次写入时把云端新值盖回去。现在要求重读前先作废缓存：④b 静态断言形态，
  *   ⑤ **编译三个库真跑**"不作废拿旧值（正对照）→ 作废拿新值"，把缓存本体的失效语义也钉住。
- *   另：④ 的订阅者清单扩到 13 个（新增句子复习/成就/自定义场景/TTS 设置/拼写句子库/闪卡留档），
+ *   另：④ 的订阅者清单扩到 15 个（新增句子复习/成就/自定义场景/TTS 设置/拼写句子库/闪卡留档，
+ *   以及后来补登记的表达纠偏本 `correction-notes.ts` 与 `/think` 模式复习 `use-think-patterns.ts`）。
+ *   ⚠️ `sync-down.ts` 是 `useSyncDown` 的**定义**，不是订阅者 —— 全仓 `useSyncDown(` 命中 16 个文件时，
+ *   订阅者只有 15 个；清单与全仓的动态比对（④ 最后一条）会同时抓住"漏登记"和"把定义算进去"。
  *   其中 `use-spelling-learning` 有两个无条件回写 effect，必须配完整回声守卫（引用比对 + 序列化比对）。
  *
  * 做法：把真实的 `use-cloud-sync.ts` + `safe-storage.ts` 转译后在 Node 里驱动，
@@ -323,12 +326,26 @@ const SUBSCRIBERS = [
   'use-word-learning.ts', 'use-phrase-learning.ts', 'custom-words.ts', 'word-notes.ts',
   'quickcard-history.ts', 'use-sentence-review.ts', 'use-achievements.ts',
   'use-custom-scenarios.ts', 'tts-settings.ts', 'use-spelling-learning.ts',
+  // 2026-10 补登记：清单曾经停在 13，把这两个真实订阅者漏在外面（清单比全仓旧 → 数字一直是错的）。
+  'correction-notes.ts', 'use-think-patterns.ts',
 ];
 for (const f of SUBSCRIBERS) {
   const t = fs.readFileSync(path.join(ROOT, 'src/lib', f), 'utf8');
   ok(/useSyncDown\(/.test(t) || /onSyncDown\(/.test(t),
     `④ ${f} 订阅下行后重读（陈旧内存态与"写回盖掉远端"的源头）`);
 }
+/* 清单与全仓双向对齐：只有"逐个点名"会随新增订阅慢慢过期（13 → 15 就是这么漏的）。
+ * 排除 `sync-down.ts` —— 它是定义文件，不是订阅者；把它算进来会让数字永远多 1。 */
+const actualSubscribers = subs
+  .filter((f) => f !== 'sync-down.ts')
+  .filter((f) => {
+    const t = fs.readFileSync(path.join(ROOT, 'src/lib', f), 'utf8');
+    return /useSyncDown\(/.test(t) || /onSyncDown\(/.test(t);
+  })
+  .sort();
+ok(actualSubscribers.join(',') === [...SUBSCRIBERS].sort().join(','),
+  `④ 订阅者清单与全仓一一对应（${SUBSCRIBERS.length} 个；新增订阅必须登记，sync-down.ts 是定义不算）`,
+  `actual=${actualSubscribers.join(',')}`);
 let legacy = 0;
 for (const f of subs) {
   const t = fs.readFileSync(path.join(ROOT, 'src/lib', f), 'utf8');
@@ -445,4 +462,4 @@ const failed = results.filter((r) => !r.pass);
 for (const r of failed) console.log(`  ✗ ${r.name}${r.detail ? '  [' + r.detail + ']' : ''}`);
 console.log(`\n断言 ${results.length - failed.length}/${results.length} 通过`);
 if (failed.length) { console.log('✗ 有失败'); process.exit(1); }
-console.log('✓ 云同步：回声已抑制、失败有提示、周期补推按需、13 个订阅者重读、三处缓存作废真跑');
+console.log('✓ 云同步：回声已抑制、失败有提示、周期补推按需、15 个订阅者重读（定义文件不计）、三处缓存作废真跑');

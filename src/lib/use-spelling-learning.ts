@@ -119,6 +119,49 @@ function sm2Update(prev: ISpellingProgress, quality: number): ISpellingProgress 
   };
 }
 
+/**
+ * 纯排队逻辑（不做任何落盘），供守卫真跑：
+ * 到期句（按最老 nextReview）→ 从未出过（洗牌）→ 出过（最久未出优先）；
+ * 排除已完成与已掌握；limit 是"本轮句数"，截断发生在 markServed 之前。
+ */
+export function planSessionQueue(
+  allSentences: ISpellingSentence[],
+  progress: Record<string, ISpellingProgress>,
+  completedIds: string[],
+  served: Record<string, number>,
+  limit?: number,
+): string[] {
+  const completedSet = new Set(completedIds);
+  const pending = allSentences.filter((s) => !completedSet.has(s.id));
+
+  const due: string[] = [];
+  const neverServed: string[] = [];
+  const seenBefore: string[] = [];
+
+  for (const s of pending) {
+    const p = progress[s.id];
+    if (!p || p.status === 'new') {
+      // 从未出过的排前；出过的按"最久未出"排序 — 保证轮次间尽量不重复
+      if (served[s.id]) seenBefore.push(s.id);
+      else neverServed.push(s.id);
+    } else if (p.status === 'mastered') {
+      // Mastered sentences do not repeat
+      continue;
+    } else {
+      // Learning/reviewing — always include (ignore SM-2 timing for linear flow)
+      due.push(s.id);
+    }
+  }
+
+  // Order: due first (by oldest nextReview), then unseen (shuffled), then seen (least-recently-served first)
+  due.sort((a, b) => (progress[a]?.nextReview || 0) - (progress[b]?.nextReview || 0));
+  const shuffledNew = shuffle(neverServed);
+  const seenSorted = seenBefore.sort((a, b) => (served[a] || 0) - (served[b] || 0));
+
+  const queue = [...due, ...shuffledNew, ...seenSorted];
+  return limit && limit > 0 ? queue.slice(0, Math.max(1, Math.floor(limit))) : queue;
+}
+
 export function useSpellingLearning() {
   const [state, setState] = useState<ISpellingLearningState>(loadState);
   const [completedSentenceIds, setCompletedSentenceIds] = useState<string[]>(loadCompletedIds);
@@ -286,39 +329,17 @@ export function useSpellingLearning() {
   /** Build session queue: 随机且不重复 — 复习句优先（按到期时间），新句
    * Fisher-Yates 洗牌且**最近出过的排最后**（跨轮次不重复），已完成/已掌握排除。 */
   const buildSessionQueue = useCallback(
-    (allSentences: ISpellingSentence[]): string[] => {
-      const progress = state.progress;
-      const completedSet = new Set(completedSentenceIds);
-      const served = loadServed();
-
-      // Exclude completed sentences
-      const pending = allSentences.filter((s) => !completedSet.has(s.id));
-
-      const due: string[] = [];
-      const neverServed: string[] = [];
-      const seenBefore: string[] = [];
-
-      for (const s of pending) {
-        const p = progress[s.id];
-        if (!p || p.status === 'new') {
-          // 从未出过的排前；出过的按"最久未出"排序 — 保证轮次间尽量不重复
-          if (served[s.id]) seenBefore.push(s.id);
-          else neverServed.push(s.id);
-        } else if (p.status === 'mastered') {
-          // Mastered sentences do not repeat
-          continue;
-        } else {
-          // Learning/reviewing — always include (ignore SM-2 timing for linear flow)
-          due.push(s.id);
-        }
-      }
-
-      // Order: due first (by oldest nextReview), then unseen (shuffled), then seen (least-recently-served first)
-      due.sort((a, b) => (progress[a]?.nextReview || 0) - (progress[b]?.nextReview || 0));
-      const shuffledNew = shuffle(neverServed);
-      const seenSorted = seenBefore.sort((a, b) => (served[a] || 0) - (served[b] || 0));
-
-      const queue = [...due, ...shuffledNew, ...seenSorted];
+    (allSentences: ISpellingSentence[], limit?: number): string[] => {
+      const queue = planSessionQueue(
+        allSentences,
+        state.progress,
+        completedSentenceIds,
+        loadServed(),
+        limit,
+      );
+      // 只登记本轮真正会出的句子。旧实现先 markServed(整池) 再在页面 slice ——
+      // 6,827 条的词书点一次「重新排队」就把整池标成"刚出过"，
+      // "从未出过优先 / 最久未出排后"的排序当场失效。
       markServed(queue);
       return queue;
     },
@@ -354,6 +375,7 @@ export function useSpellingLearning() {
 
   return {
     state,
+    completedSentenceIds,
     getProgress,
     recordAttempt,
     calculateQuality,

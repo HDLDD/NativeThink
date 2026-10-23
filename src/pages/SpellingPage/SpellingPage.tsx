@@ -31,6 +31,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/EmptyState';
+import {
+  getSpellingWords as getWords,
+  normalizeSpellingAnswer,
+  spellingTokens,
+  shuffledCopy,
+} from '@/lib/spelling-words';
 import { Input } from '@/components/ui/input';
 import {
   Sheet,
@@ -82,11 +88,6 @@ import type {
 
 // ── Helpers ──
 
-/** Get clean word list from sentence (strip punctuation for comparison) */
-function getWords(en: string): string[] {
-  return en.split(/\s+/).filter(Boolean).map((w) => w.replace(/[^a-zA-Z'-]/g, ''));
-}
-
 // ── Global word bank sentence cache (not React state — no cascading re-renders) ──
 const _wbCache: Record<string, ISpellingSentence[]> = {};
 let _wbCacheAll: ISpellingSentence[] | null = null;
@@ -123,31 +124,25 @@ function getAllSentences(hookSentences: ISpellingSentence[]): ISpellingSentence[
 /** Select blank indices for fill mode — prefer longer (content) words */
 function selectBlanks(words: string[]): number[] {
   const candidates = words
-    .map((w, i) => ({ word: w.replace(/[^a-zA-Z]/g, ''), index: i }))
+    .map((word, index) => ({ word, index }))
     .filter(({ word }) => word.length > 2);
   if (candidates.length === 0) return [Math.floor(words.length / 2)];
   const count = Math.max(1, Math.min(candidates.length, Math.floor(words.length * 0.35)));
-  const shuffled = [...candidates].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count).map((c) => c.index).sort((a, b) => a - b);
+  return shuffledCopy(candidates).slice(0, count).map((c) => c.index).sort((a, b) => a - b);
 }
 
-/** Split sentence into parts (text segments + blank slots) for fill mode */
+/** Split sentence into parts (text segments + blank slots) for fill mode.
+ *  空位用归一后的答案词，非空位保留原词/标点；下标基于同一份 token 列表。 */
 function splitForFill(
   en: string,
   blankIndices: number[],
 ): Array<{ type: 'text' | 'blank'; content: string; wordIndex: number }> {
-  const words = en.split(/\s+/).filter(Boolean);
   const blankSet = new Set(blankIndices);
-  const parts: Array<{ type: 'text' | 'blank'; content: string; wordIndex: number }> = [];
-
-  for (let i = 0; i < words.length; i++) {
-    if (blankSet.has(i)) {
-      parts.push({ type: 'blank', content: words[i], wordIndex: i });
-    } else {
-      parts.push({ type: 'text', content: words[i], wordIndex: i });
-    }
-  }
-  return parts;
+  return spellingTokens(en).map((token, i) => (
+    blankSet.has(i)
+      ? { type: 'blank' as const, content: token.word, wordIndex: i }
+      : { type: 'text' as const, content: token.raw, wordIndex: i }
+  ));
 }
 
 // ── Sub-components ──
@@ -215,14 +210,14 @@ function DictationInput({
               {/* Underline — 白色空线；聚焦加粗品牌色；已填半透品牌色；判分绿/红 */}
               <div
                 className={cn(
-                  'spelling-line h-[2px] w-full mt-0.5 rounded-full transition-all duration-200',
+                  'spelling-line h-[2.5px] w-full mt-0.5 rounded-full transition-all duration-200',
                   submitted
                     ? isCorrect
                       ? 'bg-emerald-400'
                       : 'bg-rose-400'
                     : hasValue
-                      ? 'bg-[var(--brand)]/60'
-                      : 'bg-white/90 group-hover:bg-white',
+                      ? 'bg-[var(--brand)]/70'
+                      : 'bg-foreground/55 group-hover:bg-foreground/75',
                   'group-focus-within:h-[3px] group-focus-within:bg-[var(--brand)]',
                 )}
               />
@@ -314,7 +309,7 @@ function FillDisplay({
                   ? isCorrect
                     ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300'
                     : 'border-rose-400 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300'
-                  : 'border-muted-foreground/20 hover:border-muted-foreground/40',
+                  : 'border-muted-foreground/40 hover:border-muted-foreground/60',
               )}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === 'Tab') {
@@ -335,19 +330,23 @@ function FillDisplay({
 
 // ── Main Page ──
 
-/** 本轮完成横幅 — 挂载时播放完成提示音 */
-function CompletionBanner({ todayPracticed, onRestart, onShowRecords }: {
+/** 本轮完成页 — 完成本轮目标后替换整个练习界面，挂载时播放完成提示音 */
+function CompletionBanner({ roundSize, todayPracticed, onRestart, onShowRecords }: {
+  roundSize: number;
   todayPracticed: number;
   onRestart: () => void;
   onShowRecords: () => void;
 }) {
   useEffect(() => { sfxComplete(); }, []);
   return (
-    <Card className="p-6 rounded-2xl border-[var(--brand)]/20 shadow-sm bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5">
+    <Card className="p-8 rounded-2xl border-[var(--brand)]/20 shadow-sm bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5">
       <div className="flex flex-col items-center justify-center text-center">
-        <Check className="size-8 text-ink-teal mb-2" />
-        <h2 className="text-lg font-black italic mb-1">本轮完成！</h2>
-        <p className="text-xs text-muted-foreground mb-4">
+        <Check className="size-10 text-ink-teal mb-3" />
+        <h2 className="text-xl font-black italic mb-3">本轮完成！</h2>
+        <p className="text-xs text-muted-foreground mb-1">
+          本轮 {roundSize} 句已完成
+        </p>
+        <p className="text-sm font-bold text-ink-teal mb-6">
           今日已练习 {todayPracticed} 句
         </p>
         <div className="flex gap-2">
@@ -382,6 +381,7 @@ export default function SpellingPage() {
     aiBatchAdd,
   } = useSpellingSentences();
   const {
+    completedSentenceIds,
     getProgress,
     recordAttempt,
     calculateQuality,
@@ -408,31 +408,38 @@ export default function SpellingPage() {
     wordPlayTimersRef.current.forEach(clearTimeout);
     wordPlayTimersRef.current = [];
   }, []);
-  useEffect(() => cancelWordPlay, [cancelWordPlay]);
+  /** 句子进场后的 500ms 自动朗读定时器 —— 提交/手动播放时必须先撤掉，否则它会在新朗读途中再 speak 一次把链掐掉 */
+  const autoReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelAutoRead = useCallback(() => {
+    if (autoReadTimerRef.current) {
+      clearTimeout(autoReadTimerRef.current);
+      autoReadTimerRef.current = null;
+    }
+  }, []);
+  useEffect(() => () => { cancelWordPlay(); cancelAutoRead(); }, [cancelWordPlay, cancelAutoRead]);
 
   // Session state
   const [sessionQueue, setSessionQueue] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const currentSentenceMemo = useMemo(() => {
+  // 队列为空（空桶 / 全部做完）时必须真的没有当前句 —— 旧实现用 ref 兜底，
+  // 切到空的「纠偏表达」还会显示上一本书的句子，甚至能继续判分。
+  const currentSentence = useMemo(() => {
     if (sessionQueue.length === 0) return undefined;
     const id = sessionQueue[currentIndex];
     return sentences.find((s) => s.id === id) || getWBSentences().find((s) => s.id === id);
   }, [sessionQueue, currentIndex, sentences]);
-  // Stable ref — handleSubmit always has the sentence even if useMemo flickers
-  const currentSentenceRef = useRef(currentSentenceMemo);
-  currentSentenceRef.current = currentSentenceMemo || currentSentenceRef.current;
-  const currentSentence = currentSentenceRef.current;
 
   // 逐词播放的串播逻辑放在 currentSentence 声明之后（依赖它）
   const playWordByWord = useCallback(() => {
     if (!currentSentence) return;
+    cancelAutoRead();
     cancelWordPlay();
     let t = 0;
     for (const w of getWords(currentSentence.en)) {
       wordPlayTimersRef.current.push(setTimeout(() => { try { tts.speak(w, { rate: 0.8 }); } catch { /* ignore */ } }, t));
       t += Math.min(900, 300 + w.length * 60);
     }
-  }, [currentSentence, tts, cancelWordPlay]);
+  }, [currentSentence, tts, cancelWordPlay, cancelAutoRead]);
 
   // Input state
   const [dictationInputs, setDictationInputs] = useState<string[]>([]);  // per-word inputs for 句子拼写
@@ -490,7 +497,7 @@ export default function SpellingPage() {
       }
       const filtered = level === 'all' ? allSentences : allSentences.filter((s) => s.level === level);
       // 截断到本轮句数（像背单词的每日学习量，避免 6966 句的大山）
-      const queue = buildSessionQueue(filtered).slice(0, Math.max(1, roundSizeRef.current));
+      const queue = buildSessionQueue(filtered, Math.max(1, roundSizeRef.current));
       setSessionQueue(queue);
 
       // Restore resume index if pending, else start at 0
@@ -520,22 +527,32 @@ export default function SpellingPage() {
   // Initialize session on sentences load — auto-reset completed if all done
   useEffect(() => {
     if (sentences.length > 0 && sessionQueue.length === 0) {
-      if (learningStats.completedCount >= sentences.length) {
-        // All sentences are marked completed — auto-reset for fresh session
+      // 完成计数必须按**当前这一桶**算：旧比较是"全站完成数 >= hook 句库条数"，
+      // 两个池子不同源 —— 练完 10 条词库例句就会把 AI/纠偏句子的完成标记一起清掉。
+      const poolIds = new Set(
+        getAllSentences(sentences)
+          .filter((s) => activeLevel === 'all' || s.level === activeLevel)
+          .map((s) => s.id),
+      );
+      const completedInPool = completedSentenceIds.filter((id) => poolIds.has(id)).length;
+      if (poolIds.size > 0 && completedInPool >= poolIds.size) {
+        // All sentences in this bucket are marked completed — auto-reset for fresh session
         resetCompletedAll();
         setImportDirty((c) => c + 1);
       } else {
         rebuildSession();
       }
     }
-  }, [sentences.length, rebuildSession, sessionQueue.length]);
+  }, [sentences.length, rebuildSession, sessionQueue.length, activeLevel, completedSentenceIds, resetCompletedAll]);
 
-  // Rebuild session when import completes (importDirty incremented)
+  // Rebuild session when import completes（只由 importDirty 的变化触发一次）。
+  // 旧写法的依赖里带着 rebuildSession —— 它在 progress / completedIds 每次变化后都会换身份，
+  // 于是点过一次「重新排队」之后，每答一题、每点一次「下一句」都会重建队列并跳回第 1 句。
+  const rebuildSessionRef = useRef(rebuildSession);
+  rebuildSessionRef.current = rebuildSession;
   useEffect(() => {
-    if (importDirty > 0) {
-      rebuildSession();
-    }
-  }, [importDirty, rebuildSession]);
+    if (importDirty > 0) rebuildSessionRef.current();
+  }, [importDirty]);
 
   // Reset inputs when sentence changes — never clear submitted/results (controlled by handlers only)
   useEffect(() => {
@@ -556,7 +573,9 @@ export default function SpellingPage() {
       // Auto-focus first input
       setTimeout(() => inputRefs.current[0]?.focus(), 150);
 
-      // Cancel any lingering TTS, then auto-play
+      // Cancel any lingering TTS（含逐词串播/上一次自动朗读 —— 否则旧 speak 会掐掉新句）, then auto-play
+      cancelAutoRead();
+      cancelWordPlay();
       tts.cancel();
       // 提前合成：本句 + 下一句 —— 句子音频较长，首播原本要等 1s+；预热后命中缓存近乎瞬时
       tts.prewarm(currentSentence.en, { rate: 0.85 });
@@ -565,26 +584,44 @@ export default function SpellingPage() {
         const ns = sentences.find((x) => x.id === nx);
         if (ns?.en) tts.prewarm(ns.en, { rate: 0.85 });
       }
-      const timer = setTimeout(() => {
+      autoReadTimerRef.current = setTimeout(() => {
+        autoReadTimerRef.current = null;
         if (mode === 'dictation' && autoRead) tts.speak(currentSentence.en);
       }, 500);
-      return () => { clearTimeout(timer); tts.cancel(); };
-  }, [currentSentence?.id, mode]);
+      return () => { cancelAutoRead(); tts.cancel(); };
+  }, [currentSentence?.id, mode, cancelWordPlay, cancelAutoRead]);
+
+  /** 切换玩法时清掉上一模式的判分态 —— 否则切到填空模式会仍是禁用输入 + 串位的对错色 */
+  const handleModeChange = useCallback((next: SpellingMode) => {
+    if (next === mode) return;
+    setMode(next);
+    setSubmitted(false);
+    setResults(null);
+  }, [mode]);
 
   /** Check answers — accepts synonyms for sourceWord */
   const handleSubmit = useCallback(() => {
     if (!currentSentence) return;
 
     // Look up synonyms for the example's source word (word bank data)
+    const sourceWord = normalizeSpellingAnswer(currentSentence.sourceWord || '');
     let sourceWordSynonyms: string[] = [];
     if (currentSentence.source === 'word_example' && currentSentence.sourceWord) {
       const sw = currentSentence.sourceWord.toLowerCase();
       const entries = queryWords({ search: sw });
       const entry = entries.find((w) => w.word.toLowerCase() === sw);
       if (entry?.synonyms) {
-        sourceWordSynonyms = entry.synonyms.map((s) => s.toLowerCase());
+        sourceWordSynonyms = entry.synonyms.map(normalizeSpellingAnswer);
       }
     }
+    /** 判分统一走 spelling-words 的归一（弯引号/重音/大小写） */
+    const isAnswer = (user: string, correct: string) =>
+      user === correct || (
+        sourceWordSynonyms.length > 0
+        && correct === sourceWord
+        && sourceWordSynonyms.includes(user)
+      );
+
     const words = getWords(currentSentence.en);
     let correctCount = 0;
     const wordResults: Record<number, boolean> = {};
@@ -594,9 +631,9 @@ export default function SpellingPage() {
     if (mode === 'dictation') {
       totalWords = words.length;
       for (let i = 0; i < words.length; i++) {
-        const user = (dictationInputs[i] || '').trim().toLowerCase();
-        const correct = words[i].toLowerCase();
-        const isCorrect = user === correct || (sourceWordSynonyms.length > 0 && sourceWordSynonyms.includes(user) && correct === currentSentence.sourceWord?.toLowerCase());
+        const user = normalizeSpellingAnswer(dictationInputs[i] || '');
+        const correct = normalizeSpellingAnswer(words[i]);
+        const isCorrect = isAnswer(user, correct);
         wordResults[i] = isCorrect;
         if (isCorrect) correctCount++;
         else {
@@ -611,9 +648,9 @@ export default function SpellingPage() {
       let inputIdx = 0;
       for (const part of fillParts) {
         if (part.type === 'blank') {
-          const user = (fillInputs[inputIdx] || '').trim().toLowerCase();
-          const correct = part.content.replace(/[^a-zA-Z'-]/g, '').toLowerCase();
-          const isCorrect = user === correct || (sourceWordSynonyms.length > 0 && sourceWordSynonyms.includes(user) && correct === currentSentence.sourceWord?.toLowerCase());
+          const user = normalizeSpellingAnswer(fillInputs[inputIdx] || '');
+          const correct = normalizeSpellingAnswer(part.content);
+          const isCorrect = isAnswer(user, correct);
           wordResults[part.wordIndex] = isCorrect;
           if (isCorrect) correctCount++;
           else {
@@ -635,9 +672,12 @@ export default function SpellingPage() {
     if (correctCount === totalWords) sfxCorrect();
     else sfxWrong();
 
-    // Re-read the sentence aloud after submit
+    // Re-read the sentence aloud after submit —— 先撤掉本轮自动朗读与逐词串播的定时器，
+    // 否则它们会在重读途中再 speak 一次，把整句链掐成"只读了开头一小段"。
+    cancelAutoRead();
+    cancelWordPlay();
     tts.speak(currentSentence.en);
-  }, [currentSentence, mode, dictationInputs, fillInputs, fillParts, calculateQuality, recordAttempt, tts, addStudyMinutes]);
+  }, [currentSentence, mode, dictationInputs, fillInputs, fillParts, calculateQuality, recordAttempt, tts, addStudyMinutes, cancelAutoRead, cancelWordPlay]);
 
   /** Navigate to next sentence — mark completed */
   const handleNext = useCallback(() => {
@@ -877,6 +917,10 @@ export default function SpellingPage() {
     async (lvl: string) => {
       if (lvl === activeLevel || switchingRef.current) return;
 
+      // 按 level 分键的断点真正接回来：切走再切回同一本书，从上次的位置继续，
+      // 而不是永远从第 1 句重新开始（此前只在刷新自动进入时读过断点）。
+      pendingResumeIndex.current = readResumeIndex(lvl);
+
       // 「纠偏表达」「视频精听」都不是词库，是句子库里的一个桶（分别由纠偏本 / 精听页送进来）——
       // 走词库那条路会 preload 一个不存在的 level 并误报"该词库没有例句"。
       if (lvl === CORRECTION_LEVEL || lvl === VIDEO_LEVEL) {
@@ -920,9 +964,6 @@ export default function SpellingPage() {
             createdAt: Date.now(),
           }));
           cacheWBSentences(lvl, sents);
-          toast.success(`已加载 ${({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',cet46freq:'四六级高频',cet46elite:'四六级高分',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'})[lvl] || lvl} 词库 ${sents.length} 条例句`);
-        } else {
-          toast.info('该词库没有例句');
         }
       } catch {
         toast.error('加载词库失败');
@@ -953,12 +994,10 @@ export default function SpellingPage() {
     const skipped = items.length - added;
     if (added > 0) {
       toast.success(`已导入 ${added} 个收藏单词${skipped > 0 ? `（句子库已到 ${SPELLING_SENTENCE_LIMIT} 条上限，${skipped} 个未导入）` : ''}（建议配合"单词拼写"模式）`);
-      if (activeLevel !== 'all') {
-        setActiveLevel('all');
-        rebuildSession({ level: 'all' });
-      } else {
-        rebuildSession();
-      }
+      // addSentences 的 setSentences 还没进当前闭包 —— 直接 rebuildSession() 会用旧句子库，
+      // 导入成功的句子要等下一次重排才出现。走 importDirty，等新状态渲染后再排。
+      if (activeLevel !== 'all') setActiveLevel('all');
+      setImportDirty((c) => c + 1);
     } else {
       // 到上限和"都导入过"是两件事，说错了用户会以为重点一次就行
       toast.info(
@@ -967,12 +1006,11 @@ export default function SpellingPage() {
           : '收藏单词都已导入过',
       );
     }
-  }, [favorites, addSentences, activeLevel, rebuildSession, sentences.length]);
+  }, [favorites, addSentences, activeLevel, sentences.length]);
 
   const handleBuildDatabase = useCallback(async () => {
     setBuilding(true);
     try {
-      let totalImported = 0;
       for (const level of ALL_LEVELS) {
         await preloadLevels([level]);
         const items = extractLevelSentences(level);
@@ -983,11 +1021,9 @@ export default function SpellingPage() {
             createdAt: Date.now(),
           }));
           cacheWBSentences(level, sents);
-          totalImported += sents.length;
         }
         await new Promise(r => setTimeout(r, 50));
       }
-      toast.success(`数据库建立完成：共导入 ${totalImported} 条例句`);
       setActiveLevel('all');
       rebuildSession({ level: 'all' });
     } catch {
@@ -1145,7 +1181,7 @@ export default function SpellingPage() {
           onCountChange={setAiCount}
           loading={aiLoading}
           result={aiResult}
-          onGenerate={async () => { await handleAIGenerate(); rebuildSession(); }}
+          onGenerate={async () => { await handleAIGenerate(); setImportDirty((c) => c + 1); }}
           isConfigured={ai.isConfigured}
         />
       </div>
@@ -1156,19 +1192,23 @@ export default function SpellingPage() {
   const scorePercent = results ? Math.round((results.score / results.total) * 100) : 0;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-      {/* ── Inline completion banner ── */}
+    <div className={cn('mx-auto px-4 space-y-6', completionShown ? 'max-w-2xl py-10 sm:py-16' : 'max-w-4xl py-6')}>
+      {/* ── 本轮完成页：替换整个练习界面，只留结算与两个出口 ── */}
       {completionShown && (
         <CompletionBanner
+          roundSize={sessionQueue.length}
           todayPracticed={learningStats.todayPracticed}
           onRestart={() => {
             resetCompletedAll();
+            // 等新队列排好后再由 rebuildSession 关掉完成页，避免先闪一帧旧界面
             setImportDirty(c => c + 1);
-            setCompletionShown(false);
           }}
           onShowRecords={() => setShowManageDialog(true)}
         />
       )}
+
+      {!completionShown && (
+      <>
       {/* ── Header Controls ── */}
       <Card className="p-4 rounded-2xl border-border/50 shadow-sm space-y-4">
         {/* Row 1: 拼写模式 / 音频 / 自动朗读 / 词书切换（右上角，避免误触） */}
@@ -1179,7 +1219,7 @@ export default function SpellingPage() {
             </span>
             <div className="flex rounded-xl border border-border p-0.5 bg-muted/50">
               <button
-                onClick={() => setMode('dictation')}
+                onClick={() => handleModeChange('dictation')}
                 className={cn(
                   'px-4 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-200',
                   mode === 'dictation'
@@ -1190,7 +1230,7 @@ export default function SpellingPage() {
                 句子拼写
               </button>
               <button
-                onClick={() => setMode('fill')}
+                onClick={() => handleModeChange('fill')}
                 className={cn(
                   'px-4 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-200',
                   mode === 'fill'
@@ -1416,7 +1456,27 @@ export default function SpellingPage() {
         </div>
       </Card>
 
+      {/* ── 空桶：纠偏/精听还没送句子，或词库没有例句 ── */}
+      {sessionQueue.length === 0 && !building && !levelLoading && (
+        <Card className="rounded-2xl border-border/50 shadow-sm">
+          <EmptyState
+            icon={activeLevel === CORRECTION_LEVEL ? Lightbulb : activeLevel === VIDEO_LEVEL ? Film : BookOpen}
+            title={
+              activeLevel === CORRECTION_LEVEL ? '纠偏本还没有可练的句子'
+                : activeLevel === VIDEO_LEVEL ? '视频精听还没有送进来的句子'
+                  : '这个词库还没有可练的例句'
+            }
+            description={
+              activeLevel === CORRECTION_LEVEL ? '在收藏页的纠偏本里点「拼写这句」，或从纠偏重考卡面送进来。'
+                : activeLevel === VIDEO_LEVEL ? '在视频精听的字幕卡上点「听写这句」即可。'
+                  : '换一本词书试试，或先导入收藏单词 / AI 生成句子。'
+            }
+          />
+        </Card>
+      )}
+
       {/* ── Sentence Card ── */}
+      {sessionQueue.length > 0 && (
       <Card className="rounded-2xl border-border/50 shadow-sm overflow-hidden">
         {/* 中文提示 + 拼写线 — 线紧跟在句子下一行（不与句子同行） */}
         <div className="bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-500/5 dark:to-teal-500/5 px-6 py-5 border-b border-border/50 text-center space-y-3">
@@ -1495,6 +1555,7 @@ export default function SpellingPage() {
               variant="outline"
               size="sm"
               onClick={() => {
+                cancelAutoRead();
                 cancelWordPlay();
                 if (audioMode === 'word') playWordByWord();
                 else tts.speak(currentSentence?.en || '');
@@ -1705,6 +1766,7 @@ export default function SpellingPage() {
           )}
         </div>
       </Card>
+      )}
 
       {/* ── Navigation buttons ── */}
       <div className="flex items-center justify-between">
@@ -1749,11 +1811,14 @@ export default function SpellingPage() {
           variant="ghost"
           size="sm"
           onClick={handleNext}
+          disabled={sessionQueue.length === 0}
           className="rounded-xl gap-1"
         >
           {currentIndex >= sessionQueue.length - 1 ? '完成' : '下一句'} <ChevronRightIcon className="size-4" />
         </Button>
       </div>
+      </>
+      )}
 
       {/* ── Dialogs ── */}
 
@@ -1774,7 +1839,7 @@ export default function SpellingPage() {
         result={aiResult}
         onGenerate={async () => {
           await handleAIGenerate();
-          rebuildSession();
+          setImportDirty((c) => c + 1);
         }}
         isConfigured={ai.isConfigured}
       />

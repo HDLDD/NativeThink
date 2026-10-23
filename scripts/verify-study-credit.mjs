@@ -103,7 +103,7 @@ function fnBody(src, name) {
   check(b3.size() === 10, '正对照：无 FIFO 的闸门会无限增长（被 ②的上限断言抓住）');
 }
 
-// ── ③ 接线：六个 AI/提交类站点都走闸门，且计时位置仍在请求之前 ──
+// ── ③ 接线：AI/提交类站点都走闸门，且计时位置仍在请求之前（含 /think 模式复习，见 ③b） ──
 {
   const think = readFileSync(join(ROOT, 'src/pages/ThinkInEnglishPage/ThinkInEnglishPage.tsx'), 'utf8');
   const conv = readFileSync(join(ROOT, 'src/pages/ConversationPage/ConversationPage.tsx'), 'utf8');
@@ -147,6 +147,43 @@ function fnBody(src, name) {
 
   // 历史留档仍按内容判（计时与留档是两件事，不许顺手把 recordDetectorHistory 也挪走）
   check(/if \(full\.trim\(\)\) \{\s*recordDetectorHistory\(input\);/.test(think), '思维：检测历史仍只在真拿到内容时留档（2026-10-16 起块内含纠偏收集，判据不变）');
+}
+
+// ── ③b /think 模式复习（第五个 tab）：迁移判定也按「动作」计 ──
+// 这一处与上面七个站点的形态不同：非流式 aiChat，没有 AbortController，所以不套用
+// 「credit 必须在 abort 之前」那条模板，而是各自钉「计时在 await aiChat 之前」。
+{
+  const mode = readFileSync(join(ROOT, 'src/pages/ThinkInEnglishPage/PatternReviewMode.tsx'), 'utf8');
+  const judge = fnBody(mode, 'judge');
+  check(judge.length > 0, 'PatternReviewMode.judge：函数体可定位（正对照的前提）', `实际 ${judge.length} 字符`);
+
+  const iCredit = judge.indexOf("creditOnce('think'");
+  const iChat = judge.indexOf('await aiChat(');
+  const iConfigured = judge.indexOf('if (!isConfigured)');
+  check(iCredit >= 0, '模式复习：迁移判定计时走闸门');
+  check(iCredit >= 0 && iChat >= 0 && iCredit < iChat,
+    '模式复习：计时仍在 AI 请求之前（AI 不可用不撤销这次作答）', `credit=${iCredit} chat=${iChat}`);
+  check(iCredit >= 0 && iConfigured >= 0 && iCredit < iConfigured,
+    '模式复习：没配 Key 也先计时（早退发生在计时之后）', `credit=${iCredit} configured=${iConfigured}`);
+
+  // 取整条 creditOnce 语句（到本行行尾）；键必须同时带题目身份与用户原文，
+  // 只带其一会让「换模式说同一句」或「同一模式连点」其中一种计时口径失真。
+  const stmtEnd = judge.indexOf('\n', iCredit);
+  const stmt = iCredit >= 0 ? judge.slice(iCredit, stmtEnd > iCredit ? stmtEnd : iCredit + 300) : '';
+  check(stmt.includes("creditKey('pattern'") && stmt.includes('target.id') && stmt.includes('answer'),
+    '模式复习：键里带 pattern id 与用户原文', stmt.trim());
+
+  // 闸门真跑：同一模式同一句连点只计一次；换模式或换说法各自计一次。
+  const mod = await import(pathToFileURL(transpile('src/lib/study-credit.ts', 'creditKey, makeCreditGate')).href);
+  const gate = mod.makeCreditGate();
+  const key = mod.creditKey('pattern', 'subject-first', 'I have seen it.');
+  check(gate.credit(key) === true, '模式复习闸门：首次作答放行');
+  check(gate.credit(mod.creditKey('pattern', 'subject-first', '  I have   seen it. ')) === false,
+    '模式复习闸门：同一模式同一句（空白差异）连点只计一次');
+  check(gate.credit(mod.creditKey('pattern', 'verb-driven', 'I have seen it.')) === true,
+    '模式复习闸门：换模式后同一句再计一次（键带题目身份）');
+  check(gate.credit(mod.creditKey('pattern', 'subject-first', 'I saw it.')) === true,
+    '模式复习闸门：同一模式换说法再计一次（键带用户原文）');
 }
 
 // ── ④ 本地动作不许被闸门吞掉（正对照：全页一刀切改 creditOnce 会红） ──

@@ -1,18 +1,14 @@
 import { withCors, preflight, isPreflight } from '../../_lib/cors.js';
+import { checkOrigin, checkRate, trackFactoryUsage } from '../../_lib/guard.js';
 /**
- * POST /api/ai/transcribe — 音频转写字幕
+ * POST /api/ai/transcribe — 音频转写
  *
- * 使用 AI 提供商的 Whisper 兼容 API 将 B站音频转为字幕。
- * 支持的提供商：groq, siliconflow
+ * 两种入口：
+ * 1. 影子跟读录音：multipart/form-data，字段 audio（文件）+ provider + apiKey + language
+ * 2. B 站字幕：application/json，{ apiKey, provider, bvid, cid, page } 或 { apiKey, provider, audioUrl }
  *
- * Body: { apiKey, provider, bvid, cid, page }
- * 或 { apiKey, provider, audioUrl }
- *
- * 流程：
- * 1. 获取 B站音频 URL（WBI 签名）
- * 2. 下载音频
- * 3. 调用 Whisper API 转写
- * 4. 返回字幕分段
+ * 支持的提供商：groq / siliconflow / glm。
+ * 返回统一带 **text**（GLM 只回 text，不回 segments）与 segments（有时间戳时）。
  */
 
 const BILIBILI_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
@@ -121,141 +117,223 @@ const WHISPER_MODELS = {
   glm: 'GLM-ASR-2512',
 };
 
-async function handler(context) {
-  const { request, env } = context;
-  if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
-  }
-  // Optional B站 login state — higher-quality audio streams with SESSDATA
-  const bilibiliCookie = env?.BILIBILI_COOKIE || '';
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+const ASR_PROVIDERS = new Set(Object.keys(WHISPER_ENDPOINTS));
 
-  let body;
-  try { body = await request.json(); } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 });
-  }
+function json(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
 
-  const { apiKey, provider, bvid, audioUrl: providedUrl } = body;
+function extForMime(mime) {
+  const m = String(mime || '').toLowerCase();
+  if (m.includes('wav')) return 'wav';
+  if (m.includes('mp4') || m.includes('m4a')) return 'm4a';
+  if (m.includes('ogg')) return 'ogg';
+  if (m.includes('mpeg') || m.includes('mp3')) return 'mp3';
+  return 'webm';
+}
 
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: '未提供 API Key', segments: [] }), {
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+export function normalizeTranscript(data) {
+  const rawSegments = Array.isArray(data?.segments) ? data.segments : [];
+  const segments = rawSegments
+    .filter((s) => s && typeof s.text === 'string' && s.text.trim())
+    .map((s) => {
+      const text = s.text.trim();
+      const words = text.split(/\s+/).filter(Boolean);
+      const keywords = [];
+      const seen = new Set();
+      for (const w of words) {
+        const clean = w.replace(/[^a-zA-Z]/g, '').toLowerCase();
+        if (clean.length > 4 && !seen.has(clean) && keywords.length < 4) {
+          seen.add(clean);
+          keywords.push({ word: clean, meaning: '' });
+        }
+      }
+      return { start: s.start || 0, end: s.end || 0, en: text, zh: '', keywords };
     });
+
+  let text = '';
+  if (typeof data?.text === 'string') text = data.text.trim();
+  if (!text && typeof data?.transcript === 'string') text = data.transcript.trim();
+  if (!text && Array.isArray(data?.results)) {
+    text = data.results.map((r) => r?.text || '').join(' ').trim();
   }
+  if (!text && segments.length) text = segments.map((s) => s.en).join(' ').trim();
+  return { text, segments };
+}
 
-  const prov = provider || 'groq';
-  const whEndpoint = WHISPER_ENDPOINTS[prov];
-  const whModel = WHISPER_MODELS[prov];
-
-  if (!whEndpoint) {
-    return new Response(JSON.stringify({ error: `提供商 ${prov} 不支持语音转写`, segments: [] }), {
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
-  }
-
-  try {
-    // Step 1: Get audio URL (from bvid or provided)
-    let audioUrl = providedUrl;
-    let episodeList = [];
-    let currentPage = body.page || 1;
-
-    if (!audioUrl && bvid) {
-      const viewRes = await fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`, {
-        headers: { 'User-Agent': BILIBILI_UA, 'Referer': 'https://www.bilibili.com/', Cookie: bilibiliCookie },
-      });
-      const viewData = await viewRes.json();
-      if (viewData.code !== 0) throw new Error('B站 API 错误');
-
-      const pages = viewData.data.pages || [];
-      const targetPage = pages[currentPage - 1] || pages[0];
-      if (!targetPage) throw new Error('未找到分集');
-
-      episodeList = pages.map((p) => ({
-        page: p.page, part: p.part || `Episode ${p.page}`, duration: p.duration || 0,
-      }));
-
-      const signed = await signWbi({ bvid, cid: String(targetPage.cid), fnval: 16, fnver: 0, fourk: 1 });
-      const playUrl = `https://api.bilibili.com/x/player/wbi/playurl?${new URLSearchParams(signed).toString()}`;
-      const playRes = await fetch(playUrl, {
-        headers: { 'User-Agent': BILIBILI_UA, 'Referer': 'https://www.bilibili.com/', Cookie: bilibiliCookie },
-      });
-      const playData = await playRes.json();
-      const audioList = playData?.data?.dash?.audio || [];
-      if (audioList.length === 0) throw new Error('未找到音频流');
-
-      const best = audioList
-        .filter((a) => a.bandwidth > 0)
-        .sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0))
-        .find((a) => (a.bandwidth || 0) <= 64000) || audioList[0];
-      audioUrl = best.baseUrl || best.base_url || best.url;
+async function readInput(request) {
+  const ct = String(request.headers.get('content-type') || '').toLowerCase();
+  if (ct.includes('multipart/form-data')) {
+    const form = await request.formData();
+    const audio = form.get('audio');
+    if (!audio || typeof audio.arrayBuffer !== 'function') {
+      throw new Error('缺少 audio 音频文件');
     }
+    if (audio.size > MAX_UPLOAD_BYTES) {
+      throw new Error(`音频过大（${(audio.size / 1024 / 1024).toFixed(1)} MB，上限 ${MAX_UPLOAD_BYTES / 1024 / 1024} MB）`);
+    }
+    const mime = audio.type || 'audio/webm';
+    return {
+      kind: 'upload',
+      provider: String(form.get('provider') || 'glm').toLowerCase(),
+      apiKey: String(form.get('apiKey') || '').trim(),
+      language: String(form.get('language') || 'en').slice(0, 8),
+      audioBuffer: await audio.arrayBuffer(),
+      mime,
+      filename: audio.name || `take.${extForMime(mime)}`,
+    };
+  }
+  if (ct.includes('application/json')) {
+    const body = await request.json();
+    return { kind: 'json', body };
+  }
+  throw new Error('Content-Type 必须是 application/json 或 multipart/form-data');
+}
 
-    if (!audioUrl) throw new Error('无法获取音频 URL');
+async function transcribeWithProvider({ provider, apiKey, audioBuffer, mime, filename, language }) {
+  const endpoint = WHISPER_ENDPOINTS[provider];
+  const model = WHISPER_MODELS[provider];
 
-    // Step 2: Download audio
-    const audioRes = await fetch(audioUrl, {
-      headers: { 'User-Agent': BILIBILI_UA, 'Referer': 'https://www.bilibili.com/', Cookie: bilibiliCookie },
-    });
-    if (!audioRes.ok) throw new Error('下载音频失败');
-
-    const audioBuffer = await audioRes.arrayBuffer();
-
-    // Step 3: Call Whisper API
+  const send = async (verbose, withLanguage) => {
     const formData = new FormData();
-    formData.append('file', new Blob([audioBuffer], { type: 'audio/mpeg' }), 'audio.mp3');
-    formData.append('model', whModel);
-    formData.append('response_format', 'verbose_json');
-    formData.append('language', 'en');
+    formData.append('file', new Blob([audioBuffer], { type: mime || 'audio/webm' }), filename || `take.${extForMime(mime)}`);
+    formData.append('model', model);
+    if (verbose) formData.append('response_format', 'verbose_json');
+    if (withLanguage) formData.append('language', language || 'en');
 
-    const whRes = await fetch(whEndpoint, {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
       body: formData,
     });
+    const raw = await res.text();
+    let data = null;
+    try { data = JSON.parse(raw); } catch { /* 非 JSON 错误体 */ }
+    return { ok: res.ok, status: res.status, raw, data };
+  };
 
-    if (!whRes.ok) {
-      const err = await whRes.text();
-      throw new Error(`${whRes.status}: ${err.slice(0, 200)}`);
+  let out = await send(true, true);
+  // 部分 ASR 模型不收 verbose_json / language；只在形状类错误时退一步，鉴权失败不重试
+  if (!out.ok && (out.status === 400 || out.status === 422) && provider !== 'groq') {
+    out = await send(false, false);
+  }
+  if (!out.ok) {
+    const detail = String(out.raw || '').replace(apiKey, '[REDACTED]').slice(0, 240);
+    throw new Error(`${out.status}: ${detail}`);
+  }
+  return out.data || {};
+}
+
+async function handler(context) {
+  const { request, env } = context;
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+
+  const originCheck = checkOrigin(request);
+  if (!originCheck.ok) return json({ error: 'Origin not allowed' }, 403);
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  if (!checkRate(ip).ok) return json({ error: 'Too many requests, slow down' }, 429);
+
+  let input;
+  try {
+    input = await readInput(request);
+  } catch (err) {
+    return json({ error: err.message, text: '', segments: [] }, 400);
+  }
+
+  const isUpload = input.kind === 'upload';
+  const body = isUpload ? input : input.body;
+  const provider = String(body.provider || (isUpload ? 'glm' : 'groq')).toLowerCase();
+  if (!ASR_PROVIDERS.has(provider)) {
+    return json({ error: `提供商 ${provider} 不支持语音转写`, text: '', segments: [] }, 400);
+  }
+
+  const envKey = env?.[`AI_KEY_${provider.toUpperCase()}`] || env?.SERVER_AI_KEY || '';
+  const apiKey = String(body.apiKey || envKey || '').trim();
+  if (!apiKey) {
+    return json({ error: '未配置语音转写 Key', text: '', segments: [] }, 503);
+  }
+  if (!body.apiKey && envKey) {
+    trackFactoryUsage(request, provider, WHISPER_MODELS[provider]);
+  }
+
+  const language = String(body.language || 'en').slice(0, 8);
+  const bilibiliCookie = env?.BILIBILI_COOKIE || '';
+
+  try {
+    let audioBuffer;
+    let mime = 'audio/mpeg';
+    let filename = 'audio.mp3';
+    let episodeList = [];
+
+    if (isUpload) {
+      audioBuffer = body.audioBuffer;
+      mime = body.mime;
+      filename = body.filename;
+    } else {
+      // Optional B站 login state — higher-quality audio streams with SESSDATA
+      let audioUrl = body.audioUrl;
+      const currentPage = body.page || 1;
+
+      if (!audioUrl && body.bvid) {
+        const viewRes = await fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${body.bvid}`, {
+          headers: { 'User-Agent': BILIBILI_UA, 'Referer': 'https://www.bilibili.com/', Cookie: bilibiliCookie },
+        });
+        const viewData = await viewRes.json();
+        if (viewData.code !== 0) throw new Error('B站 API 错误');
+
+        const pages = viewData.data.pages || [];
+        const targetPage = pages[currentPage - 1] || pages[0];
+        if (!targetPage) throw new Error('未找到分集');
+
+        episodeList = pages.map((p) => ({
+          page: p.page, part: p.part || `Episode ${p.page}`, duration: p.duration || 0,
+        }));
+
+        const signed = await signWbi({ bvid: body.bvid, cid: String(targetPage.cid), fnval: 16, fnver: 0, fourk: 1 });
+        const playUrl = `https://api.bilibili.com/x/player/wbi/playurl?${new URLSearchParams(signed).toString()}`;
+        const playRes = await fetch(playUrl, {
+          headers: { 'User-Agent': BILIBILI_UA, 'Referer': 'https://www.bilibili.com/', Cookie: bilibiliCookie },
+        });
+        const playData = await playRes.json();
+        const audioList = playData?.data?.dash?.audio || [];
+        if (audioList.length === 0) throw new Error('未找到音频流');
+
+        const best = audioList
+          .filter((a) => a.bandwidth > 0)
+          .sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0))
+          .find((a) => (a.bandwidth || 0) <= 64000) || audioList[0];
+        audioUrl = best.baseUrl || best.base_url || best.url;
+      }
+
+      if (!audioUrl) throw new Error('无法获取音频 URL');
+
+      const audioRes = await fetch(audioUrl, {
+        headers: { 'User-Agent': BILIBILI_UA, 'Referer': 'https://www.bilibili.com/', Cookie: bilibiliCookie },
+      });
+      if (!audioRes.ok) throw new Error('下载音频失败');
+      audioBuffer = await audioRes.arrayBuffer();
     }
 
-    const data = await whRes.json();
+    const data = await transcribeWithProvider({ provider, apiKey, audioBuffer, mime, filename, language });
+    const { text, segments } = normalizeTranscript(data);
 
-    // Step 4: Parse into segments
-    const rawSegments = data.segments || [];
-    const segments = rawSegments
-      .filter((s) => s.text && s.text.trim())
-      .map((s) => {
-        const text = s.text.trim();
-        const words = text.split(/\s+/).filter(Boolean);
-        const keywords = [];
-        const seen = new Set();
-        for (const w of words) {
-          const clean = w.replace(/[^a-zA-Z]/g, '').toLowerCase();
-          if (clean.length > 4 && !seen.has(clean) && keywords.length < 4) {
-            seen.add(clean);
-            keywords.push({ word: clean, meaning: '' });
-          }
-        }
-        return { start: s.start || 0, end: s.end || 0, en: text, zh: '', keywords };
-      });
-
-    return new Response(JSON.stringify({
+    return json({
+      text,
       segments,
+      provider,
+      model: WHISPER_MODELS[provider],
       source: 'whisper',
       error: null,
       episodeList,
       totalEpisodes: episodeList.length,
-    }), {
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
-
   } catch (err) {
-    return new Response(JSON.stringify({
-      error: err.message,
-      segments: [],
-      source: 'none',
-    }), {
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
+    const message = String(err?.message || '转写失败').replace(apiKey, '[REDACTED]');
+    return json({ error: message, text: '', segments: [], source: 'none' }, 502);
   }
 }
 

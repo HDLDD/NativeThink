@@ -39,7 +39,7 @@ scripts/.apikey（gitignore，.gitignore:4）
 
 服务端按任务选主模型：`translate → glm-4.7-flash`、`chat → glm-4-flash-250414`（`chat.js:38-41`，客户端同名分工 `ai-service.ts:54-57`），glm 系默认关思考（`:98-100`）。免费档回退链 `glm-4-flash-250414 → glm-4-flash → glm-4v-flash → glm-4.7-flash`，**只在 429/500/502/503/504 才换档**（`:47-52,104-133`）。
 
-其它云函数：`/api/ai/passage`（无 Key → 503 且带 `fallback:'client'`）、`/api/ai/transcribe`（Whisper 兼容）。
+其它云函数：`/api/ai/passage`（无 Key → 503 且带 `fallback:'client'`）、`/api/ai/transcribe`（Whisper 兼容；2026-10-23 路线 2 起同时支持 multipart 录音上传与旧 JSON audioUrl/bvid，并补 GLM `{text}` 兜底）。
 
 ### 2.3 端侧模型回落的条件
 
@@ -65,7 +65,7 @@ scripts/.apikey（gitignore，.gitignore:4）
 
 ### 2.6 `/api/ai/*` 的防滥用守卫（2026-10-05）
 
-中继端点挂在任何人都能 POST 的公网域名上，所以 `functions/_lib/guard.js` 把四件事钉在一起，`functions/api/ai/chat.js` 在**业务逻辑之前**按序跑完：
+中继端点挂在任何人都能 POST 的公网域名上，所以 `functions/_lib/guard.js` 把四件事钉在一起，`functions/api/ai/chat.js` 在**业务逻辑之前**按序跑完；`functions/api/ai/transcribe.js` 从路线 2 起也复用 Origin 白名单 + IP 限流，并额外限制 multipart 音频 ≤8MB：
 
 | 手段 | 判据 | 位置 | 为什么是这样 |
 |---|---|---|---|
@@ -73,6 +73,8 @@ scripts/.apikey（gitignore，.gitignore:4）
 | IP 分钟窗限流 | `CF-Connecting-IP` 每 60s 至多 **30** 次，超 → **429** | `guard.js:37-54`、`chat.js:72-75` | 计数放 **isolate 内存**而非 KV：免费档 KV 每日写上限 1000，逐请求写会把配额打爆。代价：跨 isolate 各算各的、冷启动即清零 —— 它是"削突发"不是硬额度 |
 | messages 形状校验 | 非空数组、**≤80 条**、每条 `role`/`content` 均为字符串、总长 **≤64k 字符**，不过 → **400** | `guard.js:78-89`、`chat.js:86-88` | 防超大 payload 白烧 Key；80 条是给 AI 对话"全量上下文"留的量（`:80` 注释写明），别当宽松项改小 |
 | 出厂 Key 用量监控 | 请求**没带** `apiKey` 时才计（按天重置、按 provider 分桶）+ 结构化日志 | `guard.js:57-71`、`chat.js:97-99` | 查看入口：`GET /api/ai/chat` 返回 `{usage:{day,factoryTotal,byProvider}}`（`chat.js:58-61`）。明细在 CF 控制台 Real-time Logs / `wrangler pages deployment tail` 里按 `type:"ai_factory_usage"` 检索（含 ip，`guard.js:70`） |
+
+`transcribe.js` 的「形状校验」不是 `messages`：multipart 必须有 `audio` 字段且 ≤8MB，JSON 路径仍接受 bvid/audioUrl；音频转发给上游后即弃，服务端不落盘。
 
 两条容易踩的边角：**GET 短路在 405 判断之前**（`chat.js:58` 早于 `:64`），所以这个端点用 GET 探活拿到的永远是用量快照；**Electron 不走这条路** —— 桌面版把 `/api/*` 在本地 Node 里执行（见 [build-release.md](./build-release.md) §5 第 8-9 条），因此白名单只需覆盖 Web / Capacitor / 本地开发三种形态。
 
@@ -84,9 +86,9 @@ scripts/.apikey（gitignore，.gitignore:4）
    - **贪婪正则**：`use-passage-generator.ts:59`、`ChunkTrainingPage.tsx`（原 `:954`）、`DashboardPage.tsx:161`、`DailyLearningMode.tsx:157` 四处用 `match(/\{[\s\S]*\}/)` 之类 —— 贪婪 `.*` 会跨多个 JSON 片段把中间说明文字一起吞进同一个匹配（`utils.ts:34` 注释就是这条的理由）。现在四处都换 `extractJson`。
    - **缺判空前置**：原记 4 处，**实际清点出 7 处**（`ArticlePage.tsx` 3 处、`DeepVocabularyPage.tsx` 3 处、`use-spelling-sentences.ts` 1 处）—— 这类问题只会随新增调用点继续长，所以做成了全仓扫描的守卫。
 
-   **守卫：`npm run verify:ai-parse`**（25 个解析点，注释行不参与判定）。元判据自证：同一段 `inspect()` 函数先跑三个固件（缺判空 / 贪婪正则 / 写对了），前两个必须各报 1 条、第三个必须 0 条 —— 否则"全仓 0 违规"可能只是检查器坏了。另有行为证据：真转译 `extractJson` 并断言 `extractJson('')` 抛的就是那句会被误读成"格式异常"的文案，以及同一份夹带文本的输入下贪婪匹配比 `extractJson` 多吞一段。变异实测：删掉任一判空前置会立刻红。
+   **守卫：`npm run verify:ai-parse`**（28 个解析点，注释行不参与判定）。元判据自证：同一段 `inspect()` 函数先跑三个固件（缺判空 / 贪婪正则 / 写对了），前两个必须各报 1 条、第三个必须 0 条 —— 否则"全仓 0 违规"可能只是检查器坏了。另有行为证据：真转译 `extractJson` 并断言 `extractJson('')` 抛的就是那句会被误读成"格式异常"的文案，以及同一份夹带文本的输入下贪婪匹配比 `extractJson` 多吞一段。变异实测：删掉任一判空前置会立刻红。
 
-2. **空串不等于解析失败**。`use-ai.ts:61-89` 失败时 toast 后返回 `''` / `yield {content:'',done:true}`，AbortError 静默返回。所以调用方**必须先判 `!result.trim()`** 当作「服务不可用」，再谈解析。全仓 25 个解析点现在都有这道前置，由 `npm run verify:ai-parse` 每次扫。
+2. **空串不等于解析失败**。`use-ai.ts:61-89` 失败时 toast 后返回 `''` / `yield {content:'',done:true}`，AbortError 静默返回。所以调用方**必须先判 `!result.trim()`** 当作「服务不可用」，再谈解析。全仓 28 个解析点现在都有这道前置，由 `npm run verify:ai-parse` 每次扫。
 
 3. **AGENTS.md 旧说法有误**：use-ai 失败并**不**统一 toast「AI 服务暂不可用，请稍后重试」，它 toast 的是 `err.message`（`use-ai.ts:69,84`）；那句文案是各页面自己发的。
 

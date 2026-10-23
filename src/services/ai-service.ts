@@ -41,6 +41,11 @@ export interface StreamCallOptions {
   temperature?: number;
   /** AbortSignal for cancellation */
   signal?: AbortSignal;
+  /**
+   * 静默调用（练习界面）：失败时不弹「离线回落」提示，由调用方内联降级。
+   * 默认 false —— 其他页面的提示行为保持不变。
+   */
+  silent?: boolean;
 }
 
 export type AITask = 'chat' | 'translate';
@@ -323,7 +328,8 @@ export async function* streamChat(
   } catch (err) {
     if (options.signal?.aborted) throw err;
     if (!isAutoFallbackEnabled() || !isLocalLlmReady()) {
-      hintOfflineFallback();
+      // 静默调用（练习界面）不弹「离线回落」提示，由调用方内联降级；默认行为不变
+      if (!options.silent) hintOfflineFallback();
       throw err;
     }
     for await (const chunk of localStreamChat(messages, {
@@ -345,7 +351,8 @@ export async function chat(
   } catch (err) {
     if (options.signal?.aborted) throw err;
     if (!isAutoFallbackEnabled() || !isLocalLlmReady()) {
-      hintOfflineFallback();
+      // 同 streamChat：静默调用不弹离线回落提示
+      if (!options.silent) hintOfflineFallback();
       throw err;
     }
     let out = '';

@@ -1,6 +1,6 @@
 # 验证体系
 
-> 本项目**没有测试框架**。防线是：`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 24 条可跑的 `scripts/verify-*.mjs` 契约守卫（另有需要基线参数的 verify-wordbank-split 与作为全量跑法的 verify-all，共 26 个文件） + 无头 Chrome/CDP 行为验收 + 真机 CDP 通道。
+> 本项目**没有测试框架**。防线是：`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 35 条可跑的 `scripts/verify-*.mjs` 契约守卫（另有需要基线参数的 verify-wordbank-split 与作为全量跑法的 verify-all，共 37 个文件） + 无头 Chrome/CDP 行为验收 + 真机 CDP 通道。
 > 一句话原则：**证据来自产物和真运行，不来自读代码**。
 
 ## 1. 契约守卫（`scripts/verify-*.mjs`）
@@ -10,14 +10,16 @@
 | 脚本 | 断言 | 守什么 | 什么时候必须跑 |
 |------|------|--------|----------------|
 | `verify-shadowing-completion.mjs` | 27 | 跟读完成标记的**索引契约**：`shadowing-progress.ts` 纯函数真跑（删除位移/跨语料隔离/原句不可删）+ 页面接线（删句传合并索引、键构造单一来源、AI 分析判空）；带"退回旧调用方式"的正对照。2026-10-05 起还守语音标注 `<u>` 渲染（renderAnnotated 接线 / 旧剥标签写法正对照 / 剥注释后无危险注入） | 改 `ShadowingPage` 完成标记 / 语音标注渲染 / `shadowing-progress.ts` |
+| `verify-shadowing-asr.mjs` | 51 | 跟读音频链路（路线 2）：ASR 纯函数/WAV 编码真跑、服务端 `normalizeTranscript` 真跑（GLM `{text}` 不许丢）、页面 MediaRecorder→WAV→转写→词级/语速接线、反向断言旧 Web Speech 已从本页移除 | 改 `ShadowingPage` 录音/转写/评分 / `asr-service` / `transcribe.js` / `wav.ts` |
+| `verify-speech-analysis.mjs` | 39 | 离线跟读分析（路线 1）：合成波形真跑标点/连词意群边界、音量/爆音阈值、20ms RMS 停顿、自相关基频/趋势/句尾、语速；静态守 SpeakBack 与影子跟读共用 `analyzeBlob` | 改 `speech-analysis.ts` / `wav.ts` / `SpeakBack` / `ShadowingPage` 录音分析 |
 | `verify-backup-idb.mjs` | 16 | 「导出学习数据」真的含整书译文：IDB 替身真跑 `dumpBookTranslationCache`（有/无缓存、超上限、跨书隔离）+ 旧枚举方式的正对照 + backup.ts 接线 | 改 `backup.ts` / `book-translation.ts` 缓存层 |
 | `verify-sentence-lab.mjs` | 16 | 拆句训练主干判定**索引同源**：真转译 `sentence-parse.ts` 跑出 `stdParts` 与 `segments` 的分歧（缩约形式跨意群那个真实例子）、坏数据不再产生假成功；守 ChunkDrill 候选来自 resolved、reveal 在 grade 之前拦 | 改 `sentence-parse.ts` / `ChunkDrill.tsx` |
 | `verify-spelling-resume.mjs` | 24 | 拼写断点**按词书分键**：注入替身真跑 persist/读/迁移/清理，含「旧全局单键只剩最后一本」的正对照；守页面与重置流程都走同一模块 | 改 `spelling-resume.ts` / `SpellingPage` 断点 / 拼写重置 |
-| `verify-video-lab.mjs` | 154 | 视频精听数据层与页面契约：SRT/VTT/转录 JSON **解析真跑**（BOM、CRLF、多行 cue、乱序时间轴、内联标记、无效时间丢条）；假 IDB 替身**真跑整段 `createVideoStore`**（索引封顶淘汰连 `m:`/`s:`/`z:` 一起删、任一步写失败不谎报也不留半课、译文分键回写不重存 blob、`load` 遇坏记录退化成无原声而不抛）；`scoreSpeech` 用 LCS 真跑（含"重复词只扣一次"与"多说不压分"两条正对照）；**批次翻译调度 `runBatchTranslation` 真跑**（编号正文 / 该批句数当 maxTokens 依据 / 并发档位受控 / 串行也要一批一回调 / 坏批退队尾只重试一次 / 连着两批坏才收摊 / `stopped()` 停止取新活 / 0 档位夹底）；**跟读五种形状各有点名断言**（无 API / `start()` 抛 / 一个回调都不回（看门狗）/ 直接 end 无结果 / **非英文幻觉回报不计分且 `recLang` 与 `rec.lang` 同源**）；吸顶六条（IO 给 root、`overflow-anchor:none`、`canPin` 门、缩宽度而不是缩 `max-h`、避让取实测 `cover`、面板高度现量）；六件套 + 点词/收藏/听写/翻译接线。⚠️ 剥注释必须走转译器（`removeComments`），裸正则会被 `accept="video/*,audio/*"` 骗掉 9KB —— 自带一条脚手架自证 | 改 `video-lab.ts` / `VideoLabPage` / `idb.ts` 的 `media` 表 |
+| `verify-video-lab.mjs` | 154 | 视频精听数据层与页面契约：SRT/VTT/转录 JSON **解析真跑**（BOM、CRLF、多行 cue、乱序时间轴、内联标记、无效时间丢条）；假 IDB 替身**真跑整段 `createVideoStore`**（索引封顶淘汰连 `m:`/`s:`/`z:` 一起删、任一步写失败不谎报也不留半课、译文分键回写不重存 blob、`load` 遇坏记录退化成无原声而不抛）；`scoreSpeech` 用 LCS 真跑（含"重复词只扣一次"与"多说不压分"两条正对照）；**批次翻译调度 `runBatchTranslation` 真跑**（编号正文 / 该批句数当 maxTokens 依据 / 并发档位受控 / 串行也要一批一回调 / 坏批退队尾只重试一次 / 连着两批坏才收摊 / `stopped()` 停止取新活 / 0 档位夹底）；**跟读五种形状各有点名断言**（无 API / `start()` 抛 / 一个回调都不回（看门狗）/ 直接 end 无结果 / **非英文幻觉回报不计分且 `recLang` 与 `rec.lang` 同源**）；吸顶六条（IO 给 root、`overflow-anchor:none`、`canPin` 门、缩宽度而不是缩 `max-h`、避让取实测 `cover`、面板高度现量）；六件套 + 点词/收藏/听写/翻译接线。⚠️ 剥注释必须走转译器（`removeComments`），裸正则会被 `accept="video/*,audio/*"` 骗掉 9KB —— 自带一条脚手架自证 | 改 `video-lab.ts` / `speech-score.ts` / `VideoLabPage` / `idb.ts` 的 `media` 表 |
 | `verify-correction-notes.mjs` | 90 | 表达纠偏本：Markdown 表格抽取真跑（三源列序 / 表头噪声 / 错=对跳过）+ store 整段真跑（去重、review 记账、删除、只拒不裁、写失败可见）+ 三处收集接线 + 收藏页折叠列表 + 第 9 模式接线总闸与重考卡面契约（不写 SM-2、零 toast、干扰项取自整本）+ 送进拼写（`correctionToSpellingItem` 真跑、纠偏桶不许走词库加载路）+ 错点归纳（十类规则各自命中、规则顺序与证据优先级、计数之和=条目数） | 改 `correction-notes.ts` / 纠偏重考 / 收藏页纠偏区 |
 | `verify-guard-shape.mjs` | 7 | **元守卫**：AST 扫全部 `verify-*.mjs`，抓"恒真断言"（`ok(/re/, src, name)` 这种第一实参是字面量本体）与漏名字的断言；逐文件识别记录器、形状表不含布尔、自带双向自证 + `inspectedTotal` 防空转 | 新增/改动任何守卫的断言写法 |
-| `verify-ai-parse.mjs` | 10 | AI 解析约定全仓扫：每个 `extractJson` 调用点前必须有 `.trim()` 判空、不许残留贪婪 `match(/…[\s\S]*…/)`；**注释行不参与判定**，并用三段固件自证检查器本身有效 | 新增/改动任何 AI 调用点 |
-| `verify-cloud-sync-hygiene.mjs` | 70 | 云同步契约：转译**真实** `use-cloud-sync` + `safe-storage` 在 Node 里驱动 —— 下行后 0 次 POST（回声）、同键本地再写必须 1 次 POST（正对照）、空 catch 数为 0、周期补推按需且 `needsResync` 引用稳定；④ 用假 target 真跑 `sync-down`（通知/退订/异常隔离/事件名一致）+ **13 个订阅者逐个点名** + "没有任何 hook 再自己拼事件名" + SM-2/语块/拼写三道回声判据；④b 三处模块级缓存"重读前必须先 invalidate"的静态形态；⑤ **编译三个缓存库真跑**"不作废拿旧值（正对照）→ 作废拿新值"，防"订阅了但被缓存挡住"的假绿 | 改 `use-cloud-sync.ts` / `sync-down.ts` / `CloudSyncProvider.tsx` / `safe-storage.ts` 双写钩子 / 任何 `useSyncDown` 调用点 |
+| `verify-ai-parse.mjs` | 11 | AI 解析约定全仓扫（当前 28 个解析点）：每个 `extractJson` 调用点前必须有 `.trim()` 判空、不许残留贪婪 `match(/…[\s\S]*…/)`；**注释行不参与判定**，并用三段固件自证检查器本身有效；具名站点 `PatternReviewMode`（/think 模式复习，2026-10 新增）必须真的被数到且前置判空在位 | 新增/改动任何 AI 调用点 |
+| `verify-cloud-sync-hygiene.mjs` | 73 | 云同步契约：转译**真实** `use-cloud-sync` + `safe-storage` 在 Node 里驱动 —— 下行后 0 次 POST（回声）、同键本地再写必须 1 次 POST（正对照）、空 catch 数为 0、周期补推按需且 `needsResync` 引用稳定；④ 用假 target 真跑 `sync-down`（通知/退订/异常隔离/事件名一致）+ **15 个订阅者逐个点名 + 清单与全仓实际订阅者双向比对**（`sync-down.ts` 是定义不计；原 13 个清单漏了 `correction-notes.ts` 与 `use-think-patterns.ts`）+ "没有任何 hook 再自己拼事件名" + SM-2/语块/拼写三道回声判据；④b 三处模块级缓存"重读前必须先 invalidate"的静态形态；⑤ **编译三个缓存库真跑**"不作废拿旧值（正对照）→ 作废拿新值"，防"订阅了但被缓存挡住"的假绿 | 改 `use-cloud-sync.ts` / `sync-down.ts` / `CloudSyncProvider.tsx` / `safe-storage.ts` 双写钩子 / 任何 `useSyncDown` 调用点 |
 | `verify-wordbank-loading.mjs` | 53 | 加载层集成：显示数 = 出卡池子、全部词书不互抢、IDB 失败才兜底 localStorage；2026-10-13 起覆盖 11 本（新增四六级高频/高分两本：池子=WORD_COUNTS=3000、跨书唯一数不变、正对照旧口径仍可鉴别） | 改词库或加载层 |
 | `verify-wordbank-split.mjs` | 数据全量比对 | 拆分校验：`--baseline` 采基线（**拆分前后都能采**）、`--check` 逐项断言 | 改词库拆分 |
 | `verify-char-hygiene.mjs` | 9 | 数据「不可见坏字符」零残留（真机渲染为 "?" 未知图标）：U+FFFD + 私用区 PUA；扫描器正/负对照固件自证 + src/data 全量 + public/books + 扫描文件数下限（防路径失效假绿）+ 净化脚本覆盖两个数据目录的静态自证 | 改词库/词典数据、新增任何数据生成器之后（与 `clean-wordbank-mojibake.mjs` 成对） |
@@ -34,7 +36,9 @@
 | `verify-bundle-budget.mjs` | 10 | 从**产物**反查入口静态依赖图：首屏必需集合里不许出现 recharts/markdown/词库数据 chunk；gzip 总量 ≤ 预算 | 改 `vite.config` 的 manualChunks、壳里新增静态 import/require |
 | `verify-list-scaling.mjs` | 18 | 一屏渲染不完的列表必须折叠/分页：写作题库默认 12 张、词库浏览分页、**语块短语库每字母段默认 6 条且 A-Z 跳转仍可达每一段**（各配「不许退回全量 `.map`」的正对照） | 新增长列表页 |
 | `verify-rv-articles.mjs` | 104 | 复习词汇文章：纯函数**真跑**（并集/**删文章即回词表**/切批与上限、`rvParaCount` 上下限、`buildRvPrompt` 带体裁与主题且「不限」不硬塞、`coveredReviewWords` 用阅读器那套形态归并且**不过度归并**、`rvRegenKeys` 取词优先级）+ 页面接线（`rvWords` 只记真出现的词、覆盖只看英文正文、逐篇串行、先落盘再计成功、历史 `aiId` 可重开、收藏口径、**重写保持原 id 且不靠先删再存**）+ 旧缺陷正对照（`slice(0,10)` 不许回来） | 改 `rv-articles.ts` / `ArticlePage` 复习词汇面板 / 已保存文章列表 |
-| `verify-study-credit.mjs` | 80 | 学习时长记账：`creditKey`/`makeCreditGate` **真跑**（同键只放行一次、FIFO 淘汰后可重计、上限 400）+ 七个提交点接线（键同时含动作类型/题面/原文，且**计时仍在请求之前**）+ 口径双向锁（不许改成"AI 回了才计"，也不许把**本地动作**套上闸门 —— 语块复习打分 / 选择题判定 / 写作开题 / **短语闪卡翻面直计时**）+ 句子学习造句那处的**刻意不同**（判空之后才计） | 改 `study-credit.ts` / 任何 `addStudyMinutes`/`creditOnce` 调用点 |
+| `verify-study-credit.mjs` | 89 | 学习时长记账：`creditKey`/`makeCreditGate` **真跑**（同键只放行一次、FIFO 淘汰后可重计、上限 400）+ 八个提交点接线（键同时含动作类型/题面/原文，且**计时仍在请求之前**；含 `/think` 模式复习的迁移判定 —— 非流式 `aiChat`，没配 Key 也先计时）+ 口径双向锁（不许改成"AI 回了才计"，也不许把**本地动作**套上闸门 —— 语块复习打分 / 选择题判定 / 写作开题 / **短语闪卡翻面直计时**）+ 句子学习造句那处的**刻意不同**（判空之后才计） | 改 `study-credit.ts` / 任何 `addStudyMinutes`/`creditOnce` 调用点 |
+| `verify-think-patterns.mjs` | 529 | `/think`「模式复习」闭环：8 模式 ×（3 识别 + 2 迁移）内容结构 / id 唯一 / 答案下标均衡（0/1/2 各 8）+ 逐项说明 24×3（best/ok/off，best 落在正确项）+ 迁移 16 组 `thinkingSteps`/`why` + 反馈并排对照；纯调度模块与 AI helper **真转译真跑**（SM-2 五档、失败重置并立即到期、每日总上限 10 与新模式 2、到期升序、失败回队/通过清副本、薄弱排序 lapses → 失败率、31 天上下界、识别/迁移轮换取模）；**会话状态机真跑**（首次失败回队尾、三次失败收摊、重试通过不留重复且最终 pass、两种模式交错、按不同模式计数、入参不被修改）；prompt 带全部线索/对比/场景，JSON 模板钉 `"evidence"` 键与中文反馈；**判定接线钉 15 秒 `AbortController` + `finally` 清定时器 + `silent: true`**，并钉 `ai-service` / `use-ai` 两层各 2 处遵守 `silent`；store 读盘清洗（含残缺记录 / NaN 排期丢弃）与首次读盘"先标记再 setState"真跑（含删标记的正对照）、`ProgressPage` 全部重置含新键；三个 UI 组件 + 页面接入块（五 tab 顺序、组件只挂 `patterns` 面板一处、旧四面板不空壳、自评/「继续」双击闸门）；末尾 **13 条变异实验**（每条要求变异串恰好一次 + 基线不出现坏行为 + 变异后必须变红） | 改 `think-patterns.ts` / `think-pattern-ai.ts` / `use-think-patterns.ts` / `PatternReview*.tsx` / `ThinkInEnglishPage` 的 tab 接入 / `use-ai.ts` 与 `ai-service.ts` 的 silent 分支 |
+| `verify-think-stream-abort.mjs` | 36 | `/think` 流式中断：AST 检查四个提交流（先 abort 上一代再 `new AbortController()`、`for await` 首句断流、catch 对 abort 静默、finally 用 `ref === controller` 身份锁）+ 六条换题/删题路径 + 卸载清理四个 ref + **检测历史在 abort 后不落盘**；**9 条变异逐条施加，必须恰好红对应一条断言**。防旧缺陷「换题后上一题流内容写进新题结果框」 | 改 `ThinkInEnglishPage` 的提交流 / 换题 / 删题 / 卸载清理 |
 | `verify-dashboard-glance.mjs` | 25 | 首页内容扩展三条契约：①「继续上次学习」labels 表含 `/sentences`（穷举映射不在新增页面六件套里，`/sentences` 真漏过 —— 漏一行该页访问后续学条静默不出现）；②「今日待复习」横幅与侧边栏角标同源（`useGlobalDueCount`）且**到期 0 整卡 return null**（不许渲染"已清零"占位）；③「本周学习概览」日期 `formatDate` 循环生成、禁 `toISOString`、禁 `slice(-7)` 取 calendar 数组尾（跨天未学习时尾部是昨天，柱状错位一天）+ 柱状容器 `h-28` 固定高度。变异 5 条全部验红 | 改 `DashboardPage` / `ReviewDueCard` / `WeekGlanceCard` / 新上线路由的 lastVisit 标签 |
 
 命令（`AGENTS.md` 的「常用命令」有全集）：
@@ -383,7 +387,7 @@ typecheck + eslint + `npm run verify:all` **28 项全绿**，断言合计 **7,88
 
 ③b **最后一句"每轮第一张都不读"是测量伪影，不是第三个缺陷**：进轮之后清了缓冲，而第一张的朗读就在进轮那几百毫秒里发起。定性靠读组件自己的状态 —— 从卡面 `<h2>` 的 `__reactFiber# 验证体系
 
-> 本项目**没有测试框架**。防线是：`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 24 条可跑的 `scripts/verify-*.mjs` 契约守卫（另有需要基线参数的 verify-wordbank-split 与作为全量跑法的 verify-all，共 26 个文件） + 无头 Chrome/CDP 行为验收 + 真机 CDP 通道。
+> 本项目**没有测试框架**。防线是：`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 35 条可跑的 `scripts/verify-*.mjs` 契约守卫（另有需要基线参数的 verify-wordbank-split 与作为全量跑法的 verify-all，共 37 个文件） + 无头 Chrome/CDP 行为验收 + 真机 CDP 通道。
 > 一句话原则：**证据来自产物和真运行，不来自读代码**。
 
 ## 1. 契约守卫（`scripts/verify-*.mjs`）
@@ -393,14 +397,16 @@ typecheck + eslint + `npm run verify:all` **28 项全绿**，断言合计 **7,88
 | 脚本 | 断言 | 守什么 | 什么时候必须跑 |
 |------|------|--------|----------------|
 | `verify-shadowing-completion.mjs` | 27 | 跟读完成标记的**索引契约**：`shadowing-progress.ts` 纯函数真跑（删除位移/跨语料隔离/原句不可删）+ 页面接线（删句传合并索引、键构造单一来源、AI 分析判空）；带"退回旧调用方式"的正对照。2026-10-05 起还守语音标注 `<u>` 渲染（renderAnnotated 接线 / 旧剥标签写法正对照 / 剥注释后无危险注入） | 改 `ShadowingPage` 完成标记 / 语音标注渲染 / `shadowing-progress.ts` |
+| `verify-shadowing-asr.mjs` | 51 | 跟读音频链路（路线 2）：ASR 纯函数/WAV 编码真跑、服务端 `normalizeTranscript` 真跑（GLM `{text}` 不许丢）、页面 MediaRecorder→WAV→转写→词级/语速接线、反向断言旧 Web Speech 已从本页移除 | 改 `ShadowingPage` 录音/转写/评分 / `asr-service` / `transcribe.js` / `wav.ts` |
+| `verify-speech-analysis.mjs` | 39 | 离线跟读分析（路线 1）：合成波形真跑标点/连词意群边界、音量/爆音阈值、20ms RMS 停顿、自相关基频/趋势/句尾、语速；静态守 SpeakBack 与影子跟读共用 `analyzeBlob` | 改 `speech-analysis.ts` / `wav.ts` / `SpeakBack` / `ShadowingPage` 录音分析 |
 | `verify-backup-idb.mjs` | 16 | 「导出学习数据」真的含整书译文：IDB 替身真跑 `dumpBookTranslationCache`（有/无缓存、超上限、跨书隔离）+ 旧枚举方式的正对照 + backup.ts 接线 | 改 `backup.ts` / `book-translation.ts` 缓存层 |
 | `verify-sentence-lab.mjs` | 16 | 拆句训练主干判定**索引同源**：真转译 `sentence-parse.ts` 跑出 `stdParts` 与 `segments` 的分歧（缩约形式跨意群那个真实例子）、坏数据不再产生假成功；守 ChunkDrill 候选来自 resolved、reveal 在 grade 之前拦 | 改 `sentence-parse.ts` / `ChunkDrill.tsx` |
 | `verify-spelling-resume.mjs` | 24 | 拼写断点**按词书分键**：注入替身真跑 persist/读/迁移/清理，含「旧全局单键只剩最后一本」的正对照；守页面与重置流程都走同一模块 | 改 `spelling-resume.ts` / `SpellingPage` 断点 / 拼写重置 |
-| `verify-video-lab.mjs` | 154 | 视频精听数据层与页面契约：SRT/VTT/转录 JSON **解析真跑**（BOM、CRLF、多行 cue、乱序时间轴、内联标记、无效时间丢条）；假 IDB 替身**真跑整段 `createVideoStore`**（索引封顶淘汰连 `m:`/`s:`/`z:` 一起删、任一步写失败不谎报也不留半课、译文分键回写不重存 blob、`load` 遇坏记录退化成无原声而不抛）；`scoreSpeech` 用 LCS 真跑（含"重复词只扣一次"与"多说不压分"两条正对照）；**批次翻译调度 `runBatchTranslation` 真跑**（编号正文 / 该批句数当 maxTokens 依据 / 并发档位受控 / 串行也要一批一回调 / 坏批退队尾只重试一次 / 连着两批坏才收摊 / `stopped()` 停止取新活 / 0 档位夹底）；**跟读五种形状各有点名断言**（无 API / `start()` 抛 / 一个回调都不回（看门狗）/ 直接 end 无结果 / **非英文幻觉回报不计分且 `recLang` 与 `rec.lang` 同源**）；吸顶六条（IO 给 root、`overflow-anchor:none`、`canPin` 门、缩宽度而不是缩 `max-h`、避让取实测 `cover`、面板高度现量）；六件套 + 点词/收藏/听写/翻译接线。⚠️ 剥注释必须走转译器（`removeComments`），裸正则会被 `accept="video/*,audio/*"` 骗掉 9KB —— 自带一条脚手架自证 | 改 `video-lab.ts` / `VideoLabPage` / `idb.ts` 的 `media` 表 |
+| `verify-video-lab.mjs` | 154 | 视频精听数据层与页面契约：SRT/VTT/转录 JSON **解析真跑**（BOM、CRLF、多行 cue、乱序时间轴、内联标记、无效时间丢条）；假 IDB 替身**真跑整段 `createVideoStore`**（索引封顶淘汰连 `m:`/`s:`/`z:` 一起删、任一步写失败不谎报也不留半课、译文分键回写不重存 blob、`load` 遇坏记录退化成无原声而不抛）；`scoreSpeech` 用 LCS 真跑（含"重复词只扣一次"与"多说不压分"两条正对照）；**批次翻译调度 `runBatchTranslation` 真跑**（编号正文 / 该批句数当 maxTokens 依据 / 并发档位受控 / 串行也要一批一回调 / 坏批退队尾只重试一次 / 连着两批坏才收摊 / `stopped()` 停止取新活 / 0 档位夹底）；**跟读五种形状各有点名断言**（无 API / `start()` 抛 / 一个回调都不回（看门狗）/ 直接 end 无结果 / **非英文幻觉回报不计分且 `recLang` 与 `rec.lang` 同源**）；吸顶六条（IO 给 root、`overflow-anchor:none`、`canPin` 门、缩宽度而不是缩 `max-h`、避让取实测 `cover`、面板高度现量）；六件套 + 点词/收藏/听写/翻译接线。⚠️ 剥注释必须走转译器（`removeComments`），裸正则会被 `accept="video/*,audio/*"` 骗掉 9KB —— 自带一条脚手架自证 | 改 `video-lab.ts` / `speech-score.ts` / `VideoLabPage` / `idb.ts` 的 `media` 表 |
 | `verify-correction-notes.mjs` | 90 | 表达纠偏本：Markdown 表格抽取真跑（三源列序 / 表头噪声 / 错=对跳过）+ store 整段真跑（去重、review 记账、删除、只拒不裁、写失败可见）+ 三处收集接线 + 收藏页折叠列表 + 第 9 模式接线总闸与重考卡面契约（不写 SM-2、零 toast、干扰项取自整本）+ 送进拼写（`correctionToSpellingItem` 真跑、纠偏桶不许走词库加载路）+ 错点归纳（十类规则各自命中、规则顺序与证据优先级、计数之和=条目数） | 改 `correction-notes.ts` / 纠偏重考 / 收藏页纠偏区 |
 | `verify-guard-shape.mjs` | 7 | **元守卫**：AST 扫全部 `verify-*.mjs`，抓"恒真断言"（`ok(/re/, src, name)` 这种第一实参是字面量本体）与漏名字的断言；逐文件识别记录器、形状表不含布尔、自带双向自证 + `inspectedTotal` 防空转 | 新增/改动任何守卫的断言写法 |
-| `verify-ai-parse.mjs` | 10 | AI 解析约定全仓扫：每个 `extractJson` 调用点前必须有 `.trim()` 判空、不许残留贪婪 `match(/…[\s\S]*…/)`；**注释行不参与判定**，并用三段固件自证检查器本身有效 | 新增/改动任何 AI 调用点 |
-| `verify-cloud-sync-hygiene.mjs` | 70 | 云同步契约：转译**真实** `use-cloud-sync` + `safe-storage` 在 Node 里驱动 —— 下行后 0 次 POST（回声）、同键本地再写必须 1 次 POST（正对照）、空 catch 数为 0、周期补推按需且 `needsResync` 引用稳定；④ 用假 target 真跑 `sync-down`（通知/退订/异常隔离/事件名一致）+ **13 个订阅者逐个点名** + "没有任何 hook 再自己拼事件名" + SM-2/语块/拼写三道回声判据；④b 三处模块级缓存"重读前必须先 invalidate"的静态形态；⑤ **编译三个缓存库真跑**"不作废拿旧值（正对照）→ 作废拿新值"，防"订阅了但被缓存挡住"的假绿 | 改 `use-cloud-sync.ts` / `sync-down.ts` / `CloudSyncProvider.tsx` / `safe-storage.ts` 双写钩子 / 任何 `useSyncDown` 调用点 |
+| `verify-ai-parse.mjs` | 11 | AI 解析约定全仓扫（当前 28 个解析点）：每个 `extractJson` 调用点前必须有 `.trim()` 判空、不许残留贪婪 `match(/…[\s\S]*…/)`；**注释行不参与判定**，并用三段固件自证检查器本身有效；具名站点 `PatternReviewMode`（/think 模式复习，2026-10 新增）必须真的被数到且前置判空在位 | 新增/改动任何 AI 调用点 |
+| `verify-cloud-sync-hygiene.mjs` | 73 | 云同步契约：转译**真实** `use-cloud-sync` + `safe-storage` 在 Node 里驱动 —— 下行后 0 次 POST（回声）、同键本地再写必须 1 次 POST（正对照）、空 catch 数为 0、周期补推按需且 `needsResync` 引用稳定；④ 用假 target 真跑 `sync-down`（通知/退订/异常隔离/事件名一致）+ **15 个订阅者逐个点名 + 清单与全仓实际订阅者双向比对**（`sync-down.ts` 是定义不计；原 13 个清单漏了 `correction-notes.ts` 与 `use-think-patterns.ts`）+ "没有任何 hook 再自己拼事件名" + SM-2/语块/拼写三道回声判据；④b 三处模块级缓存"重读前必须先 invalidate"的静态形态；⑤ **编译三个缓存库真跑**"不作废拿旧值（正对照）→ 作废拿新值"，防"订阅了但被缓存挡住"的假绿 | 改 `use-cloud-sync.ts` / `sync-down.ts` / `CloudSyncProvider.tsx` / `safe-storage.ts` 双写钩子 / 任何 `useSyncDown` 调用点 |
 | `verify-wordbank-loading.mjs` | 53 | 加载层集成：显示数 = 出卡池子、全部词书不互抢、IDB 失败才兜底 localStorage；2026-10-13 起覆盖 11 本（新增四六级高频/高分两本：池子=WORD_COUNTS=3000、跨书唯一数不变、正对照旧口径仍可鉴别） | 改词库或加载层 |
 | `verify-wordbank-split.mjs` | 数据全量比对 | 拆分校验：`--baseline` 采基线（**拆分前后都能采**）、`--check` 逐项断言 | 改词库拆分 |
 | `verify-char-hygiene.mjs` | 9 | 数据「不可见坏字符」零残留（真机渲染为 "?" 未知图标）：U+FFFD + 私用区 PUA；扫描器正/负对照固件自证 + src/data 全量 + public/books + 扫描文件数下限（防路径失效假绿）+ 净化脚本覆盖两个数据目录的静态自证 | 改词库/词典数据、新增任何数据生成器之后（与 `clean-wordbank-mojibake.mjs` 成对） |
@@ -417,7 +423,9 @@ typecheck + eslint + `npm run verify:all` **28 项全绿**，断言合计 **7,88
 | `verify-bundle-budget.mjs` | 10 | 从**产物**反查入口静态依赖图：首屏必需集合里不许出现 recharts/markdown/词库数据 chunk；gzip 总量 ≤ 预算 | 改 `vite.config` 的 manualChunks、壳里新增静态 import/require |
 | `verify-list-scaling.mjs` | 18 | 一屏渲染不完的列表必须折叠/分页：写作题库默认 12 张、词库浏览分页、**语块短语库每字母段默认 6 条且 A-Z 跳转仍可达每一段**（各配「不许退回全量 `.map`」的正对照） | 新增长列表页 |
 | `verify-rv-articles.mjs` | 104 | 复习词汇文章：纯函数**真跑**（并集/**删文章即回词表**/切批与上限、`rvParaCount` 上下限、`buildRvPrompt` 带体裁与主题且「不限」不硬塞、`coveredReviewWords` 用阅读器那套形态归并且**不过度归并**、`rvRegenKeys` 取词优先级）+ 页面接线（`rvWords` 只记真出现的词、覆盖只看英文正文、逐篇串行、先落盘再计成功、历史 `aiId` 可重开、收藏口径、**重写保持原 id 且不靠先删再存**）+ 旧缺陷正对照（`slice(0,10)` 不许回来） | 改 `rv-articles.ts` / `ArticlePage` 复习词汇面板 / 已保存文章列表 |
-| `verify-study-credit.mjs` | 80 | 学习时长记账：`creditKey`/`makeCreditGate` **真跑**（同键只放行一次、FIFO 淘汰后可重计、上限 400）+ 七个提交点接线（键同时含动作类型/题面/原文，且**计时仍在请求之前**）+ 口径双向锁（不许改成"AI 回了才计"，也不许把**本地动作**套上闸门 —— 语块复习打分 / 选择题判定 / 写作开题 / **短语闪卡翻面直计时**）+ 句子学习造句那处的**刻意不同**（判空之后才计） | 改 `study-credit.ts` / 任何 `addStudyMinutes`/`creditOnce` 调用点 |
+| `verify-study-credit.mjs` | 89 | 学习时长记账：`creditKey`/`makeCreditGate` **真跑**（同键只放行一次、FIFO 淘汰后可重计、上限 400）+ 八个提交点接线（键同时含动作类型/题面/原文，且**计时仍在请求之前**；含 `/think` 模式复习的迁移判定 —— 非流式 `aiChat`，没配 Key 也先计时）+ 口径双向锁（不许改成"AI 回了才计"，也不许把**本地动作**套上闸门 —— 语块复习打分 / 选择题判定 / 写作开题 / **短语闪卡翻面直计时**）+ 句子学习造句那处的**刻意不同**（判空之后才计） | 改 `study-credit.ts` / 任何 `addStudyMinutes`/`creditOnce` 调用点 |
+| `verify-think-patterns.mjs` | 529 | `/think`「模式复习」闭环：8 模式 ×（3 识别 + 2 迁移）内容结构 / id 唯一 / 答案下标均衡（0/1/2 各 8）+ 逐项说明 24×3（best/ok/off，best 落在正确项）+ 迁移 16 组 `thinkingSteps`/`why` + 反馈并排对照；纯调度模块与 AI helper **真转译真跑**（SM-2 五档、失败重置并立即到期、每日总上限 10 与新模式 2、到期升序、失败回队/通过清副本、薄弱排序 lapses → 失败率、31 天上下界、识别/迁移轮换取模）；**会话状态机真跑**（首次失败回队尾、三次失败收摊、重试通过不留重复且最终 pass、两种模式交错、按不同模式计数、入参不被修改）；prompt 带全部线索/对比/场景，JSON 模板钉 `"evidence"` 键与中文反馈；**判定接线钉 15 秒 `AbortController` + `finally` 清定时器 + `silent: true`**，并钉 `ai-service` / `use-ai` 两层各 2 处遵守 `silent`；store 读盘清洗（含残缺记录 / NaN 排期丢弃）与首次读盘"先标记再 setState"真跑（含删标记的正对照）、`ProgressPage` 全部重置含新键；三个 UI 组件 + 页面接入块（五 tab 顺序、组件只挂 `patterns` 面板一处、旧四面板不空壳、自评/「继续」双击闸门）；末尾 **13 条变异实验**（每条要求变异串恰好一次 + 基线不出现坏行为 + 变异后必须变红） | 改 `think-patterns.ts` / `think-pattern-ai.ts` / `use-think-patterns.ts` / `PatternReview*.tsx` / `ThinkInEnglishPage` 的 tab 接入 / `use-ai.ts` 与 `ai-service.ts` 的 silent 分支 |
+| `verify-think-stream-abort.mjs` | 36 | `/think` 流式中断：AST 检查四个提交流（先 abort 上一代再 `new AbortController()`、`for await` 首句断流、catch 对 abort 静默、finally 用 `ref === controller` 身份锁）+ 六条换题/删题路径 + 卸载清理四个 ref + **检测历史在 abort 后不落盘**；**9 条变异逐条施加，必须恰好红对应一条断言**。防旧缺陷「换题后上一题流内容写进新题结果框」 | 改 `ThinkInEnglishPage` 的提交流 / 换题 / 删题 / 卸载清理 |
 | `verify-dashboard-glance.mjs` | 25 | 首页内容扩展三条契约：①「继续上次学习」labels 表含 `/sentences`（穷举映射不在新增页面六件套里，`/sentences` 真漏过 —— 漏一行该页访问后续学条静默不出现）；②「今日待复习」横幅与侧边栏角标同源（`useGlobalDueCount`）且**到期 0 整卡 return null**（不许渲染"已清零"占位）；③「本周学习概览」日期 `formatDate` 循环生成、禁 `toISOString`、禁 `slice(-7)` 取 calendar 数组尾（跨天未学习时尾部是昨天，柱状错位一天）+ 柱状容器 `h-28` 固定高度。变异 5 条全部验红 | 改 `DashboardPage` / `ReviewDueCard` / `WeekGlanceCard` / 新上线路由的 lastVisit 标签 |
 
 命令（`AGENTS.md` 的「常用命令」有全集）：
@@ -785,3 +793,55 @@ typecheck + eslint + `npm run verify:all` **28 项全绿**，断言合计 **7,88
 ⑥ 计数（本轮实测）：`verify-interaction-fx` 75→**107**（+⑪ 默认层 15、+⑫ 入场档 6）、`walk-interaction-fx` 16→**23**（+裸按钮 2、+注入夹具 3、+参与者口径 3、+入场曲线 2）、`walk-phone` 34→**36**（+⑤ 结果图形件画在界面上：答前弧与点全 0、答后弧有尺寸有描边已收口、四颗点恰好一颗成功绿三颗未判定灰；+⑥ 收藏页 53 个参与者里 28 个是裸元素）。三屏参与者实测 31 / 112 / 18。批 3 是**收口不是新造**：`.page-enter` / `.stagger > *` 本来就挂在 12 处界面上，本轮只把重复四次的曲线字面量指回 `--fx-ease`（逐字符同值 → 零视觉变化）并补守卫。
 
 ⑦ **装到真机 2.0.93 又抓到一个只有这一台会说的话**：注入夹具 + CDP 真触摸量默认层（`tmp/press-fixture-phone.mjs`，10 条，跑完删夹具、不碰 App 状态），前 6 条一次过，第 ⑦ 条"抬手后回到不缩"红了 —— 逐帧采样看清是**平台把 `:active` 多按住了一段**：`up0/up100` 仍是 `active:true`、scale 停在 0.985，`up300` 才掉回 `none`；而这台机器报 `hover:none / pointer:coarse`（桌面报 `hover:hover / pointer:fine`）。也就是说触摸设备上 `:active` 不但"按下期间不给"（模拟器那条），**松手后还会拖后腿**（回弹晚 ~400ms）。修法 = `:active` 收进 `@media (hover: hover) and (pointer: fine)`，`[data-pressing]` 无条件生效；守卫 ⑩ 加一条反向断言（媒体门之外不许出现 `[data-press]:active`），变异 M-L/M-N 验红。**这一条只有"装进真机后用真触摸按一下"才看得见** —— 模拟器上 `:active` 恒 0，桌面合成事件也不产生 `:active`，两条本机通道都绿。
+
+2026-10-23 第 55 测（影子跟读路线 2 落地：录音终于真的参与评分）：用户定序「先 2 再 1，以后 3」。路线 2 = 录音 → 服务端转写 → 词级评分，本轮落地：
+
+① **最小验证先跑**：`scripts/probe-shadowing-asr.mjs` 直连 GLM，出厂 `scripts/.apikey` 可用，2.56s 英文 601ms 返回完全正确转写（scoreSpeech 100%）。现有 `/api/ai/transcribe` 最初只解析 `data.segments`，GLM 返回 `{text}` → 空结果；补 text 兜底后 multipart 与 audioUrl 两条路径都通过（444ms / 499ms）。
+
+② **格式坑**：Chrome MediaRecorder 产出 WebM/Opus，GLM-ASR-2512 实测回 `1214 transcriptions不支持当前文件格式`。客户端先 `blobToWav16k`（16kHz 单声道 PCM）再上传；20s 约 640KB。真界面（本地 Pages Functions + Chrome 假麦克风）录 5.5s → WAV → GLM → 词级 25%（故意喂错句，2/8 词）+ 漏词 + 语速 5.5s/参考 2.1s；AI 反馈按转写给 0/10；换句后录音/评分/URL 全部清空。
+
+③ **服务端**：`/api/ai/transcribe` 现在同时支持 multipart 与旧 JSON，补 `normalizeTranscript` text 兜底、Origin 白名单 + IP 限流 + 8MB 上限、`trackFactoryUsage`；音频转发即弃。客户端 provider 顺序 GLM → Groq → 硅基流动，一个失败自动换下一个。
+
+④ **守卫**：新增 `verify-shadowing-asr` 51 断言（ASR 纯函数/WAV 编码/服务端 normalizeTranscript 真跑 + 页面接线 + 反向断言旧 Web Speech 已移除）。`verify:all` **34 项全绿**（断言合计 **8,221**；`verify-wordbank-split` 跳过）。`verify-video-lab` 154 仍绿（scoreSpeech 抽到 `speech-score.ts` 后该校验脚本同步并入源码）。
+
+⑤ 文档：`docs/modules/shadowing.md` 新增 §4 路线 2 实现/验证/探针，§2.3 改为 MediaRecorder→WAV→ASR，旧 Web Speech 记录移入历史；`video-lab.md` 的 `scoreSpeech` 引用改到 `speech-score.ts:29`。
+
+2026-10-23 第 56 测（影子跟读路线 1：ASR 挂掉也要有可听的反馈）：路线 2 解决了"录音真的参与评分"，路线 1 补离线兜底与节奏/音量/音高。
+
+① **共享分析库**：新增 `src/lib/speech-analysis.ts`，把 SpeakBack 原来的能量包络/停顿检测抽出来，补上音量与爆音、自相关基频、标点意群边界；`wav.ts` 抽出 `resampleMono16k` 供 WAV 编码与音高分析共用。
+
+② **两条接线**：影子跟读在 `handleRecordingStop` 里对同一份 `uploadBlob` 并行跑 `analyzeBlob`（不等 ASR），ASR 失败时本地卡仍显示语速/停顿/音量/音高；句子精讲 SpeakBack 改用同一个 `analyzeBlob`，界面补音量与音高趋势，停顿边界仍用 `standardBreaks`，A/B 回放保留。
+
+③ **算法坑**：自相关在周期整数倍处都高，初版把 220Hz 正弦读成 73Hz；改成"优先取更短的强峰（≥0.9×全局峰）"后 220Hz→220Hz。音量初版用"峰值 ≥ -0.2 dBFS"判爆音，真实 TTS 录音峰值到 0 被误报；改成只看接近满幅样本占比 >0.3%，单帧峰值不再算爆音。`endsRising` 初版只比中段 50–75%，信号在 50% 处跳高时会误判；改成尾段 vs 前半段。
+
+④ **真界面**：本地 Pages Functions + Chrome 假麦克风，ASR 用 `window.fetch` 模拟失败 → 仍显示「语速 3.2s/参考 2.1s · 偏慢 53%」「停顿 0/1」「音量正常」「音高 154–222Hz」；SpeakBack 在同一台假麦克风上显示语速/停顿/音量/音高与 A/B 按钮。
+
+⑤ **守卫**：新增 `verify-speech-analysis` 39 断言（合成波形真跑边界/音量/停顿/音高/语速 + 静态接线），`verify:all` **35 项全绿**（断言合计 **8,260**；`verify-wordbank-split` 跳过）。
+
+2026-10-23 第 57 测（/think 模式复习闭环收尾：从"功能能点"到"守卫能抓"）：前 7 个任务把第五个 tab 做出来之后，本轮补齐契约与全量基线。
+
+① **变异实验进守卫**：`verify-think-patterns` 从 435 加到 **464**，末尾新增 10 条自动化变异（M1 每日 10 上限 / M2 失败回队 / M3 每日新模式上限 / M4 失败重置 repetitions / M5 mastered 看 AI 通过次数 / M6 去掉 `useSyncDown` / M7 去掉 `creditOnce` / M8 坏 `pass` 必须被判 null / M9 薄弱排序 lapses 优先 / M10 识别题取模轮换）。每条同时跑三件事：变异串恰好命中一次、**未变异的基线不出现坏行为**（防恒真夹具）、变异体必须出现坏行为。M5 第一版只写 `aiTransferPasses >= 2`，命中了文件头注释里的同形文字（hits=2）→ 连 `interval >= 21 &&` 一起写才唯一 —— 变异实验自己先被"恰好一次"抓了一次。
+
+② **订阅者清单的旧账**：`verify-cloud-sync-hygiene` 的清单停在 13，漏了 `correction-notes.ts` 与新的 `use-think-patterns.ts`。`grep -l "useSyncDown(" src/lib` 命中 16 个文件，其中 `sync-down.ts` 是定义不是订阅者 → 订阅者 **15**。守卫从"逐个点名"升级成"清单 ↔ 全仓实际订阅者双向比对"（70 → 73），`cloud-sync.md` 与 AGENTS 模块索引同步。
+
+③ **计时站点**：`verify-study-credit` 补 `/think` 模式复习的迁移判定（80 → 89）：非流式 `aiChat` 不套用 abort 模板，改为钉「creditOnce 在 await aiChat 之前」「没配 Key 也先计时」「键同时带 pattern id 与用户原文」，并用真闸门跑「同一句连点只计一次 / 换模式或换说法各计一次」。
+
+④ **解析点具名**：`verify-ai-parse` 10 → 11，新增 `PatternReviewMode` 具名站点（当前全仓 **28** 个解析点）；AGENTS 里"25 个解析点"的旧数同步改成 28。
+
+⑤ **AI prompt 的两条硬键**：`verify-think-patterns` 的 prompt 断言额外钉住 JSON 模板里的 `"evidence"` 键与「中文」反馈要求 —— 实测删掉任一串，对应断言立刻红。
+
+⑥ 计数（本轮实测）：`verify-think-patterns` **464**、`verify-cloud-sync-hygiene` **73**、`verify-study-credit` **89**、`verify-ai-parse` **11**；`npm run verify:all` **36 项全绿**（`verify-wordbank-split` 跳过），断言合计 **8,737**（2026-10-23 第 57 测）。
+
+2026-10-23 第 58 测（/think 模式复习最终整特性评审修复：判定超时/静默、会话编排抽纯函数、读盘残缺记录）：对应 `.superpowers/sdd/final-review.md` 的 I1/I2/I3 与选定的 Minor。
+
+① **判定不再永挂**：`PatternReviewMode.judge` 建 `AbortController` + 15 秒定时器 `abort()`，`signal` 传 `aiChat`，`finally` 清定时器；`useAI` 已把 `AbortError` 映射成空串 → 会话回落自评。守卫钉「建 controller → 设定时器 → 发请求 → 清定时器」的顺序（4 条）。
+
+② **练习界面静默**：`StreamCallOptions` 新增 `silent?: boolean`；`ai-service` 的 `chat`/`streamChat` 在 silent 时跳过 `hintOfflineFallback()`，`use-ai` 的 `handleChat`/`handleStreamChat` 跳过 `toast.error`（各 2 处，静态钉住）。判定请求传 `silent: true`；其他页面不传，默认提示行为不变。
+
+③ **会话编排抽纯函数**：`think-patterns.ts` 新增 `createPatternSession` / `applySessionResult` / `advanceSession` / `sessionCounts`；组件从「queue/index/retries/results 四份 state」收成一个 `session`。真跑覆盖：首次失败回队尾、同一模式三次失败收摊、重试通过不留重复且最终 pass、两种模式交错、完成页按不同模式计数、四个 helper 不修改入参。
+
+④ **读盘丢残缺记录**：`sanitizeProgress` 要求 `status` / `firstReviewedOn` / 12 个有限数字字段齐全；`{patternId}` 与 `nextReview=NaN` 两类夹具必须被丢，两条健康记录必须原样保留（引用不变）。`ProgressPage` 的「全部重置」补上 `__nativethink_think_pattern_progress`（hook 的 `resetAll` 仍无调用点，只能靠这个列表清）。
+
+⑤ **双击闸门**：自评二选一 `finishedRef` 只落一次；反馈卡「继续」`nextRef` + `disabled` 只推进一次（否则连点会跳过一个模式）。概览「全部掌握」改用 `THINK_PATTERNS.length`，不再硬编码 8。
+
+⑥ 计数（本轮实测）：`verify-think-patterns` **529**（+65：会话状态机/读盘残缺/静默/超时/双击/概览/reset 键断言 + M11-M13 三条自动化变异 + AI 失败重试/字符串 pass 归一化 + prompt 大小写/逐字规则 + 识别逐项说明覆盖/三种语气 + 迁移先想三步/why/反馈扩展），`verify-cloud-sync-hygiene` 73、`verify-study-credit` 89、`verify-ai-parse` 11（28 解析点）保持不变；`npm run verify:all` **36 项全绿**（`verify-wordbank-split` 跳过），断言合计 **8,802**（2026-10-23 第 59 测）。新增的 13 条静态/行为断言逐条跑过外部变异（改坏 → 目标断言红 → 源码字节还原）。

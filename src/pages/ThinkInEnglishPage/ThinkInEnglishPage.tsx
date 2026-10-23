@@ -13,6 +13,7 @@ import {
   Volume2,
   X,
   History,
+  Repeat,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -37,6 +38,7 @@ import { safeStorage } from '@/lib/safe-storage';
 import { persistJson, warnStorageFull } from '@/lib/capped-cache';
 import { cn, extractJson } from '@/lib/utils';
 import { useStableShuffle } from '@/lib/use-stable-shuffle';
+import { PatternReviewMode } from './PatternReviewMode';
 
 const EXAMPLE_SENTENCES = [
   'i very like this book.',
@@ -49,7 +51,7 @@ export default function ThinkInEnglishPage() {
   const { isConfigured, streamChat: aiStream, chat: aiChat } = useAI();
   const { addFavorite, removeFavorite, isFavorited, favorites } = useFavorites();
   const tts = useTTS();
-  const [activeTab, setActiveTab] = usePageMemory('think-tab', 'detector');
+  const [activeTab, setActiveTab] = usePageMemory('think-tab', 'patterns');
 
   // Detector
   const [detectorInput, setDetectorInput] = useState('');
@@ -150,6 +152,7 @@ export default function ThinkInEnglishPage() {
     // 口径：按「提交了这次作答」的动作计时；同一题同一句只记一次（连点不刷进度环）
     creditOnce('think', creditKey('detector', input));
 
+    detectorAbortRef.current?.abort();
     const controller = new AbortController();
     detectorAbortRef.current = controller;
 
@@ -191,6 +194,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
         );
 
         for await (const chunk of stream) {
+          if (controller.signal.aborted) break;
           if (chunk.content) {
             full += chunk.content;
             setDetectorResult(full);
@@ -202,6 +206,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
           .callStream('textGenerate', { english_sentence: input });
 
         for await (const chunk of stream as AsyncIterable<{ content?: string }>) {
+          if (controller.signal.aborted) break;
           if (chunk.content) {
             full += chunk.content;
             setDetectorResult(full);
@@ -209,17 +214,21 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
         }
       }
       // 历史只在真拿到内容时留档；计时按「提交这次作答」的动作计（见 study-credit.ts 头部口径说明）
+      if (controller.signal.aborted) return;
       if (full.trim()) {
         recordDetectorHistory(input);
         // 表达纠偏本：检测结果里的「Chinglish Expression | Natural English | Notes」表自动收集
         addCorrectionNotes('think', extractDetectorRows(full));
       }
     } catch (err) {
+      if (controller.signal.aborted) return;
       toast.error('AI 服务暂不可用，请稍后重试');
       setDetectorResult('> ⚠️ AI 服务连接失败，请检查网络后重试。');
     } finally {
-      setDetectorLoading(false);
-      detectorAbortRef.current = null;
+      if (detectorAbortRef.current === controller) {
+        setDetectorLoading(false);
+        detectorAbortRef.current = null;
+      }
     }
   };
 
@@ -234,6 +243,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
     setShowNativeRef(true);
     creditOnce('think', creditKey('translation', exercise.prompt, input));
 
+    translationAbortRef.current?.abort();
     const controller = new AbortController();
     translationAbortRef.current = controller;
 
@@ -274,6 +284,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
         );
 
         for await (const chunk of stream) {
+          if (controller.signal.aborted) break;
           if (chunk.content) {
             full += chunk.content;
             setTranslationResult(full);
@@ -288,6 +299,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
           });
 
         for await (const chunk of stream as AsyncIterable<{ content?: string }>) {
+          if (controller.signal.aborted) break;
           if (chunk.content) {
             full += chunk.content;
             setTranslationResult(full);
@@ -295,11 +307,14 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
         }
       }
     } catch (err) {
+      if (controller.signal.aborted) return;
       toast.error('AI 服务暂不可用，请稍后重试');
       setTranslationResult('> ⚠️ AI 服务连接失败，请检查网络后重试。');
     } finally {
-      setTranslationLoading(false);
-      translationAbortRef.current = null;
+      if (translationAbortRef.current === controller) {
+        setTranslationLoading(false);
+        translationAbortRef.current = null;
+      }
     }
   };
 
@@ -314,6 +329,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
     setShowBackRef(true);
     creditOnce('think', creditKey('back', exercise.keyword, input));
 
+    backAbortRef.current?.abort();
     const controller = new AbortController();
     backAbortRef.current = controller;
 
@@ -352,6 +368,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
         );
 
         for await (const chunk of stream) {
+          if (controller.signal.aborted) break;
           if (chunk.content) {
             full += chunk.content;
             setBackResult(full);
@@ -364,6 +381,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
         });
 
         for await (const chunk of stream as AsyncIterable<{ content?: string }>) {
+          if (controller.signal.aborted) break;
           if (chunk.content) {
             full += chunk.content;
             setBackResult(full);
@@ -371,16 +389,22 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
         }
       }
     } catch (err) {
+      if (controller.signal.aborted) return;
       toast.error('AI 服务暂不可用，请稍后重试');
       setBackResult('> ⚠️ AI 服务连接失败，请检查网络后重试。');
     } finally {
-      setBackLoading(false);
-      backAbortRef.current = null;
+      if (backAbortRef.current === controller) {
+        setBackLoading(false);
+        backAbortRef.current = null;
+      }
     }
   };
 
   const nextExercise = () => {
     if (translationExercises.length === 0) return;
+    translationAbortRef.current?.abort();
+    translationAbortRef.current = null;
+    setTranslationLoading(false);
     setCurrentExerciseIdx((prev) => (prev + 1) % translationExercises.length);
     setTranslationInput('');
     setTranslationResult('');
@@ -406,6 +430,9 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
 
   const nextBackExercise = () => {
     if (backExercises.length === 0) return;
+    backAbortRef.current?.abort();
+    backAbortRef.current = null;
+    setBackLoading(false);
     setCurrentBackIdx((prev) => (prev + 1) % backExercises.length);
     setBackInput('');
     setBackResult('');
@@ -441,6 +468,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
     setShowNativeThinkRef(true);
     creditOnce('think', creditKey('native', exercise.chineseText, input));
 
+    nativeAbortRef.current?.abort();
     const controller = new AbortController();
     nativeAbortRef.current = controller;
 
@@ -481,6 +509,7 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
         );
 
         for await (const chunk of stream) {
+          if (controller.signal.aborted) break;
           if (chunk.content) {
             full += chunk.content;
             setNativeResult(full);
@@ -488,12 +517,14 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
         }
       } else {
         const stream = (await getCapabilityClient())
-          .load(PLUGIN_IDS.CHINGLISH_DETECTION)
+          .load(PLUGIN_IDS.THOUGHT_TRANSLATION)
           .callStream('textGenerate', {
-            english_sentence: input,
+            user_english_expression: input,
+            native_expression: exercise.nativeEnglish,
           });
 
         for await (const chunk of stream as AsyncIterable<{ content?: string }>) {
+          if (controller.signal.aborted) break;
           if (chunk.content) {
             full += chunk.content;
             setNativeResult(full);
@@ -501,16 +532,22 @@ Provide ALL responses in BOTH English and Chinese (bilingual). For each section,
         }
       }
     } catch (err) {
+      if (controller.signal.aborted) return;
       toast.error('AI 服务暂不可用，请稍后重试');
       setNativeResult('> ⚠️ AI 服务连接失败，请检查网络后重试。');
     } finally {
-      setNativeLoading(false);
-      nativeAbortRef.current = null;
+      if (nativeAbortRef.current === controller) {
+        setNativeLoading(false);
+        nativeAbortRef.current = null;
+      }
     }
   };
 
   const nextNativeExercise = () => {
     if (nativeExercises.length === 0) return;
+    nativeAbortRef.current?.abort();
+    nativeAbortRef.current = null;
+    setNativeLoading(false);
     setCurrentNativeIdx((prev) => (prev + 1) % nativeExercises.length);
     setNativeInput('');
     setNativeResult('');
@@ -672,6 +709,9 @@ The chineseText should subtly embed English thinking patterns so learners discov
   const handleDeleteTranslation = () => {
     const ex = translationExercises[currentExerciseIdx];
     if (ex.id.startsWith('ai_')) {
+      translationAbortRef.current?.abort();
+      translationAbortRef.current = null;
+      setTranslationLoading(false);
       setCustomTranslations((prev) => prev.filter((e) => e.id !== ex.id));
       if (currentExerciseIdx >= translationExercises.length - 1) setCurrentExerciseIdx(Math.max(0, currentExerciseIdx - 1));
     }
@@ -679,6 +719,9 @@ The chineseText should subtly embed English thinking patterns so learners discov
   const handleDeleteBack = () => {
     const ex = backExercises[currentBackIdx];
     if (ex.id.startsWith('ai_')) {
+      backAbortRef.current?.abort();
+      backAbortRef.current = null;
+      setBackLoading(false);
       setCustomBacks((prev) => prev.filter((e) => e.id !== ex.id));
       if (currentBackIdx >= backExercises.length - 1) setCurrentBackIdx(Math.max(0, currentBackIdx - 1));
     }
@@ -686,6 +729,9 @@ The chineseText should subtly embed English thinking patterns so learners discov
   const handleDeleteNative = () => {
     const ex = nativeExercises[currentNativeIdx];
     if (ex.id.startsWith('ai_')) {
+      nativeAbortRef.current?.abort();
+      nativeAbortRef.current = null;
+      setNativeLoading(false);
       setCustomNatives((prev) => prev.filter((e) => e.id !== ex.id));
       if (currentNativeIdx >= nativeExercises.length - 1) setCurrentNativeIdx(Math.max(0, currentNativeIdx - 1));
     }
@@ -710,6 +756,13 @@ The chineseText should subtly embed English thinking patterns so learners discov
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="bg-muted p-1.5 rounded-3xl h-auto flex-wrap">
+          <TabsTrigger
+            value="patterns"
+            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
+          >
+            <Repeat className="size-4 mr-2" />
+            模式复习
+          </TabsTrigger>
           <TabsTrigger
             value="detector"
             className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
@@ -738,6 +791,11 @@ The chineseText should subtly embed English thinking patterns so learners discov
             思维还原
           </TabsTrigger>
         </TabsList>
+
+        {/* Pattern Review Tab — 五个 tab 里的第一位，默认落在这里 */}
+        <TabsContent value="patterns" className="space-y-6 mt-6">
+          <PatternReviewMode />
+        </TabsContent>
 
         {/* Detector Tab */}
         <TabsContent value="detector" className="space-y-6 mt-6">

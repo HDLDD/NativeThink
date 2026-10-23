@@ -1,6 +1,81 @@
 # NativeThink 开发日志
 
+## 2026-10-23
+- feat(think): 模式复习闭环 —— 8 个思维模式按 SM-2 排期（识别三选一 + 迁移自由输入，AI 判定失败回落自评），`/think` 第五个 tab 默认进入
+- feat(shadowing): 录音评分接服务端 ASR（词级命中 + 语速），无通道时用离线音量/停顿/音高兜底，绝不假分数
+- feat(spelling): 题面与判分词形口径收进 `spelling-words.ts`（It’s 不再剥成 Its、数字/纯标点不占格）；句子来源增加纠偏本与视频精听两桶
+- feat(ai): `/api/ai/transcribe` 支持录音上传与 GLM，统一回 text/segments 并接 Origin/限流/出厂 Key 守卫
+- chore(apk): bump 146 / 2.0.101
+- feat(home): 主卡恢复"母语思维"主视觉 —— 大脑水印 + 标语，到期数据收进路径链 (`8477dcd`)
+
+## 2026-10-21
+- fix(ui): 字体栈改为 Noto 单家族首选，绕开 ROM 的家族间回退缺失 (`be1ba2a`)
+- feat(ui): 六套主题贯穿外壳与全站，侧栏可快捷切换 (`f000d6b`)
+- fix(ui): 中文改自托管 Noto Sans SC，避免 ROM 书法体覆盖 (`58b92d9`)
+- style(ui): 换掉模板感外壳 —— 墨绿侧栏、墨面主卡、编号功能入口 (`f5b9439`)
+
+## 2026-10-20
+- feat(vocab): 搜索结果可 AI 拆词根 / 辨析近义 (`ff1e583`)
+- feat(search): 全局搜索覆盖 11 本词书 21,736 词；未收录词可 AI 查 (`aba0eea`)
+- style(ui): KPI 改成紧凑统计条，删掉装饰图标 (`63e1dce`)
+- feat(home): 主行动卡改成"今天要做什么"，去掉标语 (`92006f9`)
+- feat(settings): 左上角加返回；没有来源页时回首页 (`5f02ed7`)
+- style(ui): 窗口与配色统一 —— 弹层换一套材质，AI 紫收成品牌色 (`e430b50`)
+- style(ui): 去掉功能页的 AI 味装饰 (`c066869`)
+- feat(ui): 外观主题可切换（原主题为默认），顶栏功能收进设置 (`347bbb9`)
+- chore(apk): bump 139 / 2.0.94（:active 收进 hover 门，已装 d0e47380） (`c6b9612`)
+- fix(ui): 触摸抬手后按钮"回弹晚" —— :active 收进 hover/pointer 门 (`da25ca5`)
+- chore(apk): bump 138 / 2.0.93（交互层二/三批随包；包已出、等 USB 装机） (`35a4b1d`)
+- feat(ui): 按压词汇翻成"默认可点"，判定改用图形件，入场曲线并回一条 (`b32b148`)
+- chore(apk): bump 136 / 2.0.91（朗读取消代际修复随包，已装 d0e47380） (`0d7836e`)
+- fix(tts): 朗读取消改成代际令牌 —— 被 stopAudio 掐掉的旧链会在 onerror 里复活，反手掐掉新朗读 (`1439e2d`)
+- fix(ui): 按压缩放改由 pointerdown 挂 data-pressing —— 装机实测这台 WebView 触摸下根本不进 :active (`e7f16bc`)
+- fix(repo): 补上 7295b55 漏提交的 ResultFx，并加一条守卫盯着这类漏提交 (`43d2c92`)
+- feat(ui): 加一层"按压词汇表"，把可点反馈从各写各的收编成全站一套，结果改用图形 (`7295b55`)
+
+## 2026-10-19
+- docs(tts): 真机 Kokoro RTF 量完了 —— 1.18~1.25，仍越不过 1.0，警告不放宽 (`27b6327`)
+- chore(apk): bump 134 / 2.0.89（跟读不计分那条随包，已装 d0e47380 并跑完真机 11 条） (`272b7a2`)
+- fix(video-lab): 跟读不许把设备的幻觉打成学习者的分数，装机验收跟上真机几何口径 (`190fb8c`)
+- docs: 索引与验证台账跟上这两项 —— sticky 被外壳 overflow 抢走约束根这条进通用坑 (`fe58bb8`)
+- perf(tts): 内置离线引擎本片先入队再预取 —— 首包砍半，并把 Kokoro 长文的实测边界写在选它的地方 (`b860184`)
+- feat(video-lab): 精听播放器吸顶悬浮 —— 那一屏改成自己的滚动容器 (`be945e0`)
+- test(video-lab): 真机核验改成钩 play() 数调用，并在灌满 16 课后跑到 8/8 (`0ff3d0f`)
+- docs(video-lab): 选料口径改成时长不限，并把长访谈的重复句写清 (`0a526ca`)
+- docs(video-lab): 素材库扩到十六课（新增纪录片/长访谈/两篇 TED），并记下逐课预览图 (`62458bd`)
+- fix(video-lab): 出包工具说清"转录服务没起"，素材核验加逐课预览图 (`dd36036`)
+- feat(video-lab): 出包工具加 --dir/--title/--note，并备六课真实场景素材 (`a8762d0`)
+- feat(video-lab): 真机导入加 --no-saf，并补一支真机侧行为核验（装机后 8/8） (`c596b86`)
+- chore(apk): bump 131 / 2.0.86（视频精听用户视角那批随包，已装 d0e47380） (`4cf93ff`)
+- feat(video-lab): 用户视角八项改进 + 把凭据落到真媒体与素材实测上 (`e296492`)
+
+## 2026-10-18
+- docs(video-lab): 记下出素材前两个本机踩坑（run.ps1 编码炸、_cookies_ytdlp.txt 是耗材不能直接用） (`c562cef`)
+- feat(video-lab): 再添四课带画面素材，并把出包/探针工具的"装饰性参数"修成真参数 (`46b80aa`)
+- chore(apk): bump 130 / 2.0.85（翻译字幕那条修复随包，待装机） (`ff0bd6f`)
+- fix(video-lab): 翻译字幕不再"看着像坏了"——先量时间线，再按量到的事实重做 (`aab2ad7`)
+- feat(video-lab): 素材必须有画面——无画面轨直接拒绝出包，并补真机导入通道 (`0558f6c`)
+- chore(apk): bump 129 / 2.0.84（精听带原声那条路径的修复随包，待装机） (`8b9a9c1`)
+- feat(video-lab): 备好两课可导入素材 + 补"带真实原声"那条路径的凭据（顺手抓到两处脏值/假时长） (`0964fca`)
+- chore(apk): bump 126 / 2.0.81（视频精听随包，待装机） (`f282b33`)
+- fix(video-lab): 跟读的"接口存在≠通道可用"——补 try/catch + 9 秒看门狗（装机走查抓到） (`fcb97dd`)
+- feat(video-lab): 视频精听上线 —— 导入字幕就能像每日英语听力那样逐句学 (`786f0a4`)
+
+## 2026-10-17
+- feat(phone-lab): 装机四条走查搬上模拟器（walk-phone.mjs 32/32）+ 四条测法教训 (`e47316d`)
+- feat(phone-lab): 模拟器通道端到端跑通 —— 修 start 的窗口标题坑，smoke 改问原生注册表并真发一次调用 (`aa66c8e`)
+- chore(phone-lab): 电脑侧安卓模拟器（AVD）仿真通道 —— 装机验证不再依赖手机 (`e43139e`)
+- chore(apk): bump 125 / 2.0.80（错点归纳 + 按类重考，待装机） (`e9f8581`)
+- feat(corrections): 错点归纳 —— 中式表达按十类归堆，收藏页与纠偏重考都能只重考这一类 (`24ef469`)
+- feat(dashboard): 首页「表达纠偏待重考」横幅 + ?tab= 深链直达纠偏重考 (`b21ef1e`)
+- chore(apk): bump 123 / 2.0.78（纠偏本产出侧闭环 + 收藏回顾崩溃修复） (`c494b16`)
+- feat(corrections): 纠偏本 → 句子拼写（产出侧闭环）+ 修「0 收藏就没有纠偏本入口」 (`0ffcd0a`)
+- fix(favorites): 收藏页「开始回顾」不再整页崩 —— 补 LazyFramerProvider + 读盘清洗 (`4ff46fd`)
+
 ## 2026-10-16
+- chore(apk): bump 121 / 2.0.76（纠偏本一期 + 纠偏重考第 9 模式） (`6272de5`)
+- feat(corrections): 纠偏重考 —— 词汇页第 9 模式（四选一重认地道说法） (`9836089`)
+- feat(corrections): 表达纠偏本 —— AI 判定中式/错误的表达自动收集（思维检测·写作批改·对话分析三源表格抽取）+ 收藏页回看列表 (`5bf083e`)
 - chore(apk): bump 120 / 2.0.75（c2e 看答案出口 + 听发音） (`f31b340`)
 - docs(vocabulary): 中译英拼写卡出口与听音辅助 (`e284779`)
 - feat(c2e): 拼写卡「不会？看答案」出口 + 题面手动朗读（听音辅助拼写） (`c7a08fd`)

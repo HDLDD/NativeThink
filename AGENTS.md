@@ -34,21 +34,21 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 阅读 `/articles` | [modules/reading.md](./docs/modules/reading.md) | 五种来源一套阅读器、运行时全文升级、**两套切章必须对齐**、复习词文章词表是派生的（删文章即回词表） |
 | 朗读 TTS | [modules/tts.md](./docs/modules/tts.md) | 引擎降级链、切片 180 由上游 200 硬上限钉死、**取消按代际 chainGenRef（布尔会被旧链复活）**、闪退自愈、音色四处同步、云端缓存 FIFO 400 条 + Blob URL 用完即 revoke、**系统语音的插件边界（async 别 return 插件对象，否则永久挂死）** |
 | AI 服务与端侧模型 | [modules/ai-services.md](./docs/modules/ai-services.md) | Key 优先级、服务端免费档回退、端侧回落条件、`extractJson` 规定由 `verify:ai-parse` 全仓扫、**中继防滥用守卫（Origin/限流/形状校验/出厂 Key 用量，无守卫覆盖）** |
-| 母语思维 `/think` | [modules/think-in-english.md](./docs/modules/think-in-english.md) | 4 tab；换题不 abort 导致流式内容串题 |
+| 母语思维 `/think` | [modules/think-in-english.md](./docs/modules/think-in-english.md) | 5 tab（第五个「模式复习」：8 个思维模式 × 3 识别 + 2 迁移，SM-2 排期 + 薄弱报告）；换题不 abort 导致流式内容串题 |
 | 语块 `/chunks` | [modules/chunks.md](./docs/modules/chunks.md) | 最大单文件；963 条（**手改写进 `chunks-extra.ts`**）、练习池走 `useStableShuffle`、**同短语多登记 → 读取层去重（筛选后、洗牌前）**、短语库按字母段折叠（4,805→1,148 元素）、接龙判定三档（未判定不送分）；**短语 SM-2 进度 store 三处共享**（本页「短语复习」「闪卡」+ 词汇页「短语闪卡」） |
 | 对话 `/conversation` | [modules/conversation.md](./docs/modules/conversation.md) | 场景选择↔聊天；`mountedRef` 每轮挂载需复位（dev 下曾恒 false 让对话永远空白） |
-| 影子跟读 `/shadowing` | [modules/shadowing.md](./docs/modules/shadowing.md) | 连播/循环/录音评分；完成标记按**合并索引**存，索引换算单点在 `shadowing-progress.ts` |
+| 影子跟读 `/shadowing` | [modules/shadowing.md](./docs/modules/shadowing.md) | 连播/循环/录音评分（MediaRecorder→16k WAV→服务端 ASR→词级+语速；离线音量/停顿/音高兜底）；完成标记按**合并索引**存，索引换算单点在 `shadowing-progress.ts` |
 | 写作 `/writing` | [modules/writing.md](./docs/modules/writing.md) | 100 题 + AI 批改（Markdown 不是 JSON）；默认折叠 12 张 |
-| 句子学习 `/sentences` | [modules/sentence-lab.md](./docs/modules/sentence-lab.md) | 158 句语料、意群运行时定位；主干候选与评分**同一来源**（`verify:sentence-lab` 守） |
+| 句子学习 `/sentences` | [modules/sentence-lab.md](./docs/modules/sentence-lab.md) | 158 句语料、意群运行时定位；主干候选与评分**同一来源**（`verify:sentence-lab` 守）；跟读评价与影子跟读共用 `speech-analysis` |
 | 句子拼写 `/spelling` | [modules/spelling.md](./docs/modules/spelling.md) | 2×2 玩法、**五条题目来源**（含纠偏本 / 精听页两个句子库桶）、断点按 level 分键（`spelling-resume.ts`） |
 | 视频精听 `/video` | [modules/video-lab.md](./docs/modules/video-lab.md) | 导入字幕（+可选媒体）逐句学：SRT/VTT/转录 JSON 三解析、IDB `media` 独立表三键分片、索引封顶连媒体一起删、点词查词、跟读用 LCS 且**无识别通道时不许假分数**、AI 双语三档降级、**三形态统一走导入（不接本机转录服务）** |
 | 首页 / 记录 / 收藏 / 备份 | [modules/dashboard-progress-favorites.md](./docs/modules/dashboard-progress-favorites.md) | 每日一句、分项重置、收藏判重口径、三张首页横幅（待复习 / 纠偏待重考 + `?tab=` 深链）；整书译文随备份导出由 `verify:backup-idb` 守 |
 | 外壳与导航 | [modules/shell-and-navigation.md](./docs/modules/shell-and-navigation.md) | 启动顺序、双层 ErrorBoundary、预取时机、**新增页面实际是六处** |
 | 交互反馈层（跨模块） | [modules/interaction-fx.md](./docs/modules/interaction-fx.md) | 全站"按下去有什么反应"的唯一答案：按压词汇（**裸 `<button>`/`<a href>`/`[role=button]` 默认可点，`off` 才例外**；`scale` 独立属性 / 两档涟漪按底色挑色）、结果图形件（纯 CSS，不碰 motion；四个练习面的弧/色点/连击环）、奖励时刻（唯一 canvas 出口）、入场档（`.page-enter`/`.stagger` 与 `--fx-ease` 同源）、reduce 在委托层判 |
 | 存储与学习统计 | [modules/storage-and-stats.md](./docs/modules/storage-and-stats.md) | 四套存储、safeStorage 前缀自愈、`addStudyMinutes` 真实语义、同步边界 |
-| 云同步与账号 | [modules/cloud-sync.md](./docs/modules/cloud-sync.md) | 两条上行口径不同；回声抑制/失败提示/按需补推由 `verify:cloud-sync` 守；下行重读订阅收进 `sync-down.ts`（13 个 hook 已接；三个模块缓存库的重读必须先作废缓存） |
+| 云同步与账号 | [modules/cloud-sync.md](./docs/modules/cloud-sync.md) | 两条上行口径不同；回声抑制/失败提示/按需补推由 `verify:cloud-sync` 守；下行重读订阅收进 `sync-down.ts`（15 个订阅者已接，`sync-down.ts` 是定义不算；三个模块缓存库的重读必须先作废缓存） |
 | 构建与发布 | [modules/build-release.md](./docs/modules/build-release.md) | 脚本地图与重复 bump、**缺资产静默出残包**、APK 版本线与产物命名、产物版本核对走构建期 meta |
-| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 30 条可跑的契约守卫（含元守卫 `verify-guard-shape`：扫守卫自身的恒真断言）+ verify:all 全量跑法 + 无头 Chrome/CDP + 真机通道 + **电脑侧 AVD 模拟器通道**（`scripts/phone-emu.mjs`）+ 写守卫四条硬规矩 |
+| 验证体系 | [modules/verification.md](./docs/modules/verification.md) | 35 条可跑的契约守卫（含元守卫 `verify-guard-shape`：扫守卫自身的恒真断言）+ verify:all 全量跑法 + 无头 Chrome/CDP + 真机通道 + **电脑侧 AVD 模拟器通道**（`scripts/phone-emu.mjs`）+ 写守卫四条硬规矩 |
 
 ---
 
@@ -114,13 +114,16 @@ node scripts/verify-overlay-fit.mjs               # 41   窄视口浮层契约 +
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
 node scripts/verify-list-scaling.mjs              # 18   长列表必须折叠/分页（写作题库 + 词库浏览 + 短语库字母段）
 node scripts/verify-shadowing-completion.mjs      # 27   跟读完成标记的索引契约（纯函数真跑 + 接线）+ 语音标注 <u> 渲染接线
+node scripts/verify-shadowing-asr.mjs             # 51   跟读音频链路：WAV 编码/provider 顺序/响应归一真跑 + 页面接线 + 旧 Web Speech 必须消失
+node scripts/verify-speech-analysis.mjs           # 39   离线跟读分析：合成波形的音量/停顿/音高/语速 + SpeakBack/跟读页共用 analyzeBlob
 node scripts/verify-backup-idb.mjs                # 16   导出学习数据真的含整书译文
-node scripts/verify-cloud-sync-hygiene.mjs        # 70   云同步：下行回声/失败可见/按需补推 + 13 订阅者逐个点名 + 缓存作废静态与真跑（正对照）
+node scripts/verify-cloud-sync-hygiene.mjs        # 73   云同步：下行回声/失败可见/按需补推 + 15 订阅者逐个点名 + 清单与全仓双向比对（sync-down.ts 是定义不算）+ 缓存作废静态与真跑（正对照）
 node scripts/verify-sentence-lab.mjs              # 16   拆句训练主干判定索引同源（真转译跑出分歧）
 node scripts/verify-spelling-resume.mjs           # 24   拼写断点按词书分键 + 迁移 + 重置枚举
+node scripts/verify-spelling-logic.mjs            # 41   拼写题面词形/判分/排队（It’s 不剥成 Its、数字/纯标点不占格、limit 先截断后 markServed）+ importDirty 单次触发/空桶/切模式/逐词串播切句/提交重读撤销定时器/导入后重排/加载成功不弹 toast/完成页替换练习界面/空格下划线可见性接线
 node scripts/verify-video-lab.mjs                 # 154  视频精听：字幕三解析真跑 + 假 IDB 真跑存储层（封顶连媒体删/写失败不谎报/译文分键）+ LCS 跟读比对真跑 + **批次翻译调度真跑（批次切分/串行增量/坏批退队尾重试一次/连坏两批收摊/stopped 停取新活）** + **拖拽文件分类 splitImportFiles 真跑** + 六件套与页面接线 + **第 ⑩ 节把"用户视角"那批逐条钉住（两段式删课/删课清进度/选视频反馈与反悔/拖拽/课表展开/重播真播/释义卡进视野/单句与 A-B 双向互斥/已听与学完态/快捷键/课时取自 durationOf 而非整片时长/学习时长按课分键）**（⚠️ 剥注释走转译器，正则会被 accept="video/*" 骗到）
 node scripts/verify-chain-verdict.mjs             # 36   语块接龙判定三档（未判定不计分也不判错）
-node scripts/verify-ai-parse.mjs                  # 10   AI 解析约定：25 个解析点判空 + 无贪婪正则（元判据固件自证）
+node scripts/verify-ai-parse.mjs                  # 11   AI 解析约定：28 个解析点判空 + 无贪婪正则（元判据固件自证 + PatternReviewMode 具名站点）
 node scripts/verify-dashboard-glance.mjs            # 25   首页内容扩展：续学标签表穷举（/sentences 漏过）+ 三张横幅 0 义务整卡不渲染（待复习 / 纠偏待重考，行门控含第三张）+ 本周柱状日期与高度 + ?tab= 深链三道门（只认 MODES key / 不强进向导 / 走 enterMode 并抹参数）
 node scripts/verify-correction-notes.mjs            # 90   表达纠偏本：Markdown 表格抽取真跑（三源列序/表头噪声/错=对跳过）+ store 整段真跑（去重/review 记账/删除/只拒不裁/写失败可见）+ orderForDrill 排序真跑 + 三处收集接线 + 收藏页折叠列表 + 第 9 模式接线总闸（MODES 每个 key 必须有 TabsContent）与重考卡面契约（不写 SM-2、零 toast、干扰项取自整本）+ ⑦ 送进句子拼写（correctionToSpellingItem 真跑、两处入口接线、纠偏桶不许走词库加载路、空收藏也要有纠偏本入口）+ ⑨ 错点归纳（十类规则各自命中、规则顺序与证据优先级两条口径、计数之和=条目数、两处按类筛选接线）
 node scripts/verify-guard-shape.mjs                 # 7    元守卫：AST 扫全部 verify-*.mjs，抓"恒真断言"（`ok(/re/, src, name)` 这种第一实参是字面量本体的写法）与漏名字的断言；自带双向自证 + inspectedTotal 防空转
@@ -130,7 +133,9 @@ node scripts/verify-imports-tracked.mjs             # 8    仓库完整性：src
 node scripts/verify-app-version.mjs                 # 11   版本号单一载体：meta 注入链路 + 产物一致性（产物段先 build:web）
 node scripts/verify-brand-fonts.mjs                 # 35   品牌字体与中文自托管：7 条 @font-face（Noto 4 条不带 unicode-range、一家族贯通中英文）+ 品牌英文 3 条备用 + 字体栈以 Noto 开头且不含品牌英文字体 + 外链/favicon 零残留 + woff2 结构自洽（产物段先 build:web）
 npm run verify:rv-articles                        # 104  复习词汇文章：选词/分篇/覆盖出队/体裁主题/原位重写（含旧 slice(0,10) 正对照）
-npm run verify:study-credit                       # 80   学习时长记账：闸门真跑 + 提交点接线（含精听按课去重）+ 口径双向锁（本地动作不许套闸门，含短语闪卡翻面直计时）
+npm run verify:study-credit                       # 89   学习时长记账：闸门真跑 + 提交点接线（含精听按课去重 + /think 模式复习迁移判定）+ 口径双向锁（本地动作不许套闸门，含短语闪卡翻面直计时）
+node scripts/verify-think-patterns.mjs            # 529  /think 模式复习：8 模式内容结构 + 纯调度/AI helper 真转译真跑 + 会话状态机真跑（回队/收摊/去重/计数）+ store 读盘（含残缺记录）+ 五 tab 接入 + 13 条变异（每日上限/回队/repetitions/mastered/同步/计时/校验/排序/轮换/推进越界/清副本/计数）
+node scripts/verify-think-stream-abort.mjs        # 36   /think 流式中断：四个提交流 abort 前序/循环断流/catch 静默/finally 身份锁 + 六条换题/删题路径 + 卸载清理 + 检测历史防误留档；9 条变异逐条验红
 npm run verify:all                                # —    收尾必跑：typecheck + 全部 verify-*（自动发现，新增守卫不用登记）
 ```
 
@@ -307,7 +312,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 | 弹窗打开时按 Esc 连带退出当前流程 | Radix 在 document 冒泡阶段**同步 flush** 关弹窗 | 键盘监听用捕获阶段 `addEventListener('keydown', fn, true)` |
 | 按词累积的缓存撑爆 localStorage | 只增不减，写失败后整份静默丢失（症状是"刷新后数据没了"） | **分两类**：AI 派生可重算 → `cappedPut` FIFO 封顶；用户创作不可重算 → `appendCapped` **只拒绝新增、绝不裁剪** |
 | 落盘失败完全无声 | `safeStorage.setItem` 过去 `catch {}` 吞掉配额错误 | 现在返回布尔（`safe-storage.ts:175`）；写用户清单的 effect 一律 `if (!persistJson(k, x)) warnStorageFull()`（全站 60s 去抖一条 toast，`capped-cache.ts:48`） |
-| AI 生成内容"格式异常"误报 | `use-ai` 失败返回 `''`，页面把空串当解析失败 | **先判 `result.trim()` 为空 → 服务不可用**；解析一律 `extractJson`，勿用贪婪正则。全仓 25 个解析点由 `npm run verify:ai-parse` 扫 |
+| AI 生成内容"格式异常"误报 | `use-ai` 失败返回 `''`，页面把空串当解析失败 | **先判 `result.trim()` 为空 → 服务不可用**；解析一律 `extractJson`，勿用贪婪正则。全仓 28 个解析点由 `npm run verify:ai-parse` 扫 |
 | 功能"两端都写了却点不到" | 组件与云函数都存在，但没有页面挂载；静态检查看不出断线 | 挂载点写进回归断言（`verify-overlay-fit` ⑤ 剥注释全仓扫描：`<Toaster />` 只许挂 `src/index.tsx` 一处、Layout 必须渲染 Header）；新功能入口必须真机/真页面验证可达 |
 | 提交类操作谎报成功 | 后端只有一个 boolean，503（通道未配）与网络失败都归成"没成功"，UI 一律 toast 成功 | 结果分档返回，UI 按档给不同提示；失败保留条目并提供重试入口 |
 | 全站 toast 提示不出现 | `ui/sonner.tsx` 有 `Toaster` 但没人挂载 | 唯一出口在 `src/index.tsx`；新页面不要再挂第二个，`verify-overlay-fit` ⑤ 剥注释全仓扫描会断言 |
@@ -348,13 +353,15 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening **31** · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · backup-idb 16 · cloud-sync 70 · sentence-lab 16 · spelling-resume 24 · **video-lab 154** · ai-parse 10 · app-version 11 · brand-fonts 35 · char-hygiene 9 · rv-articles 104 · study-credit **80** · chain-verdict 36 · dashboard-glance 25 · correction-notes **90** · guard-shape **7** · **interaction-fx 107** · **imports-tracked 8** · **settings-themes 35**；合计 **8,093**，2026-10-21 第 52 测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 489 · vocab-caches 85 · tts-progress 6175 · tts-hardening **31** · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · **shadowing-asr 51** · **speech-analysis 39** · backup-idb 16 · cloud-sync **73** · sentence-lab 16 · spelling-resume 24 · spelling-logic **41** · **video-lab 154** · ai-parse **11** · app-version 11 · brand-fonts 35 · char-hygiene 9 · rv-articles 104 · study-credit **89** · **think-patterns 529** · think-abort **36** · chain-verdict 36 · dashboard-glance 25 · correction-notes **90** · guard-shape **7** · **interaction-fx 107** · **imports-tracked 8** · **settings-themes 35**；合计 **8,802**，2026-10-23 第 59 测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs` + `node scripts/verify-char-hygiene.mjs`（清了坏字符还要递增 `CACHE_VERSION`，否则老缓存挡住修复）
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过 `android/app/build.gradle` 的 `abiFilters` 或任何打包脚本 → 至少跑一次 `npm run package:apk:emu`（它收尾会读 APK 自己的 zip 中央目录自证：x86_64 的 sherpa `.so` 在、www/books/piper/tts 资产在、arm 0 条）；模拟器装机走 `node scripts/phone-emu.mjs check`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级**或内置引擎的入队顺序** → `verify-tts-hardening`（裸跑，它没有 npm script）；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`
 - [ ] 改过 `ui/dialog` 基座或设置面板 → `verify-overlay-fit`
+- [ ] 改过影子跟读录音/转写链路（`ShadowingPage` / `asr-service` / `transcribe.js`）→ `node scripts/verify-shadowing-asr.mjs`；真链路用 `node scripts/probe-shadowing-asr.mjs --via-function`（需要 Key）。改过离线跟读分析（`speech-analysis.ts` / `wav.ts` / `SpeakBack`）→ `node scripts/verify-speech-analysis.mjs`
+- [ ] 改过拼写题面/判分/排队（`spelling-words.ts`、`planSessionQueue`、`importDirty` 接线、空桶/切模式）→ `node scripts/verify-spelling-logic.mjs` + `node scripts/verify-spelling-resume.mjs`
 - [ ] 改过 `src/index.css` 的 `--fx-*` 段 / `ui/button` 基座 / `lib/press-fx.ts` / `CelebrateLayer` / 任何练习页的按钮 class → `node scripts/verify-interaction-fx.mjs` + `node scripts/walk-interaction-fx.mjs`（改基座=全站共享，务必再跑 `verify:all`）；设备侧凭据走 `node scripts/check-interaction-on-phone.mjs --port 9226 --tier strong`（模拟器）/ `--port 9223`（真机）——**`:active` 在 Android WebView 的触摸下不但按下期间不生效**（设备级真触摸实测：pointerdown 到了、涟漪建了、整页 :active 恒 0），**抬手后还会被平台多按住 ~400ms**（真机 2.0.93 实测，按钮回弹晚），所以 `:active` 只在 `@media (hover: hover) and (pointer: fine)` 里留、由委托层挂 `data-pressing` 投递触摸手感，这条通道量的就是它；`--tier default` 挑的正是**默认可点层**那一片（只挑没写 `data-press` 的裸元素），批 2 之后三档都要跑
 - [ ] 改过 `use-tts` 的**取消/降级链**（speak/cancel/stopAudio/playUrl/playChunkWithFallback）→ `node scripts/verify-tts-hardening.mjs`（E 节 10 条）+ 设备取证 `node scripts/walk-quickcard-tts.mjs --port 9226 --level cet4 --fixture <词表.json>`（静态守卫看不见"被自己掐掉"这类竞态，只有真装机能看见）
 - [ ] 改过 `functions/` → 想清楚网页/APK/桌面三条路；改过 index.html 版本 meta 或 `version.properties` → `node scripts/verify-app-version.mjs`（产物段先 build:web）
