@@ -760,7 +760,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
             className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
             <Repeat className="size-4 mr-2" />
-            模式复习
+            模式训练
           </TabsTrigger>
           <TabsTrigger
             value="detector"
@@ -792,7 +792,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
           </TabsTrigger>
         </TabsList>
 
-        {/* Pattern Review Tab — 五个 tab 里的第一位，默认落在这里 */}
+        {/* Pattern Training Tab — 五个 tab 里的第一位，默认落在这里 */}
         <TabsContent value="patterns" className="space-y-6 mt-6">
           <PatternReviewMode />
         </TabsContent>

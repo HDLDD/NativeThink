@@ -86,7 +86,7 @@ export function PatternOverview({
     ? stats.mastered === THINK_PATTERNS.length
       ? `${THINK_PATTERNS.length} 个模式都已掌握`
       : '今天已完成，下次到期后再来'
-    : `开始今日复习（${dueQueue.length}）`;
+    : `开始今日训练（${dueQueue.length}）`;
 
   /* 首屏只给“最该练的 3 个”：体检建议 → 薄弱 → 到期；全部 12 个折叠在后面。 */
   const recommendedIds = (diagnostic?.recommendedPatternIds ?? [])
@@ -120,7 +120,7 @@ export function PatternOverview({
   const heroStartable = !empty || heroRecommended;
   const heroLabel = heroStartable
     ? heroQueueCount > 1
-      ? `开始今日复习（${heroQueueCount}）`
+      ? `开始今日训练（${heroQueueCount}）`
       : '开始这个模式'
     : mainLabel;
 
@@ -245,7 +245,7 @@ export function PatternOverview({
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
             Session Complete
           </p>
-          <CardTitle className="text-2xl font-black italic tracking-tight">本轮复习完成</CardTitle>
+          <CardTitle className="text-2xl font-black italic tracking-tight">本轮训练完成</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-2">
@@ -265,9 +265,9 @@ export function PatternOverview({
       {/* 标题 + 状态；主按钮只放在下面的焦点卡里 */}
       <div className="min-w-0">
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">
-          Pattern Review
+          Pattern Training
         </p>
-        <h2 className="text-2xl font-black italic tracking-tight text-foreground">模式复习</h2>
+        <h2 className="text-2xl font-black italic tracking-tight text-foreground">模式训练</h2>
         <p className="text-sm font-medium text-muted-foreground mt-1 break-words">
           对比 → 识别 → 迁移 · 按 SM-2 安排下一次
         </p>

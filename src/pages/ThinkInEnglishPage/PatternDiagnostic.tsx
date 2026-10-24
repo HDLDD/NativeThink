@@ -200,8 +200,8 @@ export function PatternDiagnostic({
           <div className="flex flex-col sm:flex-row gap-2">
             <Button className="rounded-full sm:flex-1" onClick={handleStart}>
               {recommended.length > 0
-                ? `按建议开始复习（${recommended.length}）`
-                : '开始今日复习'}
+                ? `按建议开始训练（${recommended.length}）`
+                : '开始今日训练'}
             </Button>
             <Button variant="outline" className="rounded-full sm:flex-1" onClick={onExit}>
               返回概览

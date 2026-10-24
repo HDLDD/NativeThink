@@ -211,7 +211,7 @@ export function PatternReviewSession({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">
-            Pattern Review
+            Pattern Training
           </p>
           <h2 className="text-2xl font-black italic tracking-tight text-foreground break-words">
             {pattern.name}

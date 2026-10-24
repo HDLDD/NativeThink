@@ -34,7 +34,7 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 阅读 `/articles` | [modules/reading.md](./docs/modules/reading.md) | 五种来源一套阅读器、运行时全文升级、**两套切章必须对齐**、复习词文章词表是派生的（删文章即回词表） |
 | 朗读 TTS | [modules/tts.md](./docs/modules/tts.md) | 引擎降级链、切片 180 由上游 200 硬上限钉死、**取消按代际 chainGenRef（布尔会被旧链复活）**、闪退自愈、音色四处同步、云端缓存 FIFO 400 条 + Blob URL 用完即 revoke、**系统语音的插件边界（async 别 return 插件对象，否则永久挂死）** |
 | AI 服务与端侧模型 | [modules/ai-services.md](./docs/modules/ai-services.md) | Key 优先级、服务端免费档回退、端侧回落条件、`extractJson` 规定由 `verify:ai-parse` 全仓扫、**中继防滥用守卫（Origin/限流/形状校验/出厂 Key 用量，无守卫覆盖）** |
-| 母语思维 `/think` | [modules/think-in-english.md](./docs/modules/think-in-english.md) | 5 tab（第五个「模式复习」：12 个思维模式 × 3 识别 + 3 迁移（2 新情境 + 1 换措辞），四层地图、12 题体检、SM-2 排期、延迟 7/21/60 天标识、薄弱报告）；换题不 abort 导致流式内容串题 |
+| 母语思维 `/think` | [modules/think-in-english.md](./docs/modules/think-in-english.md) | 5 tab（第五个「模式训练」：12 个思维模式 × 3 识别 + 3 迁移（2 新情境 + 1 换措辞），四层地图、12 题体检、SM-2 排期、延迟 7/21/60 天标识、薄弱报告）；换题不 abort 导致流式内容串题 |
 | 语块 `/chunks` | [modules/chunks.md](./docs/modules/chunks.md) | 最大单文件；963 条（**手改写进 `chunks-extra.ts`**）、练习池走 `useStableShuffle`、**同短语多登记 → 读取层去重（筛选后、洗牌前）**、短语库按字母段折叠（4,805→1,148 元素）、接龙判定三档（未判定不送分）；**短语 SM-2 进度 store 三处共享**（本页「短语复习」「闪卡」+ 词汇页「短语闪卡」） |
 | 对话 `/conversation` | [modules/conversation.md](./docs/modules/conversation.md) | 场景选择↔聊天；`mountedRef` 每轮挂载需复位（dev 下曾恒 false 让对话永远空白） |
 | 影子跟读 `/shadowing` | [modules/shadowing.md](./docs/modules/shadowing.md) | 连播/循环/录音评分（MediaRecorder→16k WAV→服务端 ASR→词级+语速；离线音量/停顿/音高兜底）；完成标记按**合并索引**存，索引换算单点在 `shadowing-progress.ts` |
@@ -133,8 +133,8 @@ node scripts/verify-imports-tracked.mjs             # 8    仓库完整性：src
 node scripts/verify-app-version.mjs                 # 11   版本号单一载体：meta 注入链路 + 产物一致性（产物段先 build:web）
 node scripts/verify-brand-fonts.mjs                 # 35   品牌字体与中文自托管：7 条 @font-face（Noto 4 条不带 unicode-range、一家族贯通中英文）+ 品牌英文 3 条备用 + 字体栈以 Noto 开头且不含品牌英文字体 + 外链/favicon 零残留 + woff2 结构自洽（产物段先 build:web）
 npm run verify:rv-articles                        # 104  复习词汇文章：选词/分篇/覆盖出队/体裁主题/原位重写（含旧 slice(0,10) 正对照）
-npm run verify:study-credit                       # 89   学习时长记账：闸门真跑 + 提交点接线（含精听按课去重 + /think 模式复习迁移判定）+ 口径双向锁（本地动作不许套闸门，含短语闪卡翻面直计时）
-node scripts/verify-think-patterns.mjs            # 810  /think 模式复习：12 模式内容结构（四层）+ 纯调度/AI helper 真转译真跑 + 会话状态机真跑（回队/收摊/去重/计数）+ store 读盘（含残缺记录/体检记录/校准老记录）+ 五 tab 接入 + 四层地图/闭卷迁移/12 题体检/换措辞/延迟标识/自评校准 + 18 条变异（每日上限/回队/repetitions/mastered/同步/计时/校验/排序/轮换/推进越界/清副本/计数/闭卷阈值/诊断计分/诊断队列/延迟阈值/校准不计入）
+npm run verify:study-credit                       # 89   学习时长记账：闸门真跑 + 提交点接线（含精听按课去重 + /think 模式训练迁移判定）+ 口径双向锁（本地动作不许套闸门，含短语闪卡翻面直计时）
+node scripts/verify-think-patterns.mjs            # 810  /think 模式训练：12 模式内容结构（四层）+ 纯调度/AI helper 真转译真跑 + 会话状态机真跑（回队/收摊/去重/计数）+ store 读盘（含残缺记录/体检记录/校准老记录）+ 五 tab 接入 + 四层地图/闭卷迁移/12 题体检/换措辞/延迟标识/自评校准 + 18 条变异（每日上限/回队/repetitions/mastered/同步/计时/校验/排序/轮换/推进越界/清副本/计数/闭卷阈值/诊断计分/诊断队列/延迟阈值/校准不计入）
 node scripts/verify-think-stream-abort.mjs        # 36   /think 流式中断：四个提交流 abort 前序/循环断流/catch 静默/finally 身份锁 + 六条换题/删题路径 + 卸载清理 + 检测历史防误留档；9 条变异逐条验红
 npm run verify:all                                # —    收尾必跑：typecheck + 全部 verify-*（自动发现，新增守卫不用登记）
 ```
