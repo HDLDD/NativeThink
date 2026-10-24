@@ -79,6 +79,13 @@ export function PatternReviewMode() {
     startWith(queue);
   };
 
+  /** 自由训练：用户明确指定模式，不受到期队列与每日新名额限制 */
+  const startPractice = (patternIds: string[]) => {
+    if (!patternIds.length) return;
+    setSession(createPatternSession(patternIds.slice(0, 10)));
+    setMode('review');
+  };
+
   /** 体检建议先练的模式：去掉已掌握/今天已通过；全被过滤就回落到正常到期队列 */
   const startFromDiagnostic = (recommendedPatternIds: string[]) => {
     const now = Date.now();
@@ -196,6 +203,7 @@ export function PatternReviewMode() {
       diagnostic={diagnostic}
       onStart={start}
       onDiagnostic={() => setMode('diagnostic')}
+      onPractice={startPractice}
       onBack={() => setMode('overview')}
     />
   );

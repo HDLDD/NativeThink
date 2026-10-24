@@ -2,7 +2,7 @@
  * verify-think-patterns.mjs — /think 模式库的数据契约（第一批）。
  *
  * 模式库是「思维模式复习」的内容底座（docs/superpowers/specs/2026-10-24-think-pattern-core-v1-design.md）：
- * 12 个模式（四层），每个模式 3 道识别题 + 3 个迁移场景（2 新情境 + 1 换措辞），共 72 个内容项。
+ * 12 个模式（四层），每个模式 5 道识别题 + 5 个迁移场景（3 新情境 + 2 换措辞），共 120 个内容项。
  * 识别题的三个选项都必须**语法成立**，差在思维模式 —— 所以这里钉结构（数量 / 下标 / 唯一性 /
  * 非空 / 答案分布），不钉「哪个选项更像母语者」的语义判断（那由内容评审负责）。
  *
@@ -98,7 +98,7 @@ const contentIds = list.flatMap((p) => [
   ...asArray(p?.recognition).map((q) => q?.id),
   ...asArray(p?.transfer).map((t) => t?.id),
 ]);
-check(contentIds.length === 72, '数据：内容项共 72 个（36 识别 + 36 迁移）', `实际 ${contentIds.length}`);
+check(contentIds.length === 120, '数据：内容项共 120 个（60 识别 + 60 迁移）', `实际 ${contentIds.length}`);
 check(contentIds.every(filled), '数据：识别题/迁移题 id 全部非空',
   contentIds.filter((id) => !filled(id)).join(','));
 check(new Set(contentIds).size === contentIds.length, '数据：内容项 id 全局唯一',
@@ -116,7 +116,7 @@ for (const p of list) {
 
   const recognition = asArray(p?.recognition);
   check(Array.isArray(p?.recognition), `数据：${pid} recognition 是数组`, typeof p?.recognition);
-  check(recognition.length === 3, `数据：${pid} 恰好 3 道识别题`, `实际 ${recognition.length}`);
+  check(recognition.length === 5, `数据：${pid} 恰好 5 道识别题`, `实际 ${recognition.length}`);
   for (const q of recognition) {
     const qid = filled(q?.id) ? q.id : `${pid}/(缺 id)`;
     const options = asArray(q?.options);
@@ -136,12 +136,14 @@ for (const p of list) {
 
   const transfer = asArray(p?.transfer);
   check(Array.isArray(p?.transfer), `数据：${pid} transfer 是数组`, typeof p?.transfer);
-  check(transfer.length === 3, `数据：${pid} 恰好 3 道迁移题`, `实际 ${transfer.length}`);
+  check(transfer.length === 5, `数据：${pid} 恰好 5 道迁移题`, `实际 ${transfer.length}`);
   const transferKinds = transfer.map((t) => t?.kind ?? 'scenario');
   check(transferKinds.every((kind) => kind === 'scenario' || kind === 'wording'),
     `数据：${pid} 迁移 kind 合法`, transferKinds.join(','));
-  check(transferKinds.filter((kind) => kind === 'wording').length === 1,
-    `数据：${pid} 恰好 1 条换措辞迁移`, transferKinds.join(','));
+  check(transferKinds.filter((kind) => kind === 'wording').length === 2,
+    `数据：${pid} 恰好 2 条换措辞迁移`, transferKinds.join(','));
+  check(transferKinds.filter((kind) => kind === 'scenario').length === 3,
+    `数据：${pid} 恰好 3 条新情境迁移`, transferKinds.join(','));
   for (const t of transfer) {
     const tid = filled(t?.id) ? t.id : `${pid}/(缺 id)`;
     check(filled(t?.situation) && filled(t?.rubricFocus) && filled(t?.why) && filled(t?.modelAnswer),
@@ -170,8 +172,8 @@ for (const item of asArray(diagnosticItems)) {
 /* 固定顺序展示时，答案不能全压在一个下标上，否则用户能靠位置蒙对。 */
 const allChoices = list.flatMap((p) => asArray(p?.recognition));
 const answerCounts = ANSWER_INDICES.map((index) => allChoices.filter((q) => q?.answer === index).length);
-check(allChoices.length === 36 && answerCounts.every((count) => count === 12),
-  '数据：36 道识别题的答案下标均衡分布（0/1/2 各 12 道）', answerCounts.join('/'));
+check(allChoices.length === 60 && answerCounts.every((count) => count === 20),
+  '数据：60 道识别题的答案下标均衡分布（0/1/2 各 20 道）', answerCounts.join('/'));
 
 /* 逐项说明：每个选项都要说清“这句英文怎么样”，不能只给一个整体解释。 */
 const optionNotes = mod.THINK_PATTERN_OPTION_NOTES;
@@ -199,7 +201,7 @@ for (const q of allChoices) {
   });
 }
 check(noteKeys.length === allChoices.length && allChoices.every((q) => noteKeys.includes(q.id)),
-  '数据：逐项说明覆盖全部 36 道识别题', `keys=${noteKeys.length}`);
+  '数据：逐项说明覆盖全部 60 道识别题', `keys=${noteKeys.length}`);
 check(noteIssues.length === 0, '数据：每个选项都有逐项说明且 best 落在正确项',
   noteIssues.slice(0, 10).join(' | '));
 
@@ -373,6 +375,20 @@ check(JSON.stringify(diagnosticQueue) === JSON.stringify(['subject-first']),
   '诊断队列：去重并跳过已掌握/今天已通过', JSON.stringify(diagnosticQueue));
 check(pure.buildDiagnosticQueue(EXPECTED_PATTERN_IDS, {}, today, 10).length === 10,
   '诊断队列：最多 10 个模式');
+
+/* 自由训练：挑练得最少的模式，平手按数据顺序；不受到期限制。 */
+const practiceProgress = {
+  'subject-first': p('subject-first', { transferAttempts: 3 }),
+  'verb-driven': p('verb-driven', { transferAttempts: 0 }),
+  'end-focus': p('end-focus', { transferAttempts: 1 }),
+};
+const practiceOrder = pure.pickPracticePatternIds(patterns.slice(0, 3), practiceProgress, 3);
+check(practiceOrder[0] === 'verb-driven' && practiceOrder[1] === 'end-focus',
+  '自由训练：练得最少的排前面', JSON.stringify(practiceOrder));
+check(pure.pickPracticePatternIds(patterns, {}, 5).length === 5,
+  '自由训练：混合队列默认取 5 个');
+check(pure.pickPracticePatternIds(patterns, {}, 0).length === 0,
+  '自由训练：limit=0 返回空队列');
 
 /* 延迟探测：7/21/60 天阈值；没有迁移通过记录时不标延迟。 */
 const probeBase = { firstReviewedAt: now, transferPasses: 1 };
@@ -1064,6 +1080,14 @@ check(/今日先练/.test(overviewSrc) && /hero\.name/.test(overviewSrc) &&
   'UI：概览只有一个「今日先练」焦点卡；体检/地图/模式库降为文字入口');
 check(/到期 \{stats\.due\} · 今日已练 \{stats\.reviewedToday\}/.test(overviewSrc),
   'UI：概览统计收成一行，不再占三张卡');
+check(/自由训练/.test(overviewSrc) && /onPractice/.test(overviewSrc) && /混合训练/.test(overviewSrc),
+  'UI：概览有自由训练入口与混合训练按钮');
+check(/onPractice\(\[pattern\.id\]\)/.test(overviewSrc),
+  'UI：自由训练可任选单个模式');
+check(/再练一组（5 个）/.test(overviewSrc) && /onPractice\(practiceIds\)/.test(overviewSrc),
+  'UI：完成页可直接再练一组');
+check(/startPractice/.test(modeCode) && /onPractice=\{startPractice\}/.test(modeCode),
+  'UI：自由训练接到独立队列（不经过 dueQueue 过滤）');
 check(/isClosedBook\(progress\)/.test(sessionSrc) && /closedBook \?/.test(sessionCode) &&
   /这次闭卷/.test(sessionSrc),
   'UI：迁移卡按 isClosedBook 切换闭卷提示');
@@ -1492,6 +1516,17 @@ await runPureMutation(
     patternId: 'subject-first', recognitionCorrect: true, transferPassed: true,
     source: 'ai', answer: 'ok', feedback: 'x', confidence: 3, today,
   }, now).calibrationAttempts === 0,
+);
+
+// M19：自由训练不挑练得最少的 —— 永远从数据第一条开始。
+await runPureMutation(
+  'M19 自由训练不挑最少练的',
+  '(progress[a.id]?.transferAttempts ?? 0) - (progress[b.id]?.transferAttempts ?? 0)',
+  '(progress[b.id]?.transferAttempts ?? 0) - (progress[a.id]?.transferAttempts ?? 0)',
+  (m) => m.pickPracticePatternIds(patterns, {
+    'subject-first': p('subject-first', { transferAttempts: 5 }),
+    'verb-driven': p('verb-driven', { transferAttempts: 0 }),
+  }, 2)[0] === 'subject-first',
 );
 
 console.log('');

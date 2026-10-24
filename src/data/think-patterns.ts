@@ -943,6 +943,545 @@ modelAnswer: "I bought it, but I haven't used it yet.",
   },
 ];
 
+const THINK_PATTERN_EXTRA_RECOGNITION: Record<string, IThinkPatternChoice[]> = {
+  'subject-first': [
+    {
+      id: 'subject-first-r4',
+      prompt: '你想说“这个方案我们下周再定”。',
+      options: [
+        "We'll decide on this plan next week.",
+        "This plan we'll decide next week.",
+        'This plan will be decided next week.',
+      ],
+      answer: 0,
+      explanation: '正确项先立主语 we，再给动作 decide；另外两句把 this plan 当话题提前，或改用被动。',
+    },
+    {
+      id: 'subject-first-r5',
+      prompt: '你想说“那本书我借给小李了”。',
+      options: [
+        'That book I lent to Xiao Li.',
+        'I lent that book to Xiao Li.',
+        'That book was lent to Xiao Li by me.',
+      ],
+      answer: 1,
+      explanation: '正确项先给主语 I；另外两句把书当话题提前，或把动作变成被动。',
+    },
+  ],
+  'verb-driven': [
+    {
+      id: 'verb-driven-r4',
+      prompt: '你想说“我们需要对预算做一次调整”。',
+      options: [
+        'We need to adjust the budget.',
+        'We need to make an adjustment to the budget.',
+        'We need to do an adjustment on the budget.',
+      ],
+      answer: 0,
+      explanation: '正确项直接用 adjust；`make an adjustment to` 自然但更正式，`do an adjustment on` 搭配不自然。',
+    },
+    {
+      id: 'verb-driven-r5',
+      prompt: '你想说“他对这个决定表示了反对”。',
+      options: [
+        'He expressed opposition to the decision.',
+        'He opposed the decision.',
+        'He made an opposition against the decision.',
+      ],
+      answer: 1,
+      explanation: '正确项用 oppose 直接作动词；`expressed opposition to` 自然但更正式，`made an opposition against` 搭配不自然。',
+    },
+  ],
+  'end-focus': [
+    {
+      id: 'end-focus-r4',
+      prompt: '你想说“我昨天在车站遇到一个十年没见的老同学”。',
+      options: [
+        "I ran into an old classmate at the station yesterday — someone I hadn't seen in ten years.",
+        "I ran into an old classmate who I hadn't seen in ten years at the station yesterday.",
+        "An old classmate who I hadn't seen in ten years ran into me at the station yesterday.",
+      ],
+      answer: 0,
+      explanation: '正确项把长描述放到句尾；第二句把长从句塞在中间，第三句主语过长且焦点落在同学身上。',
+    },
+    {
+      id: 'end-focus-r5',
+      prompt: '你想说“最让我头疼的是他从来不回邮件”。',
+      options: [
+        'He never replies to emails, which gives me a headache.',
+        'What gives me the most trouble is that he never replies to emails.',
+        'His never replying to emails is what gives me the most trouble.',
+      ],
+      answer: 1,
+      explanation: '正确项用 What...is... 把新信息留在句尾；第一句重点落在头疼，第三句主语过长。',
+    },
+  ],
+  'soften-disagreement': [
+    {
+      id: 'soften-r4',
+      prompt: '同事说“我们下周就能上线”，你觉得太乐观。',
+      options: [
+        "I hope so, but I'm not sure we can make next week.",
+        "That's impossible.",
+        "You're too optimistic.",
+      ],
+      answer: 0,
+      explanation: '正确项先表达希望，再用 not sure 软否定；另外两句都把判断直接压在对方身上。',
+    },
+    {
+      id: 'soften-r5',
+      prompt: '朋友请你评价他刚写的歌，你觉得一般。',
+      options: [
+        "It's not good.",
+        "It's not really my thing, but I can hear the work you put in.",
+        'I hate it.',
+      ],
+      answer: 1,
+      explanation: '正确项先承认对方的投入，再用 not really my thing 软否定；另外两句太直接。',
+    },
+  ],
+  'be-concrete': [
+    {
+      id: 'concrete-r4',
+      prompt: '你想说“这个新功能很受欢迎”。',
+      options: [
+        'The new feature is very popular.',
+        'The new feature has many users.',
+        'The new feature was used 4,000 times in its first week.',
+      ],
+      answer: 2,
+      explanation: '正确项用第一周 4,000 次的具体数据证明受欢迎；另外两句只有空泛评价。',
+    },
+    {
+      id: 'concrete-r5',
+      prompt: '你想说“客服回复太慢”。',
+      options: [
+        'It took support three days to answer my email.',
+        'The support is very slow.',
+        'The support quality is poor.',
+      ],
+      answer: 0,
+      explanation: '正确项用三天这个具体时间说明慢；另外两句是抽象评价。',
+    },
+  ],
+  'make-logic-explicit': [
+    {
+      id: 'logic-r4',
+      prompt: '你想说“他没带伞，所以淋湿了”。',
+      options: [
+        "He didn't bring an umbrella. He got wet.",
+        "He didn't bring an umbrella, and he got wet.",
+        "He got wet because he didn't bring an umbrella.",
+      ],
+      answer: 2,
+      explanation: '正确项用 because 明确因果；另外两句只是并列，关系靠猜。',
+    },
+    {
+      id: 'logic-r5',
+      prompt: '你想说“虽然价格高，但质量很好”。',
+      options: [
+        "Even though it's expensive, the quality is excellent.",
+        "It's expensive. The quality is excellent.",
+        "It's expensive, and the quality is excellent.",
+      ],
+      answer: 0,
+      explanation: '正确项用 even though 明确转折；另外两句没有把让步关系说出来。',
+    },
+  ],
+  'polite-request': [
+    {
+      id: 'polite-r4',
+      prompt: '你想请同事把会议纪要发你。',
+      options: [
+        'Send me the meeting notes.',
+        'You should send me the meeting notes.',
+        'Could you send me the meeting notes when you have a chance?',
+      ],
+      answer: 2,
+      explanation: '正确项用 could you + 时间缓冲；另外两句是命令或施压。',
+    },
+    {
+      id: 'polite-r5',
+      prompt: '你想请室友把音乐关小。',
+      options: [
+        'Would you mind turning the music down a little?',
+        'Turn the music down.',
+        'The music is too loud.',
+      ],
+      answer: 0,
+      explanation: '正确项用 would you mind + a little，礼貌且明确；第二句是命令，第三句只是陈述。',
+    },
+  ],
+  'fill-references': [
+    {
+      id: 'ref-r4',
+      prompt: '朋友问你把伞放哪了，你想说“放门口了”。',
+      options: [
+        'I put them at the door.',
+        'I put it there.',
+        'I put it at the door.',
+      ],
+      answer: 2,
+      explanation: '伞是单数，正确项用 it 并补出地点；them 指复数，there 虽能懂但不如 at the door 明确。',
+    },
+    {
+      id: 'ref-r5',
+      prompt: '你想说“我给他打了电话，但他没接”。',
+      options: [
+        "I called him, but he didn't answer.",
+        "I called, but he didn't answer.",
+        "I called him, but didn't answer.",
+      ],
+      answer: 0,
+      explanation: '正确项把 called 的宾语 him 和后半句主语 he 都补出来；第二句省了宾语，第三句省了主语，意思会漂。',
+    },
+  ],
+  'hedge-stance': [
+    {
+      id: 'hedge-r4',
+      prompt: '你想说“这个方案可能会超预算”。',
+      options: [
+        'This plan will go over budget.',
+        'This plan could go over budget.',
+        'This plan is going to ruin the budget.',
+      ],
+      answer: 1,
+      explanation: '预测超预算用 could 更稳；will 把预测说成确定，ruin 又过度。',
+    },
+    {
+      id: 'hedge-r5',
+      prompt: '你想说“从数据看，用户似乎更在意速度”。',
+      options: [
+        'Users care more about speed.',
+        'Users always care more about speed.',
+        'Users seem to care more about speed.',
+      ],
+      answer: 2,
+      explanation: 'seem to 明示这是从数据看出的推断；第一句像事实断言，always 过度绝对。',
+    },
+  ],
+  'register-shift': [
+    {
+      id: 'register-r4',
+      prompt: '你在团队群里说“我们下午过一下这份文档”。',
+      options: [
+        'We will conduct a review of the document this afternoon.',
+        "We'll go over the document this afternoon.",
+        'We shall undertake a review of the document this afternoon.',
+      ],
+      answer: 1,
+      explanation: '团队群是即时沟通，go over 最自然；conduct a review 太正式，shall undertake 过于公文。',
+    },
+    {
+      id: 'register-r5',
+      prompt: '你在给客户的正式邮件里写“我们会尽快处理这个问题”。',
+      options: [
+        "We'll deal with it ASAP.",
+        "We'll handle this issue soon.",
+        'We will address this issue as soon as possible.',
+      ],
+      answer: 2,
+      explanation: '正式邮件里 address this issue as soon as possible 最匹配语域；ASAP 偏口语，handle soon 也可以但略随意。',
+    },
+  ],
+  'compliment-response': [
+    {
+      id: 'compliment-r4',
+      prompt: '同事夸你“你今天的演示很稳”。',
+      options: [
+        'No, I was nervous.',
+        "Thanks! I'm glad it came across that way.",
+        'It was nothing.',
+      ],
+      answer: 1,
+      explanation: '正确项先感谢再补充，最自然；第一句否定对方的判断，第三句仍是自贬。',
+    },
+    {
+      id: 'compliment-r5',
+      prompt: '客户夸你“你们团队很专业”。',
+      options: [
+        "We're just doing our job.",
+        "That's not true.",
+        "Thank you — I'll pass that on to the team.",
+      ],
+      answer: 2,
+      explanation: '正确项感谢并表示会转达，既接住赞美又自然；第一句转移话题，第二句直接反驳。',
+    },
+  ],
+  'result-state': [
+    {
+      id: 'result-r4',
+      prompt: '你想说“我把杯子摔碎了”。',
+      options: [
+        'I dropped the cup and it broke.',
+        'I broke the cup.',
+        'I made the cup broken by dropping it.',
+      ],
+      answer: 1,
+      explanation: '正确项用 break 直接承担动作+结果；第一句拆成两句，第三句结构绕。',
+    },
+    {
+      id: 'result-r5',
+      prompt: '你想说“她把衣服晾干了”。',
+      options: [
+        'She hung the clothes and they dried.',
+        'She made the clothes dry by hanging them.',
+        'She hung the clothes out to dry.',
+      ],
+      answer: 2,
+      explanation: '正确项用 hang out to dry 把动作和结果放进同一句；第一句拆开，第二句太绕。',
+    },
+  ],
+};
+
+const THINK_PATTERN_EXTRA_TRANSFER: Record<string, IThinkPatternTransfer[]> = {
+  'subject-first': [
+    {
+      id: 'subject-first-t4',
+      kind: 'scenario',
+      situation: '你想说“那份合同我明天签”。',
+      rubricFocus: '是否用 I 作主语、动作在前，而不是把合同放句首',
+      thinkingSteps: ['谁签？→ I', '动作和时间？→ will sign ... tomorrow', '对象？→ the contract'],
+      why: '中文把「那份合同」当话题；英文先立主语 I，再让 sign 接对象和时间。',
+      modelAnswer: "I'll sign the contract tomorrow.",
+    },
+    {
+      id: 'subject-first-t5',
+      kind: 'wording',
+      situation: '老板问你进度，你想说“这个风险我们已经处理了”。',
+      rubricFocus: '是否用 we 作主语、动作在前，而不是把这个风险放句首',
+      thinkingSteps: ['谁处理？→ We', '动作？→ have handled', '对象？→ the risk'],
+      why: '英文先立主语 we，再给完成时和对象；不要把 this risk 提到句首。',
+      modelAnswer: "We've already handled this risk.",
+    },
+  ],
+  'verb-driven': [
+    {
+      id: 'verb-driven-t4',
+      kind: 'scenario',
+      situation: '你想说“我们需要对流程做一次简化”。',
+      rubricFocus: '是否用 simplify 这类动词，而不是“make a simplification of”',
+      thinkingSteps: ['谁简化？→ We', '动作？→ simplify', '对象？→ the process'],
+      why: '「做一次简化」是名词化；英文用 simplify 直接承担动作。',
+      modelAnswer: 'We need to simplify the process.',
+    },
+    {
+      id: 'verb-driven-t5',
+      kind: 'wording',
+      situation: '你想说“他对这个提议做了拒绝”。',
+      rubricFocus: '是否用 reject 这类动词，而不是“make a rejection of”',
+      thinkingSteps: ['谁拒绝？→ He', '动作？→ reject', '对象？→ the proposal'],
+      why: '「做了拒绝」是名词化；英文用 reject 直接说动作。',
+      modelAnswer: 'He rejected the proposal.',
+    },
+  ],
+  'end-focus': [
+    {
+      id: 'end-focus-t4',
+      kind: 'scenario',
+      situation: '你想说“我昨天在会上遇到一个刚从国外回来的同事”。',
+      rubricFocus: '是否把长描述放到句尾，避免超长宾语或主语',
+      thinkingSteps: ['重点是什么？→ 遇到一个同事', '长描述放哪？→ who had just come back ... 放句尾', '时间地点？→ at the meeting yesterday'],
+      why: '把短主语和动作放前面，长描述留在句尾，句子更顺。',
+      modelAnswer: 'I met a colleague at the meeting yesterday who had just come back from abroad.',
+    },
+    {
+      id: 'end-focus-t5',
+      kind: 'wording',
+      situation: '你想说“最让我意外的是他当场就答应了”。',
+      rubricFocus: '是否用 What...was... 把新信息留在句尾',
+      thinkingSteps: ['重点是什么？→ 他当场答应', '用什么结构？→ What surprised me most was...', '新信息放哪？→ that 从句放句尾'],
+      why: '中文「最让我意外的是……」对应 What...was...；英文把新信息留到句尾。',
+      modelAnswer: 'What surprised me most was that he agreed on the spot.',
+    },
+  ],
+  'soften-disagreement': [
+    {
+      id: 'soften-t4',
+      kind: 'scenario',
+      situation: '同事问你对新流程的看法，你觉得交接有问题。',
+      rubricFocus: '是否先承认逻辑，再软否定并给讨论出口',
+      thinkingSteps: ['先给什么？→ I can see the logic', '再说什么？→ worried about the handoff', '给什么出口？→ can we talk through it?'],
+      why: '先承认再软否定，最后给讨论出口，比直接说有问题更容易推进。',
+      modelAnswer: "I can see the logic, but I'm a bit worried about the handoff — can we talk through it?",
+    },
+    {
+      id: 'soften-t5',
+      kind: 'wording',
+      situation: '朋友请你评价他刚写的歌，你觉得一般。',
+      rubricFocus: '是否先缓冲或承认，再软否定，而不是直接说难听',
+      thinkingSteps: ['先给什么？→ I can hear the work you put in', '再说什么？→ not really my thing', '不要做什么？→ 不要直接说难听'],
+      why: '先承认对方的投入，再用 not really my thing 软否定，关系不会被评价伤到。',
+      modelAnswer: "I can hear the work you put in, but it's not really my thing.",
+    },
+  ],
+  'be-concrete': [
+    {
+      id: 'concrete-t4',
+      kind: 'scenario',
+      situation: '你想说“这次活动来的人很多”。',
+      rubricFocus: '是否用具体人数或结果证明“很多”，而不是只说 many people',
+      thinkingSteps: ['哪个指标？→ attendance', '具体多少？→ more than 300', '怎么表述？→ More than 300 people came'],
+      why: '「很多人」是空泛评价；用具体人数，读者立刻知道规模。',
+      modelAnswer: 'More than 300 people came to the event.',
+    },
+    {
+      id: 'concrete-t5',
+      kind: 'wording',
+      situation: '你想说“这个工具帮我省了很多时间”。',
+      rubricFocus: '是否用具体时间对比说明省时，而不是只说 very helpful',
+      thinkingSteps: ['原来多久？→ an hour', '现在多久？→ ten minutes', '哪个动作？→ prep time'],
+      why: '用 from an hour to ten minutes 的具体对比，省时才有说服力。',
+      modelAnswer: 'This tool cuts my prep time from an hour to ten minutes.',
+    },
+  ],
+  'make-logic-explicit': [
+    {
+      id: 'logic-t4',
+      kind: 'scenario',
+      situation: '你想说“他没准备好，所以没通过”。',
+      rubricFocus: '是否用 because/so 明确因果，而不是两个短句并列',
+      thinkingSteps: ['结果是什么？→ He did not pass', '原因是什么？→ he was not prepared', '用什么词？→ because'],
+      why: '英文用 because 把结果和原因直接连起来，读者不用猜。',
+      modelAnswer: "He didn't pass because he wasn't prepared.",
+    },
+    {
+      id: 'logic-t5',
+      kind: 'wording',
+      situation: '你想说“虽然时间紧，但我们还是做完了”。',
+      rubricFocus: '是否用 even though/although 明确转折',
+      thinkingSteps: ['转折是什么？→ short on time but finished', '用什么词？→ even though', '结果？→ we finished it'],
+      why: '先给转折，再给结果；even though 把让步关系说清楚。',
+      modelAnswer: 'We finished it even though we were short on time.',
+    },
+  ],
+  'polite-request': [
+    {
+      id: 'polite-t4',
+      kind: 'scenario',
+      situation: '你想请朋友帮你带杯咖啡。',
+      rubricFocus: '是否用 could/would + 缓冲，而不是命令句',
+      thinkingSteps: ['先给什么？→ Could you', '请求是什么？→ grab me a coffee', '加什么缓冲？→ when you go out'],
+      why: 'Could you + 条件缓冲，把命令变成请求，朋友更容易答应。',
+      modelAnswer: 'Could you grab me a coffee when you go out?',
+    },
+    {
+      id: 'polite-t5',
+      kind: 'wording',
+      situation: '同事在忙，你想请他把文件发你。',
+      rubricFocus: '是否用 could + when you have a moment + 感谢',
+      thinkingSteps: ['先给什么？→ Could you', '加什么缓冲？→ when you have a moment', '结尾补什么？→ I would appreciate it'],
+      why: '时间缓冲 + 感谢，是英文请求的三件套；对方在忙时尤其需要。',
+      modelAnswer: "Could you send me the file when you have a moment? I'd appreciate it.",
+    },
+  ],
+  'fill-references': [
+    {
+      id: 'ref-t4',
+      kind: 'scenario',
+      situation: '朋友问你把书放哪了，你想说“放桌上了”。',
+      rubricFocus: '是否补出 I / it / the desk 的指代',
+      thinkingSteps: ['谁放？→ I', '放什么？→ it', '放哪？→ on the desk'],
+      why: '中文可以只说「放桌上了」；英文要把 I、it、the desk 都补出来。',
+      modelAnswer: 'I put it on the desk.',
+    },
+    {
+      id: 'ref-t5',
+      kind: 'wording',
+      situation: '你想说“我把报告发给她了”。',
+      rubricFocus: '是否补出 I / her / the report 的指代',
+      thinkingSteps: ['谁发？→ I', '发给谁？→ her', '发什么？→ the report'],
+      why: '英文要把主语、宾语和接收者都补出来，指代才清楚。',
+      modelAnswer: 'I sent her the report.',
+    },
+  ],
+  'hedge-stance': [
+    {
+      id: 'hedge-t4',
+      kind: 'scenario',
+      situation: '你想说“这个改动可能会影响老用户”。',
+      rubricFocus: '是否用 could/may 调节预测，而不是 will 一刀切',
+      thinkingSteps: ['这是事实还是预测？→ 预测', '用什么词？→ could / may', '影响谁？→ existing users'],
+      why: '预测影响用 could 更稳；will 会把推断说成确定。',
+      modelAnswer: 'This change could affect existing users.',
+    },
+    {
+      id: 'hedge-t5',
+      kind: 'wording',
+      situation: '你想说“从数据看，用户似乎更喜欢短一点的文章”。',
+      rubricFocus: '是否用 seem to/tend to 表达推断，而不是绝对断言',
+      thinkingSteps: ['这是事实还是推断？→ 从数据看出的推断', '用什么词？→ seem to / tend to', '比较对象？→ shorter articles'],
+      why: '从数据里看出来的是倾向，不是全称事实；seem to/tend to 更准确。',
+      modelAnswer: 'Users seem to prefer shorter articles.',
+    },
+  ],
+  'register-shift': [
+    {
+      id: 'register-t4',
+      kind: 'scenario',
+      situation: '你在团队群里说“我们明天对一下进度”。',
+      rubricFocus: '是否用口语化动词（sync/check in），而不是正式名词化',
+      thinkingSteps: ['场景是什么？→ 团队群', '动作是什么？→ sync / check in', '时间？→ tomorrow'],
+      why: '团队群是即时沟通，sync on progress 比 conduct a progress review 更自然。',
+      modelAnswer: "Let's sync on progress tomorrow.",
+    },
+    {
+      id: 'register-t5',
+      kind: 'wording',
+      situation: '你在正式邮件里请对方确认时间。',
+      rubricFocus: '是否用正式但自然的表达（confirm the time），不堆公文词',
+      thinkingSteps: ['场景是什么？→ 正式邮件', '动作是什么？→ confirm', '对象？→ the time'],
+      why: '正式邮件用 Please confirm the time 已经足够正式、清楚。',
+      modelAnswer: 'Please confirm the time at your earliest convenience.',
+    },
+  ],
+  'compliment-response': [
+    {
+      id: 'compliment-t4',
+      kind: 'scenario',
+      situation: '同事夸你“你今天的分享很清楚”。',
+      rubricFocus: '是否先感谢或接受，再补充，而不是自贬',
+      thinkingSteps: ['先接住什么？→ Thanks', '补充什么？→ glad it was clear', '不要做什么？→ 不要自贬'],
+      why: '先接受赞美，再补充一句，英文里最自然。',
+      modelAnswer: "Thanks! I'm glad it was clear.",
+    },
+    {
+      id: 'compliment-t5',
+      kind: 'wording',
+      situation: '客户夸你“你们处理得很快”。',
+      rubricFocus: '是否感谢 + 确认结果，不直接否定',
+      thinkingSteps: ['先接住什么？→ Thank you', '补充什么？→ glad we could help quickly', '不要做什么？→ 不要自贬'],
+      why: '感谢并确认结果，既谦虚又自然；直接说“没有”会让客户不好接。',
+      modelAnswer: "Thank you — I'm glad we could help quickly.",
+    },
+  ],
+  'result-state': [
+    {
+      id: 'result-t4',
+      kind: 'scenario',
+      situation: '你想说“我把电脑修好了”。',
+      rubricFocus: '是否用 fix 直接承担“修好”的结果，而不是逐字翻“把电脑弄好”',
+      thinkingSteps: ['动作是什么？→ fix', '结果是什么？→ the computer works', '用哪个动词？→ fix'],
+      why: '中文「修好了」是动作+结果；英文用 fix 直接承担结果。',
+      modelAnswer: 'I fixed the computer.',
+    },
+    {
+      id: 'result-t5',
+      kind: 'wording',
+      situation: '你想说“她把衣服晾干了”。',
+      rubricFocus: '是否用 hung ... out to dry / dried the clothes，而不是“made the clothes dry by hanging”',
+      thinkingSteps: ['动作是什么？→ hang out', '结果是什么？→ dry', '用哪个结构？→ hang ... out to dry'],
+      why: '英文用 hang the clothes out to dry 把动作和结果放进同一句，比 by hanging 更自然。',
+      modelAnswer: 'She hung the clothes out to dry.',
+    },
+  ],
+};
+
+for (const pattern of THINK_PATTERNS) {
+  pattern.recognition.push(...(THINK_PATTERN_EXTRA_RECOGNITION[pattern.id] ?? []));
+  pattern.transfer.push(...(THINK_PATTERN_EXTRA_TRANSFER[pattern.id] ?? []));
+}
+
 /**
  * 思维体检：每个模式抽一道识别题，按四层顺序排列。
  * 只用于选择接下来练哪些模式，不写 SM-2、不算“思维分”。
@@ -1167,3 +1706,128 @@ export const THINK_PATTERN_OPTION_NOTES: Record<string, IThinkPatternOptionNotes
     { tone: 'best', text: 'put + O + to sleep，动作和结果一体。' },
   ],
 };
+
+const THINK_PATTERN_EXTRA_NOTES: Record<string, IThinkPatternOptionNotes> = {
+  'subject-first-r4': [
+    { tone: 'best', text: '先立主语 we 和动作 decide，最直接。' },
+    { tone: 'ok', text: '口语里能听到话题前置，能懂；但 this plan 被提到句首，不如主动主谓直接。' },
+    { tone: 'ok', text: '语法成立，但用了被动，话题仍提前。' },
+  ],
+  'subject-first-r5': [
+    { tone: 'ok', text: '话题前置，口语能懂；但 book 被提到句首，不如 I lent... 直接。' },
+    { tone: 'best', text: 'I 作主语，动作和对象顺序清楚。' },
+    { tone: 'ok', text: '被动语法成立，但动作发出者被放到句尾。' },
+  ],
+  'verb-driven-r4': [
+    { tone: 'best', text: '直接用 adjust 承担动作，最干净。' },
+    { tone: 'ok', text: '搭配自然，但 make an adjustment to 更正式、更绕。' },
+    { tone: 'off', text: 'do an adjustment on 搭配不自然；用 adjust 或 make an adjustment to 更好。' },
+  ],
+  'verb-driven-r5': [
+    { tone: 'ok', text: '搭配自然，常见于正式书面；但 expressed opposition to 比 oppose 绕。' },
+    { tone: 'best', text: 'oppose 直接作动词，最干净。' },
+    { tone: 'off', text: 'make an opposition against 搭配不自然。' },
+  ],
+  'end-focus-r4': [
+    { tone: 'best', text: '长描述留在句尾，句子最顺。' },
+    { tone: 'ok', text: '语法成立，但长从句塞在中间，读起来绕。' },
+    { tone: 'ok', text: '语法成立，但主语过长，焦点落在同学身上。' },
+  ],
+  'end-focus-r5': [
+    { tone: 'ok', text: '语法成立，但重点落在 headache，不是句尾新信息。' },
+    { tone: 'best', text: 'What gives me... is... 把新信息留在句尾。' },
+    { tone: 'ok', text: '语法成立，但主语过长，头重脚轻。' },
+  ],
+  'soften-r4': [
+    { tone: 'best', text: '先表达希望，再用 not sure 软否定。' },
+    { tone: 'off', text: '太绝对，没有给对方留余地。' },
+    { tone: 'off', text: '直接评价对方，容易让人防御。' },
+  ],
+  'soften-r5': [
+    { tone: 'off', text: '太直接，容易伤人。' },
+    { tone: 'best', text: '先承认投入，再用 not really my thing 软否定。' },
+    { tone: 'off', text: '直接负面评价，太生硬。' },
+  ],
+  'concrete-r4': [
+    { tone: 'ok', text: '语法自然，但 very popular 太空泛。' },
+    { tone: 'ok', text: 'many users 仍然抽象，没有说明规模。' },
+    { tone: 'best', text: '用第一周 4,000 次的具体数据证明受欢迎。' },
+  ],
+  'concrete-r5': [
+    { tone: 'best', text: '用三天这个具体时间说明慢。' },
+    { tone: 'ok', text: '语法自然，但 very slow 太空泛。' },
+    { tone: 'ok', text: 'poor 是抽象评价，没有具体证据。' },
+  ],
+  'logic-r4': [
+    { tone: 'ok', text: '语法成立，但两个短句并列，因果没说出来。' },
+    { tone: 'ok', text: 'and 只表并列，不表因果。' },
+    { tone: 'best', text: 'because 明确因果。' },
+  ],
+  'logic-r5': [
+    { tone: 'best', text: 'even though 明确让步/转折。' },
+    { tone: 'ok', text: '语法成立，但转折没说出来。' },
+    { tone: 'ok', text: 'and 只表并列，不表转折。' },
+  ],
+  'polite-r4': [
+    { tone: 'off', text: '命令句，缺缓冲。' },
+    { tone: 'off', text: 'should 施压，像在命令。' },
+    { tone: 'best', text: 'could you + when you have a chance，给对方台阶。' },
+  ],
+  'polite-r5': [
+    { tone: 'best', text: 'would you mind + a little，礼貌且明确。' },
+    { tone: 'off', text: '命令句。' },
+    { tone: 'ok', text: '只是陈述音乐太吵，没明确提出请求。' },
+  ],
+  'ref-r4': [
+    { tone: 'off', text: '伞是单数，them 指复数。' },
+    { tone: 'ok', text: '语法成立，there 能懂；但 at the door 更明确。' },
+    { tone: 'best', text: 'it 指单数伞，地点也补清楚了。' },
+  ],
+  'ref-r5': [
+    { tone: 'best', text: 'called 的宾语 him 和后半句主语 he 都补出来了。' },
+    { tone: 'ok', text: 'called 可以不带宾语，但这里省掉 him 指代不如第一句清楚。' },
+    { tone: 'off', text: '后半句省了主语，容易被读成 I didn’t answer。' },
+  ],
+  'hedge-r4': [
+    { tone: 'ok', text: '语法自然，但 will 把预测说成确定。' },
+    { tone: 'best', text: 'could 给预测留余地。' },
+    { tone: 'off', text: 'ruin 过度绝对，还带情绪。' },
+  ],
+  'hedge-r5': [
+    { tone: 'ok', text: '语法自然，但像事实断言。' },
+    { tone: 'off', text: 'always 过度绝对。' },
+    { tone: 'best', text: 'seem to 明示这是推断。' },
+  ],
+  'register-r4': [
+    { tone: 'ok', text: '语法和搭配自然，但团队群里太正式。' },
+    { tone: 'best', text: 'go over 口语、直接，适合团队群。' },
+    { tone: 'off', text: 'shall undertake 过于公文。' },
+  ],
+  'register-r5': [
+    { tone: 'ok', text: 'ASAP 能懂，但正式邮件里偏口语。' },
+    { tone: 'ok', text: 'handle this issue soon 自然，但正式度略低。' },
+    { tone: 'best', text: 'address this issue as soon as possible 最匹配正式邮件。' },
+  ],
+  'compliment-r4': [
+    { tone: 'off', text: '直接否定对方的判断，让对话不好接。' },
+    { tone: 'best', text: '先感谢，再补充，最自然。' },
+    { tone: 'ok', text: 'it was nothing 仍是自贬，英文里偏生硬。' },
+  ],
+  'compliment-r5': [
+    { tone: 'ok', text: '语法自然，但把赞美推开了。' },
+    { tone: 'off', text: '直接反驳客户，失礼。' },
+    { tone: 'best', text: '感谢并表示会转达，既接住赞美又自然。' },
+  ],
+  'result-r4': [
+    { tone: 'ok', text: '语法成立，但动作和结果被拆成两句。' },
+    { tone: 'best', text: 'break 直接承担动作+结果。' },
+    { tone: 'off', text: 'made the cup broken by dropping it 结构不自然。' },
+  ],
+  'result-r5': [
+    { tone: 'ok', text: '语法成立，但结果被拆成两句。' },
+    { tone: 'ok', text: '语法成立，但 by hanging 结构绕。' },
+    { tone: 'best', text: 'hang ... out to dry 把动作和结果放进同一句。' },
+  ],
+};
+
+Object.assign(THINK_PATTERN_OPTION_NOTES, THINK_PATTERN_EXTRA_NOTES);

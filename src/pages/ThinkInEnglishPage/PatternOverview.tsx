@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { THINK_PATTERN_LAYERS, THINK_PATTERNS, type IThinkPattern } from '@/data/think-patterns';
 import type { IThinkPatternStats } from '@/lib/use-think-patterns';
 import {
+  pickPracticePatternIds,
   summarizeLayers,
   type IThinkPatternDiagnosticRecord,
   type IThinkPatternProgress,
@@ -36,6 +37,7 @@ export interface PatternOverviewProps {
   diagnostic: IThinkPatternDiagnosticRecord | null;
   onStart: (firstPatternId?: string) => void;
   onDiagnostic: () => void;
+  onPractice: (patternIds: string[]) => void;
   onBack: () => void;
 }
 
@@ -73,14 +75,17 @@ export function PatternOverview({
   diagnostic,
   onStart,
   onDiagnostic,
+  onPractice,
   onBack,
 }: PatternOverviewProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [showPractice, setShowPractice] = useState(false);
   const now = Date.now();
   const today = formatDate(new Date(now));
   const layerSummaries = summarizeLayers(THINK_PATTERNS, progress, LAYER_IDS, now, today);
+  const practiceIds = pickPracticePatternIds(THINK_PATTERNS, progress, 5);
   const empty = dueQueue.length === 0;
   const mainLabel = empty
     ? stats.mastered === THINK_PATTERNS.length
@@ -254,7 +259,14 @@ export function PatternOverview({
             <StatCell label="未通过" value={failed} />
           </div>
           <p className="text-sm text-muted-foreground break-words">下次到期：{nextDueText}</p>
-          <Button className="w-full sm:w-auto rounded-full" onClick={onBack}>返回概览</Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button className="w-full sm:w-auto rounded-full" onClick={() => onPractice(practiceIds)}>
+              再练一组（5 个）
+            </Button>
+            <Button variant="outline" className="w-full sm:w-auto rounded-full" onClick={onBack}>
+              返回概览
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -337,6 +349,10 @@ export function PatternOverview({
           思维体检{diagnostic ? ` · 上次 ${diagnostic.correct}/${diagnostic.total}` : ' · 12 题'}
         </button>
         <span aria-hidden>·</span>
+        <button type="button" className="hover:text-foreground" onClick={() => setShowPractice((prev) => !prev)}>
+          {showPractice ? '收起自由训练' : '自由训练'}
+        </button>
+        <span aria-hidden>·</span>
         <button type="button" className="hover:text-foreground" onClick={() => setShowMap((prev) => !prev)}>
           {showMap ? '收起模式地图' : '模式地图'}
         </button>
@@ -345,6 +361,40 @@ export function PatternOverview({
           {showAll ? '收起模式库' : `全部 ${THINK_PATTERNS.length} 个模式`}
         </button>
       </div>
+
+      {showPractice && (
+        <div className="space-y-3 rounded-2xl border border-border bg-muted/20 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-black text-foreground">自由训练</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                不受到期限制，想练哪个就练哪个。
+              </p>
+            </div>
+            <Button size="sm" className="rounded-full shrink-0" onClick={() => onPractice(practiceIds)}>
+              混合训练（5 个）
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {THINK_PATTERNS.map((pattern) => {
+              const layer = THINK_PATTERN_LAYERS.find((candidate) => candidate.id === pattern.layer);
+              return (
+                <button
+                  key={pattern.id}
+                  type="button"
+                  onClick={() => onPractice([pattern.id])}
+                  className="rounded-xl border border-border bg-card p-2 text-left hover:border-[var(--brand)]/50"
+                >
+                  <span className="block text-xs font-bold text-foreground break-words">{pattern.name}</span>
+                  <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                    {layer?.name ?? pattern.layer}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {showMap && renderLayerMap()}
 

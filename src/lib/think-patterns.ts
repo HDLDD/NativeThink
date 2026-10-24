@@ -359,6 +359,22 @@ export function buildDiagnosticQueue(
   return queue;
 }
 
+/**
+ * 自由训练的混合队列：挑练得最少的模式，平手按数据顺序。
+ * 不受 due / 每日新名额限制 —— 用户明确点了“自由训练”。
+ */
+export function pickPracticePatternIds(
+  patterns: IThinkPattern[],
+  progress: Record<string, IThinkPatternProgress>,
+  limit = 5,
+): string[] {
+  return [...patterns]
+    .sort((a, b) =>
+      (progress[a.id]?.transferAttempts ?? 0) - (progress[b.id]?.transferAttempts ?? 0))
+    .slice(0, Math.max(0, limit))
+    .map((pattern) => pattern.id);
+}
+
 export interface PatternLayerSummary {
   layerId: ThinkPatternLayer;
   total: number;
