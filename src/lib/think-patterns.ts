@@ -20,6 +20,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const THINK_PATTERN_STORAGE_KEY = '__nativethink_think_pattern_progress';
 
+/** 迁移提交前的自评：1 没把握 / 2 一般 / 3 有把握；2 不计入校准 */
+export type PatternConfidence = 1 | 2 | 3;
+
 export interface IThinkPatternProgress {
   patternId: string;
   status: 'learning' | 'reviewing' | 'mastered';
@@ -38,6 +41,10 @@ export interface IThinkPatternProgress {
   transferAttempts: number;
   /** 只统计 AI 判定的迁移通过；自评不计入，mastered 用它兜底 */
   aiTransferPasses: number;
+  /** “有把握/没把握”的预测与最终结果一致的次数；一般(2)不计入 */
+  calibrationAttempts?: number;
+  calibrationHits?: number;
+  lastConfidence?: PatternConfidence;
   lastAttempt?: {
     at: number;
     /** 本次尝试的本地日期键，供队列判断「今天已通过 / 今天失败」 */
@@ -49,6 +56,8 @@ export interface IThinkPatternProgress {
     /** AI 给出的证据短语 */
     evidence?: string;
     source: 'ai' | 'self';
+    /** 提交前的自评；旧记录可能没有 */
+    confidence?: PatternConfidence;
   };
 }
 
@@ -68,6 +77,8 @@ export interface PatternResultInput {
   answer: string;
   feedback: string;
   evidence?: string;
+  /** 提交前的自评；缺省表示旧版本/未选择，不计入校准 */
+  confidence?: PatternConfidence;
   today: string;
 }
 
@@ -124,6 +135,8 @@ export function initialPatternProgress(patternId: string, now = Date.now()): ITh
     transferPasses: 0,
     transferAttempts: 0,
     aiTransferPasses: 0,
+    calibrationAttempts: 0,
+    calibrationHits: 0,
   };
 }
 
@@ -164,6 +177,15 @@ export function applyPatternResult(
   const status: IThinkPatternProgress['status'] =
     quality < 3 ? 'learning' : mastered ? 'mastered' : 'reviewing';
 
+  const confidence = input.confidence;
+  const calibrated = confidence === 1 || confidence === 3;
+  const calibrationHit = calibrated && (
+    (confidence === 3 && input.transferPassed) ||
+    (confidence === 1 && !input.transferPassed)
+  );
+  const calibrationAttempts = (base.calibrationAttempts ?? 0) + (calibrated ? 1 : 0);
+  const calibrationHits = (base.calibrationHits ?? 0) + (calibrationHit ? 1 : 0);
+
   return {
     ...base,
     status,
@@ -179,6 +201,9 @@ export function applyPatternResult(
     recognitionCorrect: base.recognitionCorrect + (input.recognitionCorrect ? 1 : 0),
     transferAttempts: base.transferAttempts + 1,
     transferPasses: base.transferPasses + (input.transferPassed ? 1 : 0),
+    calibrationAttempts,
+    calibrationHits,
+    lastConfidence: confidence ?? base.lastConfidence,
     lastAttempt: {
       at: now,
       on: input.today,
@@ -188,6 +213,7 @@ export function applyPatternResult(
       feedback: truncate(input.feedback, 400),
       evidence: input.evidence ? truncate(input.evidence, 200) : undefined,
       source: input.source,
+      confidence,
     },
   };
 }

@@ -413,6 +413,39 @@ const initProgress = pure.initialPatternProgress('subject-first', now);
 check(initProgress.status === 'learning' && initProgress.repetitions === 0 &&
   initProgress.interval === 0 && initProgress.nextReview === now,
   'SM-2：初始进度从 learning、0 天、立即到期开始');
+check(initProgress.calibrationAttempts === 0 && initProgress.calibrationHits === 0,
+  '校准：初始进度从 0/0 开始');
+
+/* 自评校准：有把握/没把握与最终结果对照；一般(2)不计入。 */
+const gradeWithConfidence = (transferPassed, confidence) => pure.applyPatternResult(undefined, {
+  patternId: 'subject-first', recognitionCorrect: true, transferPassed,
+  source: 'ai', answer: 'ok', feedback: 'x', confidence, today,
+}, now);
+const confidentPass = gradeWithConfidence(true, 3);
+check(confidentPass.calibrationAttempts === 1 && confidentPass.calibrationHits === 1 &&
+  confidentPass.lastAttempt?.confidence === 3,
+  '校准：有把握 + 通过 → 1/1 且记录 confidence');
+const confidentFail = gradeWithConfidence(false, 3);
+check(confidentFail.calibrationAttempts === 1 && confidentFail.calibrationHits === 0,
+  '校准：有把握 + 未通过 → 0/1（高估）');
+const unsureFail = gradeWithConfidence(false, 1);
+check(unsureFail.calibrationAttempts === 1 && unsureFail.calibrationHits === 1,
+  '校准：没把握 + 未通过 → 1/1');
+const neutral = gradeWithConfidence(true, 2);
+check(neutral.calibrationAttempts === 0 && neutral.calibrationHits === 0,
+  '校准：一般(2) 不计入');
+const noConfidence = gradeWithConfidence(true, undefined);
+check(noConfidence.calibrationAttempts === 0 && noConfidence.calibrationHits === 0,
+  '校准：未选自评不计入（旧版本兼容）');
+const legacyCalibrationBase = { ...pure.initialPatternProgress('subject-first', now) };
+delete legacyCalibrationBase.calibrationAttempts;
+delete legacyCalibrationBase.calibrationHits;
+const legacyCalibrated = pure.applyPatternResult(legacyCalibrationBase, {
+  patternId: 'subject-first', recognitionCorrect: true, transferPassed: false,
+  source: 'ai', answer: 'ok', feedback: 'x', confidence: 1, today,
+}, now);
+check(legacyCalibrated.calibrationAttempts === 1 && legacyCalibrated.calibrationHits === 1,
+  '校准：老记录缺字段按 0 起算，不因新字段丢进度');
 
 // 自评连过足够多次（间隔已 ≥21 天）也不能 mastered —— aiTransferPasses 必须 ≥2。
 let selfLong = self;
@@ -852,6 +885,14 @@ check(Object.keys(sanitized).join(',') === 'subject-first,fill-references',
   'store 读盘真跑：只留下键=patternId、id 已知且字段完整的健康条目', JSON.stringify(Object.keys(sanitized)));
 check(sanitized['subject-first'] === healthyRecord && sanitized['fill-references'] === secondHealthyRecord,
   'store 读盘真跑：健康条目原样保留（引用不变，不在读盘时重写用户数据）');
+const legacyHealthy = { ...pure.initialPatternProgress('subject-first', now) };
+delete legacyHealthy.calibrationAttempts;
+delete legacyHealthy.calibrationHits;
+const sanitizedLegacy = typeof sanitizeProgress === 'function'
+  ? sanitizeProgress({ 'subject-first': legacyHealthy }, knownIds)
+  : {};
+check(sanitizedLegacy['subject-first'] === legacyHealthy,
+  'store 读盘真跑：老记录缺 calibration 字段仍保留（不因新字段丢进度）');
 check(!('polite-request' in sanitized),
   'store 读盘真跑：残缺记录（只有 patternId）→ 丢弃（否则永不到期、日期 Invalid）');
 check(!('soften-disagreement' in sanitized),
@@ -1033,6 +1074,19 @@ check(/transferKind === 'wording' \? '换措辞' : '新情境'/.test(sessionSrc)
   'UI：迁移卡标出新情境/换措辞');
 check(/closedBook && \(/.test(sessionCode) && /回看：这次/.test(sessionSrc),
   'UI：闭卷/延迟反馈卡回看三步');
+check(/提交前先猜一下/.test(sessionSrc) && /没把握/.test(sessionSrc) &&
+  /有把握/.test(sessionSrc) && /一般/.test(sessionSrc),
+  'UI：迁移前提供三级自评');
+check(/confidence === null/.test(sessionCode) &&
+  /disabled=\{!answer\.trim\(\) \|\| confidence === null\}/.test(sessionCode),
+  'UI：未选自评不能提交');
+check(/confidence: chosenConfidence/.test(sessionCode) &&
+  /confidence: confidence \?\? undefined/.test(sessionCode),
+  'UI：AI/自评两条路径都落 confidence');
+check(/你的判断/.test(sessionSrc) && /判断准确/.test(sessionSrc) && /判断偏了/.test(sessionSrc),
+  'UI：反馈显示自评与实际是否一致');
+check(/校准 \{calibrationHits\}\/\{calibrationAttempts\}/.test(overviewSrc),
+  'UI：焦点卡显示校准命中/次数');
 check(/mode === 'diagnostic'/.test(modeCode) && /items=\{THINK_PATTERN_DIAGNOSTIC\}/.test(modeSrc),
   'UI：diagnostic 模式渲染体检题表');
 check(/思维体检/.test(overviewSrc) && /onDiagnostic/.test(overviewSrc) && /diagnostic=/.test(modeSrc),
@@ -1118,8 +1172,8 @@ const resetAllBody = (progressPageSrc.match(/const handleResetAll = \(\) => \{[\
 check(resetAllBody.includes("'__nativethink_think_pattern_progress'"),
   'store：ProgressPage 的「全部重置」清掉模式复习进度', `切片 ${resetAllBody.length} 字`);
 check(/await onJudge\(/.test(sessionCode), 'AI：会话真的 await onJudge');
-check(/!trimmed \|\| judging/.test(sessionCode),
-  'AI：空答案/判定中不重复提交（按钮 disabled 挡不住回车与连点）');
+check(/!trimmed \|\| confidence === null \|\| judging/.test(sessionCode),
+  'AI：空答案/未选自评/判定中不重复提交（按钮 disabled 挡不住回车与连点）');
 check(/judgeSeqRef\.current !== seq/.test(sessionCode),
   'AI：旧 Promise 先比 judgeSeq 再写状态（否则写进下一张卡）');
 const cleanupEffect = (sessionCode.match(/useEffect\(\(\) => \(\) => \{[\s\S]*?\}, \[\]\);/) ?? [''])[0];
@@ -1427,6 +1481,17 @@ await runPureMutation(
   'if (days >= 7) return 7;',
   'if (days >= 99) return 7;',
   (m) => m.delayedProbeDay({ firstReviewedAt: now - 7 * 86400000, transferPasses: 1 }, now) === null,
+);
+
+// M18：自评校准不再计入 —— 有把握/没把握的预测永远不累计。
+await runPureMutation(
+  'M18 自评校准不计入',
+  'const calibrated = confidence === 1 || confidence === 3;',
+  'const calibrated = false;',
+  (m) => m.applyPatternResult(undefined, {
+    patternId: 'subject-first', recognitionCorrect: true, transferPassed: true,
+    source: 'ai', answer: 'ok', feedback: 'x', confidence: 3, today,
+  }, now).calibrationAttempts === 0,
 );
 
 console.log('');

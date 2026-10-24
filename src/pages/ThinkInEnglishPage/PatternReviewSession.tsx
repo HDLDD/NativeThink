@@ -28,6 +28,7 @@ import {
   pickRecognitionIndex,
   pickTransferIndex,
   type IThinkPatternProgress,
+  type PatternConfidence,
   type PatternSessionGradeInput,
 } from '@/lib/think-patterns';
 import type { PatternJudgeResult } from '@/lib/think-pattern-ai';
@@ -76,6 +77,7 @@ export function PatternReviewSession({
   const [stage, setStage] = useState<Stage>('contrast');
   const [selected, setSelected] = useState<number | null>(null);
   const [answer, setAnswer] = useState('');
+  const [confidence, setConfidence] = useState<PatternConfidence | null>(null);
   const [judging, setJudging] = useState(false);
   /** AI 不可用时才置 true：展示参考表达 + 两个自评按钮（Task 5 的降级路径） */
   const [fallback, setFallback] = useState(false);
@@ -102,6 +104,11 @@ export function PatternReviewSession({
   /** 第 3 次及以后复习闭卷；失败会重置 repetitions，重试卡自动回到开卷 */
   const closedBook = isClosedBook(progress) || probeDay !== null;
   const transferKind = transfer?.kind ?? 'scenario';
+  const confidenceLabel = confidence === 1 ? '没把握' : confidence === 3 ? '有把握' : '一般';
+  const calibrated = confidence === 1 || confidence === 3;
+  const calibrationMatched = calibrated && (
+    (confidence === 3 && passed === true) || (confidence === 1 && passed === false)
+  );
   const stageIndex = STAGES.findIndex((s) => s.key === stage);
 
   if (!choice || !transfer) {
@@ -134,6 +141,7 @@ export function PatternReviewSession({
       answer: answer.trim(),
       feedback: text,
       source: 'self',
+      confidence: confidence ?? undefined,
     });
     setStage('feedback');
   };
@@ -152,7 +160,8 @@ export function PatternReviewSession({
    */
   const submitTransfer = async (force = false) => {
     const trimmed = answer.trim();
-    if (!trimmed || judging || (fallback && !force)) return;
+    if (!trimmed || confidence === null || judging || (fallback && !force)) return;
+    const chosenConfidence = confidence;
     if (force) {
       setFallback(false);
       setFeedbackText('');
@@ -181,6 +190,7 @@ export function PatternReviewSession({
         feedback: result.feedback,
         evidence: result.evidence,
         source: 'ai',
+        confidence: chosenConfidence,
       });
       setStage('feedback');
     } else {
@@ -436,11 +446,46 @@ export function PatternReviewSession({
               aria-label="你的英文表达"
               className="min-h-28 resize-y"
             />
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                提交前先猜一下
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: 1 as const, label: '没把握' },
+                  { value: 2 as const, label: '一般' },
+                  { value: 3 as const, label: '有把握' },
+                ]).map((option) => {
+                  const active = confidence === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={active}
+                      disabled={judging || fallback}
+                      onClick={() => setConfidence(option.value)}
+                      className={cn(
+                        'rounded-full border px-3 py-2 text-xs font-bold transition-colors',
+                        active
+                          ? 'border-[var(--brand)]/60 bg-[var(--brand)]/10 text-ink-teal'
+                          : 'border-border bg-card text-muted-foreground hover:border-[var(--brand)]/40',
+                        (judging || fallback) && 'opacity-60',
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                先判断自己有没有用上这个模式；“一般”不计入校准。
+              </p>
+            </div>
             {!judging && !fallback && (
               <>
                 <Button
                   className="w-full sm:w-auto rounded-full"
-                  disabled={!answer.trim()}
+                  disabled={!answer.trim() || confidence === null}
                   onClick={() => { void submitTransfer(); }}
                 >
                   提交
@@ -552,6 +597,19 @@ export function PatternReviewSession({
                 <p className="mt-2 text-xs text-muted-foreground break-words">证据：{aiEvidence}</p>
               )}
             </div>
+            {confidence !== null && (
+              <div className="rounded-2xl border border-border bg-muted/20 p-4">
+                <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">
+                  你的判断
+                </p>
+                <p className="text-sm text-foreground break-words">
+                  {confidenceLabel} · 实际{passed ? '用上了' : '没做到'}
+                  {calibrated
+                    ? calibrationMatched ? ' · 判断准确' : ' · 这次判断偏了'
+                    : ' · 一般不计入校准'}
+                </p>
+              </div>
+            )}
             <div className="rounded-2xl border border-border bg-muted/20 p-4">
               <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">
                 为什么这样更自然

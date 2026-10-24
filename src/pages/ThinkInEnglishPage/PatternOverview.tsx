@@ -106,6 +106,8 @@ export function PatternOverview({
   const queue = focusPatterns.slice(1);
   const heroLayer = THINK_PATTERN_LAYERS.find((layer) => layer.id === hero.layer);
   const heroProgress = progress[hero.id];
+  const calibrationAttempts = heroProgress?.calibrationAttempts ?? 0;
+  const calibrationHits = heroProgress?.calibrationHits ?? 0;
   const heroRecommended = recommendedIds.includes(hero.id);
   const heroReason = heroRecommended
     ? '体检建议'
@@ -298,6 +300,12 @@ export function PatternOverview({
             {heroProgress ? (
               <>
                 <span>迁移 {heroProgress.transferPasses}/{heroProgress.transferAttempts}</span>
+                {calibrationAttempts > 0 && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>校准 {calibrationHits}/{calibrationAttempts}</span>
+                  </>
+                )}
                 <span aria-hidden>·</span>
                 <span>
                   下次 {heroProgress.status === 'mastered' ? '—' : formatDate(new Date(heroProgress.nextReview))}
