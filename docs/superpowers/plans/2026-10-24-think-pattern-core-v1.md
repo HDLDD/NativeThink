@@ -1,5 +1,7 @@
 # 模式复习 v1 Implementation Plan
 
+> 后续变更：题库已扩到每模式 5+5、会话改为三稿闭环；本文保留为 v1 执行记录。
+>
 > **For agentic workers:** Execute task-by-task. The controller may implement directly in this session; keep each task independently verifiable.
 
 **Goal:** 12 个模式、四层模式地图、闭卷迁移。

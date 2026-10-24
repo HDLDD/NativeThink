@@ -1831,3 +1831,43 @@ const THINK_PATTERN_EXTRA_NOTES: Record<string, IThinkPatternOptionNotes> = {
 };
 
 Object.assign(THINK_PATTERN_OPTION_NOTES, THINK_PATTERN_EXTRA_NOTES);
+
+/**
+ * 改写快练：把每道识别题里一个非最佳选项当作“中文默认英文”，
+ * 让用户改写成最佳选项。纯派生，不新增内容；共 60 题。
+ */
+export interface IThinkPatternRewrite {
+  id: string;
+  patternId: string;
+  prompt: string;
+  source: string;
+  target: string;
+  explanation: string;
+}
+
+export const THINK_PATTERN_REWRITES: IThinkPatternRewrite[] = (() => {
+  const maxRecognition = Math.max(...THINK_PATTERNS.map((pattern) => pattern.recognition.length));
+  const items: IThinkPatternRewrite[] = [];
+  // 按题号轮转模式，保证 10 题一组覆盖尽量多的模式，而不是连着练同一个模式。
+  for (let index = 0; index < maxRecognition; index += 1) {
+    for (const pattern of THINK_PATTERNS) {
+      const choice = pattern.recognition[index];
+      if (!choice) continue;
+      const sourceIndex = (choice.answer + 1) % choice.options.length;
+      const notes = THINK_PATTERN_OPTION_NOTES[choice.id];
+      const sourceNote = notes?.[sourceIndex as 0 | 1 | 2]?.text;
+      const targetNote = notes?.[choice.answer]?.text;
+      items.push({
+        id: `${choice.id}-rewrite`,
+        patternId: pattern.id,
+        prompt: choice.prompt,
+        source: choice.options[sourceIndex],
+        target: choice.options[choice.answer],
+        explanation: sourceNote && targetNote
+          ? `原句：${sourceNote} 参考：${targetNote}`
+          : choice.explanation,
+      });
+    }
+  }
+  return items;
+})();

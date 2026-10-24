@@ -38,6 +38,7 @@ export interface PatternOverviewProps {
   onStart: (firstPatternId?: string) => void;
   onDiagnostic: () => void;
   onPractice: (patternIds: string[]) => void;
+  onRewrite: () => void;
   onBack: () => void;
 }
 
@@ -76,6 +77,7 @@ export function PatternOverview({
   onStart,
   onDiagnostic,
   onPractice,
+  onRewrite,
   onBack,
 }: PatternOverviewProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -351,6 +353,10 @@ export function PatternOverview({
         <span aria-hidden>·</span>
         <button type="button" className="hover:text-foreground" onClick={() => setShowPractice((prev) => !prev)}>
           {showPractice ? '收起自由训练' : '自由训练'}
+        </button>
+        <span aria-hidden>·</span>
+        <button type="button" className="hover:text-foreground" onClick={onRewrite}>
+          改写快练
         </button>
         <span aria-hidden>·</span>
         <button type="button" className="hover:text-foreground" onClick={() => setShowMap((prev) => !prev)}>

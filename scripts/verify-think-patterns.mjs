@@ -169,6 +169,23 @@ for (const item of asArray(diagnosticItems)) {
   check(!!choice, `诊断：${item?.patternId} 的题目 ${item?.choiceId} 存在`);
 }
 
+/* 改写快练：每道识别题派生一条，source 与 target 必须不同。 */
+const rewrites = mod.THINK_PATTERN_REWRITES;
+check(Array.isArray(rewrites) && rewrites.length === 60,
+  '改写：60 道派生题', `实际 ${asArray(rewrites).length}`);
+const rewriteIds = asArray(rewrites).map((item) => item?.id);
+check(rewriteIds.every(filled) && new Set(rewriteIds).size === rewriteIds.length,
+  '改写：id 非空且唯一', rewriteIds.join(','));
+check(asArray(rewrites).every((item) => filled(item?.prompt) && filled(item?.source) &&
+  filled(item?.target) && filled(item?.explanation) && item.source !== item.target),
+  '改写：题面/原句/目标/解释完整且 source≠target');
+check(asArray(rewrites).every((item) => /原句：/.test(item?.explanation) && /参考：/.test(item?.explanation)),
+  '改写：解释只讲当前原句与参考（不复用整段识别题解释）');
+check(new Set(asArray(rewrites).map((item) => item?.patternId)).size === 12,
+  '改写：覆盖 12 个模式');
+check(new Set(asArray(rewrites).slice(0, 10).map((item) => item?.patternId)).size === 10,
+  '改写：前 10 题覆盖 10 个不同模式（按题号轮转，不是整块按模式）');
+
 /* 固定顺序展示时，答案不能全压在一个下标上，否则用户能靠位置蒙对。 */
 const allChoices = list.flatMap((p) => asArray(p?.recognition));
 const answerCounts = ANSWER_INDICES.map((index) => allChoices.filter((q) => q?.answer === index).length);
@@ -1026,6 +1043,7 @@ const modeSrc = readUi('src/pages/ThinkInEnglishPage/PatternReviewMode.tsx');
 const overviewSrc = readUi('src/pages/ThinkInEnglishPage/PatternOverview.tsx');
 const sessionSrc = readUi('src/pages/ThinkInEnglishPage/PatternReviewSession.tsx');
 const diagnosticSrc = readUi('src/pages/ThinkInEnglishPage/PatternDiagnostic.tsx');
+const rewriteSrc = readUi('src/pages/ThinkInEnglishPage/PatternRewriteDrill.tsx');
 
 /* 静态接线一律跑在**剥注释源码**上：注释里出现 `silent: true` / `applySessionResult` 之类的同形
  * 文字不许替实现答话（AI 判定那批变异实验抓过一次）。 */
@@ -1035,14 +1053,17 @@ const stripComments = (s) => s
 const modeCode = stripComments(modeSrc);
 const sessionCode = stripComments(sessionSrc);
 const diagnosticCode = stripComments(diagnosticSrc);
+const rewriteCode = stripComments(rewriteSrc);
 
-check(modeSrc.length > 0 && overviewSrc.length > 0 && sessionSrc.length > 0 && diagnosticSrc.length > 0,
-  'UI：概览/会话/状态机/体检四个组件文件都存在');
+check(modeSrc.length > 0 && overviewSrc.length > 0 && sessionSrc.length > 0 &&
+  diagnosticSrc.length > 0 && rewriteSrc.length > 0,
+  'UI：概览/会话/状态机/体检/改写五个组件文件都存在');
 check(/useThinkPatterns\(/.test(modeSrc), 'UI：顶层使用 useThinkPatterns');
 check(/<PatternOverview\b/.test(modeSrc) && /<PatternReviewSession\b/.test(modeSrc) &&
-  /<PatternDiagnostic\b/.test(modeSrc),
-  'UI：概览、复习会话、体检分离（三个组件都被渲染，不是只 import）');
-check(/'overview' \| 'diagnostic' \| 'review' \| 'complete'/.test(modeSrc), 'UI：四态状态机');
+  /<PatternDiagnostic\b/.test(modeSrc) && /<PatternRewriteDrill\b/.test(modeSrc),
+  'UI：概览、复习会话、体检、改写快练分离（四个组件都被渲染，不是只 import）');
+check(/'overview' \| 'diagnostic' \| 'review' \| 'rewrite' \| 'complete'/.test(modeSrc),
+  'UI：五态状态机');
 check(modeSrc.includes('key={`${pattern.id}-${session.index}`}'),
   'UI：换卡用「pattern.id + 会话下标」的 key 重挂载（否则重试会带着上一题阶段）');
 check(/applySessionResult\(/.test(modeCode) && /advanceSession\(/.test(modeCode) &&
@@ -1088,6 +1109,19 @@ check(/再练一组（5 个）/.test(overviewSrc) && /onPractice\(practiceIds\)/
   'UI：完成页可直接再练一组');
 check(/startPractice/.test(modeCode) && /onPractice=\{startPractice\}/.test(modeCode),
   'UI：自由训练接到独立队列（不经过 dueQueue 过滤）');
+check(/改写快练/.test(overviewSrc) && /onRewrite/.test(overviewSrc) &&
+  /onRewrite=\{\(\) => setMode\('rewrite'\)\}/.test(modeSrc),
+  'UI：概览有改写快练入口并接到状态机');
+check(/mode === 'rewrite'/.test(modeCode) && /<PatternRewriteDrill/.test(modeSrc) &&
+  /items=\{THINK_PATTERN_REWRITES\}/.test(modeSrc),
+  'UI：rewrite 模式渲染 60 道派生题');
+check(/10 题一组/.test(rewriteSrc) && /查看参考/.test(rewriteSrc) &&
+  /改对了/.test(rewriteSrc) && /还差一点/.test(rewriteSrc),
+  'UI：改写快练 10 题一组、看参考后自评');
+check(!/onGrade|grade\(|applyPatternResult|toast\./.test(rewriteCode),
+  'UI：改写快练不写 SM-2、不弹 toast');
+check(/offset \+ GROUP_SIZE/.test(rewriteCode),
+  'UI：再来一组按 10 题轮换');
 check(/isClosedBook\(progress\)/.test(sessionSrc) && /closedBook \?/.test(sessionCode) &&
   /这次闭卷/.test(sessionSrc),
   'UI：迁移卡按 isClosedBook 切换闭卷提示');
@@ -1101,12 +1135,21 @@ check(/closedBook && \(/.test(sessionCode) && /回看：这次/.test(sessionSrc)
 check(/提交前先猜一下/.test(sessionSrc) && /没把握/.test(sessionSrc) &&
   /有把握/.test(sessionSrc) && /一般/.test(sessionSrc),
   'UI：迁移前提供三级自评');
-check(/confidence === null/.test(sessionCode) &&
-  /disabled=\{!answer\.trim\(\) \|\| confidence === null\}/.test(sessionCode),
-  'UI：未选自评不能提交');
-check(/confidence: chosenConfidence/.test(sessionCode) &&
-  /confidence: confidence \?\? undefined/.test(sessionCode),
-  'UI：AI/自评两条路径都落 confidence');
+check(/round === 0 && confidence === null/.test(sessionCode) &&
+  /disabled=\{!answer\.trim\(\) \|\| \(round === 0 && confidence === null\)\}/.test(sessionCode),
+  'UI：首稿未选自评不能提交（改写/新场景不再要求 confidence）');
+check(/confidence: confidence \?\? undefined/.test(sessionCode) &&
+  /const finalize = \(/.test(sessionCode) &&
+  (sessionCode.match(/onGrade\(\{/g) ?? []).length === 1,
+  'UI：三稿只在 finalize 落一次分与 confidence');
+check(/首稿/.test(sessionSrc) && /改写/.test(sessionSrc) && /新场景/.test(sessionSrc) &&
+  /按反馈改写/.test(sessionSrc) && /换一个新场景/.test(sessionSrc) && /再改一版/.test(sessionSrc),
+  'UI：三稿阶段与反馈 CTA 齐全');
+check(/rewriteAttempts \+ 1 >= 2/.test(sessionCode) && /gradedRef\.current/.test(sessionCode) &&
+  /pass = Boolean\(rewrite\?\.pass && all\[2\]\?\.pass\)/.test(sessionCode),
+  'UI：改写与新场景都过才 pass，且只记一次 SM-2');
+check(/judgeUnavailableRef\.current/.test(sessionCode),
+  'AI：首次 AI 失败后跳过后续等待（三稿不重复等 15 秒）');
 check(/你的判断/.test(sessionSrc) && /判断准确/.test(sessionSrc) && /判断偏了/.test(sessionSrc),
   'UI：反馈显示自评与实际是否一致');
 check(/校准 \{calibrationHits\}\/\{calibrationAttempts\}/.test(overviewSrc),
@@ -1185,8 +1228,8 @@ check((useAiCode.match(/if \(!options\?\.silent\) toast\.error\(message\);/g) ??
   'AI：useAI 的 handleChat 与 handleStreamChat 都在 silent 时跳过 toast.error',
   `实际 ${(useAiCode.match(/if \(!options\?\.silent\) toast\.error\(message\);/g) ?? []).length} 处`);
 
-check(/if \(finishedRef\.current\) return;/.test(sessionCode),
-  'UI：自评「我用上了 / 还没做到」只能落一次（连点会按两次 SM-2 记分）');
+check(/if \(selfEvalRoundRef\.current === round\) return;/.test(sessionCode),
+  'UI：自评「我用上了 / 还没做到」每轮只能落一次（连点不重复记分）');
 check(/if \(nextRef\.current\) return;/.test(sessionCode) && /disabled=\{advancing\}/.test(sessionCode),
   'UI：反馈卡「继续」只能推进一次（nextRef + 禁用，双击不跳模式）');
 
@@ -1196,8 +1239,8 @@ const resetAllBody = (progressPageSrc.match(/const handleResetAll = \(\) => \{[\
 check(resetAllBody.includes("'__nativethink_think_pattern_progress'"),
   'store：ProgressPage 的「全部重置」清掉模式复习进度', `切片 ${resetAllBody.length} 字`);
 check(/await onJudge\(/.test(sessionCode), 'AI：会话真的 await onJudge');
-check(/!trimmed \|\| confidence === null \|\| judging/.test(sessionCode),
-  'AI：空答案/未选自评/判定中不重复提交（按钮 disabled 挡不住回车与连点）');
+check(/!trimmed \|\| judgingRef\.current \|\| \(round === 0 && confidence === null\)/.test(sessionCode),
+  'AI：空答案/首稿未选自评/判定中不重复提交（按钮 disabled 挡不住回车与连点）');
 check(/judgeSeqRef\.current !== seq/.test(sessionCode),
   'AI：旧 Promise 先比 judgeSeq 再写状态（否则写进下一张卡）');
 const cleanupEffect = (sessionCode.match(/useEffect\(\(\) => \(\) => \{[\s\S]*?\}, \[\]\);/) ?? [''])[0];
@@ -1208,10 +1251,11 @@ check(exitBody.includes('judgeSeqRef.current += 1') &&
   exitBody.indexOf('judgeSeqRef.current += 1') < exitBody.indexOf('onExit()'),
   'AI：退出时先作废在飞的判定再离开（onExit 会卸载组件）');
 check(/setFallback\(true\)/.test(sessionCode), 'AI：失败路径置 fallback（参考表达 + 自评按钮）');
-check(/重试 AI 判定/.test(sessionCode) && /submitTransfer\(true\)/.test(sessionCode),
+check(/重试 AI 判定/.test(sessionCode) && /submitDraft\(true\)/.test(sessionCode),
   'UI：AI 失败后可重试');
-check(/transferPassed: result\.pass/.test(sessionCode) && /source: 'ai'/.test(sessionCode),
-  'AI：成功按 AI 结果落分（transferPassed: result.pass + source ai）');
+check(/pass: result\.pass/.test(sessionCode) && /source: 'ai'/.test(sessionCode) &&
+  /transferPassed: pass/.test(sessionCode),
+  'AI：AI 结果进三稿，最终按改写+新场景计算 transferPassed');
 check(/answer: trimmed/.test(sessionCode), 'AI：落分写的是 trim 后的答案');
 check(/evidence: result\.evidence/.test(sessionCode), 'AI：证据短语随结果落分（薄弱报告要用）');
 check(/\{fallback && \(/.test(sessionCode) && /我用上了这个模式/.test(sessionCode) && /还没做到/.test(sessionCode),

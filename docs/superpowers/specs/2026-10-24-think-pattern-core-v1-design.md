@@ -1,7 +1,7 @@
 # 模式复习 v1：12 模式、四层地图与闭卷迁移
 
 - 日期：2026-10-24
-- 状态：设计已定，待实现
+- 状态：已实现；后续已扩到每模式 5+5、三稿闭环、体检/校准/自由训练，本文计数保留为 v1 历史
 - 上游：[PRODUCT-DIRECTION.md](../../PRODUCT-DIRECTION.md)
 - 现有闭环：[2026-10-23-think-pattern-loop-design.md](./2026-10-23-think-pattern-loop-design.md)
 

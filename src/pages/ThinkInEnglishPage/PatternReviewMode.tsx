@@ -24,6 +24,7 @@ import { useAI } from '@/hooks/use-ai';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   THINK_PATTERN_DIAGNOSTIC,
+  THINK_PATTERN_REWRITES,
   THINK_PATTERNS,
   type IThinkPattern,
   type IThinkPatternTransfer,
@@ -49,8 +50,9 @@ import { extractJson, formatDate } from '@/lib/utils';
 import { PatternDiagnostic } from './PatternDiagnostic';
 import { PatternOverview } from './PatternOverview';
 import { PatternReviewSession } from './PatternReviewSession';
+import { PatternRewriteDrill } from './PatternRewriteDrill';
 
-type Mode = 'overview' | 'diagnostic' | 'review' | 'complete';
+type Mode = 'overview' | 'diagnostic' | 'review' | 'rewrite' | 'complete';
 
 /** 判定最长等 15 秒：超时按「AI 不可用」处理，练习界面不永久停在「正在判定」 */
 const JUDGE_TIMEOUT_MS = 15_000;
@@ -177,6 +179,16 @@ export function PatternReviewMode() {
     );
   }
 
+  if (mode === 'rewrite') {
+    return (
+      <PatternRewriteDrill
+        patterns={THINK_PATTERNS}
+        items={THINK_PATTERN_REWRITES}
+        onExit={() => setMode('overview')}
+      />
+    );
+  }
+
   if (mode === 'review' && pattern) {
     return (
       <PatternReviewSession
@@ -204,6 +216,7 @@ export function PatternReviewMode() {
       onStart={start}
       onDiagnostic={() => setMode('diagnostic')}
       onPractice={startPractice}
+      onRewrite={() => setMode('rewrite')}
       onBack={() => setMode('overview')}
     />
   );
