@@ -5,19 +5,23 @@ const THEME_KEY = '__nativethink_theme';
 
 export type Theme = 'light' | 'dark';
 
-export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>('light');
+/** 读已保存的明暗；读不到就按亮色。挂载前与 hook 初始状态共用同一口径。 */
+export function readThemeMode(): Theme {
+  try {
+    const saved = safeStorage.getItem(THEME_KEY) as Theme | null;
+    return saved === 'dark' ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+}
 
-  useEffect(() => {
-    try {
-      const saved = safeStorage.getItem(THEME_KEY) as Theme | null;
-      if (saved === 'light' || saved === 'dark') {
-        setThemeState(saved);
-      }
-    } catch {
-      // scopedStorage unavailable — non-critical
-    }
-  }, []);
+/** 在 createRoot 之前调用：避免深色用户刷新时先闪一帧亮色再被 effect 切暗。 */
+export function initThemeMode(): void {
+  document.documentElement.classList.toggle('dark', readThemeMode() === 'dark');
+}
+
+export function useTheme() {
+  const [theme, setThemeState] = useState<Theme>(() => readThemeMode());
 
   useEffect(() => {
     const root = document.documentElement;

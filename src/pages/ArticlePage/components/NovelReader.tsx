@@ -383,7 +383,7 @@ export default function NovelReader({
             {/* 开始 / 继续阅读 */}
             <Button
               onClick={() => enterChapter(resumeIdx)}
-              className="w-full mt-4 h-12 rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white text-sm font-black gap-2"
+              className="w-full mt-4 h-12 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white text-sm font-black gap-2"
             >
               <Play className="size-4 fill-current shrink-0" />
               <span className="truncate">
@@ -632,7 +632,7 @@ export default function NovelReader({
                 size="sm"
                 onClick={handleSaveNote}
                 disabled={!noteDraft.trim()}
-                className="flex-1 rounded-xl text-xs font-bold bg-[var(--brand)] hover:bg-[#00a882] text-white"
+                className="flex-1 rounded-xl text-xs font-bold bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white"
               >
                 保存批注
               </Button>

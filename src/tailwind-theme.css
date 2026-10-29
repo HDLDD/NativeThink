@@ -19,12 +19,12 @@
   --primary: hsl(160 100% 36%);
   /* 文字用品牌色（对比度调优）：亮色下加深保证白底可读，暗色下提亮保证深底可读 */
   --ink-violet: #5A4BD1;
-  --ink-teal: #00846B;
+  --ink-teal: #007A63;
   --primary-foreground: hsl(0 0% 100%);
   --secondary: #ECEEE8;
   --secondary-foreground: #14201A;
   --muted: #ECEEE8;
-  --muted-foreground: #68736B;
+  --muted-foreground: #5F6A62;
   --accent: hsl(160 100% 36%);
   --accent-foreground: hsl(0 0% 100%);
   --info: #14201A;

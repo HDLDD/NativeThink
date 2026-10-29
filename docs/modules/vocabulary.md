@@ -209,6 +209,8 @@
 
 30. **四个练习面的判定与计数改用图形件，不写一个字**（2026-10-20 批 1，用户 10-19 口径「按键交互不要文字，要图像和动画」的落地）：复习检测头部 `记得 x%` 纯文字 → `ScoreArc`（`sessionRated > 0` 才画）；每日学习连对的 `animate-pulse` → `StreakRing`（一个元素上不许叠两种动效），配对失败 `animate-pulse` → `fx-shake`；中译英与纠偏重考各加"答过才画弧"+ 每个选项一颗 `VerdictDot`（**未判定是中性灰，绝不冒成功绿**，揭晓前整排点都不出现）。这是"练习界面零提示"（注意事项 13）的另一半：反馈不靠弹字，也不靠补一句解释文字，交给界面里已有的图形状态。口径、守卫与运行时凭据见 [interaction-fx.md](./interaction-fx.md) §5 与 §6（`verify-interaction-fx` ⑧/⑧b + `walk-phone` ⑤）。
 
+31. **首次使用的向导出口不能把人带进“词库加载中”死路**（2026-10-29）：`setupDone` 为 false 时 `enterMode` 直接 `handleOpenWizard()` 回到选书（`DeepVocabularyPage.tsx:951`）—— 预载 effect 在 setupDone 前刻意不跑，关掉向导再点模式卡，旧写法会停在永久加载。首次向导不显示“继续上次的选择”（`onContinue` 只在 setupDone 后传入，`:1115`），副标题改为“先选一本，再挑练法”（`:1020`）。CDP 实测：关闭向导 → 点每日学习卡 → 向导回来且无加载文案；选四级 + 每日学习 + 10 词完成，直接进入每日学习。
+
 ## 怎么验证
 
 ```bash

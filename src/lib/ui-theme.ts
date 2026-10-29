@@ -22,10 +22,10 @@ export interface IUiThemeDef {
 
 export const UI_THEMES: IUiThemeDef[] = [
   { id: 'classic', name: '原生青绿', desc: '墨绿外壳 · 青绿行动', swatch: ['#00B894', '#0D1A14', '#F3F4EF'] },
-  { id: 'porcelain', name: '电蓝', desc: '海军蓝外壳 · 电蓝行动', swatch: ['#2F6BFF', '#0A1A33', '#F4F7FC'] },
+  { id: 'porcelain', name: '电蓝', desc: '海军蓝外壳 · 电蓝行动', swatch: ['#2A5FE0', '#0A1A33', '#F4F7FC'] },
   { id: 'graphite', name: '石墨', desc: '石墨外壳 · 黑白极简', swatch: ['#0A0A0A', '#0C0C0E', '#F6F6F7'] },
   { id: 'lime', name: '青柠', desc: '墨绿外壳 · 青柠行动', swatch: ['#0FA968', '#0C1A12', '#F5F7F3'] },
-  { id: 'sand', name: '暖沙', desc: '棕墨外壳 · 暖沙纸面', swatch: ['#A76A34', '#221710', '#F7F1E6'] },
+  { id: 'sand', name: '暖沙', desc: '棕墨外壳 · 暖沙纸面', swatch: ['#8C5526', '#221710', '#F7F1E6'] },
   { id: 'berry', name: '莓果', desc: '深莓外壳 · 莓果纸面', swatch: ['#B23A6B', '#201016', '#FBF3F5'] },
 ];
 

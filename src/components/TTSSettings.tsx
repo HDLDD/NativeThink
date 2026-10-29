@@ -443,7 +443,7 @@ export default function TTSSettings({ trigger }: { trigger?: ReactNode } = {}) {
                 <span className={cn(
                   'text-[9px] font-black px-2 py-0.5 rounded-full',
                   sherpaDisabled ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
-                    : sherpa?.status === 'ready' ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
+                    : sherpa?.status === 'ready' ? 'bg-[var(--brand)]/10 text-ink-teal'
                     : sherpa?.status === 'error' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400'
                       : 'bg-muted text-muted-foreground',
                 )}>
@@ -526,7 +526,7 @@ export default function TTSSettings({ trigger }: { trigger?: ReactNode } = {}) {
                 </Select>
                 {/* 未手动选语音时，朗读会自动改用本地音色 —— 网络音色每次合成都要联网（约 2 秒） */}
                 {settings.nativeVoiceIndex === null && autoVoice && (
-                  <p className="text-[9px] font-bold text-[var(--brand)] leading-snug">
+                  <p className="text-[9px] font-bold text-ink-teal leading-snug">
                     未手动选择 · 朗读时自动使用本地音色「{autoVoice.name}」(离线 · 低延迟)
                   </p>
                 )}
@@ -581,18 +581,18 @@ export default function TTSSettings({ trigger }: { trigger?: ReactNode } = {}) {
               <p className="text-[10px] font-bold text-foreground leading-relaxed">
                 {lastReport.engine === 'piper' ? (
                   <>
-                    内置离线引擎（<span className="text-[var(--brand)]">设备内合成，与网速无关</span>）· 起播 {lastReport.firstAudioMs}ms
+                    内置离线引擎（<span className="text-ink-teal">设备内合成，与网速无关</span>）· 起播 {lastReport.firstAudioMs}ms
                     {lastReport.firstAudioMs > 400 && ' — 首次朗读含模型加载，之后会更快'}
                   </>
                 ) : lastReport.engine === 'native' ? (
                   lastReport.startEvidence === false ? (
                     <>
-                      系统引擎（<span className="text-[var(--brand)]">离线，与网速无关</span>）· 整句念完 {lastReport.firstAudioMs}ms
+                      系统引擎（<span className="text-ink-teal">离线，与网速无关</span>）· 整句念完 {lastReport.firstAudioMs}ms
                       {' — 这台设备的引擎不回报「开始发声」时刻，上面是整句耗时，不是起播延迟'}
                     </>
                   ) : (
                     <>
-                      系统引擎（<span className="text-[var(--brand)]">离线，与网速无关</span>）· 起播 {lastReport.firstAudioMs}ms
+                      系统引擎（<span className="text-ink-teal">离线，与网速无关</span>）· 起播 {lastReport.firstAudioMs}ms
                       {lastReport.firstAudioMs > 600 && ' — 偏慢，多半是所选音色为网络音色'}
                     </>
                   )

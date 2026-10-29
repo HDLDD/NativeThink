@@ -172,7 +172,7 @@ export function VocabTestTab({ level, levelLabel }: Props) {
             <div>
               <Button
                 onClick={start}
-                className="rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-black gap-2 px-10"
+                className="rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-black gap-2 px-10"
               >
                 <Target className="size-4" />开始测试
               </Button>
@@ -263,7 +263,7 @@ export function VocabTestTab({ level, levelLabel }: Props) {
             <p className="text-xs text-muted-foreground">{g.desc}</p>
           </div>
           <div className="flex items-center justify-center gap-3">
-            <Button onClick={start} className="rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-bold gap-2">
+            <Button onClick={start} className="rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-bold gap-2">
               <RefreshCw className="size-4" />再测一次
             </Button>
             {best && best.estimate >= est && (

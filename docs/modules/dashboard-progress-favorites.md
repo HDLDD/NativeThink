@@ -55,6 +55,7 @@ LEGACY_KEY      = __nativethink_favorites_v2     （裸 localStorage，读一次
 - **读盘边界做形状清洗（2026-10-17）**：`sanitizeFavorites(raw)`（`use-favorites.ts:73`）先把每条收成合法形状 —— 缺 `id`/缺 `content` 的条目丢出视图、`content` 是对象就整条丢（直出会让 React 抛错、ErrorBoundary 接走**整页**）、数字/布尔收成字符串（**不丢用户的条目**）、`example` 为 null/缺失时不凭空造键。为什么必须有：收藏是全站唯一不校验的清单加载器，而它有**两条外部来源**（`__nativethink_favorites_v2` 旧键迁移 + 云同步下行），渲染层却是 `{f.content}` 直出 + `cleanText(f.example)`（对非字符串直接 `.replace`）。回写判据刻意用**条数变化**而不是序列化比较 —— 清洗会重建对象、键序变了，按比较结果写就会**每次挂载都落盘**。守卫 `verify-vocab-cards` ㉔ 真跑（11 条，变异 5 条逐条验红）。
 - **收藏回顾（`FavoriteReviewMode`）有两个入口，必须各自带 `<LazyFramerProvider>`**：收藏页「开始回顾」（`FavoritesPage.tsx:92-105`）与学习记录页的收藏卡（`ProgressPage.tsx:944-946`）。该组件内部走 `useFramerMotion()`，旧实现在缺 provider 时**直接 throw** —— 2026-10-17 真机就是收藏页裸渲染，点「开始回顾」整页变「我的收藏页面出错」，而学习记录页一直正常（同一个组件两种命运）。现在 hook 缺 provider 时退化成无动画 + 一次性 `console.warn`（`lazy-framer-motion.tsx:69-81`），守卫 `verify-overlay-fit` ⑦ 改成**逐个宿主点名**（旧写法"任意一个宿主包了就放行"正是这条假绿的形状）。
 - `clearAll()` 是一次 `persist([])`，注释写明原因：「循环调 `removeFavorite` 会因陈旧闭包只删掉最后一条（ProgressPage 重置踩过）」（`:96-99`）。
+- **空态出入口（2026-10-29）**：`FavoritesPage.tsx:241-256` 的 `EmptyState` 增加「去词汇学习」按钮（`navigate('/vocabulary')`），底部提示去掉 `/60` 透明度；393px 实测按钮 134×42、bottom 482 在首屏内。空态不再是只有说明、没有下一步的终点。
 
 
 ### 表达纠偏本（2026-10-16 新增，`src/lib/correction-notes.ts`）

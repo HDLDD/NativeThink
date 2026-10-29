@@ -35,8 +35,8 @@ function QuickStartGridInner({ onNavigate }: QuickStartGridProps) {
             className="group flex min-h-[124px] flex-col justify-between rounded-[20px] border border-border bg-card p-5 text-left transition-colors hover:border-transparent hover:bg-[var(--ink)]"
           >
             <div className="flex items-start justify-between">
-              <span className="flex items-center gap-2 text-[11px] font-extrabold tracking-[0.14em] text-[var(--tint)] tabular-nums transition-colors group-hover:text-[var(--lime)]">
-                <span className="size-1.5 rounded-full bg-current" aria-hidden />
+              <span className="flex items-center gap-2 text-[11px] font-extrabold tracking-[0.14em] text-muted-foreground tabular-nums transition-colors group-hover:text-[var(--lime)]">
+                <span className="size-1.5 rounded-full transition-colors group-hover:bg-[var(--lime)]" style={{ background: entry.tint }} aria-hidden />
                 {String(index + 1).padStart(2, '0')}
               </span>
               <ArrowUpRight className="size-4 text-muted-foreground/30 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[var(--lime)]" />
@@ -60,7 +60,7 @@ function QuickStartGridInner({ onNavigate }: QuickStartGridProps) {
           >
             <div className="flex items-center gap-2 mb-1">
               <h4 className="text-[16px] font-bold text-foreground">{it.label}</h4>
-              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--warm)] bg-[var(--warm)]/10 px-2 py-0.5 rounded-full">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-800 bg-amber-100/70 dark:bg-amber-500/15 dark:text-amber-300 px-2 py-0.5 rounded-full">
                 即将上线
               </span>
             </div>

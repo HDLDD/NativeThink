@@ -54,7 +54,7 @@ const LEVELS = [
 interface SetupStepProps {
   counts: Record<string, number>;
   onComplete: (level: string, tab: string, dailyCount: number, reviewMode?: string) => void;
-  onContinue: () => void;
+  onContinue?: () => void;
   /**
    * 只在"已经选过词书"时传入：换书走这条**一步生效**的路径（保持当前学习方式）。
    * 不给这个 prop 才是首启的三步向导（词书 → 方式 → 开始）。
@@ -215,9 +215,11 @@ function VocabSetupWizard({ counts, onComplete, onContinue, onSwitchBook, curren
               <p className="mt-1 text-[10px] text-muted-foreground">加载较慢，建议选择单本词书</p>
             </button>
           </div>
-          <div className="text-center mt-4">
-            <button data-press="soft" onClick={onContinue} className="text-xs font-bold text-muted-foreground hover:text-ink-teal">继续上次的选择 →</button>
-          </div>
+          {onContinue && (
+            <div className="text-center mt-4">
+              <button data-press="soft" onClick={onContinue} className="text-xs font-bold text-muted-foreground hover:text-ink-teal">继续上次的选择 →</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -943,7 +945,13 @@ export default function DeepVocabularyPage() {
   const homeLearnedToday = Object.keys(homeWordState.progress).length > 0
     ? homeWordState.todayLearned.length
     : 0;
-  const enterMode = (key: string) => { handleTabChange(key); setImmersed(true); };
+  const enterMode = (key: string) => {
+    // 首次使用还没选词书就关掉向导时，模式卡不能把人带进“词库加载中…”死路：
+    // 预载被 setupDone 挡着，永远等不到数据。回到向导，先把书选完。
+    if (!setupDone) { handleOpenWizard(); return; }
+    handleTabChange(key);
+    setImmersed(true);
+  };
 
   /**
    * 深链直达某个模式：首页「表达纠偏」横幅带 `?tab=correction` 过来，一步落进该模式
@@ -1009,7 +1017,7 @@ export default function DeepVocabularyPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-black italic text-foreground tracking-tight">词汇深度</h1>
-          <p className="text-muted-foreground text-xs font-medium">选择一个模式开始</p>
+          <p className="text-muted-foreground text-xs font-medium">{showWizard ? '先选一本，再挑练法' : '选择一个模式开始'}</p>
         </div>
         <button data-press="soft"
           onClick={handleOpenWizard}
@@ -1104,7 +1112,7 @@ export default function DeepVocabularyPage() {
         <VocabSetupWizard
           counts={counts}
           onComplete={handleWizardComplete}
-          onContinue={handleWizardContinue}
+          onContinue={setupDone ? handleWizardContinue : undefined}
           onSwitchBook={setupDone ? handleSwitchBook : undefined}
           currentLevel={selectedLevel}
           onClose={() => setShowWizard(false)}

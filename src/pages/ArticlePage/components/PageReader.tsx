@@ -1468,7 +1468,7 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
                   <Volume2 className="size-3.5" />{readerMode === 'novel' ? '朗读本章' : '朗读本页'}
                 </Button>
                 <Button variant="outline" size="sm" onClick={toggleAutoRead}
-                  className={cn('flex-1 rounded-xl text-xs font-bold gap-1', autoReadPages && 'bg-[var(--brand)] hover:bg-[#00a882] text-white border-transparent')}>
+                  className={cn('flex-1 rounded-xl text-xs font-bold gap-1', autoReadPages && 'bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white border-transparent')}>
                   <Repeat className={cn('size-3.5', autoReadPages && 'animate-pulse')} />{autoReadPages ? '连读中…' : (readerMode === 'novel' ? '连读全书' : '连读全篇')}
                 </Button>
               </div>

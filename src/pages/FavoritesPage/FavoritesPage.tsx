@@ -242,9 +242,17 @@ export default function FavoritesPage() {
           icon={Heart}
           title="收藏本是空的"
           description={<>在词汇学习、搭配学习、文章阅读等页面，点击 <Heart className="size-3.5 inline text-rose-500 fill-current mx-0.5" /> 图标即可收藏你喜欢的表达</>}
+          action={(
+            <Button
+              onClick={() => navigate('/vocabulary')}
+              className="rounded-full bg-[var(--brand)] px-6 text-[var(--on-brand)] hover:bg-[var(--brand-strong)]"
+            >
+              去词汇学习
+            </Button>
+          )}
         />
         {correctionBlock}
-        <div className="flex items-center justify-center gap-3 pb-12 text-[10px] font-bold text-muted-foreground/60">
+        <div className="flex items-center justify-center gap-3 pb-12 text-[10px] font-bold text-muted-foreground">
           <span>💡 单词可收藏</span>
           <span>📝 例句可收藏</span>
           <span>🔗 搭配可收藏</span>
@@ -277,7 +285,7 @@ export default function FavoritesPage() {
           <Button
             onClick={() => setReviewMode(true)}
             disabled={filteredFavorites.length === 0}
-            className="rounded-xl text-[10px] font-black uppercase tracking-wider bg-[var(--brand)] hover:bg-[#00a882] text-white shadow-lg shadow-emerald-200/50 gap-1.5"
+            className="rounded-xl text-[10px] font-black uppercase tracking-wider bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white shadow-lg shadow-emerald-200/50 gap-1.5"
           >
             <BookOpen className="size-3.5" />
             开始回顾

@@ -1387,7 +1387,7 @@ export default function ArticlePage() {
                 size="sm"
                 onClick={() => aiTopicInput.trim() && generateAiArticle(aiTopicInput.trim())}
                 disabled={!aiTopicInput.trim() || aiLoading || !isConfigured}
-                className="rounded-xl bg-[var(--brand)] hover:bg-[#00a882] text-white text-[10px] font-bold px-4"
+                className="rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white text-[10px] font-bold px-4"
               >
                 {aiLoading && <Loader2 className="size-3.5 animate-spin" />}
                 <span className="ml-1">生成</span>
@@ -1770,7 +1770,7 @@ export default function ArticlePage() {
           </div>
           <div className="p-6 border-t border-border flex gap-3 justify-end">
             <Button variant="outline" onClick={() => setImportOpen(false)} className="rounded-2xl">取消</Button>
-            <Button onClick={doImport} disabled={importing || !importText.trim()} className="rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-black">
+            <Button onClick={doImport} disabled={importing || !importText.trim()} className="rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-black">
               {importing ? <Loader2 className="size-4 mr-1.5 animate-spin" /> : <Upload className="size-4 mr-1.5" />}
               {importing ? '导入中…' : '导入'}
             </Button>

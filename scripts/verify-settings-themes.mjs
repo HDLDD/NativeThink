@@ -6,7 +6,7 @@
  *   ① 保留原主题；新外观做成可来回切换的配置（明暗之外的第二维）。
  *   ② 顶栏那些功能（使用指南 / 朗读配置 / AI / 每日目标 / 更新日志 / 开发者主页）合并进"设置"。
  *
- * 这个守卫盯的是"接得对不对"，不是"好不好看"：外观最终以真机/浏览器读数为准。
+ * 这个守卫盯的是"接得对不对"与暗色表面/文字对比度；观感最终仍以真机/浏览器读数为准。
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -67,9 +67,12 @@ for (const id of ids.filter((i) => i !== 'classic')) {
 }
 const tsxFiles = fs.readdirSync(path.join(ROOT, 'src'), { recursive: true })
   .map(String).filter((f) => /\.tsx$/.test(f)).map((f) => path.join('src', f));
-const leftovers = tsxFiles.filter((f) => read(f).includes('#00B894')).map((f) => f.replace(/\\/g, '/'));
+const leftovers = tsxFiles.filter((f) => {
+  const s = read(f);
+  return s.includes('#00B894') || s.includes('#00a882');
+}).map((f) => f.replace(/\\/g, '/'));
 ok(leftovers.length === 0,
-  '③ 全站 tsx 不再硬编码 #00B894（品牌色一律 var(--brand)，否则换主题时会留下一块绿）',
+  '③ 全站 tsx 不再硬编码 #00B894 / 旧 hover #00a882（品牌色一律 var(--brand)，否则换主题时会留下一块绿）',
   JSON.stringify(leftovers.slice(0, 6)));
 
 /* ── ④ 顶栏合并 ── */
@@ -103,6 +106,85 @@ ok(/const SettingsPage = lazy\(\(\) => import\("@\/pages\/SettingsPage\/Settings
   '⑥ /settings 路由已注册（lazy + ErrorBoundary）');
 ok(/\{ path: '\/settings', label: '设置'/.test(SIDEBAR) && /'\/settings': \(\) => import\('@\/pages\/SettingsPage\/SettingsPage'\)/.test(SIDEBAR),
   '⑥ 侧边栏有条目且带预取');
+
+/* ── ⑦ 明暗 token 对比度与暗色表面完整（2026-10-29） ──
+ * 曾经：暗色只换强调色，主题亮色块凭选择器特异性压过 .dark 的 --background/--card，
+ * 结果电蓝/石墨/青柠切暗色后还是亮纸面，而文字已切亮色 → 实测对比度 1.0–2.0。
+ * 这条按 token 真算对比，而不是只看“有没有暗色块”。 */
+const BASE_CSS = stripCss(read('src/tailwind-theme.css'));
+const parseVars = (block) => {
+  const out = {};
+  for (const m of (block || '').matchAll(/(--[\w-]+):\s*([^;]+);/g)) out[m[1]] = m[2].trim();
+  return out;
+};
+const allVars = (selector, src) => {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 'g');
+  const out = {};
+  let m;
+  while ((m = re.exec(src))) Object.assign(out, parseVars(m[1]));
+  return out;
+};
+const varsFor = (id, dark) => {
+  if (id === 'classic') {
+    return { ...allVars(':root', BASE_CSS + '\n' + CSS), ...allVars(dark ? '.dark' : ':root', BASE_CSS) };
+  }
+  return allVars(dark ? `html.dark[data-ui-theme="${id}"]` : `html[data-ui-theme="${id}"]`, CSS);
+};
+const parseColor = (raw) => {
+  if (!raw) return null;
+  const h = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (h) {
+    let x = h[1];
+    if (x.length === 3) x = x.split('').map((c) => c + c).join('');
+    return { r: parseInt(x.slice(0, 2), 16), g: parseInt(x.slice(2, 4), 16), b: parseInt(x.slice(4, 6), 16) };
+  }
+  const m = raw.match(/rgba?\(([\d.]+)[, ]+([\d.]+)[, ]+([\d.]+)/);
+  return m ? { r: +m[1], g: +m[2], b: +m[3] } : null;
+};
+const luminance = (c) => {
+  const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+};
+const contrast = (a, b) => {
+  const x = luminance(a), y = luminance(b);
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+};
+const WHITE = { r: 255, g: 255, b: 255 };
+const darkSurfaces = ['--background', '--card', '--card-foreground', '--popover', '--popover-foreground',
+  '--secondary', '--secondary-foreground', '--muted', '--muted-foreground', '--border', '--input',
+  '--sidebar', '--sidebar-foreground', '--sidebar-accent', '--sidebar-border'];
+for (const id of ids) {
+  const problems = [];
+  for (const [mode, v] of [['亮色', varsFor(id, false)], ['暗色', varsFor(id, true)]]) {
+    const bg = parseColor(v['--background']);
+    for (const [token, min] of [['--ink-teal', 4.5], ['--muted-foreground', 4.5], ['--foreground', 7]]) {
+      const c = parseColor(v[token]);
+      const r = bg && c ? contrast(c, bg) : 0;
+      if (r < min) problems.push(`${mode} ${token} ${r.toFixed(2)}<${min}`);
+    }
+    const brand = parseColor(v['--brand']), onBrand = parseColor(v['--on-brand']);
+    const r = brand && onBrand ? contrast(brand, onBrand) : 0;
+    if (r < 4.5) problems.push(`${mode} on-brand ${r.toFixed(2)}<4.5`);
+  }
+  const missing = darkSurfaces.filter((k) => !varsFor(id, true)[k]);
+  if (missing.length) problems.push(`暗色表面缺 ${missing.join(',')}`);
+  ok(problems.length === 0, `⑦ ${id}：明暗文字对比度达标，暗色块自带完整表面 token`, problems.slice(0, 4).join('；'));
+}
+const darkBrandWhiteBad = ids.filter((id) => id !== 'classic').filter((id) => {
+  const brand = parseColor(varsFor(id, true)['--brand']);
+  return !brand || contrast(brand, WHITE) < 4.5;
+});
+ok(darkBrandWhiteBad.length === 0,
+  '⑦ 非 classic 主题的暗色 --brand 与白字对比度 ≥4.5（组件仍大量把 text-white 放在 brand 填充上）',
+  JSON.stringify(darkBrandWhiteBad));
+const USE_THEME = code('src/lib/use-theme.ts');
+ok(/export function initThemeMode/.test(USE_THEME) && /classList\.toggle\('dark'/.test(USE_THEME),
+  '⑦ 明暗有 initThemeMode（挂载前应用，深色刷新不闪白）');
+ok(/initThemeMode\(\)/.test(ROOT_TSX) && ROOT_TSX.indexOf('initThemeMode()') < ROOT_TSX.indexOf('createRoot('),
+  '⑦ initThemeMode() 在 createRoot 之前调用');
+ok(/useState(?:<Theme>)?\(\(\) => readThemeMode\(\)\)/.test(USE_THEME),
+  '⑦ useTheme 的初始状态直接读盘（否则 effect 会先把 dark 摘掉再装回）');
 
 const pass = results.filter((r) => r.pass).length;
 for (const r of results) if (!r.pass) console.log(`✗ ${r.name}${r.detail ? '  — ' + r.detail : ''}`);

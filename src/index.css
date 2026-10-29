@@ -442,20 +442,20 @@ html[data-ui-theme="porcelain"] {
   --border: rgba(15, 23, 42, 0.07);
   --input: rgba(15, 23, 42, 0.07);
   --muted: #EEF2F8;
-  --muted-foreground: #667085;
-  --primary: #2F6BFF;
+  --muted-foreground: #5B6477;
+  --primary: #2A5FE0;
   --primary-foreground: #FFFFFF;
   --secondary: #EEF2F8;
-  --accent: #2F6BFF;
+  --accent: #2A5FE0;
   --accent-foreground: #FFFFFF;
-  --ring: #2F6BFF;
-  --ink-teal: #2F6BFF;
+  --ring: #2A5FE0;
+  --ink-teal: #2A5FE0;
   --sidebar: #FFFFFF;
   --sidebar-border: rgba(15, 23, 42, 0.06);
   --sidebar-accent: #EEF2F8;
-  --sidebar-primary: #2F6BFF;
-  --sidebar-ring: #2F6BFF;
-  --chart-1: #2F6BFF;
+  --sidebar-primary: #2A5FE0;
+  --sidebar-ring: #2A5FE0;
+  --chart-1: #2A5FE0;
   --ink: #0A1A33;
   --ink-2: #122A4A;
   --lime: #8FE7FF;
@@ -473,7 +473,7 @@ html[data-ui-theme="graphite"] {
   --border: rgba(10, 10, 10, 0.07);
   --input: rgba(10, 10, 10, 0.07);
   --muted: #EFEFF1;
-  --muted-foreground: #71717A;
+  --muted-foreground: #64646B;
   --primary: #0A0A0A;
   --primary-foreground: #FFFFFF;
   --secondary: #EFEFF1;
@@ -506,18 +506,19 @@ html[data-ui-theme="lime"] {
   --border: rgba(13, 15, 12, 0.07);
   --input: rgba(13, 15, 12, 0.07);
   --muted: #EDF1EA;
-  --muted-foreground: #6B7268;
+  --muted-foreground: #5E665D;
   --primary: #0D0F0C;
   --primary-foreground: #D9F86A;
   --secondary: #EDF1EA;
   --accent: #0FA968;
-  --accent-foreground: #FFFFFF;
+  --accent-foreground: #0D0F0C;
   --ring: #0FA968;
-  --ink-teal: #0FA968;
+  --ink-teal: #0B7A4B;
   --sidebar: #FFFFFF;
   --sidebar-border: rgba(13, 15, 12, 0.06);
   --sidebar-accent: #EDF1EA;
   --sidebar-primary: #0FA968;
+  --sidebar-primary-foreground: #0D0F0C;
   --sidebar-ring: #0FA968;
   --chart-1: #0FA968;
   --ink: #0C1A12;
@@ -537,21 +538,23 @@ html[data-ui-theme="sand"] {
   --border: #E6D9C4;
   --input: #E6D9C4;
   --muted: #F0E6D6;
-  --muted-foreground: #7A6A58;
-  --primary: #A76A34;
+  --muted-foreground: #6B5C4B;
+  --primary: #8C5526;
   --primary-foreground: #FFFFFF;
   --secondary: #F0E6D6;
-  --accent: #A76A34;
+  --accent: #8C5526;
   --accent-foreground: #FFFFFF;
-  --ring: #A76A34;
+  --ring: #8C5526;
   --ink-teal: #8A5528;
-  --chart-1: #A76A34;
+  --chart-1: #8C5526;
   --ink: #221710;
   --ink-2: #31221A;
   --lime: #F0C46C;
   --warm: #B4522A;
   --on-brand: #FFF9F2;
   --on-lime: #221710;
+  --nav-bg: #8C5526;
+  --nav-fg: #FFFFFF;
 }
 html[data-ui-theme="berry"] {
   --background: #FBF3F5;
@@ -563,7 +566,7 @@ html[data-ui-theme="berry"] {
   --border: #EFDCE2;
   --input: #EFDCE2;
   --muted: #F5E7EB;
-  --muted-foreground: #7C6470;
+  --muted-foreground: #6E5763;
   --primary: #B23A6B;
   --primary-foreground: #FFFFFF;
   --secondary: #F5E7EB;
@@ -579,64 +582,101 @@ html[data-ui-theme="berry"] {
   --on-brand: #FFFFFF;
   --on-lime: #201016;
 }
-/* 暗色：背景仍用现有深色体系，只把强调色换成对应主题 */
+/* 暗色：完整表面 token + 对应强调色。只写强调色会被上面的亮色块按选择器特异性反盖 */
 html.dark[data-ui-theme="porcelain"] {
-  --primary: #7EA8FF; --ring: #7EA8FF; --accent: #7EA8FF; --ink-teal: #8FB4FF;
-  --sidebar-primary: #7EA8FF; --sidebar-ring: #7EA8FF; --chart-1: #7EA8FF;
+  --background: #0A1220; --foreground: #E8EEF9;
+  --card: #121D2E; --card-foreground: #E8EEF9;
+  --popover: #121D2E; --popover-foreground: #E8EEF9;
+  --secondary: #1A273B; --secondary-foreground: #E8EEF9;
+  --muted: #1A273B; --muted-foreground: #9BA9BF;
+  --border: #293852; --input: #293852;
+  --sidebar: #0A1220; --sidebar-foreground: #E8EEF9;
+  --sidebar-accent: #1A273B; --sidebar-accent-foreground: #E8EEF9; --sidebar-border: #293852;
+  --primary: #7EA8FF; --primary-foreground: #06121F; --ring: #7EA8FF; --accent: #7EA8FF; --accent-foreground: #06121F;
+  --ink-teal: #8FB4FF; --sidebar-primary: #7EA8FF; --sidebar-primary-foreground: #06121F; --sidebar-ring: #7EA8FF; --chart-1: #7EA8FF;
   --ink: #071427; --ink-2: #0E2138; --lime: #8FE7FF; --warm: #E9A15C;
   --on-brand: #FFFFFF; --on-lime: #06121F;
-  --nav-bg: #6A98F0; --nav-fg: #FFFFFF;
+  --nav-bg: #2559E0; --nav-fg: #FFFFFF;
 }
 html.dark[data-ui-theme="graphite"] {
-  --primary: #E7E7EA; --primary-foreground: #0A0A0A; --ring: #E7E7EA; --accent: #E7E7EA;
-  --accent-foreground: #0A0A0A; --ink-teal: #E7E7EA; --sidebar-primary: #E7E7EA; --chart-1: #E7E7EA;
+  --background: #0B0B0C; --foreground: #EDEDEE;
+  --card: #141416; --card-foreground: #EDEDEE;
+  --popover: #141416; --popover-foreground: #EDEDEE;
+  --secondary: #1D1D20; --secondary-foreground: #EDEDEE;
+  --muted: #1D1D20; --muted-foreground: #A1A1A8;
+  --border: #2B2B2F; --input: #2B2B2F;
+  --sidebar: #0B0B0C; --sidebar-foreground: #EDEDEE;
+  --sidebar-accent: #1D1D20; --sidebar-accent-foreground: #EDEDEE; --sidebar-border: #2B2B2F;
+  --primary: #E7E7EA; --primary-foreground: #0A0A0B; --ring: #E7E7EA; --accent: #E7E7EA; --accent-foreground: #0A0A0B;
+  --ink-teal: #E7E7EA; --sidebar-primary: #E7E7EA; --sidebar-primary-foreground: #0A0A0B; --sidebar-ring: #E7E7EA; --chart-1: #E7E7EA;
   --ink: #0A0A0B; --ink-2: #141416; --lime: #EDEDED; --warm: #E9B36A;
   --on-brand: #FFFFFF; --on-lime: #0A0A0B;
   --nav-bg: #F2F2F2; --nav-fg: #0A0A0B;
 }
 html.dark[data-ui-theme="lime"] {
-  --primary: #D9F86A; --primary-foreground: #0D0F0C; --ring: #D9F86A; --accent: #3ECF8E;
-  --ink-teal: #3ECF8E; --sidebar-primary: #D9F86A; --chart-1: #3ECF8E;
+  --background: #0A120D; --foreground: #E8F1E8;
+  --card: #121B14; --card-foreground: #E8F1E8;
+  --popover: #121B14; --popover-foreground: #E8F1E8;
+  --secondary: #1A261C; --secondary-foreground: #E8F1E8;
+  --muted: #1A261C; --muted-foreground: #9AA89D;
+  --border: #29382D; --input: #29382D;
+  --sidebar: #0A120D; --sidebar-foreground: #E8F1E8;
+  --sidebar-accent: #1A261C; --sidebar-accent-foreground: #E8F1E8; --sidebar-border: #29382D;
+  --primary: #D9F86A; --primary-foreground: #0D0F0C; --ring: #D9F86A; --accent: #3ECF8E; --accent-foreground: #0D0F0C;
+  --ink-teal: #3ECF8E; --sidebar-primary: #D9F86A; --sidebar-primary-foreground: #0D0F0C; --sidebar-ring: #D9F86A; --chart-1: #3ECF8E;
   --ink: #0C1A12; --ink-2: #16281B; --lime: #D9F86A; --warm: #F0A93A;
-  --on-brand: #0D0F0C; --on-lime: #0D0F0C;
+  --on-brand: #FFFFFF; --on-lime: #0D0F0C;
+  --nav-bg: #0B7A4B; --nav-fg: #FFFFFF;
 }
 html.dark[data-ui-theme="sand"] {
-  --background: #14100C; --card: #1D1812; --foreground: #F0E7DA; --border: #332A20;
+  --background: #14100C; --card: #1D1812; --foreground: #F0E7DA; --card-foreground: #F0E7DA;
+  --popover: #1D1812; --popover-foreground: #F0E7DA;
+  --border: #332A20; --input: #332A20;
+  --secondary: #231C15; --secondary-foreground: #F0E7DA;
   --muted: #231C15; --muted-foreground: #A69580;
+  --sidebar: #14100C; --sidebar-foreground: #F0E7DA;
+  --sidebar-accent: #231C15; --sidebar-accent-foreground: #F0E7DA; --sidebar-border: #332A20;
   --primary: #E0A065; --primary-foreground: #1A120B; --ring: #E0A065; --accent: #E0A065;
-  --accent-foreground: #1A120B; --ink-teal: #E8B37B; --sidebar-primary: #E0A065; --chart-1: #E0A065;
+  --accent-foreground: #1A120B; --ink-teal: #E8B37B; --sidebar-primary: #E0A065; --sidebar-primary-foreground: #1A120B; --chart-1: #E0A065;
   --ink: #14100C; --ink-2: #1F1811; --lime: #F0C46C; --warm: #E09A5A;
-  --on-brand: #1A120B; --on-lime: #14100C;
+  --on-brand: #FFFFFF; --on-lime: #14100C;
+  --nav-bg: #8C5526; --nav-fg: #FFFFFF;
 }
 html.dark[data-ui-theme="berry"] {
-  --background: #140B0F; --card: #1D1116; --foreground: #F5E6EC; --border: #33202A;
+  --background: #140B0F; --card: #1D1116; --foreground: #F5E6EC; --card-foreground: #F5E6EC;
+  --popover: #1D1116; --popover-foreground: #F5E6EC;
+  --border: #33202A; --input: #33202A;
+  --secondary: #24161C; --secondary-foreground: #F5E6EC;
   --muted: #24161C; --muted-foreground: #B39AA5;
+  --sidebar: #140B0F; --sidebar-foreground: #F5E6EC;
+  --sidebar-accent: #24161C; --sidebar-accent-foreground: #F5E6EC; --sidebar-border: #33202A;
   --primary: #E06A9A; --primary-foreground: #1A0C12; --ring: #E06A9A; --accent: #E06A9A;
-  --accent-foreground: #1A0C12; --ink-teal: #E58AAE; --sidebar-primary: #E06A9A; --chart-1: #E06A9A;
+  --accent-foreground: #1A0C12; --ink-teal: #E58AAE; --sidebar-primary: #E06A9A; --sidebar-primary-foreground: #1A0C12; --chart-1: #E06A9A;
   --ink: #140B0F; --ink-2: #1F1218; --lime: #F6B6CC; --warm: #D98A4F;
-  --on-brand: #1A0C12; --on-lime: #140B0F;
+  --on-brand: #FFFFFF; --on-lime: #140B0F;
+  --nav-bg: #A02E5E; --nav-fg: #FFFFFF;
 }
 /* 选中文字跟随主色（原主题保留青绿） */
-html[data-ui-theme="porcelain"] ::selection { background: #2F6BFF; color: #FFFFFF; }
+html[data-ui-theme="porcelain"] ::selection { background: #2A5FE0; color: #FFFFFF; }
 html[data-ui-theme="graphite"] ::selection { background: #0A0A0A; color: #FFFFFF; }
 html[data-ui-theme="lime"] ::selection { background: #0FA968; color: #FFFFFF; }
-html[data-ui-theme="sand"] ::selection { background: #A76A34; color: #FFF9F2; }
+html[data-ui-theme="sand"] ::selection { background: #8C5526; color: #FFFFFF; }
 html[data-ui-theme="berry"] ::selection { background: #B23A6B; color: #FFFFFF; }
 
 /* 品牌色的单一来源：主题切换时只换这三个变量，所有用 var(--brand) 的地方一起变。
    --brand-rgb 供 alpha 用法（rgb(var(--brand-rgb) / .15)）—— 直接写 rgba(0,184,148,·)
    会让阴影/高光在换主题后仍然是绿的。 */
 :root { --brand: #00B894; --brand-strong: #00A080; --brand-rgb: 0 184 148; }
-html[data-ui-theme="porcelain"] { --brand: #2F6BFF; --brand-strong: #2559E0; --brand-rgb: 47 107 255; }
+html[data-ui-theme="porcelain"] { --brand: #2A5FE0; --brand-strong: #2350C4; --brand-rgb: 42 95 224; }
 html[data-ui-theme="graphite"] { --brand: #0A0A0A; --brand-strong: #000000; --brand-rgb: 10 10 10; }
 html[data-ui-theme="lime"] { --brand: #0FA968; --brand-strong: #0C8A54; --brand-rgb: 15 169 104; }
-html[data-ui-theme="sand"] { --brand: #A76A34; --brand-strong: #8C5526; --brand-rgb: 167 106 52; }
+html[data-ui-theme="sand"] { --brand: #8C5526; --brand-strong: #74451C; --brand-rgb: 140 85 38; }
 html[data-ui-theme="berry"] { --brand: #B23A6B; --brand-strong: #933054; --brand-rgb: 178 58 107; }
-html.dark[data-ui-theme="porcelain"] { --brand: #7EA8FF; --brand-strong: #6A98F0; --brand-rgb: 126 168 255; }
-html.dark[data-ui-theme="graphite"] { --brand: #E7E7EA; --brand-strong: #FFFFFF; --brand-rgb: 231 231 234; }
-html.dark[data-ui-theme="lime"] { --brand: #3ECF8E; --brand-strong: #D9F86A; --brand-rgb: 62 207 142; }
-html.dark[data-ui-theme="sand"] { --brand: #D99455; --brand-strong: #C07D40; --brand-rgb: 217 148 85; }
-html.dark[data-ui-theme="berry"] { --brand: #D45A8B; --brand-strong: #BB4777; --brand-rgb: 212 90 139; }
+html.dark[data-ui-theme="porcelain"] { --brand: #2559E0; --brand-strong: #1E4AC2; --brand-rgb: 37 89 224; }
+html.dark[data-ui-theme="graphite"] { --brand: #3F3F46; --brand-strong: #52525B; --brand-rgb: 63 63 70; }
+html.dark[data-ui-theme="lime"] { --brand: #0B7A4B; --brand-strong: #09653E; --brand-rgb: 11 122 75; }
+html.dark[data-ui-theme="sand"] { --brand: #8C5526; --brand-strong: #74451C; --brand-rgb: 140 85 38; }
+html.dark[data-ui-theme="berry"] { --brand: #A02E5E; --brand-strong: #86264E; --brand-rgb: 160 46 94; }
 
 /* 功能区分：不再用整屏的彩色环境光（它会把纸面染成粉/绿/黄）。
    模块辨识交给导航激活项与内容本身；页面保持一块干净的纸。 */

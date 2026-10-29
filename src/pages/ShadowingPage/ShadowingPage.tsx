@@ -1346,7 +1346,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                               ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
                               : transcribing
                                 ? 'bg-muted text-muted-foreground'
-                                : 'bg-[var(--brand)] hover:bg-[#00a882] text-white',
+                                : 'bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white',
                           )}
                         >
                           {recordingVoice

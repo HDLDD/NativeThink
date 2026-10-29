@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/sonner";
 import CelebrateLayer from "./components/CelebrateLayer";
 import { initPressFx } from "./lib/press-fx";
 import { initUiTheme } from "./lib/ui-theme";
+import { initThemeMode } from "./lib/use-theme";
 import App from "./app";
 import "./index.css";
 import { checkBundledEngineHealth } from "./lib/sherpa-tts";
@@ -20,6 +21,8 @@ checkBundledEngineHealth();
 initPressFx();
 // 外观主题同理：挂载前把 <html data-ui-theme> 写好，避免首帧闪回默认主题
 initUiTheme();
+// 明暗也要在 createRoot 前落地（useTheme 的初始状态同样读盘），否则深色刷新先闪白
+initThemeMode();
 
 /** Simple error fallback — works on all platforms without Lark dependencies */
 function GlobalErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {

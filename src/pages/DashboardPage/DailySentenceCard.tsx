@@ -226,7 +226,7 @@ function DailySentenceCardInner({
 
         <div className="mt-auto flex items-center justify-between pt-6">
           <div className="flex gap-1.5">
-            <span className="rounded-full bg-[var(--warm)]/10 px-2.5 py-1 text-[10px] font-bold tracking-wider text-[var(--warm)]">
+            <span className="rounded-full bg-amber-100/70 px-2.5 py-1 text-[10px] font-bold tracking-wider text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
               {categoryLabel}
             </span>
             <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium tracking-wider text-muted-foreground">

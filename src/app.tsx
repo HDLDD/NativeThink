@@ -30,7 +30,7 @@ function PageErrorFallback({ page }: { page: string }) {
         <p className="text-sm text-muted-foreground">页面加载时发生错误，请刷新重试</p>
         <button
           onClick={() => window.location.reload()}
-          className="px-4 py-2 rounded-xl bg-[var(--brand)] text-white font-black text-sm hover:bg-[#00a882] transition-colors"
+          className="px-4 py-2 rounded-xl bg-[var(--brand)] text-white font-black text-sm hover:bg-[var(--brand-strong)] transition-colors"
         >
           刷新页面
         </button>

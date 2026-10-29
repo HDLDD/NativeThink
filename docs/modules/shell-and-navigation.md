@@ -117,5 +117,7 @@ AGENTS.md 说的"四件套"确实都还在，但**还有两处隐性要求**，�
 | 启动 | `src/index.tsx` 的 `initUiTheme()` | 在 `createRoot` 之前把 `data-ui-theme` 写到 `<html>`，刷新不闪回默认 |
 | 选择入口 | `/settings` → 外观 + 侧栏底部 | 亮/暗 + 六套主题色卡（当前主题用品牌色小点标出）；侧栏底部 6 个双色圆点可直接切换；选择写 `localStorage.__nativethink_ui_theme` 并广播给其它实例 |
 
+**暗色不是只换强调色**（2026-10-29）：`html.dark[data-ui-theme=…]` 必须自带完整的表面 token —— `--background/--card/--card-foreground/--popover/--popover-foreground/--secondary/--secondary-foreground/--muted/--muted-foreground/--border/--input/--sidebar*`。只写强调色时，亮色主题块会凭选择器特异性压过 `.dark` 的 `--background/--card`：电蓝/石墨/青柠切暗色后仍是亮纸面，而文字已经切成浅色，实测对比度掉到 1.0–2.0。暗色 `--brand` 用深一档的填充值保证白字可读，`--ink-teal` 保留亮色专供文字；亮色 lime 的 `--ink-teal`、各主题的 `--muted-foreground` 也按 4.5:1 收紧。守卫 `verify-settings-themes` ⑦ 按 token 真算对比度（45 断言，6 组变异全红）；明暗也走 `initThemeMode()` 在 `createRoot` 前落地，深色刷新不闪白。全站 tsx 的旧 hover `#00a882` 也已清零，统一 `var(--brand-strong)` —— 否则换主题后鼠标悬停会闪回绿色。
+
 **已知边界**：canvas（`celebrate.ts`）与 Recharts 的 `fill` 仍拿字面色，不跟随主题；
 `emerald-*` / `teal-*` 这类语义色（成功/正确）与品牌色是两回事，主题不会把它们染成主色 —— 这是刻意的。

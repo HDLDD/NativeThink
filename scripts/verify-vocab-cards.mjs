@@ -490,6 +490,12 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '预载失败也放行（finally 放开 dataReady），不会把人永久卡在"加载中"');
   check(/\{!showWizard && immersed && dataReady && \(/.test(page),
     '模式子树等 dataReady 才挂载（防"数据晚到但 memo 不重算"）');
+  check(/const enterMode = \(key[^)]*\) => \{[\s\S]{0,260}?if \(!setupDone\) \{ handleOpenWizard\(\); return; \}/.test(page),
+    '未完成首设时点模式卡回到向导（否则预载被 setupDone 拦住，永久停在“词库加载中”）');
+  check(/\{onContinue && \(/.test(page) && /onContinue=\{setupDone \? handleWizardContinue : undefined\}/.test(page),
+    '首次向导不显示“继续上次的选择”（没有上次选择时 default level 是 all）');
+  check(/\{showWizard \? '先选一本，再挑练法' : '选择一个模式开始'\}/.test(page),
+    '向导打开时副标题说明先选一本词书');
   check((page.match(/preloadLevels\(/g) || []).length === 1,
     'preloadLevels 只剩一个真正调用点：向导完成 / 继续 / 换书都交给同一个 effect（不再各调一遍）',
     `实际 ${(page.match(/preloadLevels\(/g) || []).length} 处`);

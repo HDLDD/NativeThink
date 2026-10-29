@@ -172,7 +172,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
             <div className="flex gap-2">
               <Button
                 onClick={restart}
-                className="flex-1 rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-black text-sm shadow-lg shadow-emerald-200/50"
+                className="flex-1 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-black text-sm shadow-lg shadow-emerald-200/50"
               >
                 <RotateCw className="size-4 mr-2" />再来一次
               </Button>
@@ -446,7 +446,7 @@ export default function FavoriteReviewMode({ favorites, onExit }: Props) {
               mark(true);
             }}
             size="lg"
-            className="rounded-2xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-black text-sm px-6 shadow-lg shadow-emerald-200/50"
+            className="rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-black text-sm px-6 shadow-lg shadow-emerald-200/50"
           >
             <CheckCircle2 className="size-4.5 mr-2" />
             认识

@@ -353,7 +353,7 @@ function CompletionBanner({ roundSize, todayPracticed, onRestart, onShowRecords 
           <Button
             size="sm"
             onClick={onRestart}
-            className="rounded-xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-bold gap-1.5"
+            className="rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-bold gap-1.5"
           >
             <RefreshCw className="size-3.5" />
             再来一轮
@@ -1585,7 +1585,7 @@ export default function SpellingPage() {
             {!submitted ? (
               <Button
                 onClick={handleSubmit}
-                className="rounded-xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-bold gap-2"
+                className="rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-bold gap-2"
               >
                 <Check className="size-4" />
                 提交答案
@@ -1614,7 +1614,7 @@ export default function SpellingPage() {
                 )}
                 <Button
                   onClick={handleNext}
-                  className="rounded-xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-bold gap-2"
+                  className="rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-bold gap-2"
                 >
                   {currentIndex < sessionQueue.length - 1 ? (
                     <>下一句 <ChevronRight className="size-4" /></>
@@ -2080,7 +2080,7 @@ function AIBatchAddDialog({
             <Button
               onClick={onGenerate}
               disabled={loading || !topic.trim()}
-              className="rounded-xl bg-[var(--brand)] hover:bg-[#00a882] text-white font-bold gap-2"
+              className="rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-bold gap-2"
             >
               {loading ? (
                 <>生成中...</>
