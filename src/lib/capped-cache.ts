@@ -37,6 +37,22 @@ export function persistJson(storageKey: string, value: unknown): boolean {
   }
 }
 
+/**
+ * 落盘一段已序列化文本；失败时按全站去抖规则提示。
+ * 学习进度、统计、用户清单这类不可重算的数据一律走这里，不要裸调 safeStorage.setItem ——
+ * 它在配额满时返回 false 而不是抛错，外层 try/catch 看不见。
+ */
+export function persistText(storageKey: string, value: string): boolean {
+  try {
+    const ok = safeStorage.setItem(storageKey, value);
+    if (!ok) warnStorageFull();
+    return ok;
+  } catch {
+    warnStorageFull();
+    return false;
+  }
+}
+
 /** 上一次"空间不足"提示的时间戳（全站一条，别刷屏） */
 let lastStorageWarnAt = 0;
 

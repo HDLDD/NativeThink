@@ -18,6 +18,7 @@ import { useFavorites } from '@/lib/use-favorites';
 import { usedReviewWordKeys, reviewWordRecord, planRvBatches, coveredReviewWords, rvParaCount, rvRegenKeys, buildRvPrompt } from '@/lib/rv-articles';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { safeStorage } from '@/lib/safe-storage';
+import { persistText } from '@/lib/capped-cache';
 import { cn, cleanText, extractJson } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
 import { toast } from 'sonner';
@@ -181,7 +182,7 @@ export default function ArticlePage() {
   const saveAiArticle = (content: IReadingContent) => {
     setAiArticles((prev) => {
       const next = [content, ...prev].slice(0, 50);
-      safeStorage.setItem(AI_ARTICLES_KEY, JSON.stringify(next));
+      persistText(AI_ARTICLES_KEY, JSON.stringify(next));
       return next;
     });
   };
@@ -197,14 +198,14 @@ export default function ArticlePage() {
       const next = hit
         ? prev.map((a) => (a.id === content.id ? content : a))
         : [content, ...prev].slice(0, 50);
-      safeStorage.setItem(AI_ARTICLES_KEY, JSON.stringify(next));
+      persistText(AI_ARTICLES_KEY, JSON.stringify(next));
       return next;
     });
   };
   const deleteAiArticle = (id: string) => {
     setAiArticles((prev) => {
       const next = prev.filter((a) => a.id !== id);
-      safeStorage.setItem(AI_ARTICLES_KEY, JSON.stringify(next));
+      persistText(AI_ARTICLES_KEY, JSON.stringify(next));
       return next;
     });
   };
@@ -878,7 +879,7 @@ export default function ArticlePage() {
     }
   }, [isConfigured, rvRegenId, level, aiChat]);
 
-  useEffect(() => { safeStorage.setItem(HISTORY_KEY, JSON.stringify(history)); }, [history]);
+  useEffect(() => { persistText(HISTORY_KEY, JSON.stringify(history)); }, [history]);
 
   
 

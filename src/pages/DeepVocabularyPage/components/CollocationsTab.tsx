@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { safeStorage } from '@/lib/safe-storage';
+import { persistText } from '@/lib/capped-cache';
 import { mergeCollocAiCache, persistCollocAiCache, readCollocAiCache } from '@/lib/colloc-ai-cache';
 import { getAllWords, queryWords, getWordCounts } from '@/data/wordbank';
 import STATIC_TRANSLATIONS from '@/data/wordbank/collocation-translations';
@@ -207,7 +208,7 @@ export default function CollocationsTab({
     setMemorizedCollocs((prev) => {
       const next = new Set(prev);
       if (next.has(key)) { next.delete(key); } else { next.add(key); }
-      try { safeStorage.setItem(MEMORIZED_STORAGE_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      persistText(MEMORIZED_STORAGE_KEY, JSON.stringify([...next]));
       return next;
     });
   };
@@ -226,7 +227,7 @@ export default function CollocationsTab({
     setMemorizedWords((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
-      try { safeStorage.setItem(WORD_MEMORIZED_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      persistText(WORD_MEMORIZED_KEY, JSON.stringify([...next]));
       return next;
     });
   };

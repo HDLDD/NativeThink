@@ -38,6 +38,7 @@ AI 生成：`aiChat`（`:154`），system 要求**只返回一个 JSON 对象**�
 - `ProgressCharts.tsx:33-42` `MODULE_COLORS`、`:44-53` `MODULE_NAMES`：颜色**按 key 取**（此前按下标对位数组，错位且 conversation/spelling 同为 `#F59E0B`，饼图图例无法区分 —— 注释 `:31-32`）。缺 key 时回落灰 `#94A3B8` / 回落 key 名，**不报错**。
 - 重置是分类型的：学习统计 `:111`、句子拼写 `:119`、阅读 `:124-143`、词汇 `:174`、按词书 `:200`、短语库 `:208`、全部 `:277`。多数提示带「刷新页面后生效」—— 因为这些模块的 hook 不在本页，内存态还在（见 `cloud-sync.md` 的陈旧内存态问题）。
 - **窄屏分类条**（2026-10-28）：`ProgressPage.tsx:703-730` 在 `<sm` 隐藏四个 tab 的图标（`hidden sm:inline`）并给 `TabsList` 加 `max-w-full overflow-x-auto`。393px + 120% 字体下四个标签必须完整可见；退回原先的 `w-fit` 单行会把「成就徽章」裁出视口。收藏卡的「传送」链接加了 `py-1`（`:1001`），手机上不再只有 18px 高。
+- **重置学习统计不再虚报成功**（2026-10-29）：`use-learning-stats` 的 `resetAll()` 现在返回 stats/calendar 两次真实写入的与；`ProgressPage.tsx:112-119` 只在两者都成功时提示「学习统计已重置」，否则提示检查可用空间。「重置全部」同样按 `statsOk` 分流（`:251-287`）。核心进度写入统一走 `persistText`，守卫 `verify-vocab-caches` ⑧。
 - `FavoriteReviewMode.tsx`（460 行）：收藏的复习模式，也在这里。
 
 ## 3. 收藏 `/favorites`

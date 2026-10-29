@@ -67,7 +67,7 @@ import { useTTS } from '@/lib/use-tts';
 import { getCapabilityClient } from '@/lib/capability-client';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
-import { cappedPut, persistJson, warnStorageFull } from '@/lib/capped-cache';
+import { cappedPut, persistJson, persistText, warnStorageFull } from '@/lib/capped-cache';
 import { parseChainVerdict, chainScoreFor } from '@/lib/chain-verdict';
 
 const CATEGORIES = [
@@ -660,7 +660,7 @@ export default function ChunkTrainingPage() {
   useEffect(() => {
     try {
       if (reviewQueue.length > 0 && reviewIdx < reviewQueue.length) {
-        safeStorage.setItem(REVIEW_BREAKPOINT_KEY, JSON.stringify({
+        persistText(REVIEW_BREAKPOINT_KEY, JSON.stringify({
           ids: reviewQueue.map((c) => c.id),
           index: reviewIdx,
           savedAt: Date.now(),
@@ -748,7 +748,7 @@ export default function ChunkTrainingPage() {
    * 初始值来自 useState 的同步读取，所以首帧就把已有数据原样写回，不会抹掉历史。
    */
   useEffect(() => {
-    try { safeStorage.setItem(MEMORIZED_KEY, JSON.stringify([...memorizedChunks])); } catch { /* */ }
+    persistText(MEMORIZED_KEY, JSON.stringify([...memorizedChunks]));
   }, [memorizedChunks]);
   const toggleMemorized = (chunkId: string) => {
     // updater 保持纯：StrictMode 会双调用更新函数，原先在里面写 safeStorage 等于写两遍

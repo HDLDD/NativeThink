@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { safeStorage } from './safe-storage';
+import { persistText } from './capped-cache';
 import { useSyncDown } from './sync-down';
 import { formatDate } from './utils';
 
@@ -114,20 +115,12 @@ function readCalendarFromStorage(): ICalendarRecord[] | null {
   return null;
 }
 
-function writeStatsToStorage(stats: ILearningStats): void {
-  try {
-    safeStorage.setItem(STATS_KEY, JSON.stringify(stats));
-  } catch {
-    // ignore
-  }
+function writeStatsToStorage(stats: ILearningStats): boolean {
+  return persistText(STATS_KEY, JSON.stringify(stats));
 }
 
-function writeCalendarToStorage(calendar: ICalendarRecord[]): void {
-  try {
-    safeStorage.setItem(CALENDAR_KEY, JSON.stringify(calendar));
-  } catch {
-    // ignore
-  }
+function writeCalendarToStorage(calendar: ICalendarRecord[]): boolean {
+  return persistText(CALENDAR_KEY, JSON.stringify(calendar));
 }
 
 function notifyChanged(type: 'stats' | 'calendar'): void {
@@ -219,14 +212,16 @@ export function useLearningStats() {
 
   const saveStats = useCallback((newStats: ILearningStats) => {
     setStats(newStats);
-    writeStatsToStorage(newStats);
+    const ok = writeStatsToStorage(newStats);
     notifyChanged('stats');
+    return ok;
   }, []);
 
   const saveCalendar = useCallback((newCalendar: ICalendarRecord[]) => {
     setCalendar(newCalendar);
-    writeCalendarToStorage(newCalendar);
+    const ok = writeCalendarToStorage(newCalendar);
     notifyChanged('calendar');
+    return ok;
   }, []);
 
   const setDailyGoal = useCallback(
@@ -303,9 +298,9 @@ export function useLearningStats() {
       ...DEFAULT_STATS,
       moduleProgress: { ...DEFAULT_STATS.moduleProgress },
     };
-    saveStats(freshStats);
-    const newCalendar = createEmptyCalendar();
-    saveCalendar(newCalendar);
+    const statsOk = saveStats(freshStats);
+    const calendarOk = saveCalendar(createEmptyCalendar());
+    return statsOk && calendarOk;
   }, [saveStats, saveCalendar]);
 
   // 今日分钟数是"当天"概念 — 跨天后显示为 0（持久化数据不动，不影响连胜计算）

@@ -15,6 +15,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
+import { persistText } from './capped-cache';
 
 const KEY = '__nativethink_quickcard_runs';
 const EVENT = 'nativethink-quickcard-runs-changed';
@@ -60,7 +61,7 @@ function read(): IQuickCardRun[] {
 
 function write(list: IQuickCardRun[]) {
   _cache = list;
-  try { safeStorage.setItem(KEY, JSON.stringify(list)); } catch { /* quota / private mode */ }
+  persistText(KEY, JSON.stringify(list));
   try { window.dispatchEvent(new CustomEvent(EVENT)); } catch { /* ignore */ }
 }
 
@@ -111,7 +112,7 @@ export function listFavSeen(): string[] {
 }
 
 export function saveFavSeen(words: string[]): void {
-  try { safeStorage.setItem(FAV_SEEN_KEY, JSON.stringify(words)); } catch { /* quota：轮转退化为从头开始，可接受 */ }
+  persistText(FAV_SEEN_KEY, JSON.stringify(words));
 }
 
 export function resetFavSeen(): void {
@@ -175,7 +176,7 @@ function readPending(): IQuickCardPending | null {
 function writePending(p: IQuickCardPending | null) {
   try {
     if (!p || p.words.length === 0) safeStorage.removeItem(PENDING_KEY);
-    else safeStorage.setItem(PENDING_KEY, JSON.stringify(p));
+    else persistText(PENDING_KEY, JSON.stringify(p));
   } catch { /* quota */ }
   try { window.dispatchEvent(new CustomEvent(EVENT)); } catch { /* ignore */ }
 }
@@ -308,7 +309,7 @@ export function loadQuickCardSession(level: string): IQuickCardSession | null {
 }
 
 export function saveQuickCardSession(s: Omit<IQuickCardSession, 'at'>): void {
-  try { safeStorage.setItem(sessionKeyOf(s.level), JSON.stringify({ ...s, at: Date.now() })); } catch { /* quota */ }
+  persistText(sessionKeyOf(s.level), JSON.stringify({ ...s, at: Date.now() }));
 }
 
 /** 清掉该词书的断点 */

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { safeStorage } from '@/lib/safe-storage';
+import { persistText } from '@/lib/capped-cache';
 import { useSyncDown } from '@/lib/sync-down';
 import type { IWordEntry } from '@/data/wordbank/schema';
 import { getRandomWords } from '@/data/wordbank';
@@ -91,7 +92,7 @@ function saveState(level: string, state: ILearningState) {
    * → safeStorage 的双写把它 POST 回云端。数据没变却来回搬，正是 `verify-cloud-sync` 要防的那类事。
    */
   if (safeStorage.getItem(storageKey(level)) === json) return;
-  safeStorage.setItem(storageKey(level), json);
+  persistText(storageKey(level), json);
   try { window.dispatchEvent(new CustomEvent(STATE_EVENT)); } catch { /* ignore */ }
 }
 
@@ -179,7 +180,7 @@ function sessionKey(level: string): string {
 }
 
 export function saveSession(level: string, s: ISavedSession): void {
-  try { safeStorage.setItem(sessionKey(level), JSON.stringify(s)); } catch { /* ignore */ }
+  persistText(sessionKey(level), JSON.stringify(s));
 }
 
 export function loadSession(level: string): ISavedSession | null {
@@ -210,7 +211,7 @@ function loadDailyQuota(level: string): number {
     if (wizardVal) {
       const n = parseInt(wizardVal);
       // Migrate to per-level key
-      safeStorage.setItem(dailyQuotaKey(level), String(n));
+      persistText(dailyQuotaKey(level), String(n));
       return n;
     }
     return 20;
@@ -353,7 +354,7 @@ export function useWordLearning(level: string) {
     saveState(level, state);
   }, [level, state, isAllLevels]);
   useEffect(() => {
-    safeStorage.setItem(dailyQuotaKey(level), String(dailyQuota));
+    persistText(dailyQuotaKey(level), String(dailyQuota));
   }, [level, dailyQuota]);
 
   const wordKey = (w: IWordEntry) => w.word.toLowerCase();

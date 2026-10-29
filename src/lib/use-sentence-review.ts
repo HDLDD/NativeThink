@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
+import { persistText } from './capped-cache';
 import { formatDate } from './utils';
 
 const STORAGE_KEY = '__nativethink_sentence_review';
@@ -49,7 +50,7 @@ function load(): IState {
 }
 
 function save(s: IState): void {
-  try { safeStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch { /* quota */ }
+  persistText(STORAGE_KEY, JSON.stringify(s));
 }
 
 /** SM-2：quality 0–5（<3 视为失败，重置间隔） */

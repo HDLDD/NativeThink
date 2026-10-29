@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
+import { persistText } from './capped-cache';
 
 const CUSTOM_SCENARIOS_KEY = '__nativethink_custom_scenarios';
 
@@ -73,11 +74,7 @@ export function useCustomScenarios() {
 
   const persist = useCallback((items: ICustomScenario[]) => {
     setScenarios(items);
-    try {
-      safeStorage.setItem(CUSTOM_SCENARIOS_KEY, JSON.stringify(items));
-    } catch {
-      // ignore
-    }
+    persistText(CUSTOM_SCENARIOS_KEY, JSON.stringify(items));
   }, []);
 
   const addScenario = useCallback(

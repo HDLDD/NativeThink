@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
+import { persistText } from './capped-cache';
 import { toast } from 'sonner';
 
 const ACHIEVEMENTS_KEY = '__nativethink_achievements';
@@ -139,11 +140,7 @@ export function useAchievements() {
 
   const persist = useCallback((items: IUnlockedAchievement[]) => {
     setUnlocked(items);
-    try {
-      safeStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(items));
-    } catch {
-      // ignore
-    }
+    persistText(ACHIEVEMENTS_KEY, JSON.stringify(items));
   }, []);
 
   const unlock = useCallback(

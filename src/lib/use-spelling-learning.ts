@@ -6,6 +6,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
+import { persistText } from './capped-cache';
 import { formatDate } from './utils';
 import type { ISpellingSentence, ISpellingProgress, ISpellingLearningState, SpellingMode } from '@/types/spelling';
 
@@ -41,7 +42,7 @@ function markServed(ids: string[]): void {
       entries.sort((a, b) => a[1] - b[1]);
       for (const [id] of entries.slice(0, entries.length - 4000)) delete served[id];
     }
-    safeStorage.setItem(SERVED_KEY, JSON.stringify(served));
+    persistText(SERVED_KEY, JSON.stringify(served));
   } catch { /* quota */ }
 }
 
@@ -57,7 +58,7 @@ function saveCompletedIds(ids: string[]) {
   const json = JSON.stringify(ids);
   // 与存储一致时不写：掐掉挂载时的同值回写（它会被双写 POST 回云端）
   if (safeStorage.getItem(COMPLETED_KEY) === json) return;
-  safeStorage.setItem(COMPLETED_KEY, json);
+  persistText(COMPLETED_KEY, json);
 }
 
 function todayKey(): string {
@@ -77,7 +78,7 @@ function saveState(state: ISpellingLearningState) {
   const json = JSON.stringify(state);
   // 与存储一字不差时不写：下行回声的第二道判据（第一道是回写 effect 的引用比对）
   if (safeStorage.getItem(STORAGE_KEY) === json) return;
-  safeStorage.setItem(STORAGE_KEY, json);
+  persistText(STORAGE_KEY, json);
 }
 
 /**

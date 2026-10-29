@@ -509,6 +509,34 @@ function transpile(relPath, extraExports) {
   }
 }
 
+// ── ⑧ 核心学习数据写失败可见（2026-10-29） ──
+// safeStorage.setItem 在配额满时返回 false 而不抛错；核心进度如果只包 try/catch，
+// 数据会静默丢在内存里、刷新后回退。这里钉住 persistText 闸门与各核心模块的接线。
+{
+  const capped = readFileSync(join(ROOT, 'src/lib/capped-cache.ts'), 'utf8');
+  check(/export function persistText[\s\S]{0,300}?if \(!ok\) warnStorageFull\(\);/.test(capped),
+    '⑧ persistText：setItem 返回 false 时必须 warnStorageFull');
+  const core = {
+    'src/lib/use-learning-stats.ts': 2,
+    'src/lib/use-word-learning.ts': 4,
+    'src/lib/use-phrase-learning.ts': 3,
+    'src/lib/use-spelling-learning.ts': 3,
+    'src/lib/quickcard-history.ts': 4,
+    'src/lib/use-sentence-review.ts': 1,
+    'src/lib/use-achievements.ts': 1,
+    'src/lib/use-custom-scenarios.ts': 1,
+    'src/pages/ChunkTrainingPage/ChunkTrainingPage.tsx': 2,
+    'src/pages/DeepVocabularyPage/components/CollocationsTab.tsx': 2,
+    'src/pages/ArticlePage/ArticlePage.tsx': 4,
+    'src/pages/ProgressPage/ProgressPage.tsx': 1,
+  };
+  for (const [rel, min] of Object.entries(core)) {
+    const src = readFileSync(join(ROOT, rel), 'utf8');
+    const n = (src.match(/persistText\(/g) || []).length;
+    check(n >= min, `⑧ ${rel}：核心学习数据写入走 persistText（≥${min} 处）`, `实际 ${n}`);
+  }
+}
+
 console.log('');
 console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
 if (fail) {

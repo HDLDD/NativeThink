@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { safeStorage } from '@/lib/safe-storage';
+import { persistText } from '@/lib/capped-cache';
 import { useSyncDown } from '@/lib/sync-down';
 import { formatDate } from '@/lib/utils';
 import type { IChunk } from '@/data/chunks';
@@ -98,7 +99,7 @@ function saveState(state: IPhraseLearningState) {
   const json = JSON.stringify(state);
   // 与存储一字不差就不写：掐掉"下行重读 → 回写 → 双写再把同一份推回云端"的回声
   if (safeStorage.getItem(STORAGE_KEY) === json) return;
-  safeStorage.setItem(STORAGE_KEY, json);
+  persistText(STORAGE_KEY, json);
 }
 
 // ── 短语闪卡会话断点（顺序 + 位置），每个短语库一条，中途退出后仍可续学 ──
@@ -113,7 +114,7 @@ export interface ISavedPhraseSession {
 const PHRASE_SESSION_KEY_PREFIX = '__nativethink_phrase_session_';
 
 export function savePhraseSession(bank: string, s: ISavedPhraseSession): void {
-  try { safeStorage.setItem(`${PHRASE_SESSION_KEY_PREFIX}${bank}`, JSON.stringify(s)); } catch { /* ignore */ }
+  persistText(`${PHRASE_SESSION_KEY_PREFIX}${bank}`, JSON.stringify(s));
 }
 
 export function loadPhraseSession(bank: string): ISavedPhraseSession | null {
@@ -214,7 +215,7 @@ export function usePhraseLearning(allPhrases: IChunk[]) {
   }, [state]);
 
   // Persist daily quota
-  useEffect(() => { safeStorage.setItem(DAILY_QUOTA_KEY, String(dailyQuota)); }, [dailyQuota]);
+  useEffect(() => { persistText(DAILY_QUOTA_KEY, String(dailyQuota)); }, [dailyQuota]);
 
   // Phrases that are due for review today（不含用户主动「不再出现」的）
   const dueForReview = useMemo(() => {

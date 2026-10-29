@@ -43,6 +43,7 @@ import { useTTS } from '@/lib/use-tts';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { EmptyState } from '@/components/EmptyState';
 import { safeStorage } from '@/lib/safe-storage';
+import { persistText } from '@/lib/capped-cache';
 import { exportBackup, importBackup, type IBackupFile } from '@/lib/backup';
 import { emitSyncDown } from '@/lib/sync-down';
 import { clearAllResume, resumeStorageWithKeys } from '@/lib/spelling-resume';
@@ -110,9 +111,10 @@ export default function ProgressPage() {
 
   // Reset handlers
   const handleResetStats = () => {
-    resetAll();
+    const ok = resetAll();
     resetAchievements();
-    toast.success('学习统计已重置');
+    if (ok) toast.success('学习统计已重置');
+    else toast.error('学习统计未能写入本地存储，请检查可用空间后重试');
     setShowResetDialog(false); setResetConfirm(null);
   };
   /** 句子拼写：进度 + 已完成 + 出题记录 + 导入词书 + 断点（按词书分键，必须枚举） */
@@ -200,7 +202,7 @@ export default function ProgressPage() {
         state.progress = newProgress;
         state.todayLearned = (state.todayLearned || []).filter((k: string) => !levelWordKeys.has(k));
         state.todayReviewed = (state.todayReviewed || []).filter((k: string) => !levelWordKeys.has(k));
-        safeStorage.setItem('__nativethink_word_learning', JSON.stringify(state));
+        persistText('__nativethink_word_learning', JSON.stringify(state));
       }
     } catch { /* legacy key not present or corrupted, ignore */ }
     const levelLabel = VOCAB_LEVELS.find((v) => v.key === level)?.label || level;
@@ -249,7 +251,7 @@ export default function ProgressPage() {
     setShowResetDialog(false); setResetConfirm(null);
   };
   const handleResetAll = () => {
-    resetAll();
+    const statsOk = resetAll();
     resetAchievements();
     // 同 handleResetFavorites：清空收藏必须走 clearAll（陈旧闭包只删一条）
     clearAll();
@@ -282,7 +284,8 @@ export default function ProgressPage() {
       '__nativethink_example_trans',
     ];
     allKeys.forEach((k) => safeStorage.removeItem(k));
-    toast.success('所有学习记录已重置（部分数据刷新后生效）');
+    if (statsOk) toast.success('所有学习记录已重置（部分数据刷新后生效）');
+    else toast.error('学习统计未能写入本地存储，其余记录已清理；请检查可用空间后重试');
     setShowResetDialog(false); setResetConfirm(null);
   };
 
