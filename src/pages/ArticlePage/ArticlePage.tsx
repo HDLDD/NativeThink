@@ -292,9 +292,13 @@ export default function ArticlePage() {
 
   const removeImported = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    await deleteImportedBook(id).catch(() => {});
-    setImportedBooks((prev) => prev.filter((b) => b.id !== id));
-    toast.success('已删除该导入书籍');
+    try {
+      await deleteImportedBook(id);
+      setImportedBooks((prev) => prev.filter((b) => b.id !== id));
+      toast.success('已删除该导入书籍');
+    } catch {
+      toast.error('删除失败，书籍已保留，请重试');
+    }
   };
 
   // Load books data when books tab is first selected
@@ -882,12 +886,12 @@ export default function ArticlePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-black italic text-foreground tracking-tight">文章阅读</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-black text-foreground tracking-tight">文章阅读</h1>
           <p className="text-muted-foreground text-xs font-medium">英文阅读与学习</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowGuide(true)} className="rounded-2xl text-[10px] font-bold gap-1">
             <HelpCircle className="size-3.5" />指南
           </Button>

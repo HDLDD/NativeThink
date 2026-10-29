@@ -16,7 +16,7 @@
 | SCP 基金会 | `wikipedia`/`publication` | `src/data/scp.ts`（CC BY-SA，必须带 `sourceUrl`） | 188KB |
 | AI 生成 | `ai` | 自由生成/主题生成即时创作，**成功即存入 `__nativethink_ai_articles`**（见 §2.6） | — |
 | 复习词汇文章 | `ai`（`source:'复习词汇生成'`） | 用**自选**到期复习词分篇生成，见 §2.6（`ArticlePage.tsx:721`） | — |
-| 用户导入 | `book` | `src/data/imported-books.ts`，`IMPORTED_ID_PREFIX` | localStorage |
+| 用户导入 | `book` | `src/data/imported-books.ts`，`IMPORTED_ID_PREFIX` | IndexedDB `imported-books-v1`，正文随学习备份导出 |
 
 阅读器两种视图，同一份数据骨架：
 
@@ -101,6 +101,12 @@ src/data/books-meta.ts   # 只含元数据，由 scripts/gen-books-meta.cjs 生�
 - **保存 / 收藏 / 删除 / 重写**：文章进「已保存的 AI 文章」（键 `__nativethink_ai_articles`，上限 50）；卡片有心形收藏（`type:'article'`、`content:文章id` → 「我的收藏」跳回并自动打开）、X 删除、以及**「重写这篇」**（`regenerateRvArticle`，`:836`）：取词走 `rvRegenKeys`（`:134`，优先 `rvWords`，老数据回落 `highlightWords`），沿用**文章自己的**体裁主题，成功后 `replaceAiArticle`（`:194`）**原位替换且 id 不变**（换新 id 会让收藏 `content` 与历史 `meta.aiId` 一起断链；"先删再存"会让词表瞬间回涨），失败/坏数据一律**保留原文**并说明。同时只允许一篇在途（`rvRegenId`）。
 - **不改 SM-2**：生成文章不算一次复习，词的到期状态原样保留；"用掉"只是"已排进文章"的展示口径。
 
+### 2.7 导入书与生词的保存结果
+
+- `src/data/imported-books.ts:127` 严格读取原书，数据库失败不能当成空书库；原书正文随 `src/lib/backup.ts:17` 导出，同 ID 恢复覆盖而其他本地书保留。原书读取失败终止导出，避免不完整备份被当作卸载保障。
+- `ArticlePage.tsx:293` 只有删除成功才从列表移除；写入失败保留书籍并提示重试。
+- `components/PageReader.tsx:123-124` 检查 `addCustomWord` 返回值，保存失败不加入复习、不报成功；成功后才记复习进度。守卫为 `verify-backup-idb` 与 `verify-vocab-caches`。
+
 ## 3. 注意事项
 
 1. **`public/books/` 是 23MB，且已进 git**（`.git` 因此 48MB）。它同时被 Cloudflare Pages 托管和 `capacitor copy` 打进 APK。这是有意的取舍：随包全文消除了「联网失败 → 静默退回压缩节选 → 章节缺失 / 译文错章」。要动这个目录，先想清楚退回节选的后果，别只按「public 不放大数据」的直觉删。
@@ -115,3 +121,4 @@ src/data/books-meta.ts   # 只含元数据，由 scripts/gen-books-meta.cjs 生�
 10. **模块 `src/data/` 下有 .bak 与进度文件**：`chunks.ts.bak`、`shadowing.ts.bak`、`shadowing.ts.expand-progress.json`（483KB）。它们不进包，但会迷惑人和增大仓库；确认生成器不再依赖后可清理。
 11. **阅读器是 `fixed inset-0` 全屏层，必须自带 safe-area**：外壳那层内缩救不到它。2026-09-30 真机反馈「AI 生成文章顶部被手机顶部栏遮住」—— 实测小米 onyx 上 `env(safe-area-inset-top)=47px`，而阅读器顶栏 `top:0`，整条（含「退出阅读」）藏进状态栏。修法：根节点补 `safe-area-top safe-area-bottom`（`PageReader.tsx:1210`），底部翻页条同时躲开手势条。新增任何贴顶的全屏层同理，`verify-overlay-fit` ④ 会扫本文件里所有 `fixed inset-0`（单/双引号都吃、先剥注释）并要求非居中的那些带内缩；本机验收用 CDP `Emulation.setSafeAreaInsetsOverride`（参数是 `insets: {top,bottom,left,right}` 对象）强制 47/24，量顶栏 `top` 从 0 变 47。
 12. **守卫覆盖**：数据层有 `verify-tts-progress`（朗读反查表）与 `verify-books-meta` ⑤⑥（书目拆分/元数据）；复习词汇文章的**选词/分篇/用词出队/体裁主题进提示词/覆盖判定/原位重写**由 `verify-rv-articles`（104 断言，含 27 条变异测试：13 条针对首版、14 条针对本次扩展）钉住。**切章对齐、翻译回填、进度百分比三件事仍没有脚本兜**，改这些要手动开真书验证：翻到中段 → 刷新看百分比 ≤100%，「翻译本章」后中文没有落到别章。
+13. **文章页头部在窄屏必须上下排列**（2026-10-28）：`ArticlePage.tsx:889-893` 是 `flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`，四个入口容器 `flex-wrap`。393px + 120% 字体下若退回单行 `justify-between`，标题会被四个按钮挤成 24px 宽（一个字一行，实测）；当前窄屏入口落在标题下方一行（70+70+94+84 + 间距 ≈ 358 < 361）。

@@ -295,6 +295,8 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
   const shown = useMemo(() => (cw ? (findWord(cw.word) ?? cw) : cw), [cw, detailTick]);
   // 当前词的助记（必须声明在 shown 之后；切词时 hook 会自动重读）
   const [note, setNote] = useWordNote(shown?.word ?? '');
+  const [noteWord, setNoteWord] = useState('');
+  const isEditingNote = editingNote && noteWord === shown?.word;
   /** 最近一次评分（决定自动跳转的停留时长）；用 ref 避免把它放进 effect 依赖 */
   const lastQualityRef = useRef(4);
   /** advance 的 ref 镜像：自动跳转的 effect 用它，避免 advance 每次重建导致定时器反复重置 */
@@ -1305,16 +1307,26 @@ export default function FlashcardMode({ level, onLevelChange, levels, counts }: 
                     <div className="rounded-2xl border border-amber-200/70 bg-amber-50/60 dark:bg-amber-500/5 p-3">
                       <button
                         className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-amber-600"
-                        onClick={(e) => { e.stopPropagation(); setEditingNote((v) => !v); }}
+                        onPointerDown={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isEditingNote) {
+                            if (setNote(noteDraft)) setEditingNote(false);
+                          } else {
+                            setNoteDraft(note);
+                            setNoteWord(shown.word);
+                            setEditingNote(true);
+                          }
+                        }}
                       >
                         <span className="flex items-center gap-1"><PenLine className="size-3" />我的助记{note ? '' : '（点这里写一个）'}</span>
-                        {editingNote ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                        {isEditingNote ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                       </button>
-                      {editingNote ? (
+                      {isEditingNote ? (
                         <Textarea
                           value={noteDraft}
                           onChange={(e) => setNoteDraft(e.target.value)}
-                          onBlur={() => { setNote(noteDraft); setEditingNote(false); }}
+                          onBlur={() => { if (setNote(noteDraft)) setEditingNote(false); }}
                           onClick={(e) => e.stopPropagation()}
                           placeholder="写点能让你记住它的东西：拆词、联想、你自己的例句…"
                           className="mt-2 min-h-[64px] text-xs rounded-xl"

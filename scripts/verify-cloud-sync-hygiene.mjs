@@ -135,6 +135,10 @@ const compile = (rel, outName, rewrites = []) => {
 };
 
 compile('src/lib/safe-storage.ts', 'safe-storage.mjs');
+compile('src/lib/capped-cache.ts', 'capped-cache.mjs', [
+  ["from './safe-storage'", "from './safe-storage.mjs'"],
+  ["from 'sonner'", "from './sonner-shim.mjs'"],
+]);
 const SYNC_DOWN_MJS = compile('src/lib/sync-down.ts', 'sync-down.mjs', [
   ["from 'react'", "from './react-shim.mjs'"],
 ]);
@@ -157,6 +161,7 @@ for (const [rel, out] of [
     ["from 'react'", "from './react-shim.mjs'"],
     ["from './sync-down'", "from './sync-down.mjs'"],
     ["from './safe-storage'", "from './safe-storage.mjs'"],
+    ["from './capped-cache'", "from './capped-cache.mjs'"],
   ]);
 }
 

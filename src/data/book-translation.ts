@@ -18,7 +18,7 @@
  */
 
 import type { IReadingContent } from './reading';
-import { idbGet, idbSet, idbDelete } from '@/lib/idb';
+import { idbGet, idbSet, idbDelete, idbGetStrict } from '@/lib/idb';
 
 // ─────────────────────────── 常量 ───────────────────────────
 
@@ -833,8 +833,8 @@ export async function dumpBookTranslationCache(
   const out: ITranslationCacheDump = { entries: {}, bytes: 0, skipped: false };
   let manifest: ITranslationManifest | null = null;
   try {
-    manifest = await idbGet<ITranslationManifest>(manifestKeyOf(bookId));
-  } catch { return out; }
+    manifest = await idbGetStrict<ITranslationManifest>(manifestKeyOf(bookId));
+  } catch { out.skipped = true; return out; }
   if (!manifest || !Array.isArray(manifest.chapters) || manifest.chapters.length === 0) return out;
 
   const put = (key: string, value: unknown): boolean => {
@@ -851,7 +851,7 @@ export async function dumpBookTranslationCache(
   for (const idx of manifest.chapters) {
     if (!Number.isInteger(idx) || idx < 0) continue;
     let arr: string[] | null = null;
-    try { arr = await idbGet<string[]>(chapterKeyOf(bookId, idx)); } catch { continue; }
+    try { arr = await idbGetStrict<string[]>(chapterKeyOf(bookId, idx)); } catch { out.skipped = true; continue; }
     if (!Array.isArray(arr) || arr.length === 0) continue;
     if (!put(chapterKeyOf(bookId, idx), arr)) break;
   }

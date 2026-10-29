@@ -120,9 +120,10 @@ export default function PageReader({ content, onClose, startPage = 0 }: Props) {
         meaning: dict.translation || dict.definition || '',
         source: content?.title ? `阅读：${content.title}` : '阅读',
       };
-      const isNew = addCustomWord(base);
+      const result = addCustomWord(base);
+      if (result === 'failed') return;
       recordWordLearn(toWordEntry({ ...base, addedAt: Date.now() }), 0);
-      toast.success(isNew
+      toast.success(result === 'added'
         ? `词库未收录，已存入生词本 — "${clean}"（复习闪卡可见）`
         : `"${clean}" 已在生词本中，已重新加入复习`);
     }).catch(() => toast.info(`查询 "${clean}" 失败，请稍后重试`));

@@ -1122,9 +1122,11 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                               onClick={(e) => toggleMaterialFavorite(e, corpus)}
                               role="button"
                               tabIndex={0}
+                              aria-label={isFavorited(corpus.title, 'shadowing') ? '取消收藏语料' : '收藏语料'}
+                              title={isFavorited(corpus.title, 'shadowing') ? '取消收藏语料' : '收藏语料'}
                               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); toggleMaterialFavorite(e as unknown as React.MouseEvent, corpus); } }}
                               className={cn(
-                                'p-1 rounded-lg transition-colors cursor-pointer',
+                                'p-2.5 rounded-lg transition-colors cursor-pointer',
                                 isFavorited(corpus.title, 'shadowing')
                                   ? 'text-rose-500'
                                   : 'text-muted-foreground hover:text-rose-500',

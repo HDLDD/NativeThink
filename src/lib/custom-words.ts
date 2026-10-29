@@ -14,6 +14,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
+import { persistJson, warnStorageFull } from './capped-cache';
 import type { IWordEntry } from '@/data/wordbank/schema';
 
 const KEY = '__nativethink_custom_words';
@@ -41,10 +42,14 @@ function read(): ICustomWord[] {
   return _cache;
 }
 
-function write(list: ICustomWord[]) {
+function write(list: ICustomWord[]): boolean {
+  if (!persistJson(KEY, list)) {
+    warnStorageFull();
+    return false;
+  }
   _cache = list;
-  try { safeStorage.setItem(KEY, JSON.stringify(list)); } catch { /* ignore */ }
   try { window.dispatchEvent(new CustomEvent(EVENT)); } catch { /* ignore */ }
+  return true;
 }
 
 /**
@@ -56,20 +61,18 @@ export function invalidateCustomWordsCache(): void {
 }
 
 /** 加入生词本（同一个词只保留一条，重复加入时更新释义） */
-export function addCustomWord(w: Omit<ICustomWord, 'addedAt'>): boolean {
+export function addCustomWord(w: Omit<ICustomWord, 'addedAt'>): 'added' | 'updated' | 'failed' {
   const key = w.word.trim().toLowerCase();
-  if (!key) return false;
+  if (!key) return 'failed';
   const list = read();
   const i = list.findIndex((x) => x.word.toLowerCase() === key);
   const entry: ICustomWord = { ...w, word: w.word.trim(), addedAt: Date.now() };
   if (i >= 0) {
     const next = [...list];
     next[i] = { ...next[i], ...entry, addedAt: next[i].addedAt };
-    write(next);
-    return false; // 已存在
+    return write(next) ? 'updated' : 'failed';
   }
-  write([entry, ...list]);
-  return true;
+  return write([entry, ...list]) ? 'added' : 'failed';
 }
 
 export function removeCustomWord(word: string): void {

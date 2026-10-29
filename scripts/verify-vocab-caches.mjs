@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import { runInNewContext } from 'node:vm';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -282,9 +283,235 @@ function transpile(relPath, extraExports) {
   check(!/safeStorage\.setItem\(COMPLETED_KEY/.test(sh), '⑥ 跟读完成标记不再用裸 setItem（吞异常）落盘');
 }
 
+// ── ⑦ 生词本/助记：真实存储链 + 页面回调；所有变异仅在内存中运行 ──
+{
+  const source = (rel) => readFileSync(join(ROOT, rel), 'utf8');
+  const customSrc = source('src/lib/custom-words.ts');
+  const notesSrc = source('src/lib/word-notes.ts');
+  const storageSrc = source('src/lib/safe-storage.ts');
+  const cappedSrc = source('src/lib/capped-cache.ts');
+  const readerSrc = source('src/pages/ArticlePage/components/PageReader.tsx');
+  const flashSrc = source('src/pages/DeepVocabularyPage/components/FlashcardMode.tsx');
+  const word = { word: 'serendipity', phonetic: '/s/', partOfSpeech: 'n.', meaning: '旧释义', source: '阅读' };
+  const seedWord = { ...word, addedAt: 1234 };
+  const specs = [
+    { label: '生词本', src: customSrc, key: '__nativethink_custom_words', event: 'nativethink-custom-words-changed', seed: [seedWord], arg: 'list' },
+    { label: '助记', src: notesSrc, key: '__nativethink_word_notes', event: 'nativethink-word-notes-changed', seed: { serendipity: '旧助记' }, arg: 'next' },
+  ];
+  const compile = (src, globals = {}, dependencies = {}) => {
+    const exports = {};
+    const js = ts.transpileModule(src, {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, removeComments: true },
+    }).outputText;
+    runInNewContext(js, {
+      ...globals, exports,
+      require: (name) => {
+        if (!(name in dependencies)) throw new Error(`未提供替身：${name}`);
+        return dependencies[name];
+      },
+    });
+    return exports;
+  };
+  const harness = (spec, src = spec.src) => {
+    const store = new Map(), events = [], warnings = [];
+    const h = { full: false, writes: 0, events, warnings };
+    const globals = {
+      localStorage: {
+        getItem: (k) => store.get(k) ?? null,
+        setItem: (k, v) => {
+          h.writes++;
+          if (h.full) { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }
+          store.set(k, String(v));
+        },
+        removeItem: (k) => store.delete(k),
+      },
+      window: {
+        appId: 'cache-test', _userInfo: { user_id: 'test' },
+        dispatchEvent: (e) => { events.push({ type: e.type, raw: h.raw(), cache: JSON.stringify(h.api.readForTest()) }); },
+      },
+      CustomEvent: class { constructor(type) { this.type = type; } },
+    };
+    const storage = compile(storageSrc, globals);
+    const capped = compile(cappedSrc, globals, {
+      './safe-storage': storage,
+      sonner: { toast: { error: (...args) => warnings.push(args) } },
+    });
+    h.storage = storage.safeStorage;
+    h.raw = () => h.storage.getItem(spec.key);
+    h.storage.setItem(spec.key, JSON.stringify(spec.seed));
+    h.writes = 0;
+    h.api = compile(src + '\nexport { read as readForTest };', globals, {
+      './safe-storage': storage, './capped-cache': capped,
+      react: { useCallback: (fn) => fn, useState: (init) => [init(), () => {}], useEffect: () => {} },
+      './sync-down': { useSyncDown: () => {} },
+    });
+    return h;
+  };
+  const rows = [];
+  const record = (bag, label, cond) => bag.push({ label, cond: !!cond });
+  const cases = (spec) => spec.label === '生词本' ? [
+    { name: '新增', run: (a) => a.addCustomWord({ ...word, word: '  Ephemeral  ' }), result: 'added', valid: (a) => a.isCustomWord('ephemeral') && a.getCustomWords().length === 2 },
+    { name: '更新', run: (a) => a.addCustomWord({ ...word, word: ' SERENDIPITY ', meaning: '新释义' }), result: 'updated', valid: (a) => a.getCustomWords().length === 1 && a.getCustomWords()[0].meaning === '新释义' && a.getCustomWords()[0].addedAt === 1234 },
+    { name: '删除', run: (a) => a.removeCustomWord(' SERENDIPITY '), valid: (a) => !a.isCustomWord('serendipity') && a.getCustomWords().length === 0 },
+  ] : [
+    { name: '新增', run: (a) => a.setWordNote(' EPHEMERAL ', ' 新助记 '), result: true, valid: (a) => a.getWordNote('ephemeral') === '新助记' && a.countWordNotes() === 2 },
+    { name: '更新', run: (a) => a.setWordNote(' SERENDIPITY ', ' 新助记 '), result: true, valid: (a) => a.getWordNote('serendipity') === '新助记' && a.countWordNotes() === 1 },
+    { name: '删除', run: (a) => a.setWordNote(' SERENDIPITY ', '  '), result: true, valid: (a) => !a.hasWordNote('serendipity') && a.countWordNotes() === 0 },
+    { name: 'hook setter', run: (a) => a.useWordNote('serendipity')[1]('新助记'), result: true, valid: (a) => a.getWordNote('serendipity') === '新助记' },
+  ];
+  const storeChecks = (spec, src = spec.src) => {
+    const bag = [];
+    for (const c of cases(spec)) {
+      const h = harness(spec, src), a = h.api;
+      const cache = a.readForTest(), before = JSON.stringify(cache), raw = h.raw();
+      h.full = true;
+      const result = c.run(a), prefix = `${spec.label}/${c.name}`;
+      if ('result' in c) record(bag, `${prefix}/失败返回`, result === (spec.label === '生词本' ? 'failed' : false));
+      record(bag, `${prefix}/失败缓存不变`, a.readForTest() === cache && JSON.stringify(a.readForTest()) === before);
+      record(bag, `${prefix}/失败存储不变`, h.raw() === raw && h.writes === 1);
+      record(bag, `${prefix}/失败不广播`, h.events.length === 0);
+      record(bag, `${prefix}/失败提示`, h.warnings.length === 1 && /空间不足/.test(h.warnings[0][0]));
+      // 重置读缓存也不能把失败的改动读回来。
+      if (spec.label === '生词本') a.invalidateCustomWordsCache(); else a.invalidateWordNotesCache();
+      record(bag, `${prefix}/失败重读不变`, JSON.stringify(a.readForTest()) === before);
+      h.full = false;
+      const eventCount = h.events.length;
+      const retried = c.run(a);
+      if ('result' in c) record(bag, `${prefix}/重试返回`, retried === c.result);
+      record(bag, `${prefix}/重试成功`, c.valid(a) && h.raw() === JSON.stringify(a.readForTest()));
+      const event = h.events[eventCount];
+      record(bag, `${prefix}/成功广播`, h.events.length === eventCount + 1 && event?.type === spec.event && event.raw === h.raw() && event.cache === h.raw());
+      record(bag, `${prefix}/成功不警告`, h.warnings.length === 1);
+    }
+    const h = harness(spec, src), before = h.raw();
+    const result = spec.label === '生词本' ? h.api.addCustomWord({ ...word, word: ' ' }) : h.api.setWordNote(' ', '助记');
+    record(bag, `${spec.label}/空词拒绝`, result === (spec.label === '生词本' ? 'failed' : false) && h.raw() === before && h.writes === 0 && h.events.length === 0);
+    return bag;
+  };
+  specs.forEach((s) => rows.push(...storeChecks(s)));
+
+  const findNodes = (src, predicate) => {
+    const file = ts.createSourceFile('site.tsx', src, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TSX);
+    const found = [];
+    const visit = (node) => { if (predicate(node)) found.push(node); ts.forEachChild(node, visit); };
+    visit(file);
+    return found;
+  };
+  const only = (nodes) => {
+    if (nodes.length !== 1) throw new Error(`回调锚点应唯一，实际 ${nodes.length}`);
+    return nodes[0];
+  };
+  const callback = (text, globals) => compile(`export const callback = ${text};`, globals).callback;
+  const readerChecks = async (src) => {
+    const bag = [];
+    const node = only(findNodes(src, (n) => ts.isVariableDeclaration(n) && n.name.getText() === 'addToLearning'));
+    const text = node.initializer.arguments[0].getText();
+    for (const existing of [false, true]) {
+      const spec = { ...specs[0], seed: existing ? [seedWord] : [] };
+      const h = harness(spec), reviews = [], successes = [], infos = [];
+      const action = callback(text, {
+        findWord: () => undefined,
+        lookupDictionary: async () => ({ translation: '新释义' }),
+        addCustomWord: h.api.addCustomWord, toWordEntry: h.api.toWordEntry,
+        recordWordLearn: (...args) => reviews.push(args),
+        toast: { success: (s) => successes.push(s), info: (s) => infos.push(s) },
+        content: { title: '测试书' },
+      });
+      const prefix = `阅读器/${existing ? '更新' : '新增'}`;
+      h.full = true;
+      action(word.word);
+      await new Promise(setImmediate);
+      record(bag, `${prefix}/失败拦截`, reviews.length === 0 && successes.length === 0 && infos.length === 0 && h.warnings.length === 1);
+      reviews.length = 0;
+      successes.length = 0;
+      h.full = false;
+      action(word.word);
+      await new Promise(setImmediate);
+      record(bag, `${prefix}/成功进度`, reviews.length === 1 && reviews[0][0].word === word.word && reviews[0][0].level === 'custom' && reviews[0][1] === 0);
+      record(bag, `${prefix}/成功文案`, successes.length === 1 && (existing ? /已在生词本中/.test(successes[0]) : /已存入生词本/.test(successes[0])));
+    }
+    return bag;
+  };
+  const noteChecks = (src) => {
+    const bag = [];
+    const textarea = only(findNodes(src, (n) => ts.isJsxSelfClosingElement(n) && n.tagName.getText() === 'Textarea' && n.attributes.properties.some((p) => p.name?.getText() === 'value' && p.initializer?.expression?.getText() === 'noteDraft')));
+    const handler = (name) => only(textarea.attributes.properties.filter((p) => p.name?.getText() === name)).initializer.expression.getText();
+    const h = harness(specs[1]);
+    const state = { noteDraft: '', editing: false, noteWord: '' };
+    const globals = {
+      setNote: h.api.useWordNote(word.word)[1],
+      setEditingNote: (v) => { state.editing = typeof v === 'function' ? v(state.editing) : v; },
+      setNoteDraft: (v) => { state.noteDraft = v; },
+      setNoteWord: (v) => { state.noteWord = v; },
+    };
+    const toggleNode = only(findNodes(src, (n) => ts.isJsxAttribute(n) && n.name.getText() === 'onClick' && n.parent.parent.tagName?.getText() === 'button' && n.initializer.getText().includes('setEditingNote')));
+    const toggle = () => callback(toggleNode.initializer.expression.getText(), {
+      ...globals, note: h.api.getWordNote(word.word), noteDraft: state.noteDraft,
+      editingNote: state.editing, isEditingNote: state.editing && state.noteWord === word.word,
+      shown: { word: word.word },
+    })({ stopPropagation() {} });
+    toggle();
+    record(bag, '助记界面/打开沿用已保存内容', state.editing && state.noteDraft === '旧助记');
+    const ownsDraft = (shownWord) => {
+      const node = findNodes(src, (n) => ts.isVariableDeclaration(n) && n.name.getText() === 'isEditingNote')[0];
+      return node ? callback(`() => (${node.initializer.getText()})`, { editingNote: state.editing, noteWord: state.noteWord, shown: { word: shownWord } })() : state.editing;
+    };
+    record(bag, '助记界面/切词不沿用编辑器', ownsDraft(word.word) && !ownsDraft('ephemeral'));
+    const editorBranch = only(findNodes(src, (n) => ts.isConditionalExpression(n) && n.whenTrue.getText().includes('value={noteDraft}')));
+    record(bag, '助记界面/编辑器绑定词面', editorBranch.condition.getText() === 'isEditingNote');
+    callback(handler('onChange'), globals)({ target: { value: '修改后的草稿' } });
+    record(bag, '助记界面/受控草稿', state.noteDraft === '修改后的草稿');
+    const blur = () => callback(handler('onBlur'), { ...globals, noteDraft: state.noteDraft })();
+    h.full = true;
+    toggle();
+    record(bag, '助记界面/收起失败保留草稿', state.editing && state.noteDraft === '修改后的草稿' && h.api.getWordNote(word.word) === '旧助记');
+    blur();
+    record(bag, '助记界面/失败保留草稿', state.editing && state.noteDraft === '修改后的草稿' && h.api.getWordNote(word.word) === '旧助记');
+    h.full = false;
+    blur();
+    record(bag, '助记界面/成功收起', !state.editing && h.api.getWordNote(word.word) === '修改后的草稿' && h.events.length === 1);
+    h.api.setWordNote(word.word, '另一端更新的助记');
+    toggle();
+    record(bag, '助记界面/再次打开重读内容', state.editing && state.noteDraft === '另一端更新的助记');
+    return bag;
+  };
+  rows.push(...await readerChecks(readerSrc), ...noteChecks(flashSrc));
+  rows.forEach((r) => check(r.cond, `⑦ ${r.label}`));
+
+  // 只有真基线全绿才做变异，防止原本就红的断言冒充变异检出。
+  if (rows.every((r) => r.cond)) {
+    const replaceOnce = (src, from, to) => {
+      if (src.split(from).length !== 2) throw new Error(`变异锚点不唯一：${from}`);
+      return src.replace(from, to);
+    };
+    const caught = (name, mutated, target, positive) => {
+      check(mutated.some((r) => target(r.label) && !r.cond), `⑦ 变异 ${name} 必须验红`);
+      const controls = mutated.filter((r) => positive(r.label));
+      check(controls.length > 0 && controls.every((r) => r.cond), `⑦ 变异 ${name} 成功正对照仍绿`);
+    };
+    for (const spec of specs) {
+      const guard = `if (!persistJson(KEY, ${spec.arg})) {`;
+      const variants = [
+        ['忽略 persist 返回值', guard, `if (!(persistJson(KEY, ${spec.arg}), true)) {`, '/失败返回'],
+        ['失败也改缓存', guard, `${guard}\n    _cache = ${spec.arg};`, '/失败缓存不变'],
+        ['失败也广播', guard, `${guard}\n    window.dispatchEvent(new CustomEvent(EVENT));`, '/失败不广播'],
+        ['失败不提示', 'warnStorageFull();', '', '/失败提示'],
+      ];
+      for (const [name, from, to, suffix] of variants) {
+        caught(`${spec.label}/${name}`, storeChecks(spec, replaceOnce(spec.src, from, to)), (s) => s.endsWith(suffix), (s) => s.endsWith('/重试成功'));
+      }
+    }
+    caught('阅读器不拦 failed', await readerChecks(replaceOnce(readerSrc, "if (result === 'failed') return;", '')), (s) => s.endsWith('/失败拦截'), (s) => /\/成功(进度|文案)$/.test(s));
+    caught('助记无条件收起', noteChecks(replaceOnce(flashSrc, 'onBlur={() => { if (setNote(noteDraft)) setEditingNote(false); }}', 'onBlur={() => { setNote(noteDraft); setEditingNote(false); }}')), (s) => s.endsWith('/失败保留草稿'), (s) => s.endsWith('/成功收起'));
+    caught('助记打开不读原文', noteChecks(replaceOnce(flashSrc, 'setNoteDraft(note);', "setNoteDraft('');")), (s) => s.endsWith('/打开沿用已保存内容'), (s) => s.endsWith('/成功收起'));
+    caught('助记不隔离词面', noteChecks(replaceOnce(flashSrc, 'editingNote && noteWord === shown?.word', 'editingNote')), (s) => s.endsWith('/切词不沿用编辑器'), (s) => s.endsWith('/成功收起'));
+    caught('助记编辑器绕过隔离', noteChecks(replaceOnce(flashSrc, '{isEditingNote ? (', '{editingNote ? (')), (s) => s.endsWith('/编辑器绑定词面'), (s) => s.endsWith('/成功收起'));
+  }
+}
+
 console.log('');
 console.log(`断言 ${pass}/${pass + fail} 通过${fail ? '' : ' ✓'}`);
 if (fail) {
-  failures.slice(0, 20).forEach((f) => console.log('  ✗ ' + f));
+  failures.slice(0, 100).forEach((f) => console.log('  ✗ ' + f));
   process.exit(1);
 }

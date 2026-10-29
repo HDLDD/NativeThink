@@ -4,11 +4,15 @@
 
 ## 1. 首页 `/`
 
-无模块 key（不参与 `moduleProgress`）。组成：`HeroCard` + `OverviewPanel` + `ModuleProgressCard` + `QuickStartGrid` + `DailySentenceCard` + `WeekGlanceCard` + `HistoryCalendar`，外加 2026-10-10 新增的 `ReviewDueCard`、2026-10-17 新增的 `NoteDrillCard`。
+无模块 key（不参与 `moduleProgress`）。组成：`HeroCard` + `OverviewPanel` + `ModuleProgressCard` + `QuickStartGrid` + `DailySentenceCard` + `WeekGlanceCard` + `HistoryCalendar`，外加 2026-10-10 新增的 `ReviewDueCard`、2026-10-17 新增的 `NoteDrillCard`、2026-10-25 新增的 `TodayPatternCard`。
 
 **视觉分层（2026-10-21）**：主行动卡 `HeroCard.tsx` 是墨面（`--ink`）上的大字号行动块；右侧四张统计卡与墨色进度卡合并成一块 `OverviewPanel.tsx`（连续天数 + 今日目标环 + 2×2 表格式明细）；`WeekGlanceCard` 从整行挪到左栏、`DailySentenceCard` 下方；`QuickStartGrid` 去掉粉彩图标块，改成 `01-11` 编号入口（hover 反白成墨面）。每日一句卡还会列最近 3 条历史（不含今天），`onShowHistory` 仍是完整历史的出口。`ProgressCard.tsx` 已删除，`RingProgress` 仍由其它页面使用。
 
+**今日分钟必须取整显示**（2026-10-28）：`todayMinutes` 由多次 `addStudyMinutes` 累加，存储里会出现 `1.9999999999999998` 这类浮点尾数。`HeroCard.tsx:21,38` 渲染前 `Math.round`（大于 0 且不足 1 显示 `<1`），`OverviewPanel.tsx:59,87` 早就这么做；别把原始值直接印到墨面卡上（393px 实测曾显示 `1.9999999999999998 / 30 MIN`）。
+
 **今日待复习（`ReviewDueCard.tsx`）**：横幅复用侧边栏角标同一数据源 `useGlobalDueCount`（`DashboardPage.tsx:18,51,336` 直扫 SM-2 存储，不挂完整学习状态实例）。**口径：`dueCount <= 0` 时整卡 `return null`（`ReviewDueCard.tsx:17`）**—— 没有复习义务就不渲染"已清零"占位卡；点击进 `/vocabulary`。外层行 gate 现在是三卡版 `(lastVisit || dueCount > 0 || pendingCorrections > 0)`（`DashboardPage.tsx:324`），都空时整行不占位。
+
+**今日模式（`TodayPatternCard.tsx`，2026-10-25）**：独立于三张横幅行，挂在「每日一句 / 本周概览」之后。`useThinkPatterns()` 读模式进度；`stats.tracked === 0` 整卡 `return null`（没学过模式不占位）。显示到期/延迟计数、下一个到期模式、近 7 天迁移柱（`trend`，七天补零）与 `passes/attempts`，点击进 `/think`。到期为 0 但有进度时显示「今天已完成，下次到期再来」，不退场。
 
 **表达纠偏待重考（`NoteDrillCard.tsx`，2026-10-17）**：纠偏本三处自动收集 + 收藏页回看 + 词汇页重考 + 句子拼写是一条完整链路，但**入口原本藏在词汇页九个模式的最后一屏**，用户不会每天去翻，所以首页给一条横幅。计数口径是**还没重考过的条数**（`corrNotes.filter((n) => !n.review).length`，`DashboardPage.tsx:56`）—— 与待复习卡同一种语义：考过就退场，不把已处理的常驻催用户；`pendingCount <= 0` 整卡 `return null`。点击带深链 **`/vocabulary?tab=correction`**，由词汇页一步落进该模式（`DeepVocabularyPage.tsx:946-963`：只认 `MODES` 里的 key、`setupDone`/向导未完时不强进、进去后 `setSearchParams({}, {replace:true})` 抹参数 —— 留着刷新会再抢一次焦点）。**只 `setTab` 不 `setImmersed` 是这模块的老坑**（用户仍停在模式列表），守卫把它钉成"必须走 `enterMode`"。守卫 `npm run verify-dashboard-glance`（25 断言，变异 11 条）。
 
@@ -33,6 +37,7 @@ AI 生成：`aiChat`（`:154`），system 要求**只返回一个 JSON 对象**�
 
 - `ProgressCharts.tsx:33-42` `MODULE_COLORS`、`:44-53` `MODULE_NAMES`：颜色**按 key 取**（此前按下标对位数组，错位且 conversation/spelling 同为 `#F59E0B`，饼图图例无法区分 —— 注释 `:31-32`）。缺 key 时回落灰 `#94A3B8` / 回落 key 名，**不报错**。
 - 重置是分类型的：学习统计 `:111`、句子拼写 `:119`、阅读 `:124-143`、词汇 `:174`、按词书 `:200`、短语库 `:208`、全部 `:277`。多数提示带「刷新页面后生效」—— 因为这些模块的 hook 不在本页，内存态还在（见 `cloud-sync.md` 的陈旧内存态问题）。
+- **窄屏分类条**（2026-10-28）：`ProgressPage.tsx:703-730` 在 `<sm` 隐藏四个 tab 的图标（`hidden sm:inline`）并给 `TabsList` 加 `max-w-full overflow-x-auto`。393px + 120% 字体下四个标签必须完整可见；退回原先的 `w-fit` 单行会把「成就徽章」裁出视口。收藏卡的「传送」链接加了 `py-1`（`:1001`），手机上不再只有 18px 高。
 - `FavoriteReviewMode.tsx`（460 行）：收藏的复习模式，也在这里。
 
 ## 3. 收藏 `/favorites`
@@ -66,15 +71,16 @@ LEGACY_KEY      = __nativethink_favorites_v2     （裸 localStorage，读一次
 
 ## 4. 备份与恢复（`src/lib/backup.ts`）
 
-`IBackupFile = { app:'NativeThink', version:2, exportedAt, data, idb? }`：
+`IBackupFile = { app:'NativeThink', version:2, exportedAt, data, idb?, importedBooks? }`，旧 v2 文件没有 `importedBooks` 也可恢复。
 
-- `exportBackup()`：扫 `localStorage` 里带 safeStorage 前缀的键，**剥掉前缀**存进 `data`（`:33-38`）；IDB 上限 40MB（`IDB_LIMIT_BYTES :28`）。
-- `importBackup()`：校验 `app` 字段后逐键 `safeStorage.setItem`（`:87-96`），**单键失败不阻断整体**；`idb` 部分逐键 `idbSet`。
-- UI 在 `ProgressPage.tsx:286-310`，导出提示会带「+ N 份翻译缓存」，`idbCount` 为 0 时**自动省略**该短语（`:297`）—— 所以界面不会说谎，见下面第 4 条。
+- `exportBackup()`（`backup.ts:17`）：只导出当前 safeStorage 前缀下的键；导入书正文与元数据单独放 `importedBooks`。原书不可重算，读取失败就拒绝导出，不得悄悄省略；40 Mi 字符预算只约束可重算的译文缓存，超限或读取失败标 `idbSkipped`。
+- `importBackup()`（`backup.ts:63`）：写入前校验 app/version/data/idb 与全部导入书形状；localStorage 返回 false 不计成功。原书按 id 覆盖同一本，保留其它本地书（`imported-books.ts:137`）；读取现有书库失败时禁止覆盖。译文只允许 `booktrans-` 键，逐条等待事务提交。
+- 返回 `restored/failed`、`restoredBooks/failedBooks`、`restoredIdb/failedIdb` 三组真实计数。UI（`ProgressPage.tsx:293`）互斥导出/恢复，原书数量明确显示；拿到恢复结果后先调用统一的 `emitSyncDown()`（`:333-335`），通知已挂载 hook 重读并沿用订阅者的缓存作废逻辑，避免陈旧收藏下一次写回覆盖刚恢复的条目。部分失败保留报告、不自动刷新，可重新选同一文件重试；完整成功也先通知，再报告并刷新（`:337-344`）。
+- 页面明确说明备份不含视频精听媒体及字幕，恢复覆盖同键进度，建议先导出当前数据。并非全部设备资产都在这个 JSON 中。
 
 ## 5. 注意事项
 
-1. ~~**首页的 AI 生成把「服务不可用」报成「格式异常」**，而且走禁用的贪婪正则~~（**已修 2026-09-30**）：现在先判 `!result.trim()` 给「AI 服务暂不可用」，解析走 `extractJson`。顺带把 `category` / `difficulty` 夹到 `IChunk` 的取值域 —— 原先 `parsed.category || 'daily'` 会把模型随口返回的陌生值原样存进每日一句与历史，取色/标签处按联合类型查表会拿到 undefined。守卫：`npm run verify:ai-parse`（全仓 28 个解析点，带元判据固件）。
+1. ~~**首页的 AI 生成把「服务不可用」报成「格式异常」**，而且走禁用的贪婪正则~~（**已修 2026-09-30**）：现在先判 `!result.trim()` 给「AI 服务暂不可用」，解析走 `extractJson`。顺带把 `category` / `difficulty` 夹到 `IChunk` 的取值域 —— 原先 `parsed.category || 'daily'` 会把模型随口返回的陌生值原样存进每日一句与历史，取色/标签处按联合类型查表会拿到 undefined。守卫：`npm run verify:ai-parse`（全仓 30 个解析点，带元判据固件）。
 2. **`MODULES` / `MODULE_COLORS` / `MODULE_NAMES` / `MODULE_PROGRESS_KEYS` 四份清单要靠人对齐**，其中 `MODULE_PROGRESS_KEYS`（`use-learning-stats.ts:70-80`）是白名单投影，漏了它新模块的进度会被 `mergeStats` **静默丢弃**。详见 `shell-and-navigation.md` §4。
 3. **重置类操作分模块、且大多要刷新才生效**。加新重置项时照 `handleResetReading` 的做法：先按 `localStorage` 键名扫一遍（`:128-133`，注意它匹配的是**含前缀的完整键名**，用 `k.includes(...)` / `k.endsWith(...)`），再单独处理 IndexedDB。
 4. ~~**【已确认缺陷】备份从来不含整书翻译缓存**~~ → **【已修，2026-09-30】** 留档备查：`exportBackup()` 原先这样找章节：
@@ -88,7 +94,7 @@ LEGACY_KEY      = __nativethink_favorites_v2     （裸 localStorage，读一次
    `booktrans-*` **只存在于 IndexedDB**，所以 `manifestKeys` 恒空 → `idb` 恒 `undefined`、`idbCount` 恒 0，`idb.ts` 也没有枚举键的 API（只有 `idbGet/idbSet/idbDelete/idbHas/idbClear`）。
 
    现在的形态：`book-translation.ts` 新增 `dumpBookTranslationCache(bookId, maxBytes)`（**键格式知识留在拥有它的模块里**，按 manifest 登记的章节导出，含清单键本身）；`backup.ts` 用 `BOOK_META` + `loadImportedBooks()` 拿到随包 22 本与用户导入书的 id，逐本导出，累计到 `IDB_LIMIT_BYTES` 就停并如实标 `idbSkipped`。
-   **守卫：`npm run verify:backup-idb`（16 断言）** —— A 段用忠实 IDB 替身真跑导出函数（有缓存/无缓存/超上限/跨书隔离），并带"旧枚举方式在同一数据下拿到 0 个键"的正对照；B 段静态守接线，变异实测：把 IDB 分支改回旧的 `Object.keys(data)` 枚举会红 5 条。
-5. **`importBackup` 会覆盖同键**且不校验 `version`，也没有"合并"语义：拿旧备份恢复会把新进度回退。恢复前 UI 应该提示这一点。
+   **守卫：`npm run verify:backup-idb`（94 断言，18 组变异）** —— 真跑译文导出、IDB 提交、导入书往返与真实页面 callback。书库失败夹具保留全 `abort`，另用 `readonly` 成功 / `readwrite` abort（`verify-backup-idb.mjs:192-208,305-313`）明确断言写入已尝试、未提交且 `failedBooks=1`；否则失败停在 `loadImportedBooks`，根本测不到 `persist`。页面判据（`:328-358`）钉恢复结束→通知重读→报告的顺序，部分失败不刷新且保留报告，完整成功再刷新。新增 M13–M18（`:416-430`）分别检出漏通知、仅成功通知、提前通知、延后通知、清空失败报告、吞掉 `persist` 错误；每组均有基线真与变异假两条断言。
+5. **`importBackup` 会覆盖同键进度**，拿旧备份恢复仍可能让进度回退；页面已明示。导入书按 id 合并而非整库替换，坏格式在任何写入前拒绝，存储错误则如实报告部分恢复，不声称跨 localStorage/IDB 原子回滚。
 6. **收藏的判重是 `content + type`**，所以想给同一句英文做"跨模块统一收藏"需要显式设计，不是把 `type` 改一改就能合并 —— 历史数据已经按 type 分开了。
 7. **`use-achievements` 只在自身文件里读写**（`:5,121,135`），不订阅 `nativethink-sync-down`（订阅者只有 3 个，见 `cloud-sync.md`）→ 云同步下来的新成就要点开首页才重算。

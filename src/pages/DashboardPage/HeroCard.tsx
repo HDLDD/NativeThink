@@ -18,6 +18,7 @@ interface HeroCardProps {
 function HeroCardInner({ onStartLearning, dueCount, todayMinutes, dailyGoalMinutes }: HeroCardProps) {
   const goal = dailyGoalMinutes > 0 ? dailyGoalMinutes : 30;
   const pct = Math.min(100, Math.round((todayMinutes / goal) * 100));
+  const shownMinutes = todayMinutes > 0 && todayMinutes < 1 ? '<1' : Math.round(todayMinutes);
 
   return (
     <Card className="relative col-span-12 overflow-hidden rounded-[26px] border-0 bg-[var(--ink)] text-[#F2F6F2] lg:col-span-7">
@@ -34,7 +35,7 @@ function HeroCardInner({ onStartLearning, dueCount, todayMinutes, dailyGoalMinut
             Today · 今日学习
           </span>
           <span className="text-[11px] font-semibold tabular-nums tracking-wide text-white/40">
-            {todayMinutes} / {goal} MIN
+            {shownMinutes} / {goal} MIN
           </span>
         </div>
 

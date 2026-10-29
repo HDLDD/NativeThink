@@ -808,34 +808,34 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
         </div>
 
         <Tabs value={promptTab} onValueChange={setPromptTab} className="w-full">
-          <TabsList className="bg-muted p-1.5 rounded-3xl h-auto mb-6">
+          <TabsList className="bg-muted p-1.5 rounded-3xl h-auto mb-6 max-w-full overflow-x-auto flex-nowrap justify-start [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <TabsTrigger
               value="all"
-              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
+              className="rounded-2xl px-1 sm:px-2 text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
             >
               全部题目
             </TabsTrigger>
             <TabsTrigger
               value="narrative"
-              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
+              className="rounded-2xl px-1 sm:px-2 text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
             >
               日常叙事
             </TabsTrigger>
             <TabsTrigger
               value="opinion"
-              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
+              className="rounded-2xl px-1 sm:px-2 text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
             >
               观点表达
             </TabsTrigger>
             <TabsTrigger
               value="workplace"
-              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
+              className="rounded-2xl px-1 sm:px-2 text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
             >
               职场写作
             </TabsTrigger>
             <TabsTrigger
               value="essay"
-              className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
+              className="rounded-2xl px-1 sm:px-2 text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
             >
               议论文
             </TabsTrigger>
@@ -1179,7 +1179,12 @@ function PromptCard({
             </h3>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <button onClick={toggleFav} className={cn('p-1 rounded-lg transition-colors', favorited ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')}>
+            <button
+              onClick={toggleFav}
+              aria-label={favorited ? '取消收藏题目' : '收藏题目'}
+              title={favorited ? '取消收藏题目' : '收藏题目'}
+              className={cn('p-2.5 rounded-lg transition-colors', favorited ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')}
+            >
               <Heart className={cn('size-3.5', favorited && 'fill-current')} />
             </button>
             {isAi && onDelete && (

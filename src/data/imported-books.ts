@@ -10,7 +10,7 @@
 
 import type { IReadingContent, IParagraph } from './reading';
 import { buildPages } from './reading';
-import { idbGet, idbSet } from '@/lib/idb';
+import { idbGetStrict, idbSet } from '@/lib/idb';
 
 const IDB_KEY = 'imported-books-v1';
 export const IMPORTED_ID_PREFIX = 'imp_';
@@ -102,17 +102,44 @@ export function parseBookText(raw: string, fallbackTitle: string): { paragraphs:
   return { paragraphs, chapterCount };
 }
 
+export function validateImportedBooks(value: unknown): asserts value is IImportedBook[] {
+  const ids = new Set<string>();
+  if (!Array.isArray(value) || !value.every((book) => {
+    if (!book || typeof book !== 'object' || typeof book.id !== 'string' ||
+      !book.id.startsWith(IMPORTED_ID_PREFIX) || ids.has(book.id) || book.type !== 'book' ||
+      !['title', 'zhTitle', 'source', 'topic'].every((key) => typeof book[key] === 'string') ||
+      !['beginner', 'intermediate', 'advanced'].includes(book.difficulty) ||
+      !['totalWords', 'importedAt', 'rawBytes'].every((key) => Number.isFinite(book[key]) && book[key] >= 0) ||
+      !['author', 'zhAuthor', 'cover', 'sourceUrl', 'rvGenre'].every((key) => book[key] === undefined || typeof book[key] === 'string') ||
+      !['highlightWords', 'rvWords'].every((key) => book[key] === undefined || (Array.isArray(book[key]) && book[key].every((word: unknown) => typeof word === 'string'))) ||
+      !Array.isArray(book.pages) || !book.pages.every((page: unknown, index: number) => {
+        if (!page || typeof page !== 'object') return false;
+        const p = page as { pageNumber?: unknown; paragraphs?: unknown };
+        return p.pageNumber === index + 1 && Array.isArray(p.paragraphs) && p.paragraphs.every((paragraph) =>
+          paragraph && typeof paragraph.en === 'string' && typeof paragraph.zh === 'string');
+      })) return false;
+    ids.add(book.id);
+    return true;
+  })) throw new Error('导入书籍数据格式不正确');
+}
+
 /** 读取全部导入书籍（按导入时间倒序） */
 export async function loadImportedBooks(): Promise<IImportedBook[]> {
-  try {
-    const list = await idbGet<IImportedBook[]>(IDB_KEY);
-    if (!Array.isArray(list)) return [];
-    return [...list].sort((a, b) => b.importedAt - a.importedAt);
-  } catch { return []; }
+  const list = await idbGetStrict<unknown>(IDB_KEY) ?? [];
+  validateImportedBooks(list);
+  return [...list].sort((a, b) => b.importedAt - a.importedAt);
 }
 
 async function persist(list: IImportedBook[]): Promise<void> {
   await idbSet(IDB_KEY, list);
+}
+
+export async function restoreImportedBooks(books: IImportedBook[]): Promise<void> {
+  validateImportedBooks(books);
+  if (!books.length) return;
+  const current = await loadImportedBooks();
+  const restoredIds = new Set(books.map((book) => book.id));
+  await persist([...books, ...current.filter((book) => !restoredIds.has(book.id))]);
 }
 
 /** 从文本创建并保存一本导入书籍 */

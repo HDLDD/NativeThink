@@ -143,7 +143,8 @@
 - 收藏与 `FavoritesPage` 同源（`use-favorites.ts`，键 `__nativethink_favorites`）。⚠️ **同一个"收藏单词"存两种 type**：词库浏览用 `'vocabulary'`（`DeepVocabularyPage.tsx:910`），每日学习与快速闪卡用 `'word'`（`DailyLearningMode.tsx:424-442`、`QuickCardMode.tsx:163-182`）。判重/统计必须同时看两个 type —— **2026-10-15 起全链路落实**：三处学习卡 + 词汇深度页/全局搜索/阅读器查词的星标心形都用 `isWordFavorited`（hook 导出的词族判重版）；`use-favorites` 单点加装：载入同词去重回写（`dedupeWordFavs`，存量脏数据自愈）、新增词族判重、删除词族双条目（守卫 ㉑d/㉑e/㉑f，其中 ㉑f 转译真跑）。
 - **写失败必须可见（2026-10-16"无法收藏仍存在"的收口）**：`safeStorage.setItem` 配额满是**返回 false 而不抛错**，`persist` 只写 try/catch 时写失败完全无声 —— 星标在内存里点亮（`setFavorites` 先执行）、退出回来就没了，与"无法收藏/退出后又可以"症状逐字吻合。现 `persist` 检查返回值并 `warnStorageFull()`（全站 60s 去抖一条），广播移出 try（守卫 ㉓a'，变异 3 条：恢复 try/catch / 删提示 / 撤广播，各红 1 条）。**再遇"点了没反应"先看有没有存储满 toast，再看 158+ 收藏是否写失败**。
 - 生词本 `custom-words.ts`（键 `__nativethink_custom_words`）：阅读器收集词库未收录的词，词条 `level:'custom'`（`:106`），进度经 `SUB_LEVELS` 走独立一路；复习队列把**已有进度记录的生词本词排在队首**（`FlashcardMode.tsx:149-152`），2026-10-05 起**不再要求账号另有词库进度**，且跳过被「不再出现」屏蔽的词（见注意事项 15）。
-- 助记 `word-notes.ts`（键 `__nativethink_word_notes`）：**目前只有复习检测卡背接了线**（`FlashcardMode.tsx:1142-1165`），其它模式不显示。
+- **生词本与助记先落盘再更新内存**：`custom-words.ts:45` / `word-notes.ts:30` 检查 `persistJson` 返回值，失败只提示空间不足，不改缓存、不广播成功。`addCustomWord`（`:64`）返回 `added / updated / failed`，阅读器 `PageReader.tsx:123` 在 `failed` 时不写学习进度、不报成功；助记 setter 返回布尔。
+- 助记 `word-notes.ts`（键 `__nativethink_word_notes`）：**目前只有复习检测卡背接了线**（`FlashcardMode.tsx:1310-1337`），其它模式不显示。打开编辑器以当前已保存内容初始化；失焦或主动收起均仅在保存成功后关闭，失败保留草稿。`isEditingNote`（`:299`）同时校验草稿所属词，换卡不能把上一词的草稿显示或写入下一词；标题的 pointerdown 阻止焦点先转移，避免 blur 与 click 连续切换编辑状态。
 
 ## 进度口径统一与已学清单（2026-10-15）
 
@@ -214,6 +215,7 @@
 npm run typecheck
 node scripts/verify-vocab-cards.mjs      # 478 断言：手势决策表（含复习检测禁滑动评分 allowRate:false，短语闪卡正对照）、排卡、换卡节奏（数值锁）、答错重排延后、回看出口、断点、静默契约、换书一步生效、预载门、单词分档字号（DL/QC 手机档=FM 档，PFM 正对照）、词面按钮组整组换行（⑭b：四个模式长词不折两截）、快速闪卡卡内边距（⑭c）、每日学习卡片几何与答对零等待（⑯）、短语闪卡（接线/懒加载去重/会话同构/存储扩展）、复习结束态/跨词书空态/换等级竞态（⑰）、收藏轮转/已学清单/中译英/进度统一（㉑㉓）
 node scripts/verify-correction-notes.mjs # 89 断言：三源表格抽取真跑 + store 整段真跑（去重/记账/删除/只拒不裁/写失败可见）+ orderForDrill 真跑 + 第 9 模式接线总闸与卡面契约 + 拼写桶 + 错点归纳十类规则真跑（含规则顺序与证据优先级两条口径）与两处按类筛选接线
+node scripts/verify-vocab-caches.mjs     # 195 断言：缓存封顶、生词/助记保存失败与重试、阅读器失败不计复习、助记回填与切词隔离
 node scripts/verify-guard-shape.mjs      # 7 断言：守卫自身的"恒真断言"扫描（AST）—— ok(/re/, src, name) 这种第一个实参是字面量本体的写法永远真
 ```
 交互类改动（"点了没反应"、状态不写回）静态检查看不出来 —— 用本机无头 Chrome + CDP 真点一遍（见 [验证体系](./verification.md)）。换卡耗时这类体感问题同样要按帧量：`TEMP/nt-flip-timing.mjs` 会点真实评分按钮、按帧采样卡片 DOM，直接报"进 DOM 毫秒数"。

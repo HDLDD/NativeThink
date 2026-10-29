@@ -53,3 +53,4 @@
 6. **每块 `setFeedback(full)` → 整篇 `ReactMarkdown` 重渲染**（`:563,576`；渲染在固定 `h-[400px]` 的 ScrollArea 里 `:1075-1078`）。长反馈在低端机上是持续重排源；改成节流要保住"实时看到字在出"的体验。
 7. **写作页没有「不再出现」**：全仓 `不再出现` 只在背单词链路（`use-word-learning.ts:38,364` 的屏蔽开关及其组件入口）与阅读复习词出队（`reading.ts:45`）里出现。这里唯一的"消失"入口是删除 AI 题（`handleDeletePrompt` `:685-688`，X 按钮仅 `isAi` 时渲染 `:1183-1191`）—— 内置题删不掉是设计。
 8. **有守卫**：`node scripts/verify-list-scaling.mjs`（18 断言；写作段守题库 ≥100、`slice(0, 12)`、展开/收起两入口、两个 `TabsContent` 面板都走 `PromptGrid`，正对照是「不存在 `allPrompts.map(` 全量渲染」；另两段是词库浏览分页与短语库字母段折叠这两个同类不变量）。把折叠改回去会立刻变红。
+9. **窄屏分类条与收藏点击区**（2026-10-28）：`WritingPage.tsx:811` 的五个分类在 393px + 120% 字体下必须完整可见 —— `TabsList` 带 `max-w-full overflow-x-auto`，trigger 用 `px-1 sm:px-2`；退回 `w-fit` 单行会让「议论文」被裁出视口。题目卡右上的收藏是纯图标按钮，`p-2.5`（34px 命中区）并带 `aria-label/title`（`:1182-1189`），别缩回 `p-1` 的 22px。

@@ -137,19 +137,14 @@ export async function idbGet<T>(key: string): Promise<T | null> {
  * @param value - The value to store
  */
 export async function idbSet<T>(key: string, value: T): Promise<void> {
-  try {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('wordbank', 'readwrite');
-      const store = tx.objectStore('wordbank');
-      const request = store.put({ key, value, timestamp: Date.now() });
+  const result = await withStore('wordbank', 'readwrite', (store) => store.put({ key, value, timestamp: Date.now() }));
+  if (!result.ok) throw new Error('本地数据库写入失败，请检查可用存储空间后重试');
+}
 
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
-  } catch {
-    // IndexedDB not available or error - fail silently
-  }
+export async function idbGetStrict<T>(key: string): Promise<T | null> {
+  const result = await withStore<{ value: T }>('wordbank', 'readonly', (store) => store.get(key));
+  if (!result.ok) throw new Error('本地数据库读取失败，请重试');
+  return result.value?.value ?? null;
 }
 
 /**

@@ -44,6 +44,7 @@ import { usePageMemory } from '@/lib/use-page-memory';
 import { EmptyState } from '@/components/EmptyState';
 import { safeStorage } from '@/lib/safe-storage';
 import { exportBackup, importBackup, type IBackupFile } from '@/lib/backup';
+import { emitSyncDown } from '@/lib/sync-down';
 import { clearAllResume, resumeStorageWithKeys } from '@/lib/spelling-resume';
 import { WORD_COUNTS } from '@/data/wordbank/meta';
 import { cn, cleanText, formatDate } from '@/lib/utils';
@@ -289,11 +290,16 @@ export default function ProgressPage() {
     return buildCalendarDays(calendar, currentMonth.getFullYear(), currentMonth.getMonth());
   }, [currentMonth, calendar]);
 
-  // ── 导出学习数据（JSON 备份，可自行保存/迁移） ──
-  /** 导出全部数据（学习记录 + 阅读翻译缓存）— 更新安装包前建议导出一次 */
+  const [backupBusy, setBackupBusy] = useState(false);
+  const backupBusyRef = useRef(false);
+  const [backupReport, setBackupReport] = useState('');
   const exportLearningData = useCallback(async () => {
+    if (backupBusyRef.current) return;
+    backupBusyRef.current = true;
+    setBackupBusy(true);
+    setBackupReport('');
     try {
-      const { file, localStorageCount, idbCount, idbSkipped } = await exportBackup();
+      const { file, localStorageCount, idbCount, importedBookCount, idbSkipped } = await exportBackup();
       const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -301,23 +307,48 @@ export default function ProgressPage() {
       a.download = `nativethink-backup-${formatDate(new Date())}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`已导出 ${localStorageCount} 项数据${idbCount ? ` + ${idbCount} 份翻译缓存` : ''}${idbSkipped ? '（缓存过大已省略，可重新翻译）' : ''}`);
+      const summary = `已导出 ${localStorageCount} 项数据、${importedBookCount} 本导入书、${idbCount} 份翻译缓存`;
+      setBackupReport(`${summary}${idbSkipped ? '；部分翻译缓存过大或读取失败，已省略，可重新翻译' : ''}`);
+      if (idbSkipped) toast.warning('备份已导出，但部分翻译缓存未包含，请查看下方说明');
+      else toast.success(summary);
     } catch {
-      toast.error('导出失败，请重试');
+      const message = '导出失败：未能完整读取本地数据，请重试；不要卸载应用';
+      setBackupReport(message);
+      toast.error(message);
+    } finally {
+      backupBusyRef.current = false;
+      setBackupBusy(false);
     }
   }, []);
 
-  /** 从备份文件恢复 — 重装/换设备后使用 */
   const fileInputRef = useRef<HTMLInputElement>(null);
   const handleImportFile = useCallback(async (file: File) => {
+    if (backupBusyRef.current) return;
+    backupBusyRef.current = true;
+    setBackupBusy(true);
+    setBackupReport('');
     try {
       const text = await file.text();
       const parsed = JSON.parse(text) as IBackupFile;
-      const { restored, restoredIdb } = await importBackup(parsed);
-      toast.success(`已恢复 ${restored} 项数据${restoredIdb ? ` + ${restoredIdb} 份翻译缓存` : ''}，页面即将刷新`);
+      const { restored, restoredIdb, restoredBooks, failed, failedIdb, failedBooks } = await importBackup(parsed);
+      // 部分恢复不刷新，也必须重读已落盘数据，避免陈旧 hook 下一次写回覆盖它。
+      emitSyncDown();
+      const summary = `已恢复 ${restored} 项数据、${restoredBooks} 本导入书、${restoredIdb} 份翻译缓存`;
+      if (failed + failedIdb + failedBooks > 0) {
+        setBackupReport(`${summary}；未恢复 ${failed} 项数据、${failedBooks} 本导入书、${failedIdb} 份翻译缓存。请检查可用存储空间后重新选择备份重试；已恢复的数据不会回滚。`);
+        toast.error('部分数据未恢复，请查看下方结果并重试');
+        return;
+      }
+      setBackupReport(summary);
+      toast.success(`${summary}，页面即将刷新`);
       setTimeout(() => window.location.reload(), 1200);
     } catch (e) {
-      toast.error(e instanceof Error && e.message.includes('格式') ? e.message : '恢复失败：文件无法解析');
+      const message = e instanceof Error && e.message.includes('格式') ? e.message : '恢复失败：文件无法解析或备份组件无法加载';
+      setBackupReport(message);
+      toast.error(message);
+    } finally {
+      backupBusyRef.current = false;
+      setBackupBusy(false);
     }
   }, []);
 
@@ -401,6 +432,7 @@ export default function ProgressPage() {
               variant="outline"
               size="sm"
               onClick={exportLearningData}
+              disabled={backupBusy}
               className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
             >
               <Download className="size-3.5 mr-1.5" />
@@ -410,6 +442,7 @@ export default function ProgressPage() {
               variant="outline"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
+              disabled={backupBusy}
               className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
             >
               <Upload className="size-3.5 mr-1.5" />
@@ -427,6 +460,10 @@ export default function ProgressPage() {
               }}
             />
           </div>
+          <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
+            备份含学习数据、导入书正文和阅读译文，不含视频精听媒体及字幕。恢复会覆盖同名数据和同 ID 书籍，保留其他本地书；建议先导出当前数据。
+          </p>
+          {backupReport && <p role="status" className="mt-2 text-sm leading-relaxed">{backupReport}</p>}
         </div>
       </div>
 
@@ -663,26 +700,26 @@ export default function ProgressPage() {
       </div>
 
       <Tabs defaultValue="calendar" value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="bg-muted p-1.5 rounded-3xl h-auto">
+        <TabsList className="bg-muted p-1.5 rounded-3xl h-auto max-w-full overflow-x-auto flex-nowrap justify-start [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <TabsTrigger
             value="calendar"
             className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
-            <Calendar className="size-4 mr-2" />
+            <Calendar className="hidden sm:inline size-4 mr-2" />
             日历打卡
           </TabsTrigger>
           <TabsTrigger
             value="stats"
             className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
-            <BarChart3 className="size-4 mr-2" />
+            <BarChart3 className="hidden sm:inline size-4 mr-2" />
             学习统计
           </TabsTrigger>
           <TabsTrigger
             value="favorites"
             className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
           >
-            <Heart className="size-4 mr-2" />
+            <Heart className="hidden sm:inline size-4 mr-2" />
             收藏本
           </TabsTrigger>
           <TabsTrigger
@@ -961,7 +998,7 @@ export default function ProgressPage() {
                             {getFavPortal(item.type) && (
                               <button
                                 onClick={() => navigate(getFavPortal(item.type)!)}
-                                className="shrink-0 text-[10px] font-bold text-ink-teal hover:underline flex items-center gap-0.5"
+                                className="shrink-0 py-1 text-[10px] font-bold text-ink-teal hover:underline flex items-center gap-0.5"
                                 title={`前往${typeLabelMap[item.type] || item.type}`}
                               >
                                 <ExternalLink className="size-3" />传送

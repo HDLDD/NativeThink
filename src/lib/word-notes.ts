@@ -10,6 +10,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSyncDown } from './sync-down';
 import { safeStorage } from './safe-storage';
+import { persistJson, warnStorageFull } from './capped-cache';
 
 const KEY = '__nativethink_word_notes';
 const EVENT = 'nativethink-word-notes-changed';
@@ -26,10 +27,14 @@ function read(): Record<string, string> {
   return _cache;
 }
 
-function write(next: Record<string, string>) {
+function write(next: Record<string, string>): boolean {
+  if (!persistJson(KEY, next)) {
+    warnStorageFull();
+    return false;
+  }
   _cache = next;
-  try { safeStorage.setItem(KEY, JSON.stringify(next)); } catch { /* ignore */ }
   try { window.dispatchEvent(new CustomEvent(EVENT)); } catch { /* ignore */ }
+  return true;
 }
 
 /**
@@ -43,14 +48,14 @@ export function getWordNote(word: string): string {
   return read()[word.trim().toLowerCase()] ?? '';
 }
 
-export function setWordNote(word: string, note: string): void {
+export function setWordNote(word: string, note: string): boolean {
   const key = word.trim().toLowerCase();
-  if (!key) return;
+  if (!key) return false;
   const next = { ...read() };
   const text = note.trim();
   if (!text) delete next[key];
   else next[key] = text;
-  write(next);
+  return write(next);
 }
 
 export function hasWordNote(word: string): boolean {
@@ -58,7 +63,7 @@ export function hasWordNote(word: string): boolean {
 }
 
 /** 订阅式读取（同一词在多个组件显示时保持一致） */
-export function useWordNote(word: string): [string, (note: string) => void] {
+export function useWordNote(word: string): [string, (note: string) => boolean] {
   const [note, setNote] = useState<string>(() => getWordNote(word));
   useEffect(() => { setNote(getWordNote(word)); }, [word]);
   useEffect(() => {

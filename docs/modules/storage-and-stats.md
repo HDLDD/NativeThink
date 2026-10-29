@@ -53,7 +53,9 @@
 
 ### 2.4 IndexedDB
 
-`src/lib/idb.ts` 提供 `idbGet/idbSet/idbDelete`，单一 `wordbank` KV store（键名任意复用，例如词库缓存 `wb-<level>`、书籍译文 `booktrans-<id>-ch<n>`、书籍全文 `book-full-v2-<gutenbergId>`）。
+`src/lib/idb.ts` 的 `wordbank` KV store 保存词库缓存、书籍全文、导入书正文与译文；`media` 是视频精听的独立 store，清词库不能清掉媒体。
+
+`idbSet`（`idb.ts:139`）以事务 `oncomplete` 为成功依据；打开失败、请求失败、事务 abort 均拒绝 Promise，不再吞掉打开错误或提前用请求 success 兑现。`idbGetStrict`（`:144`）区分「没有记录 → null」与「读取失败 → 抛错」，用于原书读改写与备份；普通缓存仍可用原来的 `idbGet`。
 
 词库侧的策略是 **IndexedDB 为主、localStorage 为兜底**：`saveToCache` 先 `idbSet`，只有在 IDB 抛错时才镜像进 localStorage（`wordbank.ts`），避免同一份数据写两遍挤爆配额。
 
@@ -120,6 +122,8 @@ safeStorage.setItem(key, value): boolean   // safe-storage.ts:175-190（2026-09-
 | **用户/AI 创作、不可重算**（自建题目、自建语块、跟读材料、拼写句子库、「已记住」清单） | **绝不裁剪已有条目**；到上限只拒绝新增并如实报 `added/skipped` | `appendCapped(items, additions, max)`（`capped-cache.ts:64`）；拼写句子库上限 `SPELLING_SENTENCE_LIMIT = 1200`（`use-spelling-sentences.ts:21`） |
 
 **写失败必须可见**：`safeStorage.setItem` 现在返回布尔（`safe-storage.ts:175`，配额满时 `false` 而不是吞掉），`persistJson` 透传该结果（`capped-cache.ts:32`）。用户清单的 effect 统一写成 `if (!persistJson(key, x)) warnStorageFull();` —— `warnStorageFull`（`capped-cache.ts:48`）全站 60 秒去抖一条 toast，指路「学习记录 → 清理学习数据」。
+
+同步写入的生词本与助记采用更严格的提交顺序（`custom-words.ts:45`、`word-notes.ts:30`）：`persistJson` 成功后才替换模块缓存并广播；失败返回 `failed` / `false`，不允许调用者继续记学习进度、收起草稿或提示成功。守卫 `verify-vocab-caches` ⑦ 真跑新增、更新、删除、重试与页面回调，并以变异验证失败分支。
 
 接线点（守卫 `verify-vocab-caches` ⑤ 逐个钉，M/N 变异各验红）：`custom_prompts`（WritingPage）、`custom_shadowing` + `shadowing_extra`（ShadowingPage）、`custom_chunks` + `chunk_ai_sentences` + `example_trans` + `ai_replacements` + `phrase_examples`（ChunkTrainingPage）、`custom_translations`/`_backs`/`_natives`（ThinkInEnglishPage）、`spelling_sentences`（use-spelling-sentences）、`browse_memorized`（DeepVocabularyPage）。语块侧上限钉死：AI 例句 200 键 / 每键 30 条、例句翻译 400 键、短语例句 300 键。
 

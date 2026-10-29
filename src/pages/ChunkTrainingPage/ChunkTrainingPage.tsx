@@ -1595,7 +1595,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                 <div className="flex items-center gap-1.5">
                                   <button
                                     onClick={(e) => { e.stopPropagation(); tts.speak(chunk.content); }}
-                                    className="shrink-0 text-muted-foreground/40 hover:text-ink-teal transition-colors"
+                                    className="shrink-0 p-1.5 text-muted-foreground/40 hover:text-ink-teal transition-colors"
                                     title={`朗读 "${chunk.content}"`}
                                   >
                                     <Volume2 className="size-3.5" />
@@ -1612,7 +1612,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                   onClick={(e) => { e.stopPropagation(); toggleMemorized(chunk.id); }}
                                   title={memorizedChunks.has(chunk.id) ? '取消记忆' : '标记为已记'}
                                   className={cn(
-                                    'p-0.5 rounded-lg transition-colors',
+                                    'p-1.5 rounded-lg transition-colors',
                                     memorizedChunks.has(chunk.id)
                                       ? 'text-ink-teal hover:text-ink-teal/70'
                                       : 'text-muted-foreground/30 hover:text-ink-teal',
@@ -1622,8 +1622,10 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                 </button>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); toggleFavorite(chunk); }}
+                                  aria-label={favorited ? '取消收藏语块' : '收藏语块'}
+                                  title={favorited ? '取消收藏语块' : '收藏语块'}
                                   className={cn(
-                                    'p-0.5 rounded-lg transition-colors',
+                                    'p-1.5 rounded-lg transition-colors',
                                     favorited ? 'text-rose-500' : 'text-muted-foreground/30 hover:text-rose-500',
                                   )}
                                 >
@@ -2495,7 +2497,7 @@ ${isCorrect ? 'Explain why this chunk fits perfectly.' : 'Explain why the correc
                                     <div className="flex items-center gap-1.5">
                                       <button
                                         onClick={(e) => { e.stopPropagation(); tts.speak(chunk.content); }}
-                                        className="shrink-0 text-muted-foreground/40 hover:text-ink-teal transition-colors"
+                                        className="shrink-0 p-1.5 text-muted-foreground/40 hover:text-ink-teal transition-colors"
                                         title={`朗读 "${chunk.content}"`}
                                       >
                                         <Volume2 className="size-3.5" />
@@ -3006,7 +3008,7 @@ function PageJumpInput({ current, total, onJump }: { current: number; total: num
     return (
       <button
         onClick={() => { setEditing(true); setVal(String(current)); }}
-        className="text-[10px] font-black text-muted-foreground tabular-nums px-1.5 py-0.5 rounded hover:bg-muted min-w-[3em] text-center"
+        className="text-[10px] font-black text-muted-foreground tabular-nums px-1.5 py-1 rounded hover:bg-muted min-w-[3em] text-center"
         title="点击跳转页面"
       >
         {current} / {total}
