@@ -18,22 +18,34 @@
  *
  * 练习界面零 toast（store 的 warnStorageFull 除外）。
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAI } from '@/hooks/use-ai';
 import { Card, CardContent } from '@/components/ui/card';
 import {
+  THINK_LONG_TASKS,
   THINK_PATTERN_DIAGNOSTIC,
   THINK_PATTERN_REWRITES,
   THINK_PATTERNS,
+  THINK_REAL_TASKS,
+  THINK_SPEAKING_PROMPTS,
+  type IThinkLongTask,
   type IThinkPattern,
   type IThinkPatternTransfer,
+  type IThinkRealTaskPrompt,
 } from '@/data/think-patterns';
 import { creditKey, useStudyCredit } from '@/lib/study-credit';
 import {
+  buildGeneratedPracticePrompt,
   buildPatternJudgePrompt,
+  buildRealTaskPrompt,
+  validateGeneratedPracticeTask,
   validatePatternJudgeResult,
+  validateRealTaskJudgeResult,
+  type GeneratedPracticeTask,
   type PatternJudgeResult,
+  type RealTaskJudgeResult,
+  type TaskPromptShape,
 } from '@/lib/think-pattern-ai';
 import {
   advanceSession,
@@ -45,31 +57,70 @@ import {
   type PatternSessionGradeInput,
   type PatternSessionState,
 } from '@/lib/think-patterns';
+import {
+  clearPatternResume,
+  isResumeUsable,
+  loadPatternResume,
+  type PatternResumeSnapshot,
+} from '@/lib/think-session-resume';
 import { useThinkPatterns } from '@/lib/use-think-patterns';
 import { extractJson, formatDate } from '@/lib/utils';
+import { PatternDetail } from './PatternDetail';
+import { LongTaskPractice } from './LongTaskPractice';
 import { PatternDiagnostic } from './PatternDiagnostic';
 import { PatternOverview } from './PatternOverview';
 import { PatternReviewSession } from './PatternReviewSession';
 import { PatternRewriteDrill } from './PatternRewriteDrill';
+import { RealTaskAssessment } from './RealTaskAssessment';
+import { SpeakingPractice } from './SpeakingPractice';
 
-type Mode = 'overview' | 'diagnostic' | 'review' | 'rewrite' | 'complete';
+type Mode = 'overview' | 'detail' | 'diagnostic' | 'review' | 'rewrite' | 'realTask' | 'speaking' | 'longTask' | 'complete';
 
 /** 判定最长等 15 秒：超时按「AI 不可用」处理，练习界面不永久停在「正在判定」 */
 const JUDGE_TIMEOUT_MS = 15_000;
+const REAL_TASK_TIMEOUT_MS = 20_000;
+const KNOWN_PATTERN_IDS: ReadonlySet<string> = new Set(THINK_PATTERNS.map((pattern) => pattern.id));
 
 export function PatternReviewMode() {
-  const { loaded, progress, stats, dueQueue, diagnostic, grade, saveDiagnostic } = useThinkPatterns();
+  const {
+    loaded, progress, stats, dueQueue, delayedQueue, diagnostic, diagnosticHistory, trend,
+    realTask, grade, saveDiagnostic, saveRealTask,
+  } = useThinkPatterns();
   const { isConfigured, chat: aiChat } = useAI();
   const { creditOnce } = useStudyCredit();
   const [mode, setMode] = useState<Mode>('overview');
   const [session, setSession] = useState<PatternSessionState>(() => createPatternSession([]));
+  const [delayedSession, setDelayedSession] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [resumeSnapshot, setResumeSnapshot] = useState<PatternResumeSnapshot | null>(null);
+  const [resumeInfo, setResumeInfo] = useState<PatternResumeSnapshot | null>(null);
+
+  // 概览才读断点；练习中不读（否则会把正在写的这一轮又当成“上次”）。
+  useEffect(() => {
+    if (!loaded || mode !== 'overview') return;
+    const snapshot = loadPatternResume();
+    if (snapshot && isResumeUsable(snapshot, KNOWN_PATTERN_IDS)) {
+      setResumeInfo(snapshot);
+    } else {
+      if (snapshot) clearPatternResume();
+      setResumeInfo(null);
+    }
+  }, [loaded, mode]);
+
+  const dropOldResume = () => {
+    clearPatternResume();
+    setResumeSnapshot(null);
+    setResumeInfo(null);
+  };
 
   const weak = getWeakPatterns(THINK_PATTERNS, progress);
   // 完成页按不同模式计数：重试通过后 results 只剩一条 pass，不会把同一模式数两次
   const { passed, failed } = sessionCounts(session);
 
   const startWith = (ids: string[]) => {
+    dropOldResume();
     const queue = ids.length ? ids : dueQueue;
+    setDelayedSession(false);
     setSession(createPatternSession(queue));
     setMode(queue.length ? 'review' : 'overview');
   };
@@ -84,9 +135,35 @@ export function PatternReviewMode() {
   /** 自由训练：用户明确指定模式，不受到期队列与每日新名额限制 */
   const startPractice = (patternIds: string[]) => {
     if (!patternIds.length) return;
+    dropOldResume();
+    setDelayedSession(false);
     setSession(createPatternSession(patternIds.slice(0, 10)));
     setMode('review');
   };
+
+  /** 独立的 7/21/60 天延迟探测，不混进普通到期队列 */
+  const startDelayed = () => {
+    if (!delayedQueue.length) return;
+    dropOldResume();
+    setDelayedSession(true);
+    setSession(createPatternSession(delayedQueue.slice(0, 5)));
+    setMode('review');
+  };
+
+  /** 从概览「继续上次训练」进来：队列与草稿都从快照恢复，不在中途重新组队。 */
+  const resumeSession = () => {
+    const snapshot = loadPatternResume();
+    if (!snapshot || !isResumeUsable(snapshot, KNOWN_PATTERN_IDS)) {
+      setResumeInfo(null);
+      return;
+    }
+    setResumeSnapshot(snapshot);
+    setDelayedSession(snapshot.delayed);
+    setSession(snapshot.session);
+    setMode('review');
+  };
+
+  const discardResume = () => dropOldResume();
 
   /** 体检建议先练的模式：去掉已掌握/今天已通过；全被过滤就回落到正常到期队列 */
   const startFromDiagnostic = (recommendedPatternIds: string[]) => {
@@ -109,8 +186,13 @@ export function PatternReviewMode() {
   };
 
   const handleNext = () => {
+    // 这一卡已经完成：清掉断点；下一卡由新挂载的会话重新写一份。
+    clearPatternResume();
+    setResumeSnapshot(null);
+    setResumeInfo(null);
     const next = advanceSession(session);
     if (next.done) {
+      setDelayedSession(false);
       setMode('complete');
       return;
     }
@@ -155,6 +237,70 @@ export function PatternReviewMode() {
     }
   };
 
+  /** 真实任务/长文分析共用一条链路：只返回模式使用/缺失与反馈；失败一律 null。 */
+  const analyzeTask = async (
+    creditKind: 'real-task' | 'long-task',
+    task: TaskPromptShape & { id: string },
+    answer: string,
+  ): Promise<RealTaskJudgeResult | null> => {
+    creditOnce('think', creditKey(creditKind, task.id, answer));
+    if (!isConfigured) return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REAL_TASK_TIMEOUT_MS);
+    try {
+      const raw = await aiChat(buildRealTaskPrompt(task, answer, THINK_PATTERNS), {
+        temperature: 0.2,
+        maxTokens: 700,
+        silent: true,
+        signal: controller.signal,
+      });
+      if (!raw.trim()) return null;
+      try {
+        return validateRealTaskJudgeResult(extractJson(raw), task.targetPatternIds);
+      } catch {
+        return null;
+      }
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  const analyzeRealTask = (task: IThinkRealTaskPrompt, answer: string) =>
+    analyzeTask('real-task', task, answer);
+
+  const analyzeLongTask = (task: IThinkLongTask, answer: string) =>
+    analyzeTask('long-task', task, answer);
+
+  /** 额外练习出题：不进入掌握判定；无 Key / 坏 JSON / 超时一律返回 null。 */
+  const generateLongTask = async (): Promise<GeneratedPracticeTask | null> => {
+    if (!isConfigured) return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), JUDGE_TIMEOUT_MS);
+    try {
+      const raw = await aiChat(buildGeneratedPracticePrompt(THINK_PATTERNS), {
+        temperature: 0.7,
+        maxTokens: 600,
+        silent: true,
+        signal: controller.signal,
+      });
+      if (!raw.trim()) return null;
+      try {
+        return validateGeneratedPracticeTask(
+          extractJson(raw),
+          THINK_PATTERNS.map((pattern) => pattern.id),
+        );
+      } catch {
+        return null;
+      }
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
   // 首屏：progress 还没从 storage 读出来，先给一个小加载态，避免统计闪 0。
   if (!loaded) {
     return (
@@ -165,6 +311,20 @@ export function PatternReviewMode() {
         </CardContent>
       </Card>
     );
+  }
+
+  if (mode === 'detail') {
+    const detailPattern = THINK_PATTERNS.find((candidate) => candidate.id === detailId);
+    if (detailPattern) {
+      return (
+        <PatternDetail
+          pattern={detailPattern}
+          progress={progress[detailPattern.id]}
+          onPractice={(patternId) => startPractice([patternId])}
+          onBack={() => setMode('overview')}
+        />
+      );
+    }
   }
 
   if (mode === 'diagnostic') {
@@ -189,6 +349,37 @@ export function PatternReviewMode() {
     );
   }
 
+  if (mode === 'realTask') {
+    return (
+      <RealTaskAssessment
+        realTask={realTask}
+        onAnalyze={analyzeRealTask}
+        onSave={saveRealTask}
+        onExit={() => setMode('overview')}
+      />
+    );
+  }
+
+  if (mode === 'speaking') {
+    return (
+      <SpeakingPractice
+        prompts={THINK_SPEAKING_PROMPTS}
+        onExit={() => setMode('overview')}
+      />
+    );
+  }
+
+  if (mode === 'longTask') {
+    return (
+      <LongTaskPractice
+        tasks={THINK_LONG_TASKS}
+        onAnalyze={analyzeLongTask}
+        onGenerate={generateLongTask}
+        onExit={() => setMode('overview')}
+      />
+    );
+  }
+
   if (mode === 'review' && pattern) {
     return (
       <PatternReviewSession
@@ -198,7 +389,14 @@ export function PatternReviewMode() {
         onJudge={judge}
         onGrade={handleGrade}
         onNext={handleNext}
-        onExit={() => setMode('overview')}
+        delayedProbe={delayedSession}
+        sessionState={session}
+        resume={resumeSnapshot}
+        onExit={() => {
+          setDelayedSession(false);
+          setResumeSnapshot(null);
+          setMode('overview');
+        }}
       />
     );
   }
@@ -208,15 +406,29 @@ export function PatternReviewMode() {
       stats={stats}
       weak={weak}
       dueQueue={dueQueue}
+      delayedQueue={delayedQueue}
       progress={progress}
-      mode={mode}
+      mode={mode === 'complete' ? 'complete' : 'overview'}
       passed={passed}
       failed={failed}
       diagnostic={diagnostic}
+      diagnosticHistory={diagnosticHistory}
+      trend={trend}
+      resume={resumeInfo}
+      onResume={resumeSession}
+      onDiscardResume={discardResume}
       onStart={start}
       onDiagnostic={() => setMode('diagnostic')}
+      onDelayed={startDelayed}
       onPractice={startPractice}
       onRewrite={() => setMode('rewrite')}
+      onRealTask={() => setMode('realTask')}
+      onSpeaking={() => setMode('speaking')}
+      onLongTask={() => setMode('longTask')}
+      onDetail={(patternId) => {
+        setDetailId(patternId);
+        setMode('detail');
+      }}
       onBack={() => setMode('overview')}
     />
   );

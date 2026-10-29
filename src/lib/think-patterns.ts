@@ -45,6 +45,12 @@ export interface IThinkPatternProgress {
   calibrationAttempts?: number;
   calibrationHits?: number;
   lastConfidence?: PatternConfidence;
+  /** 下一次 7/21/60 天延迟探测的到期时间；undefined 表示尚未安排或已完成 */
+  delayedProbeAt?: number;
+  /** 已通过的延迟探测数（0→7 天，1→21 天，2→60 天） */
+  delayedProbeCount?: number;
+  delayedProbeAttempts?: number;
+  delayedProbePasses?: number;
   lastAttempt?: {
     at: number;
     /** 本次尝试的本地日期键，供队列判断「今天已通过 / 今天失败」 */
@@ -58,15 +64,53 @@ export interface IThinkPatternProgress {
     source: 'ai' | 'self';
     /** 提交前的自评；旧记录可能没有 */
     confidence?: PatternConfidence;
+    /** 这次是否是独立的延迟探测 */
+    delayedProbe?: boolean;
   };
+}
+
+export interface IRealTaskRecord {
+  promptId: string;
+  prompt: string;
+  answer: string;
+  completedOn: string;
+  at: number;
+  patternsUsed: string[];
+  patternsMissing: string[];
+  feedback: string;
+  strengths: string[];
+  issues: string[];
+  wordCount: number;
+  source: 'ai' | 'self';
+}
+
+/** 每日迁移/校准计数：只用于趋势，不参与 SM-2。旧记录没有这个字段时按空算。 */
+export interface IThinkPatternDayStats {
+  attempts: number;
+  passes: number;
+  calibrationAttempts: number;
+  calibrationHits: number;
+}
+
+export interface IThinkPatternTrendPoint extends IThinkPatternDayStats {
+  date: string;
 }
 
 export interface IThinkPatternState {
   progress: Record<string, IThinkPatternProgress>;
   /** 日期 → 当天练过的模式 id（用于今日计数与去重） */
   daily: Record<string, string[]>;
+  /** 日期 → 当天迁移/校准计数；只保留最近 31 天 */
+  dailyStats?: Record<string, IThinkPatternDayStats>;
   /** 最近一次思维体检；只存汇总与建议，不存逐题答案 */
   diagnostic?: IThinkPatternDiagnosticRecord;
+  /** 体检复测历史（最多 10 次，按 completedOn 去重） */
+  diagnosticHistory?: IThinkPatternDiagnosticRecord[];
+  /** 真实任务前后测；只保留前测/后测各一条 */
+  realTask?: {
+    baseline?: IRealTaskRecord;
+    followUp?: IRealTaskRecord;
+  };
 }
 
 export interface PatternResultInput {
@@ -79,6 +123,8 @@ export interface PatternResultInput {
   evidence?: string;
   /** 提交前的自评；缺省表示旧版本/未选择，不计入校准 */
   confidence?: PatternConfidence;
+  /** 这次是否是独立的延迟探测（不是普通复习） */
+  delayedProbe?: boolean;
   today: string;
 }
 
@@ -137,6 +183,9 @@ export function initialPatternProgress(patternId: string, now = Date.now()): ITh
     aiTransferPasses: 0,
     calibrationAttempts: 0,
     calibrationHits: 0,
+    delayedProbeCount: 0,
+    delayedProbeAttempts: 0,
+    delayedProbePasses: 0,
   };
 }
 
@@ -186,6 +235,28 @@ export function applyPatternResult(
   const calibrationAttempts = (base.calibrationAttempts ?? 0) + (calibrated ? 1 : 0);
   const calibrationHits = (base.calibrationHits ?? 0) + (calibrationHit ? 1 : 0);
 
+  const isDelayedProbe = input.delayedProbe === true;
+  let delayedProbeAt = base.delayedProbeAt;
+  let delayedProbeCount = base.delayedProbeCount ?? 0;
+  let delayedProbeAttempts = base.delayedProbeAttempts ?? 0;
+  let delayedProbePasses = base.delayedProbePasses ?? 0;
+  if (isDelayedProbe) {
+    delayedProbeAttempts += 1;
+    if (input.transferPassed) {
+      delayedProbePasses += 1;
+      delayedProbeCount += 1;
+      if (delayedProbeCount === 1) delayedProbeAt = now + 21 * DAY_MS;
+      else if (delayedProbeCount === 2) delayedProbeAt = now + 60 * DAY_MS;
+      else delayedProbeAt = undefined;
+    } else {
+      // 延迟探测失败：次日再测，但不把下一次排期丢到很久以后
+      delayedProbeAt = now + DAY_MS;
+    }
+  } else if (quality >= 3 && delayedProbeAt == null && delayedProbeCount < 3) {
+    // 普通复习第一次通过后安排 7 天后的独立延迟探测
+    delayedProbeAt = now + 7 * DAY_MS;
+  }
+
   return {
     ...base,
     status,
@@ -204,6 +275,10 @@ export function applyPatternResult(
     calibrationAttempts,
     calibrationHits,
     lastConfidence: confidence ?? base.lastConfidence,
+    delayedProbeAt,
+    delayedProbeCount,
+    delayedProbeAttempts,
+    delayedProbePasses,
     lastAttempt: {
       at: now,
       on: input.today,
@@ -214,6 +289,7 @@ export function applyPatternResult(
       evidence: input.evidence ? truncate(input.evidence, 200) : undefined,
       source: input.source,
       confidence,
+      delayedProbe: isDelayedProbe,
     },
   };
 }
@@ -249,20 +325,25 @@ export function isClosedBook(
 
 export type DelayedProbeDay = 7 | 21 | 60;
 
-/**
- * 延迟探测的“已过阈值”标识：距首次练习 ≥7 / ≥21 / ≥60 天。
- * 只做标识，不另建排期 —— 实际什么时候复习仍由 SM-2 的 nextReview 决定。
- */
-export function delayedProbeDay(
-  progress: Pick<IThinkPatternProgress, 'firstReviewedAt' | 'transferPasses'> | null | undefined,
+/** 下一次延迟探测的档位：0 次通过 → 7 天，1 次 → 21 天，2 次 → 60 天。 */
+export function delayedProbeDays(
+  progress?: Pick<IThinkPatternProgress, 'delayedProbeCount'> | null,
+): DelayedProbeDay {
+  const count = progress?.delayedProbeCount ?? 0;
+  return count === 0 ? 7 : count === 1 ? 21 : 60;
+}
+
+/** 到期未做的延迟探测，按到期时间升序；最多 max 个。 */
+export function buildDelayedProbeQueue(
+  progress: Record<string, IThinkPatternProgress>,
   now: number,
-): DelayedProbeDay | null {
-  if (!progress || progress.transferPasses <= 0) return null;
-  const days = Math.floor((now - progress.firstReviewedAt) / DAY_MS);
-  if (days >= 60) return 60;
-  if (days >= 21) return 21;
-  if (days >= 7) return 7;
-  return null;
+  max = 5,
+): string[] {
+  return Object.values(progress)
+    .filter((record) => typeof record.delayedProbeAt === 'number' && record.delayedProbeAt <= now)
+    .sort((a, b) => (a.delayedProbeAt ?? 0) - (b.delayedProbeAt ?? 0))
+    .slice(0, Math.max(0, max))
+    .map((record) => record.patternId);
 }
 
 export interface DiagnosticLayerScore {
@@ -546,4 +627,47 @@ export function pruneDaily(
       .filter(([key]) => key >= cutoff && key <= today)
       .sort(([a], [b]) => a.localeCompare(b)),
   );
+}
+
+/** 同 pruneDaily 的窗口口径；坏日期键与未来日期一律丢掉。 */
+export function pruneDailyStats(
+  stats: Record<string, IThinkPatternDayStats> | undefined,
+  today: string,
+  days = 31,
+): Record<string, IThinkPatternDayStats> {
+  if (!stats) return {};
+  const d = new Date(`${today}T00:00:00`);
+  d.setDate(d.getDate() - (days - 1));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const cutoff = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return Object.fromEntries(
+    Object.entries(stats)
+      .filter(([key]) => key >= cutoff && key <= today)
+      .sort(([a], [b]) => a.localeCompare(b)),
+  );
+}
+
+/** 近 N 天趋势：缺的日期补 0，顺序从最早到今天；首页/概览直接渲染。 */
+export function buildTransferTrend(
+  stats: Record<string, IThinkPatternDayStats> | undefined,
+  today: string,
+  days = 7,
+): IThinkPatternTrendPoint[] {
+  const end = new Date(`${today}T00:00:00`);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const points: IThinkPatternTrendPoint[] = [];
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const d = new Date(end);
+    d.setDate(d.getDate() - offset);
+    const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const row = stats?.[date];
+    points.push({
+      date,
+      attempts: row?.attempts ?? 0,
+      passes: row?.passes ?? 0,
+      calibrationAttempts: row?.calibrationAttempts ?? 0,
+      calibrationHits: row?.calibrationHits ?? 0,
+    });
+  }
+  return points;
 }

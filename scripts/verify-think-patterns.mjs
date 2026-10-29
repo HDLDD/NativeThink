@@ -2,7 +2,7 @@
  * verify-think-patterns.mjs — /think 模式库的数据契约（第一批）。
  *
  * 模式库是「思维模式复习」的内容底座（docs/superpowers/specs/2026-10-24-think-pattern-core-v1-design.md）：
- * 12 个模式（四层），每个模式 5 道识别题 + 5 个迁移场景（3 新情境 + 2 换措辞），共 120 个内容项。
+ * 15 个模式（四层），每个模式 5 道识别题 + 5 个迁移场景（3 新情境 + 2 换措辞），共 150 个内容项。
  * 识别题的三个选项都必须**语法成立**，差在思维模式 —— 所以这里钉结构（数量 / 下标 / 唯一性 /
  * 非空 / 答案分布），不钉「哪个选项更像母语者」的语义判断（那由内容评审负责）。
  *
@@ -15,7 +15,7 @@
  *
  * 用法：node scripts/verify-think-patterns.mjs（verify:all 自动发现）
  */
-import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -26,7 +26,7 @@ const ts = require('typescript');
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FILE = 'src/data/think-patterns.ts';
 
-/** 12 个 id，顺序也钉住（新模式按数据顺序引入；概览另按 layer 分组渲染）。 */
+/** 15 个 id，顺序也钉住（新模式按数据顺序引入；概览另按 layer 分组渲染）。 */
 const EXPECTED_PATTERN_IDS = [
   'subject-first',
   'verb-driven',
@@ -40,6 +40,9 @@ const EXPECTED_PATTERN_IDS = [
   'register-shift',
   'compliment-response',
   'result-state',
+  'motion-path',
+  'stance-verbs',
+  'cohesion',
 ];
 const EXPECTED_LAYER_IDS = ['structure', 'verb', 'clarity', 'pragmatics'];
 const ANSWER_INDICES = [0, 1, 2];
@@ -70,12 +73,12 @@ const patterns = mod.THINK_PATTERNS;
 check(Array.isArray(patterns), '数据：THINK_PATTERNS 是数组', typeof patterns);
 const list = asArray(patterns);
 
-check(list.length === 12, '数据：恰好 12 个模式', `实际 ${list.length}`);
+check(list.length === 15, '数据：恰好 15 个模式', `实际 ${list.length}`);
 
 const patternIds = list.map((p) => p?.id);
 check(patternIds.every(filled), '数据：每个模式都有非空 id', patternIds.filter((id) => !filled(id)).join(','));
 check(patternIds.join(',') === EXPECTED_PATTERN_IDS.join(','),
-  '数据：模式 id 与 12 个预期 id 逐一对应（含顺序）', patternIds.join(','));
+  '数据：模式 id 与 15 个预期 id 逐一对应（含顺序）', patternIds.join(','));
 check(new Set(patternIds).size === patternIds.length, '数据：模式 id 唯一', patternIds.join(','));
 
 /* 四层元数据：每层有名字/描述，每个模式落在合法层里，四层各至少 2 个模式。 */
@@ -98,7 +101,7 @@ const contentIds = list.flatMap((p) => [
   ...asArray(p?.recognition).map((q) => q?.id),
   ...asArray(p?.transfer).map((t) => t?.id),
 ]);
-check(contentIds.length === 120, '数据：内容项共 120 个（60 识别 + 60 迁移）', `实际 ${contentIds.length}`);
+check(contentIds.length === 150, '数据：内容项共 150 个（75 识别 + 75 迁移）', `实际 ${contentIds.length}`);
 check(contentIds.every(filled), '数据：识别题/迁移题 id 全部非空',
   contentIds.filter((id) => !filled(id)).join(','));
 check(new Set(contentIds).size === contentIds.length, '数据：内容项 id 全局唯一',
@@ -155,12 +158,12 @@ for (const p of list) {
 
 /* 思维体检：每模式一道识别题，题面引用必须真实存在且不重复。 */
 const diagnosticItems = mod.THINK_PATTERN_DIAGNOSTIC;
-check(Array.isArray(diagnosticItems) && diagnosticItems.length === 12,
-  '诊断：恰好 12 道体检题', `实际 ${asArray(diagnosticItems).length}`);
+check(Array.isArray(diagnosticItems) && diagnosticItems.length === 15,
+  '诊断：恰好 15 道体检题', `实际 ${asArray(diagnosticItems).length}`);
 const diagnosticPatternIds = asArray(diagnosticItems).map((item) => item?.patternId);
 const diagnosticChoiceIds = asArray(diagnosticItems).map((item) => item?.choiceId);
-check(new Set(diagnosticPatternIds).size === 12 && EXPECTED_PATTERN_IDS.every((id) => diagnosticPatternIds.includes(id)),
-  '诊断：12 个模式各被抽到一次', diagnosticPatternIds.join(','));
+check(new Set(diagnosticPatternIds).size === 15 && EXPECTED_PATTERN_IDS.every((id) => diagnosticPatternIds.includes(id)),
+  '诊断：15 个模式各被抽到一次', diagnosticPatternIds.join(','));
 check(new Set(diagnosticChoiceIds).size === diagnosticChoiceIds.length,
   '诊断：识别题 id 不重复', diagnosticChoiceIds.join(','));
 for (const item of asArray(diagnosticItems)) {
@@ -171,8 +174,8 @@ for (const item of asArray(diagnosticItems)) {
 
 /* 改写快练：每道识别题派生一条，source 与 target 必须不同。 */
 const rewrites = mod.THINK_PATTERN_REWRITES;
-check(Array.isArray(rewrites) && rewrites.length === 60,
-  '改写：60 道派生题', `实际 ${asArray(rewrites).length}`);
+check(Array.isArray(rewrites) && rewrites.length === 75,
+  '改写：75 道派生题', `实际 ${asArray(rewrites).length}`);
 const rewriteIds = asArray(rewrites).map((item) => item?.id);
 check(rewriteIds.every(filled) && new Set(rewriteIds).size === rewriteIds.length,
   '改写：id 非空且唯一', rewriteIds.join(','));
@@ -181,16 +184,68 @@ check(asArray(rewrites).every((item) => filled(item?.prompt) && filled(item?.sou
   '改写：题面/原句/目标/解释完整且 source≠target');
 check(asArray(rewrites).every((item) => /原句：/.test(item?.explanation) && /参考：/.test(item?.explanation)),
   '改写：解释只讲当前原句与参考（不复用整段识别题解释）');
-check(new Set(asArray(rewrites).map((item) => item?.patternId)).size === 12,
-  '改写：覆盖 12 个模式');
+check(new Set(asArray(rewrites).map((item) => item?.patternId)).size === 15,
+  '改写：覆盖 15 个模式');
 check(new Set(asArray(rewrites).slice(0, 10).map((item) => item?.patternId)).size === 10,
   '改写：前 10 题覆盖 10 个不同模式（按题号轮转，不是整块按模式）');
+
+/* 真实任务前后测：同题型、不同内容、同一组目标模式。 */
+const realTasks = mod.THINK_REAL_TASKS;
+check(Array.isArray(realTasks) && realTasks.length === 2,
+  '真实任务：前测/后测两条', `实际 ${asArray(realTasks).length}`);
+check(asArray(realTasks).map((task) => task?.stage).join(',') === 'baseline,followUp',
+  '真实任务：stage 顺序为前测→后测');
+check(asArray(realTasks).every((task) => filled(task?.title) && filled(task?.prompt) &&
+  Array.isArray(task?.targetPatternIds) && task.targetPatternIds.length === 5 &&
+  task.targetPatternIds.every((id) => patternIds.includes(id))),
+  '真实任务：标题/题面完整，目标模式 5 个且都存在');
+check(JSON.stringify(realTasks?.[0]?.targetPatternIds) === JSON.stringify(realTasks?.[1]?.targetPatternIds),
+  '真实任务：前后测使用同一组目标模式（可比）');
+
+/* 口头任务：60–90 秒、两条场景、目标模式与真实任务同一组（口头与书面可比）。 */
+const speakingPrompts = mod.THINK_SPEAKING_PROMPTS;
+check(Array.isArray(speakingPrompts) && speakingPrompts.length === 2,
+  '口头任务：两条真实场景', `实际 ${asArray(speakingPrompts).length}`);
+check(asArray(speakingPrompts).every((item) => filled(item?.id) && filled(item?.title) &&
+  filled(item?.prompt) && /60–90 秒/.test(item?.prompt) &&
+  Array.isArray(item?.targetPatternIds) && item.targetPatternIds.length === 5 &&
+  item.targetPatternIds.every((id) => patternIds.includes(id))),
+  '口头任务：题面含 60–90 秒，目标模式 5 个且都存在');
+check(new Set(asArray(speakingPrompts).map((item) => item?.id)).size === 2 &&
+  JSON.stringify(speakingPrompts?.[0]?.targetPatternIds) === JSON.stringify(realTasks?.[0]?.targetPatternIds) &&
+  JSON.stringify(speakingPrompts?.[1]?.targetPatternIds) === JSON.stringify(realTasks?.[1]?.targetPatternIds),
+  '口头任务：题目不重复，且与真实任务同一组目标模式（口头/书面对齐）');
+
+/* 长文/对话/无中文源：2 条创作 + 4 条无中文源（图表 1 + 实景图 3），目标模式真实。 */
+const longTasks = mod.THINK_LONG_TASKS;
+check(Array.isArray(longTasks) && longTasks.length === 6 &&
+  asArray(longTasks).slice(0, 3).map((task) => task?.kind).join(',') === 'long-email,dialogue,no-chinese-source' &&
+  asArray(longTasks).filter((task) => task?.kind === 'no-chinese-source').length === 4,
+  '长文任务：长邮件/对话 + 4 条无中文源', asArray(longTasks).map((task) => task?.kind).join(','));
+check(asArray(longTasks).every((task) => filled(task?.id) && filled(task?.title) && filled(task?.prompt) &&
+  Number.isFinite(task?.minWords) && Number.isFinite(task?.maxWords) &&
+  task.minWords > 0 && task.minWords < task.maxWords &&
+  Array.isArray(task?.targetPatternIds) && task.targetPatternIds.length === 5 &&
+  task.targetPatternIds.every((id) => patternIds.includes(id))),
+  '长文任务：题面/字数区间/5 个目标模式齐全');
+check(asArray(longTasks).filter((task) => task?.kind === 'no-chinese-source')
+  .every((task) => !/[\u4e00-\u9fff]/.test(task?.prompt ?? '')),
+  '长文任务：所有无中文源题面都不含中文（不能用中文提示代替思考）');
+check(longTasks?.find((task) => task.id === 'chart-without-source')?.chart?.values.length === 6,
+  '长文任务：内联图表有 6 个点');
+const imageTasks = asArray(longTasks).filter((task) => filled(task?.image));
+check(imageTasks.length === 3 &&
+  imageTasks.every((task) => /^\/images\/think\/[a-z-]+\.webp$/.test(task.image) &&
+    filled(task.imageAlt) &&
+    existsSync(join(ROOT, 'public', task.image.replace(/^\//, '')))),
+  '长文任务：3 张实景图都落在 public/images/think 且有无障碍描述',
+  imageTasks.map((task) => `${task.image}:${existsSync(join(ROOT, 'public', task.image.replace(/^\//, '')))}`).join(' '));
 
 /* 固定顺序展示时，答案不能全压在一个下标上，否则用户能靠位置蒙对。 */
 const allChoices = list.flatMap((p) => asArray(p?.recognition));
 const answerCounts = ANSWER_INDICES.map((index) => allChoices.filter((q) => q?.answer === index).length);
-check(allChoices.length === 60 && answerCounts.every((count) => count === 20),
-  '数据：60 道识别题的答案下标均衡分布（0/1/2 各 20 道）', answerCounts.join('/'));
+check(allChoices.length === 75 && answerCounts.every((count) => count === 25),
+  '数据：75 道识别题的答案下标均衡分布（0/1/2 各 25 道）', answerCounts.join('/'));
 
 /* 逐项说明：每个选项都要说清“这句英文怎么样”，不能只给一个整体解释。 */
 const optionNotes = mod.THINK_PATTERN_OPTION_NOTES;
@@ -218,7 +273,7 @@ for (const q of allChoices) {
   });
 }
 check(noteKeys.length === allChoices.length && allChoices.every((q) => noteKeys.includes(q.id)),
-  '数据：逐项说明覆盖全部 60 道识别题', `keys=${noteKeys.length}`);
+  '数据：逐项说明覆盖全部 75 道识别题', `keys=${noteKeys.length}`);
 check(noteIssues.length === 0, '数据：每个选项都有逐项说明且 best 落在正确项',
   noteIssues.slice(0, 10).join(' | '));
 
@@ -238,8 +293,162 @@ const pure = await import(pathToFileURL(
   })(),
 ).href);
 
+/* 断点续练：模块只 import type，真转译后可以直接跑。 */
+const resume = await import(pathToFileURL(
+  (() => {
+    const src = readFileSync(join(ROOT, 'src/lib/think-session-resume.ts'), 'utf8');
+    const js = ts.transpileModule(src, {
+      compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    const file = join(mkdtempSync(join(tmpdir(), 'nt-pattern-resume-')), 'resume.mjs');
+    writeFileSync(file, js, 'utf8');
+    return file;
+  })(),
+).href);
+
+/* 跨模块证据 → 模式候选：同样只有 type import，真转译后直接跑。 */
+const evidence = await import(pathToFileURL(
+  (() => {
+    const src = readFileSync(join(ROOT, 'src/lib/think-evidence.ts'), 'utf8');
+    const js = ts.transpileModule(src, {
+      compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    const file = join(mkdtempSync(join(tmpdir(), 'nt-pattern-evidence-')), 'evidence.mjs');
+    writeFileSync(file, js, 'utf8');
+    return file;
+  })(),
+).href);
+
 const now = Date.UTC(2026, 9, 23, 4, 0, 0);
 const today = '2026-10-23';
+
+const evidenceNotes = [
+  { source: 'writing', wrong: 'This problem we will discuss tomorrow.', right: "We'll discuss it tomorrow.", chineseHint: '', note: '主语和话题前置，句首没有动作发出者。' },
+  { source: 'conversation', wrong: 'I very like it.', right: 'I really like it.', chineseHint: '我很喜欢它', note: '动词搭配不自然；动作要由动词承担。' },
+  { source: 'think', wrong: 'Please send me the file.', right: 'Could you send it when you have a moment?', chineseHint: '', note: '请求缺少礼貌台阶。' },
+];
+const evidenceSuggestions = evidence.suggestPatternsFromEvidence(evidenceNotes);
+check(evidenceSuggestions.length === 3 &&
+  evidenceSuggestions[0].patternId === 'verb-driven' &&
+  evidenceSuggestions.some((row) => row.patternId === 'subject-first') &&
+  evidenceSuggestions.some((row) => row.patternId === 'polite-request'),
+  '跨模块证据：按原因线索归到模式', JSON.stringify(evidenceSuggestions));
+check(evidenceSuggestions[0].hits === 2 && evidenceSuggestions[0].examples.length === 2 &&
+  evidenceSuggestions.filter((row) => row.patternId !== 'verb-driven').every((row) =>
+    row.hits === 1 && row.examples.length === 1),
+  '跨模块证据：命中数按条目计，例子保留原句→改法');
+check(evidence.suggestPatternsFromEvidence(evidenceNotes, 2).length === 2 &&
+  evidence.suggestPatternsFromEvidence([]).length === 0,
+  '跨模块证据：limit 生效，空证据不造候选');
+check(JSON.stringify(evidence.summarizeEvidenceSources(evidenceNotes)) ===
+  JSON.stringify({ total: 3, think: 1, writing: 1, conversation: 1 }),
+  '跨模块证据：来源计数（写作/对话/检测）');
+
+const resumeSession = pure.createPatternSession(['subject-first', 'end-focus']);
+const resumeTransfer = patterns[0].transfer[0];
+const resumeBase = {
+  v: 1,
+  patternId: 'subject-first',
+  session: resumeSession,
+  delayed: false,
+  stage: 'writing',
+  round: 0,
+  selected: 1,
+  answer: 'I can hand in the report by Friday.',
+  confidence: 2,
+  results: [],
+  rewriteAttempts: 0,
+  recognitionIndex: 0,
+  transferIndex: 0,
+  updatedAt: now,
+};
+const cleanResume = resume.sanitizePatternResume(resumeBase, now);
+check(cleanResume !== null &&
+  cleanResume.patternId === 'subject-first' &&
+  cleanResume.session.queue.join(',') === 'subject-first,end-focus' &&
+  cleanResume.answer === resumeBase.answer &&
+  cleanResume.confidence === 2,
+  '断点：合法快照原样读回，保留队列/草稿/自评');
+check(cleanResume !== null && resume.resumeStepLabel(cleanResume) === '第 3/5 步 · 首稿',
+  '断点：写作首稿的阶段标签', cleanResume ? resume.resumeStepLabel(cleanResume) : 'null');
+check(cleanResume !== null &&
+  resume.resumeStepLabel({ ...cleanResume, delayed: true }) === '延迟探测 · 第 3/5 步 · 首稿',
+  '断点：延迟探测前缀');
+check(cleanResume !== null && resume.resumeStepLabel({ ...cleanResume, stage: 'feedback', results: [
+  { pass: true, feedback: '好', source: 'ai', answer: resumeBase.answer, transfer: resumeTransfer },
+] }) === '第 3/5 步 · 首稿反馈',
+  '断点：反馈阶段标签按 round 区分');
+
+const feedbackResume = {
+  ...resumeBase,
+  stage: 'feedback',
+  results: [{ pass: true, feedback: '好', source: 'ai', answer: resumeBase.answer, transfer: resumeTransfer }],
+};
+check(resume.sanitizePatternResume(feedbackResume, now) !== null,
+  '断点：反馈阶段带结果可恢复');
+check(resume.sanitizePatternResume({ ...feedbackResume, results: [] }, now) === null,
+  '断点：反馈阶段缺结果整份丢弃（否则恢复后是空白页）');
+check(resume.sanitizePatternResume({ ...resumeBase, session: { ...resumeSession, index: 9 } }, now) === null,
+  '断点：会话下标越界整份丢弃');
+check(resume.sanitizePatternResume({ ...resumeBase, patternId: 'end-focus' }, now) === null,
+  '断点：当前模式与队列项不一致整份丢弃');
+check(resume.sanitizePatternResume({ ...resumeBase, updatedAt: now - 3 * 86400000 }, now) === null,
+  '断点：超过 2 天的旧快照不恢复');
+check(resume.sanitizePatternResume({ ...resumeBase, stage: 'unknown' }, now) === null,
+  '断点：未知阶段整份丢弃');
+check(resume.sanitizePatternResume({ ...resumeBase, confidence: 4 }, now) === null,
+  '断点：非法自评档位整份丢弃');
+check(cleanResume !== null && resume.isResumeUsable(cleanResume, new Set(['subject-first', 'end-focus'])),
+  '断点：队列与模式都在当前模式库时可用');
+check(cleanResume !== null &&
+  !resume.isResumeUsable(cleanResume, new Set(['subject-first'])) &&
+  !resume.isResumeUsable({ ...cleanResume, patternId: 'ghost' }, new Set(['subject-first', 'end-focus'])),
+  '断点：未知模式 id 的快照不可用');
+
+/* 存储行为：Node 里没有 window → 不写；注入替身 localStorage 后真跑 save/load/clear。 */
+check(resume.savePatternResume(cleanResume) === false && resume.loadPatternResume(now) === null,
+  '断点：没有 localStorage 时不写盘、不炸');
+{
+  const fake = new Map();
+  globalThis.window = {
+    localStorage: {
+      getItem: (key) => (fake.has(key) ? fake.get(key) : null),
+      setItem: (key, value) => { fake.set(key, String(value)); },
+      removeItem: (key) => { fake.delete(key); },
+    },
+  };
+  check(cleanResume !== null && resume.savePatternResume(cleanResume) === true &&
+    resume.loadPatternResume(now)?.answer === cleanResume.answer,
+    '断点：写入后能按本地日期读回同一份草稿');
+  resume.clearPatternResume();
+  check(resume.loadPatternResume(now) === null, '断点：完成后清键，不会再次弹出「继续」');
+  delete globalThis.window;
+}
+
+/* 每日迁移/校准趋势：31 天窗口 + 7 天补零。 */
+const dayStatsFixture = {
+  '2026-09-01': { attempts: 1, passes: 1, calibrationAttempts: 0, calibrationHits: 0 },
+  '2026-10-17': { attempts: 2, passes: 1, calibrationAttempts: 1, calibrationHits: 0 },
+  '2026-10-23': { attempts: 3, passes: 2, calibrationAttempts: 2, calibrationHits: 2 },
+  '2026-10-24': { attempts: 9, passes: 9, calibrationAttempts: 9, calibrationHits: 9 },
+};
+const prunedStats = pure.pruneDailyStats(dayStatsFixture, today);
+check(!('2026-09-01' in prunedStats) && !('2026-10-24' in prunedStats) &&
+  prunedStats['2026-10-17']?.attempts === 2 && prunedStats['2026-10-23']?.passes === 2,
+  '趋势：31 天窗口裁掉过老与未来日期', JSON.stringify(Object.keys(prunedStats)));
+check(JSON.stringify(pure.pruneDailyStats(undefined, today)) === '{}',
+  '趋势：旧记录没有 dailyStats 时按空对象');
+
+const trend7 = pure.buildTransferTrend(dayStatsFixture, today, 7);
+check(trend7.length === 7 && trend7[0].date === '2026-10-17' && trend7[6].date === '2026-10-23',
+  '趋势：近 7 天按日期升序、首尾对齐', trend7.map((point) => point.date).join(','));
+check(trend7[0].attempts === 2 && trend7[0].passes === 1 &&
+  trend7[2].attempts === 0 && trend7[6].attempts === 3 && trend7[6].passes === 2,
+  '趋势：有数据的日期取值、缺的日期补 0', JSON.stringify(trend7));
+check(pure.buildTransferTrend(undefined, today, 7).every((point) =>
+  point.attempts === 0 && point.passes === 0 &&
+  point.calibrationAttempts === 0 && point.calibrationHits === 0),
+  '趋势：没有任何统计时七天全 0（不造数）');
 
 const first = pure.applyPatternResult(undefined, {
   patternId: 'subject-first', recognitionCorrect: true, transferPassed: true,
@@ -338,12 +547,12 @@ check(layerSummary.length === 4 && layerSummary.map((row) => row.layerId).join('
   '层统计：四层各返回一行且顺序稳定', JSON.stringify(layerSummary));
 check(layerById.structure?.total === 3 && layerById.structure?.mastered === 1 && layerById.structure?.due === 0,
   '层统计：信息结构 3 个、已掌握 1、到期 0', JSON.stringify(layerById.structure));
-check(layerById.verb?.total === 2 && layerById.verb?.due === 1,
-  '层统计：动词与焦点 2 个、到期 1', JSON.stringify(layerById.verb));
-check(layerById.clarity?.total === 3 && layerById.clarity?.due === 0,
+check(layerById.verb?.total === 3 && layerById.verb?.due === 1,
+  '层统计：动词与焦点 3 个、到期 1', JSON.stringify(layerById.verb));
+check(layerById.clarity?.total === 4 && layerById.clarity?.due === 0,
   '层统计：今天已通过的模式不算到期', JSON.stringify(layerById.clarity));
-check(layerById.pragmatics?.total === 4 && layerById.pragmatics?.due === 0,
-  '层统计：语域与语用 4 个、未开始不算到期', JSON.stringify(layerById.pragmatics));
+check(layerById.pragmatics?.total === 5 && layerById.pragmatics?.due === 0,
+  '层统计：语域与语用 5 个、未开始不算到期', JSON.stringify(layerById.pragmatics));
 check(JSON.stringify(layerProgress) === layerSnapshot, '层统计：不修改入参（纯函数）');
 
 /* 思维体检计分：全对 → 无建议；错一题 → 只建议那一个模式；层分按真实模式数。 */
@@ -355,12 +564,12 @@ for (const item of diagItems) {
   if (choice) diagCorrectAnswers[item.choiceId] = choice.answer;
 }
 const allCorrect = pure.scoreDiagnostic(patterns, diagItems, diagCorrectAnswers, EXPECTED_LAYER_IDS);
-check(allCorrect.correct === 12 && allCorrect.total === 12,
-  '诊断：全对 12/12', JSON.stringify(allCorrect));
+check(allCorrect.correct === 15 && allCorrect.total === 15,
+  '诊断：全对 15/15', JSON.stringify(allCorrect));
 check(allCorrect.recommendedPatternIds.length === 0 && allCorrect.missedPatternIds.length === 0,
   '诊断：全对时没有建议模式', JSON.stringify(allCorrect.recommendedPatternIds));
-check(allCorrect.layers.map((layer) => layer.total).join('/') === '3/2/3/4',
-  '诊断：四层题量按真实模式数（3/2/3/4）', allCorrect.layers.map((layer) => layer.total).join('/'));
+check(allCorrect.layers.map((layer) => layer.total).join('/') === '3/3/4/5',
+  '诊断：四层题量按真实模式数（3/3/4/5）', allCorrect.layers.map((layer) => layer.total).join('/'));
 
 const firstDiag = diagItems[0];
 const wrongAnswers = {
@@ -368,12 +577,12 @@ const wrongAnswers = {
   [firstDiag.choiceId]: (diagCorrectAnswers[firstDiag.choiceId] + 1) % 3,
 };
 const oneWrong = pure.scoreDiagnostic(patterns, diagItems, wrongAnswers, EXPECTED_LAYER_IDS);
-check(oneWrong.correct === 11 && oneWrong.recommendedPatternIds.join(',') === firstDiag.patternId,
+check(oneWrong.correct === 14 && oneWrong.recommendedPatternIds.join(',') === firstDiag.patternId,
   '诊断：错一题只建议对应模式', JSON.stringify(oneWrong.recommendedPatternIds));
 check(oneWrong.layers.find((layer) => layer.layerId === 'structure')?.correct === 2,
   '诊断：结构层错一题 → 2/3', JSON.stringify(oneWrong.layers));
 check(pure.scoreDiagnostic(patterns, diagItems, {}, EXPECTED_LAYER_IDS).correct === 0,
-  '诊断：没作答不猜对（空答案 → 0/12）');
+  '诊断：没作答不猜对（空答案 → 0/15）');
 
 /* 按体检结果组队：去重、跳过已掌握/今天已通过、封顶 10。 */
 const diagnosticProgress = {
@@ -407,20 +616,61 @@ check(pure.pickPracticePatternIds(patterns, {}, 5).length === 5,
 check(pure.pickPracticePatternIds(patterns, {}, 0).length === 0,
   '自由训练：limit=0 返回空队列');
 
-/* 延迟探测：7/21/60 天阈值；没有迁移通过记录时不标延迟。 */
-const probeBase = { firstReviewedAt: now, transferPasses: 1 };
-check(pure.delayedProbeDay({ ...probeBase, firstReviewedAt: now - 6 * 86400000 }, now) === null,
-  '延迟：第 6 天还不算延迟');
-check(pure.delayedProbeDay({ ...probeBase, firstReviewedAt: now - 7 * 86400000 }, now) === 7,
-  '延迟：第 7 天 → 7');
-check(pure.delayedProbeDay({ ...probeBase, firstReviewedAt: now - 20 * 86400000 }, now) === 7,
-  '延迟：第 20 天仍是 7 天档');
-check(pure.delayedProbeDay({ ...probeBase, firstReviewedAt: now - 21 * 86400000 }, now) === 21,
-  '延迟：第 21 天 → 21');
-check(pure.delayedProbeDay({ ...probeBase, firstReviewedAt: now - 60 * 86400000 }, now) === 60,
-  '延迟：第 60 天 → 60');
-check(pure.delayedProbeDay({ ...probeBase, transferPasses: 0, firstReviewedAt: now - 60 * 86400000 }, now) === null,
-  '延迟：没有迁移通过记录 → 不标延迟');
+/* 延迟探测：真正的 7/21/60 天排期，不再按已过天数猜。 */
+const DAY = 86400000;
+check(pure.delayedProbeDays({ delayedProbeCount: 0 }) === 7 &&
+  pure.delayedProbeDays({ delayedProbeCount: 1 }) === 21 &&
+  pure.delayedProbeDays({ delayedProbeCount: 2 }) === 60,
+  '延迟：0/1/2 次通过对应 7/21/60 天档');
+const normalPass = pure.applyPatternResult(undefined, {
+  patternId: 'subject-first', recognitionCorrect: true, transferPassed: true,
+  source: 'ai', answer: 'ok', feedback: '好', today,
+}, now);
+check(normalPass.delayedProbeAt === now + 7 * DAY && normalPass.delayedProbeCount === 0,
+  '延迟：普通首次通过 → 安排 7 天后');
+const normalFail = pure.applyPatternResult(undefined, {
+  patternId: 'subject-first', recognitionCorrect: true, transferPassed: false,
+  source: 'ai', answer: 'bad', feedback: '再试', today,
+}, now);
+check(normalFail.delayedProbeAt == null, '延迟：普通失败不安排延迟探测');
+const delayedBase = p('subject-first', {
+  delayedProbeAt: now - 1, delayedProbeCount: 0, delayedProbeAttempts: 0, delayedProbePasses: 0,
+});
+const delayedPass1 = pure.applyPatternResult(delayedBase, {
+  patternId: 'subject-first', recognitionCorrect: true, transferPassed: true,
+  source: 'ai', answer: 'ok', feedback: '好', delayedProbe: true, today,
+}, now);
+check(delayedPass1.delayedProbeCount === 1 && delayedPass1.delayedProbeAttempts === 1 &&
+  delayedPass1.delayedProbePasses === 1 && delayedPass1.delayedProbeAt === now + 21 * DAY,
+  '延迟：第一次通过 → 21 天后');
+const delayedPass2 = pure.applyPatternResult({ ...delayedPass1, delayedProbeAt: now - 1 }, {
+  patternId: 'subject-first', recognitionCorrect: true, transferPassed: true,
+  source: 'ai', answer: 'ok', feedback: '好', delayedProbe: true, today,
+}, now + 2 * DAY);
+check(delayedPass2.delayedProbeCount === 2 && delayedPass2.delayedProbeAt === now + 2 * DAY + 60 * DAY,
+  '延迟：第二次通过 → 60 天后');
+const delayedPass3 = pure.applyPatternResult({ ...delayedPass2, delayedProbeAt: now - 1 }, {
+  patternId: 'subject-first', recognitionCorrect: true, transferPassed: true,
+  source: 'ai', answer: 'ok', feedback: '好', delayedProbe: true, today,
+}, now + 3 * DAY);
+check(delayedPass3.delayedProbeCount === 3 && delayedPass3.delayedProbeAt === undefined,
+  '延迟：第三次通过 → 不再安排');
+const delayedFail = pure.applyPatternResult(delayedBase, {
+  patternId: 'subject-first', recognitionCorrect: true, transferPassed: false,
+  source: 'ai', answer: 'bad', feedback: '再试', delayedProbe: true, today,
+}, now);
+check(delayedFail.delayedProbeAttempts === 1 && delayedFail.delayedProbePasses === 0 &&
+  delayedFail.delayedProbeAt === now + DAY,
+  '延迟：失败 → 次日再测');
+const delayedQueue = pure.buildDelayedProbeQueue({
+  a: p('a', { delayedProbeAt: now - 1 }),
+  b: p('b', { delayedProbeAt: now - 2 }),
+  c: p('c', { delayedProbeAt: now + 1000 }),
+}, now, 5);
+check(delayedQueue.join(',') === 'b,a',
+  '延迟队列：只收到期项并按到期时间升序', JSON.stringify(delayedQueue));
+check(pure.buildDelayedProbeQueue({ a: p('a', { delayedProbeAt: now - 1 }), b: p('b', { delayedProbeAt: now - 2 }) }, now, 1).length === 1,
+  '延迟队列：遵守 max');
 
 /* ── 补充断言 ────────────────────────────────────────────────────────────
  * 上面那批用例有几条「实现改坏也仍然绿」：自评只练 4 次时间隔还没到 21 天、
@@ -791,6 +1041,56 @@ check(/"feedback"\s*:\s*"中文/.test(prompt[0].content),
   'AI：prompt 的 JSON 模板要求中文反馈（feedback 示例以「中文」开头）', prompt[0].content.slice(-160));
 check(prompt[1].content.includes('I have seen it.'), 'AI：prompt 带用户答案');
 
+/* 真实任务分析 helper：目标模式、JSON 键与返回清洗。 */
+const realTask = realTasks[0];
+const realPrompt = ai.buildRealTaskPrompt(realTask, 'Dear client, the project will be delayed by a week.', patterns);
+check(realPrompt.length === 2 && realPrompt[0].role === 'system' && realPrompt[1].role === 'user',
+  '真实任务 AI：system + user');
+check(realPrompt[0].content.includes(realTask.prompt), '真实任务 AI：prompt 带任务题面');
+check(realTask.targetPatternIds.every((id) => {
+  const pattern = patterns.find((candidate) => candidate.id === id);
+  return !!pattern && realPrompt[0].content.includes(pattern.name) && realPrompt[0].content.includes(pattern.oneLiner);
+}), '真实任务 AI：prompt 带目标模式名与原则');
+check(/"patternsUsed"\s*:/.test(realPrompt[0].content) && /"patternsMissing"\s*:/.test(realPrompt[0].content) &&
+  /"feedback"\s*:\s*"中文/.test(realPrompt[0].content),
+  '真实任务 AI：JSON 模板含 used / missing / 中文 feedback');
+const realValidated = ai.validateRealTaskJudgeResult({
+  patternsUsed: ['subject-first', 'ghost', 'subject-first'],
+  patternsMissing: ['subject-first', 'end-focus'],
+  feedback: '  这封邮件用了主语优先，但结尾焦点还不够。  ',
+  strengths: [' 主语清楚 ', '', '结尾可再具体'],
+  issues: [' 缺少明确时间点 '],
+}, realTask.targetPatternIds);
+check(realValidated?.patternsUsed.join(',') === 'subject-first' &&
+  realValidated?.patternsMissing.join(',') === 'end-focus' &&
+  realValidated?.feedback === '这封邮件用了主语优先，但结尾焦点还不够。' &&
+  realValidated?.strengths.length === 2 && realValidated?.issues.length === 1,
+  '真实任务 AI：过滤未知/重复模式，used 与 missing 不重叠', JSON.stringify(realValidated));
+check(ai.validateRealTaskJudgeResult({ feedback: '' }, realTask.targetPatternIds) === null &&
+  ai.validateRealTaskJudgeResult(null, realTask.targetPatternIds) === null,
+  '真实任务 AI：空反馈/null 返回 null');
+
+/* AI 额外出题：只出练习，不进入掌握判定；提示词带模式库，返回限定 2-3 个真实 id。 */
+const genPrompt = ai.buildGeneratedPracticePrompt(patterns);
+check(genPrompt[0].content.includes(patterns[0].id) && genPrompt[0].content.includes(patterns[0].name) &&
+  patterns.every((pattern) => genPrompt[0].content.includes(pattern.id)),
+  'AI 出题：prompt 带完整模式库（id + 名字）');
+check(/"title"\s*:/.test(genPrompt[0].content) && /"prompt"\s*:/.test(genPrompt[0].content) &&
+  /"targetPatternIds"\s*:/.test(genPrompt[0].content) && /2-3/.test(genPrompt[0].content),
+  'AI 出题：JSON 模板含 title/prompt/targetPatternIds 与 2-3 个模式');
+const generated = ai.validateGeneratedPracticeTask({
+  title: '  新场景  ',
+  prompt: '  写一封……  ',
+  targetPatternIds: ['subject-first', 'ghost', 'subject-first', 'cohesion'],
+}, patternIds);
+check(generated?.title === '新场景' && generated?.prompt === '写一封……' &&
+  generated?.targetPatternIds.join(',') === 'subject-first,cohesion',
+  'AI 出题：过滤未知/重复 id，标题与题面 trim', JSON.stringify(generated));
+check(ai.validateGeneratedPracticeTask({ title: 'x', prompt: 'y', targetPatternIds: ['subject-first'] }, patternIds) === null &&
+  ai.validateGeneratedPracticeTask({ title: 'x', prompt: '', targetPatternIds: ['subject-first', 'cohesion'] }, patternIds) === null &&
+  ai.validateGeneratedPracticeTask(null, patternIds) === null,
+  'AI 出题：少于 2 个模式/空题面/null 一律拒绝');
+
 // 全局约束：模式线索 / 中式对比 / 迁移场景与评分焦点也必须进 prompt —— 只给名字的 prompt 判不准。
 check(sample.cues.every((cue) => prompt[0].content.includes(cue)),
   'AI：prompt 带全部思维线索（cues）', prompt[0].content);
@@ -867,9 +1167,31 @@ check(/due: all\.filter\(\(p\) => isDue\(p, now, today\)\)\.length/.test(hookCod
   'store：stats.due 只数 isDue（新引入项由 dueQueue 负责，不能算进 due）');
 check(/buildReviewQueue\(/.test(hookCode), 'store：dueQueue 走 buildReviewQueue（新引入项可以进队）');
 check(/diagnostic:\s*sanitizeDiagnostic\(/.test(hookCode), 'store：load 时清洗 diagnostic（不把坏体检记录带进界面）');
-check(/saveDiagnostic\s*=\s*useCallback/.test(hookCode) && /diagnostic:\s*\{/.test(hookCode) &&
+check(/saveDiagnostic\s*=\s*useCallback/.test(hookCode) &&
+  /diagnostic:\s*record/.test(hookCode) && /diagnosticHistory:\s*\[/.test(hookCode) &&
   /recommendedPatternIds/.test(hookCode) && /completedOn/.test(hookCode),
-  'store：saveDiagnostic 只写汇总（completedOn / 分数 / 层 / 建议）');
+  'store：saveDiagnostic 只写汇总并追加历史（completedOn / 分数 / 层 / 建议）');
+check(/realTask:\s*sanitizeRealTask\(/.test(hookCode), 'store：load 时清洗真实任务记录');
+check(/saveRealTask\s*=\s*useCallback/.test(hookCode) && /\[stage\]: record/.test(hookCode),
+  'store：saveRealTask 按 baseline/followUp 写一条');
+check(/dailyStats:\s*pruneDailyStats\(sanitizeDailyStats\(/.test(hookCode),
+  'store：load 时清洗并按 31 天裁剪每日迁移统计');
+check(/diagnosticHistory:\s*sanitizeDiagnosticHistory\(/.test(hookCode),
+  'store：load 时清洗体检历史');
+check(/dailyStats\[today\]\s*=/.test(hookCode) && /calibrationAttempts:/.test(hookCode) &&
+  /calibrationHits:/.test(hookCode),
+  'store：grade 按天累计迁移与校准，不另建一份进度');
+check(/diagnosticHistory:\s*\[/.test(hookCode) && /slice\(0, 10\)/.test(hookCode),
+  'store：体检历史同一天只留最新、最多 10 次');
+check(/trend\s*=\s*useMemo/.test(hookCode) && /buildTransferTrend\(/.test(hookCode),
+  'store：趋势由 buildTransferTrend 统一算（组件不各算一套）');
+{
+  const gradeStart = hookCode.indexOf('const grade = useCallback');
+  const gradeEnd = hookCode.indexOf('const trend = useMemo');
+  const gradeSrc = gradeStart >= 0 && gradeEnd > gradeStart ? hookCode.slice(gradeStart, gradeEnd) : '';
+  check(gradeSrc.length > 0 && /\.\.\.prev,/.test(gradeSrc),
+    'store：grade 落盘保留 diagnostic / realTask / 历史（不被新状态抹掉）');
+}
 
 // 读盘清洗（task-2 审查追加）：幽灵/错配记录会让同一个模式既算到期又被当新模式，还可能在界面上崩。
 check(/function sanitizeProgress\(/.test(hookCode) && (hookCode.match(/sanitizeProgress\(/g) ?? []).length >= 2,
@@ -893,7 +1215,80 @@ if (sanitizeSrc) {
   sanitizeProgress = (await import(pathToFileURL(file).href)).sanitizeProgress;
 }
 
+/* 每日统计清洗：坏日期、负数、缺字段整行丢，合法的按整数保留。 */
+const dailyStatsSrc = (hookCode.match(/function sanitizeDailyStats\([\s\S]*?\n\}/) ?? [''])[0];
+check(dailyStatsSrc.length > 0, 'store 读盘：能抽出 sanitizeDailyStats 纯函数段（供真跑）');
+let sanitizeDailyStats = null;
+if (dailyStatsSrc) {
+  const js = ts.transpileModule(`${dailyStatsSrc}\nexport { sanitizeDailyStats };`, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const file = join(mkdtempSync(join(tmpdir(), 'nt-pattern-daystats-')), 'day-stats.mjs');
+  writeFileSync(file, js, 'utf8');
+  sanitizeDailyStats = (await import(pathToFileURL(file).href)).sanitizeDailyStats;
+}
+const cleanDayStats = sanitizeDailyStats?.({
+  '2026-10-23': { attempts: 2.8, passes: 1, calibrationAttempts: 1, calibrationHits: 0 },
+  'not-a-date': { attempts: 1, passes: 1, calibrationAttempts: 0, calibrationHits: 0 },
+  '2026-10-22': { attempts: -1, passes: 0, calibrationAttempts: 0, calibrationHits: 0 },
+  '2026-10-21': { attempts: 1, passes: 0 },
+  '2026-10-20': null,
+});
+check(cleanDayStats && Object.keys(cleanDayStats).length === 1 &&
+  cleanDayStats['2026-10-23']?.attempts === 2 &&
+  cleanDayStats['2026-10-23']?.passes === 1,
+  'store 读盘：每日统计只留合法日期与四项非负数', JSON.stringify(cleanDayStats));
+check(JSON.stringify(sanitizeDailyStats?.(null)) === '{}' &&
+  JSON.stringify(sanitizeDailyStats?.([])) === '{}' &&
+  JSON.stringify(sanitizeDailyStats?.('nope')) === '{}',
+  'store 读盘：每日统计坏容器回退空对象');
+
 const knownIds = new Set(EXPECTED_PATTERN_IDS);
+
+/* 真实任务记录清洗：未知模式过滤、used/missing 去重去交叉、坏数值整条丢弃。 */
+const realSanitizeSrc = (() => {
+  const start = hookCode.indexOf('function sanitizeRealTaskRecord(');
+  const end = hookCode.indexOf('function load()');
+  return start >= 0 && end > start ? hookCode.slice(start, end) : '';
+})();
+check(realSanitizeSrc.length > 0, 'store 读盘：能抽出真实任务清洗段（供真跑）');
+let sanitizeRealTask = null;
+if (realSanitizeSrc) {
+  const js = ts.transpileModule(`${realSanitizeSrc}\nexport { sanitizeRealTask };`, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const file = join(mkdtempSync(join(tmpdir(), 'nt-pattern-real-task-')), 'sanitize-real-task.mjs');
+  writeFileSync(file, js, 'utf8');
+  sanitizeRealTask = (await import(pathToFileURL(file).href)).sanitizeRealTask;
+}
+const validRealTask = {
+  promptId: 'email-delay',
+  prompt: '写一封延迟邮件',
+  answer: 'Dear client, ...',
+  completedOn: today,
+  at: now,
+  patternsUsed: ['subject-first', 'ghost', 'subject-first'],
+  patternsMissing: ['subject-first', 'end-focus'],
+  feedback: '好',
+  strengths: ['a', '', 'b'],
+  issues: ['c'],
+  wordCount: 90,
+  source: 'ai',
+};
+const cleanRealTask = sanitizeRealTask?.({
+  baseline: validRealTask,
+  followUp: { ...validRealTask, promptId: 'email-quality' },
+}, knownIds);
+check(cleanRealTask?.baseline?.patternsUsed.join(',') === 'subject-first' &&
+  cleanRealTask?.baseline?.patternsMissing.join(',') === 'end-focus' &&
+  cleanRealTask?.baseline?.strengths.length === 2 &&
+  cleanRealTask?.followUp?.promptId === 'email-quality',
+  'store 真实任务清洗：过滤未知/重复模式，used 与 missing 不交叉', JSON.stringify(cleanRealTask));
+check(sanitizeRealTask?.({ baseline: { ...validRealTask, wordCount: Number.NaN } }, knownIds) === undefined,
+  'store 真实任务清洗：坏数值整条丢弃');
+check(sanitizeRealTask?.(null, knownIds) === undefined &&
+  sanitizeRealTask?.('nope', knownIds) === undefined,
+  'store 真实任务清洗：非对象 → undefined');
 const healthyRecord = pure.initialPatternProgress('subject-first', now);
 const secondHealthyRecord = pure.initialPatternProgress('fill-references', now);
 const sanitizeFixture = {
@@ -979,6 +1374,39 @@ check(sanitizeDiagnostic?.(null, knownIds, EXPECTED_LAYER_IDS) === undefined &&
   sanitizeDiagnostic?.('nope', knownIds, EXPECTED_LAYER_IDS) === undefined,
   'store 体检清洗：非对象 → undefined');
 
+/* 体检历史：同一天只留最新、最多 10 次、坏条目丢。 */
+const diagHistorySrc = (hookCode.match(/function sanitizeDiagnosticHistory\([\s\S]*?\n\}/) ?? [''])[0];
+check(diagHistorySrc.length > 0, 'store 读盘：能抽出 sanitizeDiagnosticHistory 段（供真跑）');
+let sanitizeDiagnosticHistory = null;
+if (sanitizeDiagSrc && diagHistorySrc) {
+  const js = ts.transpileModule(
+    `${sanitizeDiagSrc}\n${diagHistorySrc}\nexport { sanitizeDiagnosticHistory };`,
+    { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
+  ).outputText;
+  const file = join(mkdtempSync(join(tmpdir(), 'nt-pattern-diag-history-')), 'diag-history.mjs');
+  writeFileSync(file, js, 'utf8');
+  sanitizeDiagnosticHistory = (await import(pathToFileURL(file).href)).sanitizeDiagnosticHistory;
+}
+const diagHistory = sanitizeDiagnosticHistory?.([
+  validDiagnostic,
+  { ...validDiagnostic, correct: 9 },
+  { ...validDiagnostic, completedOn: '2026-10-22', correct: 6 },
+  { ...validDiagnostic, completedOn: '2026-10-21', correct: 13 },
+], knownIds, EXPECTED_LAYER_IDS);
+check(diagHistory?.length === 2 &&
+  diagHistory[0].completedOn === today && diagHistory[0].correct === 10 &&
+  diagHistory[1].correct === 6,
+  'store 体检历史：同一天只留最新，坏记录丢', JSON.stringify(diagHistory));
+const manyDiagnostics = Array.from({ length: 12 }, (_, i) => ({
+  ...validDiagnostic,
+  completedOn: `2026-10-${String(i + 1).padStart(2, '0')}`,
+}));
+check(sanitizeDiagnosticHistory?.(manyDiagnostics, knownIds, EXPECTED_LAYER_IDS)?.length === 10,
+  'store 体检历史：最多保留 10 次');
+check(JSON.stringify(sanitizeDiagnosticHistory?.(null, knownIds, EXPECTED_LAYER_IDS)) === '[]' &&
+  JSON.stringify(sanitizeDiagnosticHistory?.({}, knownIds, EXPECTED_LAYER_IDS)) === '[]',
+  'store 体检历史：坏容器回退空数组');
+
 /* ── 首次读盘也要打「来自 storage」标记（task-4-review.md 的 Important fix）────
  * 只在 useSyncDown 回调里打标记不够：fresh device 首次挂载读到空 state 时，落盘 effect
  * 会在第一次下行到达前把它写盘（safeStorage 双写把它排进上行队列）→ 远端进度被空对象盖掉。
@@ -1044,6 +1472,12 @@ const overviewSrc = readUi('src/pages/ThinkInEnglishPage/PatternOverview.tsx');
 const sessionSrc = readUi('src/pages/ThinkInEnglishPage/PatternReviewSession.tsx');
 const diagnosticSrc = readUi('src/pages/ThinkInEnglishPage/PatternDiagnostic.tsx');
 const rewriteSrc = readUi('src/pages/ThinkInEnglishPage/PatternRewriteDrill.tsx');
+const realTaskSrc = readUi('src/pages/ThinkInEnglishPage/RealTaskAssessment.tsx');
+const speakingSrc = readUi('src/pages/ThinkInEnglishPage/SpeakingPractice.tsx');
+const detailSrc = readUi('src/pages/ThinkInEnglishPage/PatternDetail.tsx');
+const longTaskSrc = readUi('src/pages/ThinkInEnglishPage/LongTaskPractice.tsx');
+const todayPatternSrc = readUi('src/pages/DashboardPage/TodayPatternCard.tsx');
+const dashboardSrc = readUi('src/pages/DashboardPage/DashboardPage.tsx');
 
 /* 静态接线一律跑在**剥注释源码**上：注释里出现 `silent: true` / `applySessionResult` 之类的同形
  * 文字不许替实现答话（AI 判定那批变异实验抓过一次）。 */
@@ -1054,16 +1488,23 @@ const modeCode = stripComments(modeSrc);
 const sessionCode = stripComments(sessionSrc);
 const diagnosticCode = stripComments(diagnosticSrc);
 const rewriteCode = stripComments(rewriteSrc);
+const realTaskCode = stripComments(realTaskSrc);
+const speakingCode = stripComments(speakingSrc);
+const detailCode = stripComments(detailSrc);
+const longTaskCode = stripComments(longTaskSrc);
 
 check(modeSrc.length > 0 && overviewSrc.length > 0 && sessionSrc.length > 0 &&
-  diagnosticSrc.length > 0 && rewriteSrc.length > 0,
-  'UI：概览/会话/状态机/体检/改写五个组件文件都存在');
+  diagnosticSrc.length > 0 && rewriteSrc.length > 0 && realTaskSrc.length > 0 &&
+  speakingSrc.length > 0 && detailSrc.length > 0 && longTaskSrc.length > 0,
+  'UI：概览/会话/状态机/体检/改写/真实任务/口头任务/模式详情/长文任务九个组件文件都存在');
 check(/useThinkPatterns\(/.test(modeSrc), 'UI：顶层使用 useThinkPatterns');
 check(/<PatternOverview\b/.test(modeSrc) && /<PatternReviewSession\b/.test(modeSrc) &&
-  /<PatternDiagnostic\b/.test(modeSrc) && /<PatternRewriteDrill\b/.test(modeSrc),
-  'UI：概览、复习会话、体检、改写快练分离（四个组件都被渲染，不是只 import）');
-check(/'overview' \| 'diagnostic' \| 'review' \| 'rewrite' \| 'complete'/.test(modeSrc),
-  'UI：五态状态机');
+  /<PatternDiagnostic\b/.test(modeSrc) && /<PatternRewriteDrill\b/.test(modeSrc) &&
+  /<RealTaskAssessment\b/.test(modeSrc) && /<SpeakingPractice\b/.test(modeSrc) &&
+  /<PatternDetail\b/.test(modeSrc) && /<LongTaskPractice\b/.test(modeSrc),
+  'UI：概览、复习会话、体检、改写快练、真实任务、口头任务、详情、长文任务分离（八个组件都被渲染，不是只 import）');
+check(/'overview' \| 'detail' \| 'diagnostic' \| 'review' \| 'rewrite' \| 'realTask' \| 'speaking' \| 'longTask' \| 'complete'/.test(modeSrc),
+  'UI：九态状态机');
 check(modeSrc.includes('key={`${pattern.id}-${session.index}`}'),
   'UI：换卡用「pattern.id + 会话下标」的 key 重挂载（否则重试会带着上一题阶段）');
 check(/applySessionResult\(/.test(modeCode) && /advanceSession\(/.test(modeCode) &&
@@ -1114,7 +1555,7 @@ check(/改写快练/.test(overviewSrc) && /onRewrite/.test(overviewSrc) &&
   'UI：概览有改写快练入口并接到状态机');
 check(/mode === 'rewrite'/.test(modeCode) && /<PatternRewriteDrill/.test(modeSrc) &&
   /items=\{THINK_PATTERN_REWRITES\}/.test(modeSrc),
-  'UI：rewrite 模式渲染 60 道派生题');
+  'UI：rewrite 模式渲染 75 道派生题');
 check(/10 题一组/.test(rewriteSrc) && /查看参考/.test(rewriteSrc) &&
   /改对了/.test(rewriteSrc) && /还差一点/.test(rewriteSrc),
   'UI：改写快练 10 题一组、看参考后自评');
@@ -1122,12 +1563,112 @@ check(!/onGrade|grade\(|applyPatternResult|toast\./.test(rewriteCode),
   'UI：改写快练不写 SM-2、不弹 toast');
 check(/offset \+ GROUP_SIZE/.test(rewriteCode),
   'UI：再来一组按 10 题轮换');
+check(/真实任务/.test(overviewSrc) && /onRealTask/.test(overviewSrc) &&
+  /onRealTask=\{\(\) => setMode\('realTask'\)\}/.test(modeSrc),
+  'UI：概览有真实任务入口并接到状态机');
+check(/mode === 'realTask'/.test(modeCode) && /<RealTaskAssessment/.test(modeSrc) &&
+  /onAnalyze=\{analyzeRealTask\}/.test(modeSrc) && /onSave=\{saveRealTask\}/.test(modeSrc),
+  'UI：realTask 模式接 AI 分析与保存');
+check(/真实任务前后测/.test(realTaskSrc) && /80–120 词/.test(realTaskSrc) &&
+  /分析并保存/.test(realTaskSrc) && /手动标记这次用上的模式/.test(realTaskSrc),
+  'UI：真实任务说明、词数、AI 分析/手动标记齐全');
+check(/不是分数/.test(realTaskSrc) && /变化：/.test(realTaskSrc),
+  'UI：前后测只对比模式使用，不造总分');
+check(/MIN_WORDS/.test(realTaskCode) && /MAX_WORDS/.test(realTaskCode) &&
+  !/onGrade|grade\(|applyPatternResult|toast\./.test(realTaskCode),
+  'UI：真实任务不写 SM-2、不弹 toast');
+check(/口头任务/.test(overviewSrc) && /onSpeaking/.test(overviewSrc) &&
+  /onSpeaking=\{\(\) => setMode\('speaking'\)\}/.test(modeSrc),
+  'UI：概览有口头任务入口并接到状态机');
+check(/mode === 'speaking'/.test(modeCode) && /<SpeakingPractice/.test(modeSrc) &&
+  /prompts=\{THINK_SPEAKING_PROMPTS\}/.test(modeSrc) && /onExit=\{\(\) => setMode\('overview'\)\}/.test(modeSrc),
+  'UI：speaking 模式渲染口头任务并可退出');
+check(/getUserMedia/.test(speakingCode) && /new MediaRecorder/.test(speakingCode) &&
+  /createObjectURL/.test(speakingCode) && /revokeObjectURL/.test(speakingCode),
+  'UI：口头任务本地录音、回听链接用完即 revoke');
+check(/MAX_SECONDS/.test(speakingCode) && /stopRecordingRef\.current\(\)/.test(speakingCode),
+  'UI：口头任务到 90 秒自动停止（计时器不会空转）');
+check(/getTracks\(\)\.forEach\(.*track\.stop/.test(speakingCode) &&
+  /mountedRef/.test(speakingCode) && /discardRecorder/.test(speakingCode),
+  'UI：口头任务释放麦克风，换题/重录丢弃旧 onstop 回调');
+check(!/SpeechRecognition|transcribe|upload|fetch\(|onGrade|grade\(|applyPatternResult|toast\./.test(speakingCode),
+  'UI：口头任务不上传、不接 ASR、不写 SM-2、不造发音分、不弹 toast');
+check(/说顺了/.test(speakingSrc) && /还差一点/.test(speakingSrc) &&
+  /不做发音评分/.test(speakingSrc) && /不上传/.test(speakingSrc),
+  'UI：口头任务只做自评，并明说不评分/不上传');
+check(/长文 \/ 对话/.test(overviewSrc) && /onLongTask/.test(overviewSrc) &&
+  /onLongTask=\{\(\) => setMode\('longTask'\)\}/.test(modeSrc) &&
+  /mode === 'longTask'/.test(modeCode) && /<LongTaskPractice/.test(modeSrc) &&
+  /tasks=\{THINK_LONG_TASKS\}/.test(modeSrc),
+  'UI：概览有长文/对话入口并接到状态机');
+check(/AI 再出一道/.test(longTaskSrc) && /onGenerate/.test(longTaskSrc) &&
+  /onGenerate=\{generateLongTask\}/.test(modeSrc) &&
+  /buildGeneratedPracticePrompt/.test(modeCode) && /validateGeneratedPracticeTask/.test(modeCode),
+  'UI：长文页面可让 AI 再出一道，并校验返回');
+check(/DRAFT_KEY/.test(longTaskSrc) && /localStorage/.test(longTaskSrc) &&
+  /setTimeout\(\(\) => saveDrafts\(answers\), 350\)/.test(longTaskSrc) &&
+  /countWords/.test(longTaskSrc),
+  'UI：长文草稿按任务本地保存（350ms 去抖）并显示词数');
+check(/MiniTrendChart/.test(longTaskSrc) && /<svg/.test(longTaskSrc) &&
+  /chart\.values/.test(longTaskSrc) && /自查：这次用上了哪些模式/.test(longTaskSrc),
+  'UI：无中文源任务画内联图表，AI 不可用时可手动自查');
+check(/task\.image/.test(longTaskSrc) && /<img/.test(longTaskSrc) &&
+  /alt=\{task\.imageAlt \?\? task\.title\}/.test(longTaskSrc) && /loading="lazy"/.test(longTaskSrc),
+  'UI：实景图任务真的渲染图片，带 alt 与懒加载');
+check(!/onGrade|grade\(|applyPatternResult|toast\./.test(longTaskCode) &&
+  /不写 SM-2/.test(longTaskSrc),
+  'UI：长文任务不写 SM-2、不弹 toast');
+check(/薄弱报告/.test(overviewSrc) && /showWeak/.test(overviewSrc) &&
+  /最近反馈：/.test(overviewSrc) && /lapses \{p\.lapses\}/.test(overviewSrc) &&
+  /onDetail\(row\.pattern\.id\)/.test(overviewSrc),
+  'UI：薄弱报告列出 lapses/迁移率/最近反馈，点行进详情');
+check(/mode === 'detail'/.test(modeCode) && /<PatternDetail/.test(modeSrc) &&
+  /onPractice=\{\(patternId\) => startPractice\(\[patternId\]\)\}/.test(modeSrc) &&
+  /onDetail=\{[^}]*setMode\('detail'\)/.test(modeCode),
+  'UI：详情模式接当前进度，并能直接开练一个模式');
+check(/中文默认 → 英语默认/.test(detailSrc) && /反例与改法/.test(detailSrc) &&
+  /还能更直接/.test(detailSrc) && /练这个模式/.test(detailSrc),
+  'UI：详情有中文/英语默认、反例与改法、开练按钮');
+check(/THINK_PATTERN_OPTION_NOTES/.test(detailSrc) && /tone === 'off'/.test(detailSrc) &&
+  /progress\.lastAttempt\?\.feedback/.test(detailSrc) && /delayedProbeAt/.test(detailSrc),
+  'UI：反例取题库逐项说明，详情显示最近反馈与延迟排期');
+check(!/onGrade|grade\(|applyPatternResult|toast\./.test(detailCode),
+  'UI：详情只读，不写 SM-2、不弹 toast');
+check(/继续上次训练/.test(overviewSrc) && /resumeStepLabel\(resume\)/.test(overviewSrc) &&
+  /onResume/.test(overviewSrc) && /onDiscardResume/.test(overviewSrc),
+  'UI：概览有「继续上次训练」与放弃入口');
+check(/loadPatternResume/.test(modeCode) && /isResumeUsable/.test(modeCode) &&
+  /savePatternResume/.test(sessionCode) && /clearPatternResume/.test(sessionCode) &&
+  /addEventListener\('pagehide', flush\)/.test(sessionCode) &&
+  /removeEventListener\('pagehide', flush\)/.test(sessionCode),
+  'UI：断点读写都接上，页面关闭时补一次落盘');
+check(/sessionState=\{session\}/.test(modeSrc) && /resume=\{resumeSnapshot\}/.test(modeSrc) &&
+  /matchedResume\?\.stage/.test(sessionCode) && /matchedResume\?\.recognitionIndex/.test(sessionCode),
+  'UI：恢复时沿用原队列/阶段/题号，不重新抽题');
+check(/dropOldResume/.test(modeCode) && /clearPatternResume\(\)/.test(modeCode),
+  'UI：开始新一轮/完成一卡都清旧断点');
+check(todayPatternSrc.length > 0 && /useThinkPatterns\(/.test(todayPatternSrc) &&
+  /今日模式/.test(todayPatternSrc) && /近 7 天迁移/.test(todayPatternSrc) &&
+  /stats\.tracked === 0/.test(todayPatternSrc),
+  'UI：首页今日模式卡用真实进度，没学过时整卡不渲染');
+check(/<TodayPatternCard onNavigate=\{navigate\} \/>/.test(dashboardSrc),
+  'UI：首页真的挂上今日模式卡（只写组件不挂载 = 用户看不见）');
+check(/diagnosticHistory=\{diagnosticHistory\}/.test(modeSrc) && /trend=\{trend\}/.test(modeSrc),
+  'UI：体检历史与趋势从 store 传到概览');
+check(/近 7 天趋势/.test(overviewSrc) && /体检复测/.test(overviewSrc) &&
+  /trend\.map/.test(overviewSrc) && /diagnosticHistory/.test(overviewSrc),
+  'UI：概览渲染 7 天迁移柱与体检复测序列');
+check(/useCorrectionNotes/.test(overviewSrc) && /跨模块证据/.test(overviewSrc) &&
+  /suggestPatternsFromEvidence/.test(overviewSrc) && /onDetail\(row\.patternId\)/.test(overviewSrc) &&
+  /writing/.test(overviewSrc) && /conversation/.test(overviewSrc),
+  'UI：跨模块证据显示写作/对话来源，候选模式可进详情');
 check(/isClosedBook\(progress\)/.test(sessionSrc) && /closedBook \?/.test(sessionCode) &&
   /这次闭卷/.test(sessionSrc),
   'UI：迁移卡按 isClosedBook 切换闭卷提示');
-check(/delayedProbeDay\(progress/.test(sessionSrc) && /延迟 \$\{probeDay\} 天/.test(sessionSrc) &&
+check(/delayedProbe \? delayedProbeDays\(progress\)/.test(sessionSrc) &&
+  /延迟 \$\{probeDay\} 天/.test(sessionSrc) &&
   /probeDay \? '延迟迁移' : '闭卷'/.test(sessionSrc),
-  'UI：迁移卡标出 7/21/60 天延迟探测');
+  'UI：独立延迟探测按 7/21/60 档位标出');
 check(/transferKind === 'wording' \? '换措辞' : '新情境'/.test(sessionSrc),
   'UI：迁移卡标出新情境/换措辞');
 check(/closedBook && \(/.test(sessionCode) && /回看：这次/.test(sessionSrc),
@@ -1175,6 +1716,10 @@ check(!/toast\./.test(modeSrc + overviewSrc + sessionSrc + diagnosticSrc), 'UI�
 check(/useAI\(/.test(modeCode), 'AI：组件使用 useAI');
 check(/creditOnce\('think'/.test(modeCode), 'AI：迁移提交走 creditOnce');
 check(/creditKey\('pattern'/.test(modeCode), 'AI：计时键含 pattern 与题目/答案');
+check(/const analyzeTask = async/.test(modeCode) &&
+  /creditOnce\('think', creditKey\(creditKind, task\.id, answer\)\)/.test(modeCode) &&
+  /analyzeTask\('real-task'/.test(modeCode) && /analyzeTask\('long-task'/.test(modeCode),
+  'AI：真实任务/长文分析都按动作计时');
 check(/judgeSeq/.test(sessionCode), 'AI：会话用请求序号防旧结果');
 check(/validatePatternJudgeResult/.test(modeCode), 'AI：走 validatePatternJudgeResult');
 check(/extractJson\(raw\)/.test(modeCode) && /if \(!raw\.trim\(\)\)/.test(modeCode), 'AI：空串先判空再 extractJson');
@@ -1437,11 +1982,13 @@ await runPureMutation(
 }
 
 // M7：去掉迁移判定前的计时接线（静态）—— AI 不可用时那次真实作答会被静默吞掉。
+// 真实任务分析也有一个合法的 creditOnce；这里只变异模式迁移那一条。
 {
-  const hasCredit = (src) => /creditOnce\('think'/.test(src);
-  check(hasCredit(modeText), 'M7 基线：迁移提交走 creditOnce');
-  const m7 = replaceOnce(modeText, "creditOnce('think'", "noop('think'");
-  check(m7.hits === 1 && !hasCredit(m7.out), 'M7 去掉 creditOnce：计时接线必须消失');
+  const patternCredit = "creditOnce('think', creditKey('pattern', target.id, answer))";
+  const hasPatternCredit = (src) => src.includes(patternCredit);
+  check(hasPatternCredit(modeText), 'M7 基线：迁移提交走 creditOnce');
+  const m7 = replaceOnce(modeText, patternCredit, patternCredit.replace('creditOnce', 'noop'));
+  check(m7.hits === 1 && !hasPatternCredit(m7.out), 'M7 去掉迁移 creditOnce：计时接线必须消失');
 }
 
 // M8：坏形状不再判 null（AI 返回校验）—— 坏 pass 会被放行落分。
@@ -1543,12 +2090,12 @@ await runPureMutation(
   ).length === 1,
 );
 
-// M17：延迟 7 天阈值失效 —— 第 7 天不再标延迟。
+// M17：延迟 7 天档失效 —— 第一次探测被排到 60 天。
 await runPureMutation(
-  'M17 延迟 7 天阈值',
-  'if (days >= 7) return 7;',
-  'if (days >= 99) return 7;',
-  (m) => m.delayedProbeDay({ firstReviewedAt: now - 7 * 86400000, transferPasses: 1 }, now) === null,
+  'M17 延迟 7 天档失效',
+  'return count === 0 ? 7 : count === 1 ? 21 : 60;',
+  'return count === 99 ? 7 : count === 1 ? 21 : 60;',
+  (m) => m.delayedProbeDays({ delayedProbeCount: 0 }) === 60,
 );
 
 // M18：自评校准不再计入 —— 有把握/没把握的预测永远不累计。

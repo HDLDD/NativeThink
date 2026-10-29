@@ -25,14 +25,20 @@ import { THINK_PATTERN_LAYERS, THINK_PATTERNS } from '@/data/think-patterns';
 import {
   THINK_PATTERN_STORAGE_KEY,
   applyPatternResult,
+  buildDelayedProbeQueue,
   buildReviewQueue,
+  buildTransferTrend,
   isDue,
   pruneDaily,
+  pruneDailyStats,
   type DiagnosticLayerScore,
   type DiagnosticResult,
+  type IRealTaskRecord,
+  type IThinkPatternDayStats,
   type IThinkPatternDiagnosticRecord,
   type IThinkPatternProgress,
   type IThinkPatternState,
+  type IThinkPatternTrendPoint,
   type PatternGradeInput,
 } from '@/lib/think-patterns';
 import type { ThinkPatternLayer } from '@/data/think-patterns';
@@ -54,10 +60,19 @@ export interface IThinkPatternsApi {
   stats: IThinkPatternStats;
   /** 本轮复习顺序：到期项在前、新引入项在后（新引入不算 due，见 stats.due） */
   dueQueue: string[];
+  /** 独立延迟探测队列（7/21/60 天到期） */
+  delayedQueue: string[];
   /** 最近一次思维体检；没有就是 null */
   diagnostic: IThinkPatternDiagnosticRecord | null;
+  /** 体检复测历史（按日期新→旧，最多 10 次） */
+  diagnosticHistory: IThinkPatternDiagnosticRecord[];
+  /** 近 7 天迁移/校准趋势（缺的日期补 0） */
+  trend: IThinkPatternTrendPoint[];
+  /** 真实任务前测 / 后测；没有就是 null */
+  realTask: IThinkPatternState['realTask'] | null;
   grade: (input: PatternGradeInput) => void;
   saveDiagnostic: (result: DiagnosticResult) => void;
+  saveRealTask: (stage: 'baseline' | 'followUp', record: IRealTaskRecord) => void;
   getProgress: (patternId: string) => IThinkPatternProgress | null;
   resetAll: () => void;
 }
@@ -112,6 +127,31 @@ function sanitizeDaily(raw: unknown): Record<string, string[]> {
   return out;
 }
 
+/** 每日迁移/校准计数：日期键必须是 YYYY-MM-DD，四项都是非负有限数；坏行整条丢。 */
+function sanitizeDailyStats(raw: unknown): Record<string, IThinkPatternDayStats> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Record<string, IThinkPatternDayStats> = {};
+  const fields: Array<keyof IThinkPatternDayStats> = [
+    'attempts', 'passes', 'calibrationAttempts', 'calibrationHits',
+  ];
+  for (const [day, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const row = value as Record<string, unknown>;
+    if (!fields.every((field) => {
+      const fieldValue = row[field];
+      return typeof fieldValue === 'number' && Number.isFinite(fieldValue) && fieldValue >= 0;
+    })) continue;
+    out[day] = {
+      attempts: Math.floor(row.attempts as number),
+      passes: Math.floor(row.passes as number),
+      calibrationAttempts: Math.floor(row.calibrationAttempts as number),
+      calibrationHits: Math.floor(row.calibrationHits as number),
+    };
+  }
+  return out;
+}
+
 /**
  * 体检记录的读盘清洗：只保留汇总与建议，不存逐题答案。
  * 坏形状、未知层、未知模式 id 一律丢掉；整份坏掉时回退 undefined，不影响复习进度。
@@ -158,16 +198,98 @@ function sanitizeDiagnostic(
   };
 }
 
+/** 体检历史：逐条过 sanitizeDiagnostic；同一天只留一条，最多 10 次。 */
+function sanitizeDiagnosticHistory(
+  raw: unknown,
+  knownPatternIds: ReadonlySet<string>,
+  layerIds: readonly ThinkPatternLayer[],
+): IThinkPatternDiagnosticRecord[] {
+  if (!Array.isArray(raw)) return [];
+  const out: IThinkPatternDiagnosticRecord[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    const clean = sanitizeDiagnostic(entry, knownPatternIds, layerIds);
+    if (!clean || seen.has(clean.completedOn)) continue;
+    seen.add(clean.completedOn);
+    out.push(clean);
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+
+function sanitizeRealTaskRecord(
+  raw: unknown,
+  knownPatternIds: ReadonlySet<string>,
+): IRealTaskRecord | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const v = raw as Record<string, unknown>;
+  if (typeof v.promptId !== 'string' || !v.promptId) return undefined;
+  if (typeof v.prompt !== 'string' || !v.prompt) return undefined;
+  if (typeof v.answer !== 'string' || !v.answer.trim()) return undefined;
+  if (typeof v.completedOn !== 'string' || !v.completedOn) return undefined;
+  if (typeof v.at !== 'number' || !Number.isFinite(v.at)) return undefined;
+  if (typeof v.wordCount !== 'number' || !Number.isFinite(v.wordCount)) return undefined;
+  if (v.source !== 'ai' && v.source !== 'self') return undefined;
+  if (typeof v.feedback !== 'string') return undefined;
+
+  const toIds = (value: unknown): string[] => (Array.isArray(value) ? value : [])
+    .filter((id): id is string => typeof id === 'string' && knownPatternIds.has(id));
+  const patternsUsed = toIds(v.patternsUsed).filter((id, index, list) => list.indexOf(id) === index);
+  const patternsMissing = toIds(v.patternsMissing)
+    .filter((id) => !patternsUsed.includes(id))
+    .filter((id, index, list) => list.indexOf(id) === index);
+  const toPhrases = (value: unknown): string[] => (Array.isArray(value) ? value : [])
+    .filter((text): text is string => typeof text === 'string' && text.trim().length > 0)
+    .map((text) => text.trim())
+    .slice(0, 3);
+
+  return {
+    promptId: v.promptId,
+    prompt: v.prompt,
+    answer: v.answer,
+    completedOn: v.completedOn,
+    at: v.at,
+    patternsUsed,
+    patternsMissing,
+    feedback: v.feedback,
+    strengths: toPhrases(v.strengths),
+    issues: toPhrases(v.issues),
+    wordCount: v.wordCount,
+    source: v.source,
+  };
+}
+
+function sanitizeRealTask(
+  raw: unknown,
+  knownPatternIds: ReadonlySet<string>,
+): IThinkPatternState['realTask'] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const v = raw as Record<string, unknown>;
+  const baseline = sanitizeRealTaskRecord(v.baseline, knownPatternIds);
+  const followUp = sanitizeRealTaskRecord(v.followUp, knownPatternIds);
+  if (!baseline && !followUp) return undefined;
+  return {
+    ...(baseline ? { baseline } : {}),
+    ...(followUp ? { followUp } : {}),
+  };
+}
+
 function load(): IThinkPatternState {
   try {
     const raw = safeStorage.getItem(THINK_PATTERN_STORAGE_KEY);
     if (!raw) return createEmptyState();
     const parsed = JSON.parse(raw);
+    const today = formatDate(new Date());
     return {
       progress: sanitizeProgress(parsed?.progress, KNOWN_PATTERN_IDS),
       // 用本地 today 裁 daily：设备时钟回拨/时区切换留下的未来键不能当成今天的历史
-      daily: pruneDaily(sanitizeDaily(parsed?.daily), formatDate(new Date())),
+      daily: pruneDaily(sanitizeDaily(parsed?.daily), today),
+      dailyStats: pruneDailyStats(sanitizeDailyStats(parsed?.dailyStats), today),
       diagnostic: sanitizeDiagnostic(parsed?.diagnostic, KNOWN_PATTERN_IDS, KNOWN_LAYER_IDS),
+      diagnosticHistory: sanitizeDiagnosticHistory(
+        parsed?.diagnosticHistory, KNOWN_PATTERN_IDS, KNOWN_LAYER_IDS,
+      ),
+      realTask: sanitizeRealTask(parsed?.realTask, KNOWN_PATTERN_IDS),
     };
   } catch {
     return createEmptyState();
@@ -222,12 +344,29 @@ export function useThinkPatterns(): IThinkPatternsApi {
     setState((prev) => {
       const nextProgress = applyPatternResult(prev.progress[input.patternId], { ...input, today }, now);
       const todayList = prev.daily[today] ?? [];
+      const dailyStats = pruneDailyStats(prev.dailyStats, today);
+      const dayStats = dailyStats[today] ?? {
+        attempts: 0, passes: 0, calibrationAttempts: 0, calibrationHits: 0,
+      };
+      const calibrated = input.confidence === 1 || input.confidence === 3;
+      const calibrationHit = calibrated && (
+        (input.confidence === 3 && input.transferPassed) ||
+        (input.confidence === 1 && !input.transferPassed)
+      );
+      dailyStats[today] = {
+        attempts: dayStats.attempts + 1,
+        passes: dayStats.passes + (input.transferPassed ? 1 : 0),
+        calibrationAttempts: dayStats.calibrationAttempts + (calibrated ? 1 : 0),
+        calibrationHits: dayStats.calibrationHits + (calibrationHit ? 1 : 0),
+      };
       return {
+        ...prev,
         progress: { ...prev.progress, [input.patternId]: nextProgress },
         daily: {
           ...pruneDaily(prev.daily, today),
           [today]: todayList.includes(input.patternId) ? todayList : [...todayList, input.patternId],
         },
+        dailyStats,
       };
     });
   }, []);
@@ -241,6 +380,15 @@ export function useThinkPatterns(): IThinkPatternsApi {
       today: formatDate(new Date(now)),
     });
   }, [state.progress]);
+
+  const delayedQueue = useMemo(() => {
+    return buildDelayedProbeQueue(state.progress, Date.now());
+  }, [state.progress]);
+
+  const trend = useMemo(
+    () => buildTransferTrend(state.dailyStats, formatDate(new Date()), 7),
+    [state.dailyStats],
+  );
 
   const stats = useMemo(() => {
     const now = Date.now();
@@ -257,14 +405,30 @@ export function useThinkPatterns(): IThinkPatternsApi {
 
   const saveDiagnostic = useCallback((result: DiagnosticResult) => {
     const today = formatDate(new Date());
+    const record: IThinkPatternDiagnosticRecord = {
+      completedOn: today,
+      correct: result.correct,
+      total: result.total,
+      layers: result.layers,
+      recommendedPatternIds: result.recommendedPatternIds,
+    };
     setState((prev) => ({
       ...prev,
-      diagnostic: {
-        completedOn: today,
-        correct: result.correct,
-        total: result.total,
-        layers: result.layers,
-        recommendedPatternIds: result.recommendedPatternIds,
+      diagnostic: record,
+      // 同一天重测只留最新一条；历史最多 10 次。
+      diagnosticHistory: [
+        record,
+        ...(prev.diagnosticHistory ?? []).filter((entry) => entry.completedOn !== today),
+      ].slice(0, 10),
+    }));
+  }, []);
+
+  const saveRealTask = useCallback((stage: 'baseline' | 'followUp', record: IRealTaskRecord) => {
+    setState((prev) => ({
+      ...prev,
+      realTask: {
+        ...prev.realTask,
+        [stage]: record,
       },
     }));
   }, []);
@@ -282,9 +446,14 @@ export function useThinkPatterns(): IThinkPatternsApi {
     progress: state.progress,
     stats,
     dueQueue,
+    delayedQueue,
     diagnostic: state.diagnostic ?? null,
+    diagnosticHistory: state.diagnosticHistory ?? [],
+    trend,
+    realTask: state.realTask ?? null,
     grade,
     saveDiagnostic,
+    saveRealTask,
     getProgress,
     resetAll,
   };

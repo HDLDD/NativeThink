@@ -941,6 +941,357 @@ modelAnswer: "I bought it, but I haven't used it yet.",
       },
     ],
   },
+  {
+    id: 'motion-path',
+    layer: 'verb',
+    name: '路径要单独说出来',
+    oneLiner: '中文把方向压在动词里，英文常把路径交给介词或短语。',
+    contrast: {
+      chineseThinking: '他从房间里跑出来。',
+      native: 'He ran out of the room.',
+      note: '中文「跑出来」一个动词带方向；英文用 ran + out of the room 把动作和路径分开。',
+    },
+    cues: [
+      '先选动作动词：run / walk / climb / crawl',
+      '方向用 out of / into / across / along / to 说清楚',
+      '中文的“出来/进去/上去”通常不是英文动词本身',
+    ],
+    recognition: [
+      {
+        id: 'motion-r1',
+        prompt: '你想说“她从桥上走过去”。',
+        options: [
+          'She walked across the bridge.',
+          'She crossed the bridge on foot.',
+          'She went across the bridge by walking.',
+        ],
+        answer: 0,
+        explanation: '正确项用 walked + across the bridge 把动作和路径分开，最直接；`crossed ... on foot` 也自然但更书面，`by walking` 绕。',
+      },
+      {
+        id: 'motion-r2',
+        prompt: '你想说“他把钥匙放进口袋”。',
+        options: [
+          'He put his keys inside.',
+          'He put his keys into his pocket.',
+          'He placed his keys into the pocket.',
+        ],
+        answer: 1,
+        explanation: '正确项把目标 pocket 说清楚；`inside` 少了目标，`placed ... into` 更正式也更笨重。',
+      },
+      {
+        id: 'motion-r3',
+        prompt: '你想说“我们终于爬上了山顶”。',
+        options: [
+          'We climbed the top finally.',
+          'Finally, we climbed the top.',
+          'We finally climbed to the top of the mountain.',
+        ],
+        answer: 2,
+        explanation: '正确项用 climbed to the top 把路径说全；`climbed the top` 搭配不自然，像是把山顶当成了攀爬对象。',
+      },
+      {
+        id: 'motion-r4',
+        prompt: '你想说“猫从沙发底下钻出来”。',
+        options: [
+          'The cat crawled out from under the sofa.',
+          'The cat came out from under the sofa, crawling.',
+          'The cat crawled and came out from under the sofa.',
+        ],
+        answer: 0,
+        explanation: '正确项把动作 crawled 和路径 out from under the sofa 一次说清；另外两句把动作和路径拆成两个动作，显得绕。',
+      },
+      {
+        id: 'motion-r5',
+        prompt: '你想说“她沿着河走”。',
+        options: [
+          'She took a walk beside the river.',
+          'She walked along the river.',
+          'She went along the river on foot.',
+        ],
+        answer: 1,
+        explanation: '正确项 walked along the river 最直接；`beside` 只说明位置、不说明方向，`on foot` 多余。',
+      },
+    ],
+    transfer: [
+      {
+        id: 'motion-t1',
+        situation: '你想说“我坐地铁到机场，然后走进航站楼”。',
+        rubricFocus: '是否把 take the subway to / walk into 的路径说清楚，而不是把“到/进”都塞进一个动词',
+        thinkingSteps: ['动作是什么？→ take / walk', '路径到哪里？→ to the airport / into the terminal', '顺序怎么接？→ and then'],
+        why: '英文把动作和路径分开：take the subway to the airport, walk into the terminal，方向一目了然。',
+        modelAnswer: "I'll take the subway to the airport and walk into the terminal.",
+      },
+      {
+        id: 'motion-t2',
+        situation: '你想说“孩子们跑出教室，冲下楼梯”。',
+        rubricFocus: '是否用 ran out of / rushed down 把两个动作的路径都说出来',
+        thinkingSteps: ['第一个动作？→ ran', '从哪里出来？→ out of the classroom', '第二个动作和方向？→ rushed down the stairs'],
+        why: '中文“跑出/冲下”把方向压在动词后；英文用 ran out of、rushed down 让路径跟着介词短语出现。',
+        modelAnswer: 'The kids ran out of the classroom and rushed down the stairs.',
+      },
+      {
+        id: 'motion-t3',
+        situation: '你想说“她把书从桌上拿起来，放进包里”。',
+        rubricFocus: '是否用 picked ... up from / put ... in 把起点和终点说清楚',
+        thinkingSteps: ['动作是什么？→ pick up / put', '起点？→ from the desk', '终点？→ in her bag'],
+        why: '英文用 picked the book up from the desk、put it in her bag 分开说起点和终点，不把“起来/进去”塞进一个动词。',
+        modelAnswer: 'She picked the book up from the desk and put it in her bag.',
+      },
+      {
+        id: 'motion-w1',
+        kind: 'wording',
+        situation: '你想说“他穿过马路，走进咖啡馆”。',
+        rubricFocus: '是否用 crossed / walked into 把两个路径都表达出来',
+        thinkingSteps: ['第一个动作？→ crossed the street', '第二个动作？→ walked into the café', '方向？→ into'],
+        why: 'crossed the street 已经含“穿过”；walked into the café 再把终点说清楚，两句都自然。',
+        modelAnswer: 'He crossed the street and walked into the café.',
+      },
+      {
+        id: 'motion-w2',
+        kind: 'wording',
+        situation: '你想说“我们沿着山路一直走到湖边”。',
+        rubricFocus: '是否用 along / all the way to 说清路径，而不是逐字翻“走到”',
+        thinkingSteps: ['动作？→ walked / followed', '沿哪里？→ along the mountain road', '终点？→ all the way to the lake'],
+        why: '英文用 along the mountain road, all the way to the lake 把路径和终点都摆出来，比一个“走到”清楚。',
+        modelAnswer: 'We followed the mountain road all the way to the lake.',
+      },
+    ],
+  },
+  {
+    id: 'stance-verbs',
+    layer: 'pragmatics',
+    name: '态度动词要选准',
+    oneLiner: '同样是“觉得”，证据强弱不同，英文换动词。',
+    contrast: {
+      chineseThinking: '我怀疑他没来。',
+      native: "I suspect he didn't come.",
+      note: '中文“怀疑”可以指“猜一件不好的事”；英文 suspect 才是这个意思，doubt 是“认为不会”。',
+    },
+    cues: [
+      '先问自己：是判断、猜测、期待，还是不相信？',
+      'suspect 常接“不好的可能”；doubt 接“不会发生”',
+      'expect 是预测，look forward to 是期待（后接 doing）',
+    ],
+    recognition: [
+      {
+        id: 'stance-r1',
+        prompt: '你想说“我怀疑他拿了我的伞”。',
+        options: [
+          'I doubt he took my umbrella.',
+          'I expect he took my umbrella.',
+          'I suspect he took my umbrella.',
+        ],
+        answer: 2,
+        explanation: '正确项 suspect 表示“有依据地猜一件不好的事”；doubt 反而是“认为他没拿”，expect 是预测、没有怀疑意味。',
+      },
+      {
+        id: 'stance-r2',
+        prompt: '你想说“我认为这个方案可行”。',
+        options: [
+          'I think this plan will work.',
+          'I suspect this plan will work.',
+          'I doubt this plan will work.',
+        ],
+        answer: 0,
+        explanation: '正确项 think 是中性判断；suspect 常带负面猜测，doubt 直接表示“不看好”。',
+      },
+      {
+        id: 'stance-r3',
+        prompt: '你想说“我期待收到你的回复”。',
+        options: [
+          'I expect to receive your reply.',
+          'I look forward to hearing from you.',
+          'I hope to hear from you.',
+        ],
+        answer: 1,
+        explanation: '正确项 look forward to hearing from you 是自然、礼貌的期待；expect 容易显得像在催，hope 也可以但语域更轻。',
+      },
+      {
+        id: 'stance-r4',
+        prompt: '你想说“我怀疑这个数字不对”。',
+        options: [
+          'I doubt this number is wrong.',
+          'I hope this number is wrong.',
+          'I suspect this number is wrong.',
+        ],
+        answer: 2,
+        explanation: '正确项 suspect 表示“怀疑它有问题”；doubt 是“认为它没问题”，hope 是希望它错，语义都变了。',
+      },
+      {
+        id: 'stance-r5',
+        prompt: '你想说“我们预计周五完成”。',
+        options: [
+          'We expect to finish by Friday.',
+          'We suspect that we will finish by Friday.',
+          'We look forward to finishing by Friday.',
+        ],
+        answer: 0,
+        explanation: '正确项 expect to finish 是预测；suspect 带“可能有问题”的意味，look forward to 是期待而不是预计。',
+      },
+    ],
+    transfer: [
+      {
+        id: 'stance-t1',
+        situation: '你想告诉客户“我们预计下周三上线，但还要看测试结果”。',
+        rubricFocus: '是否用 expect 表达预测，并用 but / depending on 保留不确定性',
+        thinkingSteps: ['预测动词？→ expect', '时间？→ next Wednesday', '不确定性？→ depending on the test results'],
+        why: 'expect 说预测，depending on 保留条件，既给承诺又不把话说满。',
+        modelAnswer: 'We expect to launch next Wednesday, depending on the test results.',
+      },
+      {
+        id: 'stance-t2',
+        situation: '你想说“我怀疑问题出在缓存，但还不确定”。',
+        rubricFocus: '是否用 suspect 表达“有依据的怀疑”，并用 but I’m not sure 保留余地',
+        thinkingSteps: ['怀疑动词？→ suspect', '怀疑什么？→ the issue is in the cache', '余地？→ but I’m not sure yet'],
+        why: 'suspect 适合“有一点证据但不确定”；补一句 not sure，避免把猜测说成结论。',
+        modelAnswer: "I suspect the issue is in the cache, but I'm not sure yet.",
+      },
+      {
+        id: 'stance-t3',
+        situation: '你想说“我期待和你一起推进这个项目”。',
+        rubricFocus: '是否用 look forward to doing，而不是 expect to do',
+        thinkingSteps: ['期待动词？→ look forward to', '后面接什么？→ working', '和谁？→ with you'],
+        why: 'look forward to 后面接动名词，表达期待；expect 会变成“预计一起工作”，语域不对。',
+        modelAnswer: 'I look forward to working with you on this project.',
+      },
+      {
+        id: 'stance-w1',
+        kind: 'wording',
+        situation: '你想说“我不认为这个方案能解决问题”。',
+        rubricFocus: '是否用 doubt 表达“不相信能解决”，而不是 suspect',
+        thinkingSteps: ['态度是什么？→ 不相信', '动词？→ doubt', '内容？→ this plan will solve the problem'],
+        why: 'doubt 表示“认为不会”，正好对应“不认为能解决”；suspect 会变成“怀疑它能解决”，意思相反。',
+        modelAnswer: 'I doubt this plan will solve the problem.',
+      },
+      {
+        id: 'stance-w2',
+        kind: 'wording',
+        situation: '你想说“我们认为这个风险可以接受”。',
+        rubricFocus: '是否用 believe 表达有依据的判断，而不是 think 的随口一说',
+        thinkingSteps: ['判断强度？→ 有依据', '动词？→ believe', '内容？→ this risk is acceptable'],
+        why: 'believe 比 think 更像经过判断的立场，适合正式表达团队结论。',
+        modelAnswer: 'We believe this risk is acceptable.',
+      },
+    ],
+  },
+  {
+    id: 'cohesion',
+    layer: 'clarity',
+    name: '关系要说出来',
+    oneLiner: '中文靠逗号和意合，英文常把因果/转折/并列写出来。',
+    contrast: {
+      chineseThinking: '下雨了，比赛取消了。',
+      native: 'The game was canceled because it rained.',
+      note: '中文两个短句并排就懂；英文用 because 把因果说清楚，读者不用猜。',
+    },
+    cues: [
+      '先判断两句是什么关系：因果、转折、并列、递进',
+      '英文通常只留一个连接词：because 或 so，不同时用',
+      'although 和 but 不同时出现',
+    ],
+    recognition: [
+      {
+        id: 'cohesion-r1',
+        prompt: '你想说“因为下雨，比赛取消了”。',
+        options: [
+          'The game was canceled, and it rained.',
+          'The game was canceled because it rained.',
+          'Because of the rain, the game was canceled.',
+        ],
+        answer: 1,
+        explanation: '正确项 because 直接说因果；and 只并列、关系不明，because of 开头也可以但焦点落在原因上。',
+      },
+      {
+        id: 'cohesion-r2',
+        prompt: '你想说“虽然他很累，但他还是来了”。',
+        options: [
+          'He was tired, but he still came.',
+          'He was tired, although he still came.',
+          'Although he was tired, he still came.',
+        ],
+        answer: 2,
+        explanation: '正确项 Although ..., he still came 是标准让步结构；but 也可以但少了“虽然”的让步语气，第二句把 although 用反了。',
+      },
+      {
+        id: 'cohesion-r3',
+        prompt: '你想说“不是我们不想做，而是时间不够”。',
+        options: [
+          "It's not that we don't want to do it; it's that we don't have enough time.",
+          "We don't want to do it, and we don't have enough time.",
+          "We don't want to do it, but we don't have enough time.",
+        ],
+        answer: 0,
+        explanation: '正确项用 not that ... it’s that ... 把“不是前者而是后者”的对比说清楚；另外两句都变成“既不想做又没时间”，意思变了。',
+      },
+      {
+        id: 'cohesion-r4',
+        prompt: '你想说“这个方案成本低，但它很慢”。',
+        options: [
+          'This plan is cheap, and it is slow.',
+          'This plan is cheap, but it is slow.',
+          'This plan is cheap, so it is slow.',
+        ],
+        answer: 1,
+        explanation: '正确项 but 表转折；and 丢了对比，so 把“便宜”说成“慢”的原因，逻辑错了。',
+      },
+      {
+        id: 'cohesion-r5',
+        prompt: '你想说“先测试，再上线”。',
+        options: [
+          'First we test it, and then we launch it.',
+          'We test it first; we launch it second.',
+          'Test it first, then launch it.',
+        ],
+        answer: 2,
+        explanation: '正确项用祈使句 + then 最简洁；第一句也能懂但啰嗦，第二句像在排座位，不像流程指令。',
+      },
+    ],
+    transfer: [
+      {
+        id: 'cohesion-t1',
+        situation: '你想向老板解释“这周没完成，因为供应商延迟；但我们已经找到替代方案”。',
+        rubricFocus: '是否用 because 说原因、but 说转折，两个关系各用一个连接词',
+        thinkingSteps: ['原因？→ because the supplier was late', '转折？→ but we have found an alternative', '结果？→ we didn’t finish this week'],
+        why: 'because 和 but 各管一层关系，读者不用自己补逻辑。',
+        modelAnswer: "We didn't finish this week because the supplier was late, but we've already found an alternative.",
+      },
+      {
+        id: 'cohesion-t2',
+        situation: '你想说“这个功能不难，只是需要时间；所以我想先做小范围测试”。',
+        rubricFocus: '是否用分号/句号分开两层，再用 So 引出结论',
+        thinkingSteps: ['第一层？→ not hard, just takes time', '结论？→ test with a small group first', '连接？→ So'],
+        why: '前两句是并列补充，第三句是结论；用句号断开再用 So，比一串逗号清楚。',
+        modelAnswer: "The feature isn't hard; it just takes time. So I'd like to test it with a small group first.",
+      },
+      {
+        id: 'cohesion-t3',
+        situation: '你想说“虽然预算紧，但我们还是建议保留这项培训，因为它能减少返工”。',
+        rubricFocus: '是否用 Although 让步、because 说理由，且不同时用 but',
+        thinkingSteps: ['让步？→ Although the budget is tight', '主张？→ we recommend keeping the training', '理由？→ because it reduces rework'],
+        why: 'Although 已经承担转折，主句不再加 but；because 再把保留的理由说清楚。',
+        modelAnswer: 'Although the budget is tight, we recommend keeping the training because it reduces rework.',
+      },
+      {
+        id: 'cohesion-w1',
+        kind: 'wording',
+        situation: '你想说“不是价格问题，而是交付时间问题”。',
+        rubricFocus: '是否用 not about ... it’s about ... 明确否定一个、肯定另一个',
+        thinkingSteps: ['否定什么？→ not about the price', '肯定什么？→ about the delivery time', '结构？→ It’s not about A; it’s about B'],
+        why: 'not about A; it’s about B 把对比说满，避免中文逗号直译成两个并列句。',
+        modelAnswer: "It's not about the price; it's about the delivery time.",
+      },
+      {
+        id: 'cohesion-w2',
+        kind: 'wording',
+        situation: '你想说“客户先投诉，然后我们才更新了流程”。',
+        rubricFocus: '是否用 After 把先后关系说清楚，而不是只用 and then',
+        thinkingSteps: ['先发生？→ the client complained', '后发生？→ we updated the process', '连接？→ After ...'],
+        why: 'After 把先后关系放在句首，比 and then 更像流程复盘；时态也用过去式。',
+        modelAnswer: 'After the client complained, we updated the process.',
+      },
+    ],
+  },
 ];
 
 const THINK_PATTERN_EXTRA_RECOGNITION: Record<string, IThinkPatternChoice[]> = {
@@ -1504,6 +1855,9 @@ export const THINK_PATTERN_DIAGNOSTIC: IThinkPatternDiagnosticItem[] = [
   { patternId: 'polite-request', choiceId: 'polite-r1' },
   { patternId: 'compliment-response', choiceId: 'compliment-r1' },
   { patternId: 'register-shift', choiceId: 'register-r1' },
+  { patternId: 'motion-path', choiceId: 'motion-r1' },
+  { patternId: 'stance-verbs', choiceId: 'stance-r1' },
+  { patternId: 'cohesion', choiceId: 'cohesion-r1' },
 ];
 
 /**
@@ -1828,6 +2182,81 @@ const THINK_PATTERN_EXTRA_NOTES: Record<string, IThinkPatternOptionNotes> = {
     { tone: 'ok', text: '语法成立，但 by hanging 结构绕。' },
     { tone: 'best', text: 'hang ... out to dry 把动作和结果放进同一句。' },
   ],
+  'motion-r1': [
+    { tone: 'best', text: 'walked + across the bridge，动作和路径分开，最直接。' },
+    { tone: 'ok', text: 'crossed 本身含“穿过”，on foot 有点多余，但自然。' },
+    { tone: 'ok', text: 'by walking 把方式又说了一遍，绕。' },
+  ],
+  'motion-r2': [
+    { tone: 'ok', text: 'inside 只说“在里面”，没交代口袋这个目标。' },
+    { tone: 'best', text: 'put ... into his pocket 起点动作和终点都清楚。' },
+    { tone: 'ok', text: 'placed ... into 更正式，日常说 put 就够。' },
+  ],
+  'motion-r3': [
+    { tone: 'off', text: 'climbed the top 搭配不自然，像把山顶当成攀爬对象。' },
+    { tone: 'off', text: '同上，finally 位置换了但搭配问题还在。' },
+    { tone: 'best', text: 'climbed to the top 把路径说全。' },
+  ],
+  'motion-r4': [
+    { tone: 'best', text: 'crawled + out from under 一次说清动作和路径。' },
+    { tone: 'ok', text: 'came out ... crawling 把动作后置，能懂但绕。' },
+    { tone: 'ok', text: 'crawled and came out 把同一个动作拆成两个。' },
+  ],
+  'motion-r5': [
+    { tone: 'ok', text: 'took a walk beside 只说位置，不说沿着走的方向。' },
+    { tone: 'best', text: 'walked along the river 动作和路径都直接。' },
+    { tone: 'ok', text: 'on foot 多余，went along 也不如 walked 具体。' },
+  ],
+  'stance-r1': [
+    { tone: 'off', text: 'doubt 是“认为他没拿”，和“怀疑他拿了”相反。' },
+    { tone: 'off', text: 'expect 是预测，没有怀疑意味。' },
+    { tone: 'best', text: 'suspect 表示有依据地猜一件不好的事。' },
+  ],
+  'stance-r2': [
+    { tone: 'best', text: 'think 是中性判断，最贴合“我认为”。' },
+    { tone: 'ok', text: 'suspect 带“可能有问题”的负面猜测。' },
+    { tone: 'off', text: 'doubt 表示“不看好”，语义相反。' },
+  ],
+  'stance-r3': [
+    { tone: 'ok', text: 'expect 是预测，容易显得像在催回复。' },
+    { tone: 'best', text: 'look forward to doing 是自然、礼貌的期待。' },
+    { tone: 'ok', text: 'hope 也可以，但语域比 look forward to 轻。' },
+  ],
+  'stance-r4': [
+    { tone: 'off', text: 'doubt 变成“认为它没问题”，意思反了。' },
+    { tone: 'off', text: 'hope 是希望它错，不是怀疑。' },
+    { tone: 'best', text: 'suspect 表示怀疑它有问题。' },
+  ],
+  'stance-r5': [
+    { tone: 'best', text: 'expect to finish 是预测，最贴合“预计”。' },
+    { tone: 'ok', text: 'suspect 带“可能完不成”的负面意味。' },
+    { tone: 'ok', text: 'look forward to 是期待，不是预计。' },
+  ],
+  'cohesion-r1': [
+    { tone: 'ok', text: 'and 只并列，读者要自己补因果。' },
+    { tone: 'best', text: 'because 直接把因果说清楚。' },
+    { tone: 'ok', text: 'because of 开头也自然，但焦点落在原因上。' },
+  ],
+  'cohesion-r2': [
+    { tone: 'ok', text: 'but 能表转折，但少了“虽然”的让步语气。' },
+    { tone: 'off', text: 'although 放到后半句，意思变成“他还是来了，虽然累”之外的怪逻辑。' },
+    { tone: 'best', text: 'Although ..., he still came 是标准让步结构。' },
+  ],
+  'cohesion-r3': [
+    { tone: 'best', text: 'not that ... it’s that ... 把“不是A而是B”说满。' },
+    { tone: 'off', text: 'and 把两句并列，意思变成“既不想做又没时间”。' },
+    { tone: 'off', text: 'but 也改变了“不是不想”的否定范围。' },
+  ],
+  'cohesion-r4': [
+    { tone: 'ok', text: 'and 只并列，丢掉了“成本低但慢”的对比。' },
+    { tone: 'best', text: 'but 明确转折。' },
+    { tone: 'off', text: 'so 把“便宜”说成“慢”的原因，逻辑错了。' },
+  ],
+  'cohesion-r5': [
+    { tone: 'ok', text: 'First ... and then 能懂，但比祈使句啰嗦。' },
+    { tone: 'ok', text: 'first/second 像在排座位，不像流程指令。' },
+    { tone: 'best', text: 'Test it first, then launch it 简洁、顺序清楚。' },
+  ],
 };
 
 Object.assign(THINK_PATTERN_OPTION_NOTES, THINK_PATTERN_EXTRA_NOTES);
@@ -1844,6 +2273,139 @@ export interface IThinkPatternRewrite {
   target: string;
   explanation: string;
 }
+
+/**
+ * 真实任务前后测：用真实邮件测“目标模式有没有自发用出来”。
+ * 前后测题型相同、内容不同，避免背同一封。
+ */
+export interface IThinkRealTaskPrompt {
+  id: 'email-delay' | 'email-quality';
+  stage: 'baseline' | 'followUp';
+  title: string;
+  prompt: string;
+  targetPatternIds: string[];
+}
+
+export const THINK_REAL_TASKS: IThinkRealTaskPrompt[] = [
+  {
+    id: 'email-delay',
+    stage: 'baseline',
+    title: '前测：项目延迟邮件',
+    prompt: '你负责的项目会延迟一周。给客户写一封 80–120 词的邮件：说明原因、给新时间、提出下一步。',
+    targetPatternIds: ['subject-first', 'end-focus', 'be-concrete', 'make-logic-explicit', 'polite-request'],
+  },
+  {
+    id: 'email-quality',
+    stage: 'followUp',
+    title: '后测：质量投诉邮件',
+    prompt: '客户投诉最近交付质量不稳定。给客户写一封 80–120 词的邮件：回应问题、说明改进、给一个可执行的时间点。',
+    targetPatternIds: ['subject-first', 'end-focus', 'be-concrete', 'make-logic-explicit', 'polite-request'],
+  },
+];
+
+export interface IThinkSpeakingPrompt {
+  id: string;
+  title: string;
+  prompt: string;
+  targetPatternIds: string[];
+}
+
+export const THINK_SPEAKING_PROMPTS: IThinkSpeakingPrompt[] = [
+  {
+    id: 'call-delay',
+    title: '客户电话：项目延迟',
+    prompt: '用 60–90 秒口头说明项目会延迟一周：原因、新时间、下一步。',
+    targetPatternIds: ['subject-first', 'end-focus', 'be-concrete', 'make-logic-explicit', 'polite-request'],
+  },
+  {
+    id: 'call-quality',
+    title: '客户电话：质量投诉',
+    prompt: '用 60–90 秒口头回应质量投诉：承认问题、改进措施、给一个时间点。',
+    targetPatternIds: ['subject-first', 'end-focus', 'be-concrete', 'make-logic-explicit', 'polite-request'],
+  },
+];
+
+/** 长文/对话/无中文源任务：练“把多个模式连着用出来”，不写 SM-2。 */
+export type ThinkLongTaskKind = 'long-email' | 'dialogue' | 'no-chinese-source';
+
+export interface IThinkLongTask {
+  id: string;
+  kind: ThinkLongTaskKind;
+  title: string;
+  prompt: string;
+  minWords: number;
+  maxWords: number;
+  targetPatternIds: string[];
+  /** 无中文源任务用内联数据画一条趋势线；不依赖外部图片。 */
+  chart?: { label: string; values: number[] };
+  /** 真实图片任务：看图直接表达，题面不提供中文源。 */
+  image?: string;
+  imageAlt?: string;
+}
+
+export const THINK_LONG_TASKS: IThinkLongTask[] = [
+  {
+    id: 'project-week-email',
+    kind: 'long-email',
+    title: '长邮件：项目周报',
+    prompt: '给客户写一封 150–220 词的项目周报：本周完成了什么、遇到什么延迟、原因是什么、下周计划与需要对方配合的一件事。要求因果和转折都说清楚，不要只列项目符号。',
+    minWords: 150,
+    maxWords: 220,
+    targetPatternIds: ['subject-first', 'make-logic-explicit', 'be-concrete', 'end-focus', 'cohesion'],
+  },
+  {
+    id: 'support-escalation',
+    kind: 'dialogue',
+    title: '对话：客户投诉升级',
+    prompt: '客户因为连续两次延迟交付而情绪升级。用 6–8 轮对话回应：先承认问题、说明你已经查到的事实、给出可执行的时间点，并拒绝一个不合理的免费加急要求。总字数 100–180 词。',
+    minWords: 100,
+    maxWords: 180,
+    targetPatternIds: ['polite-request', 'soften-disagreement', 'hedge-stance', 'stance-verbs', 'cohesion'],
+  },
+  {
+    id: 'chart-without-source',
+    kind: 'no-chinese-source',
+    title: '无中文源：图表描述',
+    prompt: 'Look at the chart above. Describe the trend in 100–140 words: what changed, one likely reason, and one recommendation. Do not translate from Chinese; write directly in English.',
+    minWords: 100,
+    maxWords: 140,
+    targetPatternIds: ['be-concrete', 'make-logic-explicit', 'end-focus', 'cohesion', 'hedge-stance'],
+    chart: { label: 'Weekly active users (thousands)', values: [120, 180, 240, 210, 320, 380] },
+  },
+  {
+    id: 'photo-station-transfer',
+    kind: 'no-chinese-source',
+    title: '看图：赶车的旅客',
+    prompt: 'Look at the photo. Describe what the traveler is doing, the path she takes through the station, and one thing that might go wrong. Write 100–140 words in English only. Do not translate from Chinese.',
+    minWords: 100,
+    maxWords: 140,
+    targetPatternIds: ['motion-path', 'be-concrete', 'end-focus', 'cohesion', 'hedge-stance'],
+    image: '/images/think/station-transfer.webp',
+    imageAlt: 'A traveler with a suitcase walking down stairs toward a train platform.',
+  },
+  {
+    id: 'photo-service-counter',
+    kind: 'no-chinese-source',
+    title: '看图：服务台前',
+    prompt: 'Look at the photo. Describe the situation at the counter, what the customer and the staff member seem to want, and how you would handle it politely. Write 100–140 words in English only.',
+    minWords: 100,
+    maxWords: 140,
+    targetPatternIds: ['polite-request', 'soften-disagreement', 'stance-verbs', 'be-concrete', 'cohesion'],
+    image: '/images/think/service-counter.webp',
+    imageAlt: 'A customer holding a phone at a service counter while a staff member gestures toward a parcel.',
+  },
+  {
+    id: 'photo-team-whiteboard',
+    kind: 'no-chinese-source',
+    title: '看图：白板前的团队',
+    prompt: 'Look at the photo. Describe the trend on the whiteboard, one likely reason for it, and what the team should do next. Write 100–140 words in English only.',
+    minWords: 100,
+    maxWords: 140,
+    targetPatternIds: ['be-concrete', 'make-logic-explicit', 'end-focus', 'cohesion', 'hedge-stance'],
+    image: '/images/think/team-whiteboard.webp',
+    imageAlt: 'A team meeting where one person draws an upward trend and boxes on a whiteboard.',
+  },
+];
 
 export const THINK_PATTERN_REWRITES: IThinkPatternRewrite[] = (() => {
   const maxRecognition = Math.max(...THINK_PATTERNS.map((pattern) => pattern.recognition.length));

@@ -49,6 +49,128 @@ Rules:
   ];
 }
 
+export interface RealTaskJudgeResult {
+  patternsUsed: string[];
+  patternsMissing: string[];
+  feedback: string;
+  strengths: string[];
+  issues: string[];
+}
+
+export interface TaskPromptShape {
+  title: string;
+  prompt: string;
+  targetPatternIds: string[];
+}
+
+export function buildRealTaskPrompt(
+  task: TaskPromptShape,
+  answer: string,
+  patterns: IThinkPattern[],
+): ChatMessage[] {
+  const targets = patterns.filter((pattern) => task.targetPatternIds.includes(pattern.id));
+  const patternBlock = targets
+    .map((pattern) => `- ${pattern.id}｜${pattern.name}：${pattern.oneLiner}；线索：${pattern.cues.join('；')}`)
+    .join('\n');
+  return [
+    {
+      role: 'system',
+      content: `You are an English writing coach. Analyse a learner's real-world email for target thinking patterns.
+Task: ${task.prompt}
+Target patterns:
+${patternBlock}
+
+Rules:
+- Count a pattern only when its structural cue is clearly present, not merely because the idea is mentioned.
+- patternsUsed and patternsMissing must use the ids above and must not overlap.
+- feedback: 2-3 short Chinese sentences, concrete and actionable.
+- strengths and issues: 1-3 short Chinese phrases each; no generic praise.
+- Do not rewrite the whole email.
+- Return ONLY JSON with exactly these fields:
+{"patternsUsed":["id"],"patternsMissing":["id"],"feedback":"中文 2-3 句","strengths":["中文短句"],"issues":["中文短句"]}`,
+    },
+    { role: 'user', content: `My email:\n${answer}` },
+  ];
+}
+
+export function validateRealTaskJudgeResult(
+  value: unknown,
+  allowedPatternIds: readonly string[],
+): RealTaskJudgeResult | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.feedback !== 'string' || !v.feedback.trim()) return null;
+  const allowed = new Set(allowedPatternIds);
+  const toIds = (raw: unknown): string[] => (Array.isArray(raw) ? raw : [])
+    .filter((id): id is string => typeof id === 'string' && allowed.has(id))
+    .filter((id, index, list) => list.indexOf(id) === index);
+  const used = toIds(v.patternsUsed);
+  const usedSet = new Set(used);
+  const missing = toIds(v.patternsMissing).filter((id) => !usedSet.has(id));
+  const toPhrases = (raw: unknown): string[] => (Array.isArray(raw) ? raw : [])
+    .filter((text): text is string => typeof text === 'string' && text.trim().length > 0)
+    .map((text) => text.trim())
+    .slice(0, 3);
+  return {
+    patternsUsed: used,
+    patternsMissing: missing,
+    feedback: v.feedback.trim(),
+    strengths: toPhrases(v.strengths),
+    issues: toPhrases(v.issues),
+  };
+}
+
+export interface GeneratedPracticeTask {
+  title: string;
+  prompt: string;
+  targetPatternIds: string[];
+}
+
+/** AI 额外出题：只用于防背诵，不进入掌握判定；仍限定在现有模式库里。 */
+export function buildGeneratedPracticePrompt(patterns: IThinkPattern[]): ChatMessage[] {
+  const block = patterns
+    .map((pattern) => `- ${pattern.id}｜${pattern.name}：${pattern.oneLiner}`)
+    .join('\n');
+  return [
+    {
+      role: 'system',
+      content: `You design extra English thinking-practice tasks for a Chinese learner.
+Available patterns:
+${block}
+
+Rules:
+- Create ONE realistic workplace or daily-life writing task in Chinese, 120-180 Chinese characters.
+- Pick 2-3 target patterns from the list above and use their exact ids.
+- The task must require the learner to write 120-180 English words; do not include a model answer.
+- Do not reuse the same scenario as a weekly report, a delayed delivery, or a quality complaint.
+- Return ONLY JSON with exactly these fields:
+{"title":"中文短标题","prompt":"中文任务描述","targetPatternIds":["id"]}`,
+    },
+    { role: 'user', content: 'Generate one new practice task.' },
+  ];
+}
+
+export function validateGeneratedPracticeTask(
+  value: unknown,
+  allowedPatternIds: readonly string[],
+): GeneratedPracticeTask | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.title !== 'string' || !v.title.trim()) return null;
+  if (typeof v.prompt !== 'string' || !v.prompt.trim()) return null;
+  const allowed = new Set(allowedPatternIds);
+  const ids = (Array.isArray(v.targetPatternIds) ? v.targetPatternIds : [])
+    .filter((id): id is string => typeof id === 'string' && allowed.has(id))
+    .filter((id, index, list) => list.indexOf(id) === index)
+    .slice(0, 3);
+  if (ids.length < 2) return null;
+  return {
+    title: v.title.trim().slice(0, 60),
+    prompt: v.prompt.trim().slice(0, 1200),
+    targetPatternIds: ids,
+  };
+}
+
 export function validatePatternJudgeResult(value: unknown): PatternJudgeResult | null {
   if (!value || typeof value !== 'object') return null;
   const v = value as Record<string, unknown>;

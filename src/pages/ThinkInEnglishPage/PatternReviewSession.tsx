@@ -22,28 +22,29 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { THINK_PATTERN_OPTION_NOTES, type IThinkPattern, type IThinkPatternTransfer } from '@/data/think-patterns';
 import {
-  delayedProbeDay,
+  delayedProbeDays,
   isClosedBook,
   pickRecognitionIndex,
   pickTransferIndex,
   type IThinkPatternProgress,
   type PatternConfidence,
   type PatternSessionGradeInput,
+  type PatternSessionState,
 } from '@/lib/think-patterns';
 import type { PatternJudgeResult } from '@/lib/think-pattern-ai';
+import {
+  clearPatternResume,
+  savePatternResume,
+  type PatternDraftRound,
+  type PatternDraftSnapshot,
+  type PatternResumeSnapshot,
+  type PatternStage,
+} from '@/lib/think-session-resume';
 import { cn } from '@/lib/utils';
 
-type Stage = 'contrast' | 'recognition' | 'writing' | 'feedback';
-type DraftRound = 0 | 1 | 2;
-
-interface DraftResult {
-  pass: boolean;
-  feedback: string;
-  evidence?: string;
-  source: 'ai' | 'self';
-  answer: string;
-  transfer: IThinkPatternTransfer;
-}
+type Stage = PatternStage;
+type DraftRound = PatternDraftRound;
+type DraftResult = PatternDraftSnapshot;
 
 const STAGES = [
   { key: 'contrast', label: '对比' },
@@ -68,6 +69,12 @@ export interface PatternReviewSessionProps {
   ) => Promise<PatternJudgeResult | null>;
   onGrade: (input: PatternSessionGradeInput) => void;
   onNext: () => void;
+  /** 这次会话是否是独立的 7/21/60 天延迟探测 */
+  delayedProbe?: boolean;
+  /** 本轮会话的队列/下标/重试/结果；断点快照要连同它一起存 */
+  sessionState: PatternSessionState;
+  /** 从概览「继续」进来时的快照；不匹配当前模式/下标就忽略 */
+  resume?: PatternResumeSnapshot | null;
   onExit: () => void;
 }
 
@@ -77,23 +84,38 @@ export function PatternReviewSession({
   onJudge,
   onGrade,
   onNext,
+  delayedProbe = false,
+  sessionState,
+  resume = null,
   onExit,
 }: PatternReviewSessionProps) {
+  const matchedResume = resume &&
+    resume.patternId === pattern.id &&
+    resume.session.index === sessionState.index &&
+    resume.delayed === delayedProbe
+    ? resume
+    : null;
+
   // 挂载时快照：评分后 progress 会前进，重算会让反馈页的题目/解释与用户刚答的对不上。
+  // 从断点恢复时用快照里的下标，保证「识别的还是那道题」。
   const [recognitionIndex] = useState(() =>
+    matchedResume?.recognitionIndex ??
     pickRecognitionIndex(progress?.recognitionTotal ?? 0, pattern.recognition.length));
   const [transferIndex] = useState(() =>
+    matchedResume?.transferIndex ??
     pickTransferIndex(progress?.transferAttempts ?? 0, pattern.transfer.length));
 
-  const [stage, setStage] = useState<Stage>('contrast');
-  const [round, setRound] = useState<DraftRound>(0);
-  const [selected, setSelected] = useState<number | null>(null);
-  const [answer, setAnswer] = useState('');
-  const [confidence, setConfidence] = useState<PatternConfidence | null>(null);
+  const [stage, setStage] = useState<Stage>(matchedResume?.stage ?? 'contrast');
+  const [round, setRound] = useState<DraftRound>(matchedResume?.round ?? 0);
+  const [selected, setSelected] = useState<number | null>(matchedResume?.selected ?? null);
+  const [answer, setAnswer] = useState(matchedResume?.answer ?? '');
+  const [confidence, setConfidence] = useState<PatternConfidence | null>(matchedResume?.confidence ?? null);
   const [judging, setJudging] = useState(false);
   const [fallback, setFallback] = useState(false);
-  const [results, setResults] = useState<Array<DraftResult | undefined>>([]);
-  const [rewriteAttempts, setRewriteAttempts] = useState(0);
+  const [results, setResults] = useState<Array<DraftResult | undefined>>(
+    () => (matchedResume?.results ?? []).map((entry) => entry ?? undefined),
+  );
+  const [rewriteAttempts, setRewriteAttempts] = useState(matchedResume?.rewriteAttempts ?? 0);
   const [advancing, setAdvancing] = useState(false);
   const gradedRef = useRef(false);
   const nextRef = useRef(false);
@@ -101,19 +123,57 @@ export function PatternReviewSession({
   const selfEvalRoundRef = useRef<DraftRound | null>(null);
   const judgeSeqRef = useRef(0);
   const judgeUnavailableRef = useRef(false);
+  const snapshotRef = useRef<PatternResumeSnapshot | null>(null);
+  const completedRef = useRef(false);
 
   // 判定是异步的：卸载（含换卡重挂载、退出）时作废在飞的 Promise。
   useEffect(() => () => { judgeSeqRef.current += 1; }, []);
+
+  /** 断点落盘：阶段/草稿/反馈任一变化都写；输入框用 350ms 去抖，页面被关掉时 pagehide 再补一次。 */
+  useEffect(() => {
+    const snapshot: PatternResumeSnapshot = {
+      v: 1,
+      patternId: pattern.id,
+      session: sessionState,
+      delayed: delayedProbe,
+      stage,
+      round,
+      selected,
+      answer,
+      confidence,
+      results: results.map((entry) => entry ?? null),
+      rewriteAttempts,
+      recognitionIndex,
+      transferIndex,
+      updatedAt: Date.now(),
+    };
+    snapshotRef.current = snapshot;
+    const timer = window.setTimeout(() => {
+      if (!completedRef.current) savePatternResume(snapshot);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [
+    pattern.id, sessionState, delayedProbe, stage, round, selected, answer,
+    confidence, results, rewriteAttempts, recognitionIndex, transferIndex,
+  ]);
+
+  useEffect(() => {
+    const flush = () => {
+      if (!completedRef.current && snapshotRef.current) savePatternResume(snapshotRef.current);
+    };
+    window.addEventListener('pagehide', flush);
+    return () => window.removeEventListener('pagehide', flush);
+  }, []);
 
   const choice = pattern.recognition[recognitionIndex];
   const firstTransfer = pattern.transfer[transferIndex];
   const secondTransfer = pattern.transfer[(transferIndex + 1) % pattern.transfer.length];
   const currentTransfer = round === 2 ? secondTransfer : firstTransfer;
   const recognitionCorrect = selected !== null && selected === choice?.answer;
-  /** 距首次练习 ≥7/21/60 天时标成延迟迁移；延迟探测同样闭卷。挂载时快照，避免最终落分后 progress 变化把它翻掉。 */
-  const [probeDay] = useState(() => delayedProbeDay(progress, Date.now()));
-  /** 第 3 次及以后复习闭卷；失败会重置 repetitions，重试卡自动回到开卷 */
-  const [closedBook] = useState(() => isClosedBook(progress) || probeDay !== null);
+  /** 独立的 7/21/60 天延迟探测：按排期档位显示，不按已过天数猜。挂载时快照。 */
+  const [probeDay] = useState(() => delayedProbe ? delayedProbeDays(progress) : null);
+  /** 第 3 次及以后复习或延迟探测闭卷；失败会重置 repetitions，重试卡自动回到开卷 */
+  const [closedBook] = useState(() => isClosedBook(progress) || delayedProbe);
   const transferKind = currentTransfer?.kind ?? 'scenario';
   const confidenceLabel = confidence === 1 ? '没把握' : confidence === 3 ? '有把握' : '一般';
   const calibrated = confidence === 1 || confidence === 3;
@@ -181,6 +241,7 @@ export function PatternReviewSession({
       evidence: last?.evidence,
       source: last?.source ?? 'self',
       confidence: confidence ?? undefined,
+      delayedProbe,
     });
   };
 
@@ -248,6 +309,8 @@ export function PatternReviewSession({
   const finishSession = () => {
     if (nextRef.current) return;
     nextRef.current = true;
+    completedRef.current = true;
+    clearPatternResume();
     setAdvancing(true);
     onNext();
   };
@@ -273,9 +336,10 @@ export function PatternReviewSession({
     finishSession();
   };
 
-  /** 退出也作废在飞的判定（卸载时 cleanup 还会再加一次，双保险） */
+  /** 退出也作废在飞的判定（卸载时 cleanup 还会再加一次，双保险）；同时把这轮写进断点。 */
   const handleExit = () => {
     judgeSeqRef.current += 1;
+    if (!completedRef.current && snapshotRef.current) savePatternResume(snapshotRef.current);
     onExit();
   };
 

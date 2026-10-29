@@ -82,7 +82,7 @@ export function PatternRewriteDrill({ patterns, items, onExit }: PatternRewriteD
             10 题一组：给你一句可以更直接的英文，把它改写成更自然的版本。不记 SM-2，做完看参考自评。
           </p>
           <div className="rounded-2xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
-            共 {items.length} 题，覆盖 12 个模式；每组不重复，做完可以换一组。
+            共 {items.length} 题，覆盖 {patterns.length} 个模式；每组不重复，做完可以换一组。
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <Button className="rounded-full sm:flex-1" onClick={() => startGroup(0)}>开始快练</Button>

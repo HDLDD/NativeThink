@@ -124,13 +124,13 @@ ok(allViolations.length === 0,
   '①② 全仓所有 extractJson 调用点都有判空前置，且没有贪婪正则残留',
   allViolations.slice(0, 6).join(' ; '));
 
-/* 具名站点：`/think` 模式复习的迁移判定（2026-10 新增）必须在扫描结果里真的被数到。
+/* 具名站点：`/think` 的三处 AI 解析（迁移判定 / 真实任务 / 额外出题）必须在扫描结果里真的被数到。
  * 只有"总数 ≥ 20"挡不住"这一处被 scope 排除"（以后给 walk 加过滤就会静默漏扫）。 */
 {
   const rel = 'src/pages/ThinkInEnglishPage/PatternReviewMode.tsx';
   const r = inspect(fs.readFileSync(path.join(ROOT, rel), 'utf8'), rel);
-  ok(r.sites === 1 && r.violations.length === 0,
-    '具名站点：PatternReviewMode 的 extractJson 只 1 处且前置 !raw.trim() 判空', JSON.stringify(r));
+  ok(r.sites === 3 && r.violations.length === 0,
+    '具名站点：PatternReviewMode 的 extractJson 3 处（模式迁移 + 真实任务 + AI 出题）且都有判空', JSON.stringify(r));
 }
 
 /* ───────────── 行为证据：空串喂进 extractJson 确实抛「格式异常」类错误 ───────────── */

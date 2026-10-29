@@ -25,6 +25,7 @@ import { ModuleProgressCard } from './ModuleProgressCard';
 import { HistoryCalendar } from './HistoryCalendar';
 import { ReviewDueCard } from './ReviewDueCard';
 import { NoteDrillCard } from './NoteDrillCard';
+import { TodayPatternCard } from './TodayPatternCard';
 import { useCorrectionNotes } from '@/lib/correction-notes';
 import { WeekGlanceCard } from './WeekGlanceCard';
 import { LEARNING_OPTIONS } from './constants';
@@ -378,6 +379,8 @@ export default function DashboardPage() {
 
         <QuickStartGrid onNavigate={navigate} />
       </div>
+
+      <TodayPatternCard onNavigate={navigate} />
 
       {/* 模块进度 */}
       <ModuleProgressCard
