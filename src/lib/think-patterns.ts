@@ -607,6 +607,35 @@ export function getWeakPatterns(
 }
 
 /**
+ * 模式库排序：到期 → 进行中 → 未开始 → 已掌握；同档按 lapses 降序、
+ * 下次到期升序，最后保持内容库顺序。只用于展示，不改进度。
+ */
+export function sortPatternsForLibrary(
+  patterns: IThinkPattern[],
+  progress: Record<string, IThinkPatternProgress>,
+  now: number,
+  today: string,
+): IThinkPattern[] {
+  const order = new Map(patterns.map((pattern, index) => [pattern.id, index]));
+  const rank = (pattern: IThinkPattern): number => {
+    const p = progress[pattern.id];
+    if (p && isDue(p, now, today)) return 0;
+    if (p && p.status !== 'mastered') return 1;
+    if (!p) return 2;
+    return 3;
+  };
+  return [...patterns].sort((a, b) => {
+    const rankDiff = rank(a) - rank(b);
+    if (rankDiff !== 0) return rankDiff;
+    const lapsesDiff = (progress[b.id]?.lapses ?? 0) - (progress[a.id]?.lapses ?? 0);
+    if (lapsesDiff !== 0) return lapsesDiff;
+    const dueDiff = (progress[a.id]?.nextReview ?? Infinity) - (progress[b.id]?.nextReview ?? Infinity);
+    if (dueDiff !== 0) return dueDiff;
+    return (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0);
+  });
+}
+
+/**
  * `daily` 只保留 [today - (days - 1), today] 这段日期（含今天共 days 天），
  * 不是「最后 N 个键」—— 隔了几天没练也不会把有效日期误删。结果按日期升序。
  *

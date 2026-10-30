@@ -555,6 +555,32 @@ check(layerById.pragmatics?.total === 5 && layerById.pragmatics?.due === 0,
   '层统计：语域与语用 5 个、未开始不算到期', JSON.stringify(layerById.pragmatics));
 check(JSON.stringify(layerProgress) === layerSnapshot, '层统计：不修改入参（纯函数）');
 
+/* 模式库排序：到期 → 进行中 → 未开始 → 已掌握；到期同档 lapses 优先。 */
+const libraryProgress = {
+  'subject-first': p('subject-first', { nextReview: now - 1000, lapses: 1 }),
+  'verb-driven': p('verb-driven', { status: 'reviewing', nextReview: now + 86400000, lapses: 5 }),
+  'end-focus': p('end-focus', { status: 'mastered', nextReview: now + 2 * 86400000 }),
+};
+const libraryOrder = pure.sortPatternsForLibrary(
+  patterns.slice(0, 4), libraryProgress, now, today,
+).map((pattern) => pattern.id);
+check(libraryOrder.join(',') === 'subject-first,verb-driven,soften-disagreement,end-focus',
+  '模式库排序：到期 → 进行中 → 未开始 → 已掌握', libraryOrder.join(','));
+const dueTieOrder = pure.sortPatternsForLibrary(
+  patterns.slice(0, 2),
+  {
+    'subject-first': p('subject-first', { nextReview: now - 1, lapses: 1 }),
+    'verb-driven': p('verb-driven', { nextReview: now - 2, lapses: 4 }),
+  },
+  now,
+  today,
+).map((pattern) => pattern.id);
+check(dueTieOrder.join(',') === 'verb-driven,subject-first',
+  '模式库排序：同档 lapses 多的排前面', dueTieOrder.join(','));
+check(pure.sortPatternsForLibrary(patterns.slice(0, 2), {}, now, today)
+  .map((pattern) => pattern.id).join(',') === 'subject-first,verb-driven',
+  '模式库排序：都没开始时保持内容库顺序');
+
 /* 思维体检计分：全对 → 无建议；错一题 → 只建议那一个模式；层分按真实模式数。 */
 const diagItems = mod.THINK_PATTERN_DIAGNOSTIC;
 const diagCorrectAnswers = {};
@@ -1533,19 +1559,38 @@ check(/ReactMarkdown/.test(sessionSrc) && /remarkGfm/.test(sessionSrc),
 check((overviewSrc.match(/formatDate\(new Date\(/g) ?? []).length >= 2,
   'UI：到期日期走 formatDate（模式卡 + 完成页两处，不是裸日期字符串）');
 check(/THINK_PATTERN_LAYERS/.test(overviewSrc) && /summarizeLayers\(/.test(overviewSrc) &&
-  /模式地图/.test(overviewSrc) && /layerSummaries\.map/.test(overviewSrc),
-  'UI：概览渲染四层模式地图与层统计');
-check(/THINK_PATTERN_LAYERS\.map/.test(overviewSrc) && /pattern\.layer === layer\.id/.test(overviewSrc),
-  'UI：展开全部时模式库按 layer 分组，不是平铺');
+  /renderPatternLibrary/.test(overviewSrc) && /filteredGroups\.map/.test(overviewSrc) &&
+  /pattern\.layer === layer\.id/.test(overviewSrc),
+  'UI：模式库默认摊开，按四层分组并保留层统计');
 check(/今日先练/.test(overviewSrc) && /hero\.name/.test(overviewSrc) &&
-  /showMap/.test(overviewSrc) && /全部 \$\{THINK_PATTERNS\.length\} 个模式/.test(overviewSrc),
-  'UI：概览只有一个「今日先练」焦点卡；体检/地图/模式库降为文字入口');
+  /renderPatternLibrary\(\)/.test(overviewSrc) &&
+  !/showAll|showMap|全部 \$\{THINK_PATTERNS\.length\} 个模式/.test(overviewSrc),
+  'UI：保留单一「今日先练」焦点；模式库不再折叠');
+check(/sortPatternsForLibrary\(/.test(overviewSrc) &&
+  /layerFilter/.test(overviewSrc) && /statusFilter/.test(overviewSrc) &&
+  /aria-pressed=\{layerFilter ===/.test(overviewSrc) &&
+  /aria-pressed=\{statusFilter ===/.test(overviewSrc) &&
+  /filteredPatterns\.length === 0 \? \(/.test(overviewSrc) &&
+  /清除筛选/.test(overviewSrc),
+  'UI：模式库按层/状态筛选，空结果可一键清除');
+check(/renderPatternCard/.test(overviewSrc) && /onDetail\(pattern\.id\)/.test(overviewSrc) &&
+  /onPractice\(\[pattern\.id\]\)/.test(overviewSrc) &&
+  /连续 \{reps\}\/4 · AI \{aiPasses\}\/2/.test(overviewSrc) &&
+  /lastAttempt\?\.on === today/.test(overviewSrc),
+  'UI：每张模式卡有详情/直接练、连续通过点与今日已练标记');
+check(/data-pattern-id=\{pattern\.id\}/.test(overviewSrc) &&
+  /对比 → 识别 → 迁移 · 约 3 分钟/.test(overviewSrc) &&
+  /p \? \(/.test(overviewSrc),
+  'UI：模式卡有稳定 id；未开始的卡不显示 0/4 假指标');
+check(/usePageMemory/.test(overviewSrc) && /think-library-filter/.test(overviewSrc) &&
+  /setLibraryFilter/.test(overviewSrc) && /resetLibraryFilter/.test(overviewSrc),
+  'UI：模式库筛选跨详情返回/刷新仍保留，坏旧值回退全部');
 check(/到期 \{stats\.due\} · 今日已练 \{stats\.reviewedToday\}/.test(overviewSrc),
   'UI：概览统计收成一行，不再占三张卡');
 check(/自由训练/.test(overviewSrc) && /onPractice/.test(overviewSrc) && /混合训练/.test(overviewSrc),
   'UI：概览有自由训练入口与混合训练按钮');
-check(/onPractice\(\[pattern\.id\]\)/.test(overviewSrc),
-  'UI：自由训练可任选单个模式');
+check((overviewSrc.match(/onPractice\(\[pattern\.id\]\)/g) ?? []).length === 1,
+  'UI：单模式快练只在模式卡一处（不再和自由训练网格重复）');
 check(/再练一组（5 个）/.test(overviewSrc) && /onPractice\(practiceIds\)/.test(overviewSrc),
   'UI：完成页可直接再练一组');
 check(/startPractice/.test(modeCode) && /onPractice=\{startPractice\}/.test(modeCode),

@@ -1,15 +1,14 @@
 /**
- * 模式复习概览：今日行动 / 模式地图 / 建议先练（默认 3 个，可展开全部）/ 本轮完成页。
+ * 模式复习概览：今日焦点 / 模式库 / 本轮完成页。
  *
- * 首屏只留一个主按钮；体检降为一行次级入口，薄弱 Top 3 不再单独占卡，
- * 而是并进“体检建议 → 薄弱 → 到期”的 3 张焦点卡。
+ * 模式库是**默认摊开**的分层卡片墙（像词汇深度的模式选择）：按层分组，
+ * 到期 → 进行中 → 未开始 → 已掌握排序；每张卡可直接练或进详情。
+ * 首屏仍只留一个主按钮；薄弱报告/趋势/跨模块证据按需展开，不抢焦点。
  *
  * 全部数据来自 props（`stats` / `weak` / `dueQueue` / `progress` / `diagnostic`），
- * 本组件不读存储、不改进度 —— 点模式卡只展开对比卡，不写任何状态到 store。
- * 日期一律 formatDate（本地日），避免东八区凌晨错天（AGENTS.md 学习统计约定）。
+ * 本组件不读存储、不改进度。日期一律 formatDate（本地日）。
  */
 import { useState } from 'react';
-import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,14 +17,18 @@ import {
   THINK_PATTERN_LAYERS,
   THINK_PATTERNS,
   type IThinkPattern,
+  type ThinkPatternLayer,
 } from '@/data/think-patterns';
 import { useCorrectionNotes } from '@/lib/correction-notes';
+import { usePageMemory } from '@/lib/use-page-memory';
 import { suggestPatternsFromEvidence, summarizeEvidenceSources } from '@/lib/think-evidence';
 import type { PatternResumeSnapshot } from '@/lib/think-session-resume';
 import { resumeStepLabel } from '@/lib/think-session-resume';
 import type { IThinkPatternStats } from '@/lib/use-think-patterns';
 import {
+  isDue,
   pickPracticePatternIds,
+  sortPatternsForLibrary,
   summarizeLayers,
   type IThinkPatternDiagnosticRecord,
   type IThinkPatternProgress,
@@ -35,6 +38,7 @@ import {
 import { cn, formatDate } from '@/lib/utils';
 
 const LAYER_IDS = THINK_PATTERN_LAYERS.map((layer) => layer.id);
+type PatternLibraryFilter = 'all' | 'due' | 'active' | 'mastered';
 
 export interface PatternOverviewProps {
   stats: IThinkPatternStats;
@@ -114,16 +118,49 @@ export function PatternOverview({
   onDetail,
   onBack,
 }: PatternOverviewProps) {
-  const [showAll, setShowAll] = useState(false);
-  const [showMap, setShowMap] = useState(false);
   const [showPractice, setShowPractice] = useState(false);
   const [showWeak, setShowWeak] = useState(false);
   const [showTrend, setShowTrend] = useState(false);
+  const [libraryFilter, setLibraryFilter] = usePageMemory<{
+    layer: 'all' | ThinkPatternLayer;
+    status: PatternLibraryFilter;
+  }>('think-library-filter', { layer: 'all', status: 'all' });
+  // usePageMemory 的旧值可能来自旧版本；运行时再收一次，坏值回退到“全部”。
+  const layerFilter = libraryFilter.layer === 'all' || LAYER_IDS.includes(libraryFilter.layer)
+    ? libraryFilter.layer
+    : 'all';
+  const statusFilter = (['all', 'due', 'active', 'mastered'] as const).includes(libraryFilter.status)
+    ? libraryFilter.status
+    : 'all';
+  const setLayerFilter = (layer: 'all' | ThinkPatternLayer) =>
+    setLibraryFilter((prev) => ({ ...prev, layer }));
+  const setStatusFilter = (status: PatternLibraryFilter) =>
+    setLibraryFilter((prev) => ({ ...prev, status }));
+  const resetLibraryFilter = () => setLibraryFilter({ layer: 'all', status: 'all' });
   const { notes: correctionNotes } = useCorrectionNotes();
   const now = Date.now();
   const today = formatDate(new Date(now));
   const layerSummaries = summarizeLayers(THINK_PATTERNS, progress, LAYER_IDS, now, today);
   const practiceIds = pickPracticePatternIds(THINK_PATTERNS, progress, 5);
+  const sortedPatterns = sortPatternsForLibrary(THINK_PATTERNS, progress, now, today);
+  const activeCount = Object.values(progress).filter((p) => p.status !== 'mastered').length;
+  const libraryCounts = {
+    all: THINK_PATTERNS.length,
+    due: stats.due,
+    active: activeCount,
+    mastered: stats.mastered,
+  };
+  const filteredPatterns = sortedPatterns.filter((pattern) => {
+    if (layerFilter !== 'all' && pattern.layer !== layerFilter) return false;
+    const p = progress[pattern.id];
+    if (statusFilter === 'due') return !!p && isDue(p, now, today);
+    if (statusFilter === 'active') return !!p && p.status !== 'mastered';
+    if (statusFilter === 'mastered') return p?.status === 'mastered';
+    return true;
+  });
+  const filteredGroups = THINK_PATTERN_LAYERS
+    .map((layer) => ({ layer, items: filteredPatterns.filter((pattern) => pattern.layer === layer.id) }))
+    .filter((group) => group.items.length > 0);
   const empty = dueQueue.length === 0;
   const mainLabel = empty
     ? stats.mastered === THINK_PATTERNS.length
@@ -181,72 +218,234 @@ export function PatternOverview({
 
   const renderPatternCard = (pattern: IThinkPattern) => {
     const p = progress[pattern.id];
-    const status = statusLabel(p);
-    const nextDue = !p ? '未开始' : p.status === 'mastered' ? '—' : formatDate(new Date(p.nextReview));
+    const due = !!p && isDue(p, now, today);
+    const status = due ? '到期' : statusLabel(p);
+    const reps = Math.min(4, Math.max(0, p?.repetitions ?? 0));
+    const aiPasses = Math.min(2, Math.max(0, p?.aiTransferPasses ?? 0));
+    const transferRate = p && p.transferAttempts > 0
+      ? Math.round((p.transferPasses / p.transferAttempts) * 100)
+      : null;
+    const nextText = due
+      ? '今天到期'
+      : !p
+        ? '还没开始'
+        : p.status === 'mastered'
+          ? '下次 —'
+          : `下次 ${formatDate(new Date(p.nextReview))}`;
+    const todayDone = p?.lastAttempt?.on === today;
     return (
-      <Card key={pattern.id} className="rounded-3xl border-border shadow-sm overflow-hidden min-w-0">
-        <button
-          type="button"
-          onClick={() => onDetail(pattern.id)}
-          className="w-full text-left p-4"
-        >
+      <Card
+        key={pattern.id}
+        data-pattern-id={pattern.id}
+        className={cn(
+          'min-w-0 rounded-3xl border-border shadow-sm',
+          due && 'border-amber-500/40',
+        )}
+      >
+        <CardContent className="space-y-3 p-4">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-sm font-black text-foreground break-words">{pattern.name}</p>
-              <p className="text-xs text-muted-foreground mt-1 break-words">{pattern.oneLiner}</p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <h5 className="text-sm font-black text-foreground break-words">{pattern.name}</h5>
+                {todayDone && (
+                  <Badge variant="outline" className="border-emerald-500/40 text-emerald-600">
+                    今天已练
+                  </Badge>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground break-words">{pattern.oneLiner}</p>
             </div>
-            <Badge variant="outline" className={cn('shrink-0', statusTone(p))}>{status}</Badge>
+            <Badge
+              variant="outline"
+              className={cn('shrink-0', due ? 'border-amber-500/40 text-amber-700' : statusTone(p))}
+            >
+              {status}
+            </Badge>
           </div>
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              下次到期：{nextDue}
+
+          <div className="flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-bold text-muted-foreground">
+            <span>{nextText}</span>
+            {p && (
+              <>
+                <span aria-hidden>·</span>
+                <span>
+                  迁移 {p.transferPasses}/{p.transferAttempts}
+                  {transferRate !== null ? ` · ${transferRate}%` : ''}
+                </span>
+                <span aria-hidden>·</span>
+                <span>lapses {p.lapses}</span>
+              </>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {p ? (
+              <span
+                className="flex items-center gap-1.5"
+                aria-label={`连续通过 ${reps}/4，AI 通过 ${aiPasses}/2`}
+              >
+                <span className="flex gap-0.5" aria-hidden>
+                  {[0, 1, 2, 3].map((index) => (
+                    <span
+                      key={index}
+                      className={cn(
+                        'size-1.5 rounded-full',
+                        index < reps ? 'bg-[var(--brand)]' : 'bg-muted',
+                      )}
+                    />
+                  ))}
+                </span>
+                <span className="text-[10px] font-bold text-muted-foreground">
+                  连续 {reps}/4 · AI {aiPasses}/2
+                </span>
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold text-muted-foreground">
+                对比 → 识别 → 迁移 · 约 3 分钟
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-full px-2.5"
+                onClick={() => onDetail(pattern.id)}
+              >
+                详情
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full border-[var(--brand)]/40 px-3 text-ink-teal"
+                onClick={() => onPractice([pattern.id])}
+              >
+                {p ? '练' : '开始'}
+              </Button>
             </span>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           </div>
-        </button>
+        </CardContent>
       </Card>
     );
   };
 
-  const renderLayerMap = () => (
-    <Card className="rounded-3xl border-border shadow-sm">
-      <CardHeader className="pb-2">
-        <div className="flex items-baseline justify-between gap-2">
-          <CardTitle className="text-xs font-black uppercase tracking-wider text-muted-foreground">
-            模式地图
-          </CardTitle>
+  const renderPatternLibrary = () => {
+    const statusOptions: Array<{ key: PatternLibraryFilter; label: string; count: number }> = [
+      { key: 'all', label: '全部状态', count: libraryCounts.all },
+      { key: 'due', label: '到期', count: libraryCounts.due },
+      { key: 'active', label: '进行中', count: libraryCounts.active },
+      { key: 'mastered', label: '已掌握', count: libraryCounts.mastered },
+    ];
+    const chipClass = (selected: boolean) => cn(
+      'rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors',
+      selected
+        ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
+        : 'border-border bg-card text-muted-foreground hover:text-foreground',
+    );
+    return (
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+              Pattern Library
+            </p>
+            <h3 className="text-lg font-black italic tracking-tight text-foreground">模式库</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground break-words">
+              {THINK_PATTERNS.length} 个模式按四层摊开；到期优先，点「练」直接开始。
+            </p>
+          </div>
           <span className="text-[11px] font-bold text-muted-foreground">
-            四层 · {THINK_PATTERNS.length} 个模式
+            显示 {filteredPatterns.length}/{THINK_PATTERNS.length}
           </span>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-2.5">
-        {layerSummaries.map((summary) => {
-          const meta = THINK_PATTERN_LAYERS.find((layer) => layer.id === summary.layerId);
-          const percent = summary.total > 0 ? Math.round((summary.mastered / summary.total) * 100) : 0;
-          return (
-            <div key={summary.layerId} className="flex items-center gap-2 min-w-0">
-              <span className="w-20 shrink-0 text-xs font-bold text-foreground">
-                {meta?.name ?? summary.layerId}
-              </span>
-              <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden" aria-hidden>
-                <div
-                  className="h-full rounded-full bg-[var(--brand)]"
-                  style={{ width: `${percent}%` }}
-                />
-              </div>
-              <span className="w-10 shrink-0 text-right text-[11px] font-bold text-muted-foreground">
-                {summary.mastered}/{summary.total}
-              </span>
-              <span className="w-14 shrink-0 text-right text-[10px] font-bold text-muted-foreground">
-                到期 {summary.due}
-              </span>
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
+
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="按层筛选">
+            <button
+              type="button"
+              aria-pressed={layerFilter === 'all'}
+              className={chipClass(layerFilter === 'all')}
+              onClick={() => setLayerFilter('all')}
+            >
+              全部层级 {THINK_PATTERNS.length}
+            </button>
+            {THINK_PATTERN_LAYERS.map((layer) => {
+              const total = layerSummaries.find((summary) => summary.layerId === layer.id)?.total ?? 0;
+              return (
+                <button
+                  key={layer.id}
+                  type="button"
+                  aria-pressed={layerFilter === layer.id}
+                  className={chipClass(layerFilter === layer.id)}
+                  onClick={() => setLayerFilter(layer.id)}
+                >
+                  {layer.name} {total}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="按状态筛选">
+            {statusOptions.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={statusFilter === option.key}
+                className={chipClass(statusFilter === option.key)}
+                onClick={() => setStatusFilter(option.key)}
+              >
+                {option.label} {option.count}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {filteredPatterns.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-muted/20 p-4 text-center">
+            <p className="text-sm text-muted-foreground">没有符合当前筛选的模式。</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2 rounded-full"
+              onClick={resetLibraryFilter}
+            >
+              清除筛选
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {filteredGroups.map(({ layer, items }) => {
+              const summary = layerSummaries.find((row) => row.layerId === layer.id);
+              const total = summary?.total ?? items.length;
+              const mastered = summary?.mastered ?? 0;
+              const due = summary?.due ?? 0;
+              const percent = total > 0 ? Math.round((mastered / total) * 100) : 0;
+              return (
+                <section key={layer.id} className="space-y-2.5">
+                  <div className="flex flex-wrap items-end justify-between gap-2">
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-black text-foreground">{layer.name}</h4>
+                      <p className="text-xs text-muted-foreground break-words">{layer.description}</p>
+                    </div>
+                    <span className="shrink-0 text-[11px] font-bold text-muted-foreground">
+                      已掌握 {mastered}/{total} · 到期 {due}
+                    </span>
+                  </div>
+                  <div className="h-1 overflow-hidden rounded-full bg-muted" aria-hidden>
+                    <div
+                      className="h-full rounded-full bg-[var(--brand)]"
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {items.map((pattern) => renderPatternCard(pattern))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    );
+  };
 
   /* ── 本轮完成页：通过/失败按**不同模式**计数（重试不重复，见顶层 results 的更新口径）── */
   if (mode === 'complete') {
@@ -425,14 +624,6 @@ export function PatternOverview({
         <button type="button" className="py-0.5 hover:text-foreground" onClick={onRewrite}>
           改写快练
         </button>
-        <span aria-hidden>·</span>
-        <button type="button" className="py-0.5 hover:text-foreground" onClick={() => setShowMap((prev) => !prev)}>
-          {showMap ? '收起模式地图' : '模式地图'}
-        </button>
-        <span aria-hidden>·</span>
-        <button type="button" className="py-0.5 hover:text-foreground" onClick={() => setShowAll((prev) => !prev)}>
-          {showAll ? '收起模式库' : `全部 ${THINK_PATTERNS.length} 个模式`}
-        </button>
       </div>
 
       {showTrend && (
@@ -575,51 +766,13 @@ export function PatternOverview({
               混合训练（5 个）
             </Button>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            {THINK_PATTERNS.map((pattern) => {
-              const layer = THINK_PATTERN_LAYERS.find((candidate) => candidate.id === pattern.layer);
-              return (
-                <button
-                  key={pattern.id}
-                  type="button"
-                  onClick={() => onPractice([pattern.id])}
-                  className="rounded-xl border border-border bg-card p-2 text-left hover:border-[var(--brand)]/50"
-                >
-                  <span className="block text-xs font-bold text-foreground break-words">{pattern.name}</span>
-                  <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                    {layer?.name ?? pattern.layer}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          <p className="text-[11px] text-muted-foreground">
+            想指定模式？直接在下面模式库点「练」；这里只负责随机混合。
+          </p>
         </div>
       )}
 
-      {showMap && renderLayerMap()}
-
-      {showAll && (
-        <div className="space-y-5">
-          <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">
-            模式库 · 按四层
-          </h3>
-          {THINK_PATTERN_LAYERS.map((layer) => {
-            const items = THINK_PATTERNS.filter((pattern) => pattern.layer === layer.id);
-            if (items.length === 0) return null;
-            return (
-              <section key={layer.id} className="space-y-2">
-                <div className="min-w-0">
-                  <h4 className="text-sm font-black text-foreground">{layer.name}</h4>
-                  <p className="text-xs text-muted-foreground break-words">{layer.description}</p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {items.map((pattern) => renderPatternCard(pattern))}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      )}
+      {renderPatternLibrary()}
     </div>
   );
 }
