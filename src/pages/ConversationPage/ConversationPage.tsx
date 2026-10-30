@@ -125,6 +125,7 @@ const SCENARIOS: IScenario[] = [
     icon: MessageCircle,
     color: 'var(--brand)',
     bg: 'from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10',
+    difficulty: '日常' as const,
   },
   {
     id: 'debate',
@@ -247,6 +248,12 @@ const ICON_MAP: Record<IconName, LucideIcon> = {
   ShoppingBag,
   Stethoscope,
   GraduationCap,
+  Building2,
+  UtensilsCrossed,
+  CarTaxiFront,
+  PartyPopper,
+  PhoneCall,
+  Headset,
 };
 
 /**

@@ -13,7 +13,13 @@ export type IconName =
   | 'Plane'
   | 'ShoppingBag'
   | 'Stethoscope'
-  | 'GraduationCap';
+  | 'GraduationCap'
+  | 'Building2'
+  | 'UtensilsCrossed'
+  | 'CarTaxiFront'
+  | 'PartyPopper'
+  | 'PhoneCall'
+  | 'Headset';
 
 export interface ICustomScenario {
   id: string;
@@ -35,6 +41,12 @@ const ICON_OPTIONS: { name: IconName; label: string }[] = [
   { name: 'ShoppingBag', label: '购物' },
   { name: 'Stethoscope', label: '医疗' },
   { name: 'GraduationCap', label: '学术' },
+  { name: 'Building2', label: '酒店' },
+  { name: 'UtensilsCrossed', label: '餐饮' },
+  { name: 'CarTaxiFront', label: '出行' },
+  { name: 'PartyPopper', label: '派对' },
+  { name: 'PhoneCall', label: '电话' },
+  { name: 'Headset', label: '客服' },
 ];
 
 const COLOR_OPTIONS = [
