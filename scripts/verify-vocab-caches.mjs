@@ -529,6 +529,11 @@ function transpile(relPath, extraExports) {
     'src/pages/DeepVocabularyPage/components/CollocationsTab.tsx': 2,
     'src/pages/ArticlePage/ArticlePage.tsx': 4,
     'src/pages/ProgressPage/ProgressPage.tsx': 1,
+    'src/pages/ArticlePage/components/PageReader.tsx': 1,
+    'src/pages/ArticlePage/components/NovelReader.tsx': 2,
+    'src/pages/WritingPage/WritingPage.tsx': 1,
+    'src/pages/ConversationPage/ConversationPage.tsx': 2,
+    'src/pages/ThinkInEnglishPage/ThinkInEnglishPage.tsx': 1,
   };
   for (const [rel, min] of Object.entries(core)) {
     const src = readFileSync(join(ROOT, rel), 'utf8');

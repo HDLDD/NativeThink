@@ -34,6 +34,7 @@ import { useAI } from '@/hooks/use-ai';
 import { useTTS } from '@/lib/use-tts';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { safeStorage } from '@/lib/safe-storage';
+import { persistText } from '@/lib/capped-cache';
 import { persistJson, warnStorageFull } from '@/lib/capped-cache';
 import { cn, extractJson } from '@/lib/utils';
 import { useStableShuffle } from '@/lib/use-stable-shuffle';
@@ -74,7 +75,7 @@ export default function ThinkInEnglishPage() {
     let list: unknown[] = [];
     try { list = raw ? JSON.parse(raw) : []; } catch { list = []; }
     list.unshift({ type: 'detector', userInput: input, feedback: '', createdAt: Date.now() });
-    try { safeStorage.setItem('__nativethink_practice_history', JSON.stringify(list.slice(0, 50))); } catch { /* ignore */ }
+    persistText('__nativethink_practice_history', JSON.stringify(list.slice(0, 50)));
     setDetectorHistory((prev) => [input, ...prev.filter((s) => s !== input)].slice(0, 8));
   };
 

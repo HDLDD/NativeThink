@@ -125,7 +125,7 @@ safeStorage.setItem(key, value): boolean   // safe-storage.ts:175-190（2026-09-
 
 同步写入的生词本与助记采用更严格的提交顺序（`custom-words.ts:45`、`word-notes.ts:30`）：`persistJson` 成功后才替换模块缓存并广播；失败返回 `failed` / `false`，不允许调用者继续记学习进度、收起草稿或提示成功。守卫 `verify-vocab-caches` ⑦ 真跑新增、更新、删除、重试与页面回调，并以变异验证失败分支。
 
-**核心学习进度也走同一个闸门**（2026-10-29）：统计、SM-2、短语、拼写、快速闪卡、句子复习、已记清单、AI 文章等写入统一 `persistText(key, json)`（`capped-cache.ts:45`）；它在 `safeStorage.setItem` 返回 false 时调用 `warnStorageFull()` 并返回 false，外层不再只包一个看不见失败的 `try/catch`。学习统计 `resetAll` 也返回真实写入结果，`ProgressPage` 失败时不再 toast「已重置」。守卫 `verify-vocab-caches` ⑧ 逐个模块点名（208 断言，2 组变异）。
+**核心学习进度也走同一个闸门**（2026-10-29）：统计、SM-2、短语、拼写、快速闪卡、句子复习、已记清单、AI 文章，以及阅读进度/段落批注、写作草稿、对话历史、思维检测历史等写入统一 `persistText(key, json)`（`capped-cache.ts:45`）；它在 `safeStorage.setItem` 返回 false 时调用 `warnStorageFull()` 并返回 false，外层不再只包一个看不见失败的 `try/catch`。学习统计 `resetAll` 也返回真实写入结果，`ProgressPage` 失败时不再 toast「已重置」。可重算的派生缓存（如阅读段级译文 `__reader_trans_*`）仍允许静默失败。守卫 `verify-vocab-caches` ⑧ 逐个模块点名（213 断言，2 组变异）。
 
 接线点（守卫 `verify-vocab-caches` ⑤ 逐个钉，M/N 变异各验红）：`custom_prompts`（WritingPage）、`custom_shadowing` + `shadowing_extra`（ShadowingPage）、`custom_chunks` + `chunk_ai_sentences` + `example_trans` + `ai_replacements` + `phrase_examples`（ChunkTrainingPage）、`custom_translations`/`_backs`/`_natives`（ThinkInEnglishPage）、`spelling_sentences`（use-spelling-sentences）、`browse_memorized`（DeepVocabularyPage）。语块侧上限钉死：AI 例句 200 键 / 每键 30 条、例句翻译 400 键、短语例句 300 键。
 

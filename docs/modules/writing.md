@@ -37,7 +37,7 @@
 
 | key | 行为 |
 |-----|------|
-| `__nativethink_writing_draft` | 800ms 防抖保存（`:402-414`），进页面给「已恢复草稿 + 放弃草稿」条（恢复 `:384-401`、放弃 `:415-420`、横条 JSX `:982-993`） |
+| `__nativethink_writing_draft` | 800ms 防抖保存（`:402-414`），进页面给「已恢复草稿 + 放弃草稿」条（恢复 `:384-401`、放弃 `:415-420`、横条 JSX `:982-993`）；写失败走 `persistText` 提示，不再静默丢稿 |
 | `__nativethink_writing_history` | 落盘 `trimOldest(history, 50, 256KB)`（常量 `:357-359`，effect `:422-428`）—— 条数 + 字节双封顶、保留最新，写失败 `warnStorageFull()`；首页只列最后 5 条（`:878`），点开走历史 Dialog（`:899-909`） |
 | `__nativethink_custom_prompts` | 每次 `customPrompts` 变化整份重写（`:441-444`） |
 

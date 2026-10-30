@@ -19,6 +19,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { cn, cleanText } from '@/lib/utils';
 import { safeStorage } from '@/lib/safe-storage';
+import { persistText } from '@/lib/capped-cache';
 import { toast } from 'sonner';
 import type { IReadingContent, IParagraph, TransMode } from '@/data/reading';
 import {
@@ -39,7 +40,7 @@ function useReaderNotes(contentId: string) {
   const saveNote = useCallback((paraKey: string, en: string, note: string) => {
     setNotes((prev) => {
       const next = { ...prev, [paraKey]: { en, note, ts: Date.now() } };
-      try { safeStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* quota */ }
+      persistText(storageKey, JSON.stringify(next));
       return next;
     });
   }, [storageKey]);
@@ -47,7 +48,7 @@ function useReaderNotes(contentId: string) {
     setNotes((prev) => {
       const next = { ...prev };
       delete next[paraKey];
-      try { safeStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* quota */ }
+      persistText(storageKey, JSON.stringify(next));
       return next;
     });
   }, [storageKey]);

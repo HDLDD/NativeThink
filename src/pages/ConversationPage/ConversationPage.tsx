@@ -42,6 +42,7 @@ import { useCustomScenarios, ICON_OPTIONS, COLOR_OPTIONS, type IconName } from '
 import { useTTS } from '@/lib/use-tts';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { safeStorage } from '@/lib/safe-storage';
+import { persistText } from '@/lib/capped-cache';
 
 interface IMessage {
   role: 'user' | 'ai';
@@ -536,7 +537,7 @@ export default function ConversationPage() {
       };
       setConvHistory((prev) => {
         const next = [record, ...prev.filter((c) => c.scenarioId !== record.scenarioId)].slice(0, 20);
-        try { safeStorage.setItem(CONV_HISTORY_KEY, JSON.stringify(next)); } catch { /* quota */ }
+        persistText(CONV_HISTORY_KEY, JSON.stringify(next));
         return next;
       });
     }, 800);
@@ -572,7 +573,7 @@ export default function ConversationPage() {
   const deleteSavedConversation = (scenarioId: string) => {
     setConvHistory((prev) => {
       const next = prev.filter((c) => c.scenarioId !== scenarioId);
-      try { safeStorage.setItem(CONV_HISTORY_KEY, JSON.stringify(next)); } catch { /* quota */ }
+      persistText(CONV_HISTORY_KEY, JSON.stringify(next));
       return next;
     });
   };

@@ -45,7 +45,7 @@ import { useAI } from '@/hooks/use-ai';
 import { useTTS } from '@/lib/use-tts';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { safeStorage } from '@/lib/safe-storage';
-import { persistJson, warnStorageFull, trimOldest } from '@/lib/capped-cache';
+import { persistJson, persistText, warnStorageFull, trimOldest } from '@/lib/capped-cache';
 import { cn, extractJson } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -405,7 +405,7 @@ export default function WritingPage() {
     const t = setTimeout(() => {
       try {
         if (essay.trim() && selectedPrompt) {
-          safeStorage.setItem(DRAFT_KEY, JSON.stringify({ prompt: selectedPrompt, essay, savedAt: Date.now() }));
+          persistText(DRAFT_KEY, JSON.stringify({ prompt: selectedPrompt, essay, savedAt: Date.now() }));
         } else if (!essay.trim()) {
           safeStorage.removeItem(DRAFT_KEY);
         }

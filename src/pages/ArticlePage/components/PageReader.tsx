@@ -17,6 +17,7 @@ import { useAI } from '@/hooks/use-ai';
 import { useTTS } from '@/lib/use-tts';
 import { useFavorites } from '@/lib/use-favorites';
 import { safeStorage } from '@/lib/safe-storage';
+import { persistText } from '@/lib/capped-cache';
 import { cn, cleanText, extractJson } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { IReadingContent, TransMode, IParagraph } from '@/data/reading';
@@ -51,7 +52,7 @@ function loadProgress(contentId: string): ReaderProgress {
   } catch { return { page: 0 }; }
 }
 function saveProgress(contentId: string, data: ReaderProgress) {
-  try { safeStorage.setItem(`__reader_progress_${contentId}`, JSON.stringify(data)); } catch { /* */ }
+  persistText(`__reader_progress_${contentId}`, JSON.stringify(data));
 }
 
 // ── Word lookup: 词库中文 → 本地大词典(ECDICT, 离线秒查) → 在线词典 API ──
