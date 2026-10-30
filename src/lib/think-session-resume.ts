@@ -196,7 +196,7 @@ const storage = (): Storage | null => {
   }
 };
 
-/** 写失败只返回 false：断点是可丢的临时状态，练习界面不弹 toast。 */
+/** 写失败返回 false 并提示（去抖）：断点虽然是临时状态，但丢了意味着重做。 */
 export function savePatternResume(snapshot: PatternResumeSnapshot): boolean {
   const target = storage();
   if (!target) return false;
@@ -204,6 +204,7 @@ export function savePatternResume(snapshot: PatternResumeSnapshot): boolean {
     target.setItem(THINK_SESSION_RESUME_KEY, JSON.stringify(snapshot));
     return true;
   } catch {
+    import('./capped-cache').then(({ warnStorageFull }) => warnStorageFull());
     return false;
   }
 }

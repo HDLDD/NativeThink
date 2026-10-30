@@ -388,49 +388,49 @@ export function PatternOverview({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-muted-foreground">
         {delayedQueue.length > 0 && (
           <>
-            <button type="button" className="text-amber-700 hover:text-amber-800" onClick={onDelayed}>
+            <button type="button" className="py-0.5 text-amber-700 hover:text-amber-800" onClick={onDelayed}>
               延迟探测（{delayedQueue.length}）
             </button>
             <span aria-hidden>·</span>
           </>
         )}
-        <button type="button" className="hover:text-foreground" onClick={() => setShowWeak((prev) => !prev)}>
+        <button type="button" className="py-0.5 hover:text-foreground" onClick={() => setShowWeak((prev) => !prev)}>
           {showWeak ? '收起薄弱报告' : `薄弱报告（${weak.length}）`}
         </button>
         <span aria-hidden>·</span>
-        <button type="button" className="hover:text-foreground" onClick={() => setShowTrend((prev) => !prev)}>
+        <button type="button" className="py-0.5 hover:text-foreground" onClick={() => setShowTrend((prev) => !prev)}>
           {showTrend ? '收起趋势' : '趋势'}
         </button>
         <span aria-hidden>·</span>
-        <button type="button" className="hover:text-foreground" onClick={onDiagnostic}>
+        <button type="button" className="py-0.5 hover:text-foreground" onClick={onDiagnostic}>
           思维体检{diagnostic ? ` · 上次 ${diagnostic.correct}/${diagnostic.total}` : ` · ${THINK_PATTERN_DIAGNOSTIC.length} 题`}
         </button>
         <span aria-hidden>·</span>
-        <button type="button" className="hover:text-foreground" onClick={onRealTask}>
+        <button type="button" className="py-0.5 hover:text-foreground" onClick={onRealTask}>
           真实任务
         </button>
         <span aria-hidden>·</span>
-        <button type="button" className="hover:text-foreground" onClick={onSpeaking}>
+        <button type="button" className="py-0.5 hover:text-foreground" onClick={onSpeaking}>
           口头任务
         </button>
         <span aria-hidden>·</span>
-        <button type="button" className="hover:text-foreground" onClick={onLongTask}>
+        <button type="button" className="py-0.5 hover:text-foreground" onClick={onLongTask}>
           长文 / 对话
         </button>
         <span aria-hidden>·</span>
-        <button type="button" className="hover:text-foreground" onClick={() => setShowPractice((prev) => !prev)}>
+        <button type="button" className="py-0.5 hover:text-foreground" onClick={() => setShowPractice((prev) => !prev)}>
           {showPractice ? '收起自由训练' : '自由训练'}
         </button>
         <span aria-hidden>·</span>
-        <button type="button" className="hover:text-foreground" onClick={onRewrite}>
+        <button type="button" className="py-0.5 hover:text-foreground" onClick={onRewrite}>
           改写快练
         </button>
         <span aria-hidden>·</span>
-        <button type="button" className="hover:text-foreground" onClick={() => setShowMap((prev) => !prev)}>
+        <button type="button" className="py-0.5 hover:text-foreground" onClick={() => setShowMap((prev) => !prev)}>
           {showMap ? '收起模式地图' : '模式地图'}
         </button>
         <span aria-hidden>·</span>
-        <button type="button" className="hover:text-foreground" onClick={() => setShowAll((prev) => !prev)}>
+        <button type="button" className="py-0.5 hover:text-foreground" onClick={() => setShowAll((prev) => !prev)}>
           {showAll ? '收起模式库' : `全部 ${THINK_PATTERNS.length} 个模式`}
         </button>
       </div>

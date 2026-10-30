@@ -39,7 +39,7 @@ function saveDrafts(drafts: Record<string, string>): void {
   try {
     localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
   } catch {
-    // 本地草稿可丢，不弹 toast
+    import('@/lib/capped-cache').then(({ warnStorageFull }) => warnStorageFull());
   }
 }
 
