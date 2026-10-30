@@ -18,6 +18,13 @@ import {
   ShoppingBag,
   Stethoscope,
   GraduationCap,
+  Building2,
+  UtensilsCrossed,
+  PhoneCall,
+  PartyPopper,
+  Headset,
+  CarTaxiFront,
+  Lightbulb,
   Languages,
   Volume2,
   History,
@@ -58,6 +65,9 @@ interface IScenario {
   icon: typeof Coffee;
   color: string;
   bg: string;
+  difficulty?: '日常' | '进阶';
+  /** 场景核心词/短语，帮用户在对话前做准备 */
+  keyPhrases?: string[];
 }
 
 /** Persisted conversation record (per scenario — resume where you left off) */
@@ -93,6 +103,8 @@ const SCENARIOS: IScenario[] = [
     icon: Coffee,
     color: '#F97316',
     bg: 'from-orange-50 to-amber-50 dark:from-orange-500/10 dark:to-amber-500/10',
+    difficulty: '日常' as const,
+    keyPhrases: ["I'll have a...", 'Could I get...', 'For here or to go'],
   },
   {
     id: 'interview',
@@ -102,6 +114,8 @@ const SCENARIOS: IScenario[] = [
     icon: Briefcase,
     color: '#6366F1',
     bg: 'from-indigo-50 to-violet-50 dark:from-indigo-500/10 dark:to-violet-500/10',
+    difficulty: '进阶' as const,
+    keyPhrases: ['I have experience in...', 'My biggest strength is...', "I'm looking for an opportunity to..."],
   },
   {
     id: 'chat',
@@ -120,6 +134,107 @@ const SCENARIOS: IScenario[] = [
     icon: Swords,
     color: '#EC4899',
     bg: 'from-pink-50 to-rose-50 dark:from-pink-500/10 dark:to-rose-500/10',
+    difficulty: '进阶' as const,
+    keyPhrases: ['I see your point, but...', "That's a fair argument, however...", 'Let me push back on that'],
+  },
+  {
+    id: 'shopping',
+    name: '商场购物',
+    description: '试穿、询价、退换货，练日常消费口语',
+    role: 'You are a helpful store assistant at a clothing store. Help the customer find items, suggest sizes and colors, mention prices and discounts naturally.',
+    icon: ShoppingBag,
+    color: '#8B5CF6',
+    bg: 'from-violet-50 to-purple-50 dark:from-violet-500/10 dark:to-purple-500/10',
+    difficulty: '日常' as const,
+    keyPhrases: ['Do you have this in...', 'How much is it?', "I'm just looking, thanks"],
+  },
+  {
+    id: 'hotel',
+    name: '酒店入住',
+    description: '办理入住、询问设施，练旅行英语',
+    role: 'You are a warm, professional hotel front desk receptionist. Greet the guest, ask about their reservation, mention check-in time and amenities. Offer help with luggage or directions.',
+    icon: Building2,
+    color: '#0EA5E9',
+    bg: 'from-sky-50 to-blue-50 dark:from-sky-500/10 dark:to-blue-500/10',
+    difficulty: '日常' as const,
+    keyPhrases: ['I have a reservation under...', 'What time is check-out?', 'Is breakfast included?'],
+  },
+  {
+    id: 'restaurant',
+    name: '餐厅点餐',
+    description: '看菜单、点菜、买单，练餐饮场景对话',
+    role: 'You are a waiter at a popular restaurant. Present the menu, make recommendations when asked, take the order, and check on the customer. Mention daily specials naturally.',
+    icon: UtensilsCrossed,
+    color: '#F59E0B',
+    bg: 'from-amber-50 to-yellow-50 dark:from-amber-500/10 dark:to-yellow-500/10',
+    difficulty: '日常' as const,
+    keyPhrases: ['Could I see the menu?', "I'll have the...", 'Could we get the check?'],
+  },
+  {
+    id: 'taxi',
+    name: '打车出行',
+    description: '告诉司机去哪、问路费，练出行英语',
+    role: 'You are a taxi/rideshare driver making small talk with the passenger. Ask where they are headed, mention traffic, and chat casually about the city.',
+    icon: CarTaxiFront,
+    color: '#10B981',
+    bg: 'from-green-50 to-emerald-50 dark:from-green-500/10 dark:to-emerald-500/10',
+    difficulty: '日常' as const,
+    keyPhrases: ['Could you take me to...', 'How long will it take?', 'Keep the change'],
+  },
+  {
+    id: 'party',
+    name: '派对寒暄',
+    description: '在派对上认识新朋友、聊兴趣，练社交英语',
+    role: 'You are a friendly, outgoing person at a house party. Make small talk, ask about hobbies and interests, share funny stories, and introduce the user to other imaginary guests.',
+    icon: PartyPopper,
+    color: '#F43F5E',
+    bg: 'from-rose-50 to-pink-50 dark:from-rose-500/10 dark:to-pink-500/10',
+    difficulty: '日常' as const,
+    keyPhrases: ['So how do you know...?', 'Have you tried...?', "That's hilarious!"],
+  },
+  {
+    id: 'doctor',
+    name: '看病就诊',
+    description: '描述症状、听医嘱，练医疗英语',
+    role: 'You are a caring doctor at a clinic. Ask about the patient\'s symptoms, how long they\'ve had them, and their medical history. Explain your diagnosis simply and prescribe basic treatment.',
+    icon: Stethoscope,
+    color: '#EF4444',
+    bg: 'from-red-50 to-rose-50 dark:from-red-500/10 dark:to-rose-500/10',
+    difficulty: '进阶' as const,
+    keyPhrases: ["I've been having...", 'It hurts when I...', 'How long will it take to recover?'],
+  },
+  {
+    id: 'airport',
+    name: '机场出行',
+    description: '值机、安检、问路，练机场英语',
+    role: 'You are an airline check-in agent at the airport. Help the passenger check in, ask about luggage, mention the gate and boarding time. Be efficient but friendly.',
+    icon: Plane,
+    color: '#06B6D4',
+    bg: 'from-cyan-50 to-teal-50 dark:from-cyan-500/10 dark:to-teal-500/10',
+    difficulty: '进阶' as const,
+    keyPhrases: ["I'd like to check in", 'I have one bag to check', 'Which gate is...'],
+  },
+  {
+    id: 'phone',
+    name: '电话沟通',
+    description: '打电话预约、咨询，练电话英语（没有肢体语言辅助）',
+    role: 'You are a customer service representative answering a phone call. Since this is a phone conversation, rely on verbal communication only. Ask how you can help, confirm details, and be patient if the caller asks you to repeat.',
+    icon: PhoneCall,
+    color: '#A855F7',
+    bg: 'from-purple-50 to-fuchsia-50 dark:from-purple-500/10 dark:to-fuchsia-500/10',
+    difficulty: '进阶' as const,
+    keyPhrases: ['Hello, this is...', "I'm calling to...", 'Could you repeat that?'],
+  },
+  {
+    id: 'support',
+    name: '客服投诉',
+    description: '描述问题、要求解决，练客服英语',
+    role: 'You are a customer service agent handling a complaint. Listen to the issue, apologize empathetically, ask clarifying questions, and offer a solution (refund, replacement, or escalation). Stay calm and professional.',
+    icon: Headset,
+    color: '#64748B',
+    bg: 'from-slate-50 to-gray-50 dark:from-slate-500/10 dark:to-slate-500/10',
+    difficulty: '进阶' as const,
+    keyPhrases: ["I'd like to report a problem with...", 'This is the third time...', 'What can you do about this?'],
   },
 ];
 
@@ -133,6 +248,40 @@ const ICON_MAP: Record<IconName, LucideIcon> = {
   Stethoscope,
   GraduationCap,
 };
+
+/**
+ * AI 回复末尾的 `---SUGGEST---` 分隔符后跟 2-3 条用户可能想说的英文。
+ * 解析失败（AI 没跟格式）就整体当正文，建议列表为空 → UI 回退到「卡住了？」提示。
+ */
+function parseSuggestions(content: string): { text: string; suggestions: string[] } {
+  const SEP = '\n---SUGGEST---\n';
+  const idx = content.indexOf(SEP);
+  if (idx < 0) return { text: content, suggestions: [] };
+  return {
+    text: content.slice(0, idx).trim(),
+    suggestions: content.slice(idx + SEP.length)
+      .split('\n')
+      .map((s) => s.replace(/^[-\d.]*\s*/, '').trim())
+      .filter(Boolean)
+      .slice(0, 3),
+  };
+}
+
+/** 对话教练 system prompt：教 AI 当角色 + 当老师 */
+function buildSystemPrompt(scenario: IScenario): string {
+  const base = `${scenario.role}
+
+Important rules:
+1. Reply in English only, no Chinese
+2. Keep responses 2-5 sentences, natural and conversational
+3. Stay in character, don't break the fourth wall
+4. If the user makes a grammar mistake, add the correction at the very end in this exact format on a new line: "💡 ...corrected version..." — keep it brief, one correction per response
+5. At the VERY END of your response, add a line '---SUGGEST---' followed by 2-3 short English sentences (one per line, no numbering) that the user might naturally say next in this conversation. Keep them simple and appropriate for an English learner.`;
+  if (scenario.keyPhrases?.length) {
+    return `${base}\n6. Key phrases for this scenario that the user should practice: ${scenario.keyPhrases.join(', ')}. Work them into the conversation naturally.`;
+  }
+  return base;
+}
 
 export default function ConversationPage() {
   const { creditOnce } = useStudyCredit();
@@ -168,6 +317,8 @@ export default function ConversationPage() {
   const [translationTexts, setTranslationTexts] = useState<Record<number, string>>({});
   const [visibleTranslations, setVisibleTranslations] = useState<Record<number, boolean>>({});
   const [translatingIdx, setTranslatingIdx] = useState<number | null>(null);
+  // AI 建议回复（从 AI 回复末尾解析，用户可一键填入）
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   // Custom scenario dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -194,6 +345,7 @@ export default function ConversationPage() {
     setMessages([]);
     setAnalysis('');
     setShowAnalysis(false);
+    setSuggestions([]);
     // Duolingo 式：AI 角色先开口，进入场景即刻有真实语境
     requestOpening(scenario);
   };
@@ -211,10 +363,7 @@ export default function ConversationPage() {
     try {
       const stream = aiStream(
         [
-          {
-            role: 'system',
-            content: `${scenario.role}\n\nImportant rules:\n1. Reply in English only, no Chinese\n2. Keep responses 2-5 sentences, natural and conversational\n3. Stay in character, don't break the fourth wall`,
-          },
+          { role: 'system', content: buildSystemPrompt(scenario) },
           {
             role: 'user',
             content: "Open the conversation in character: greet me naturally and set the scene in one short turn (at most one question). Do not describe the scene in stage directions — just speak.",
@@ -231,7 +380,10 @@ export default function ConversationPage() {
       }
       if (!mountedRef.current) return;
       if (full.trim()) {
-        if (autoRead) { try { tts.speak(full); } catch { /* ignore */ } }
+        const { text, suggestions: sug } = parseSuggestions(full);
+        if (sug.length) setSuggestions(sug);
+        if (text !== full) setMessages([{ role: 'ai', content: text, timestamp: aiMsg.timestamp }]);
+        if (autoRead) { try { tts.speak(text); } catch { /* ignore */ } }
       } else {
         setMessages([]);
         toast.error('开场白生成失败，请点击「换一个场景」或重新进入重试', { duration: 4000 });
@@ -257,6 +409,7 @@ export default function ConversationPage() {
     setMessages(newMessages);
     setInput('');
     setIsLoading(true);
+    setSuggestions([]);
     // 口径：按「发出去一句」的动作计时；同一场景同一句话只记一次（连点/重发不刷进度环）
     creditOnce('conversation', creditKey('send', selectedScenario?.name, text));
 
@@ -273,18 +426,16 @@ export default function ConversationPage() {
       setMessages([...newMessages, aiMsg]);
 
       if (isConfigured) {
-        // Use DeepSeek/Doubao AI service
-        const systemPrompt = selectedScenario?.role || 'You are a friendly English conversation partner.';
+        const systemPrompt = selectedScenario
+          ? buildSystemPrompt(selectedScenario)
+          : 'You are a friendly English conversation partner.';
         const conversationCtx = newMessages
           .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
           .join('\n');
 
         const stream = aiStream(
           [
-            {
-              role: 'system',
-              content: `${systemPrompt}\n\nImportant rules:\n1. Reply in English only, no Chinese\n2. Keep responses 2-5 sentences, natural and conversational\n3. Stay in character, don't break the fourth wall\n4. If the user makes grammar mistakes, briefly note corrections in parentheses at the end`,
-            },
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: conversationCtx },
           ],
           { temperature: 0.8, signal: controller.signal },
@@ -295,6 +446,13 @@ export default function ConversationPage() {
           if (chunk.content) {
             full += chunk.content;
             setMessages([...newMessages, { ...aiMsg, content: full }]);
+          }
+        }
+        if (mountedRef.current && full.trim()) {
+          const { text, suggestions: sug } = parseSuggestions(full);
+          if (sug.length) {
+            setSuggestions(sug);
+            setMessages([...newMessages, { ...aiMsg, content: text }]);
           }
         }
       } else {
@@ -507,6 +665,7 @@ export default function ConversationPage() {
     setMessages([]);
     setAnalysis('');
     setShowAnalysis(false);
+    setSuggestions([]);
     // Reset translations when leaving a scenario
     setTranslationTexts({});
     setVisibleTranslations({});
@@ -565,6 +724,7 @@ export default function ConversationPage() {
     setMessages(record.messages);
     setAnalysis(record.analysis ?? '');
     setShowAnalysis(false);
+    setSuggestions([]);
     setTranslationTexts({});
     setVisibleTranslations({});
     setTranslatingIdx(null);
@@ -682,7 +842,22 @@ export default function ConversationPage() {
                   >
                     <Icon className="size-5" />
                   </div>
-                  <h3 className="text-xl font-black text-foreground mb-2">{scenario.name}</h3>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-xl font-black text-foreground">{scenario.name}</h3>
+                    {scenario.difficulty && (
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider border-none',
+                          scenario.difficulty === '日常'
+                            ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400'
+                            : 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400',
+                        )}
+                      >
+                        {scenario.difficulty}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground font-medium mb-4">
                     {scenario.description}
                   </p>
@@ -955,6 +1130,20 @@ export default function ConversationPage() {
                 <p className="text-sm text-muted-foreground font-medium">
                   在下方输入框中输入英文，开始与 AI 练习对话
                 </p>
+                {selectedScenario.keyPhrases?.length ? (
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 px-4">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground/60">试试这些：</span>
+                    {selectedScenario.keyPhrases.map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => setInput(p)}
+                        className="px-2 py-0.5 rounded-full bg-muted/60 text-[11px] font-bold text-muted-foreground hover:text-ink-teal hover:bg-emerald-500/10 transition-colors"
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             )}
 
@@ -1049,8 +1238,23 @@ export default function ConversationPage() {
         </ScrollArea>
 
         <div className="p-4 border-t border-border bg-card">
-          {/* 卡住求助：对话刚开始且未输入时，给可一键填入的求助短语 */}
-          {messages.length <= 1 && !input.trim() && (
+          {/* AI 建议回复：AI 回复后出现，一键填入输入框 */}
+          {suggestions.length > 0 && !isLoading && (
+            <div className="max-w-3xl mx-auto mb-2.5 flex items-center gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <Lightbulb className="size-3.5 text-amber-500 shrink-0" />
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setInput(s)}
+                  className="px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-[12px] font-bold text-ink-teal whitespace-nowrap transition-colors border border-emerald-200/50 dark:border-emerald-500/20"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* 卡住求助：无 AI 建议时的兜底 */}
+          {suggestions.length === 0 && messages.length <= 1 && !input.trim() && (
             <div className="max-w-3xl mx-auto mb-2.5 flex items-center gap-1.5 flex-wrap">
               <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground/60 shrink-0">卡住了？</span>
               {[

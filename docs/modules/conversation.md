@@ -1,37 +1,39 @@
 # 对话练习（`/conversation`）
 
-> 模块 key `conversation`，`src/pages/ConversationPage/ConversationPage.tsx`（1079 行）。无 tab：场景选择页 ↔ 聊天页两段视图。
+> 模块 key `conversation`，`src/pages/ConversationPage/ConversationPage.tsx`（~1200 行）。无 tab：场景选择页 ↔ 聊天页两段视图。
 
 ## 1. 功能
 
-选场景 → AI 先开口 → 自由对话（逐句可翻译）→ 结束生成表现分析 → 历史可继续或删除。内置场景 + 用户自建场景合并展示。
+选场景 → AI 先开口 → 自由对话（逐句可翻译 + AI 建议回复 chips）→ 结束生成表现分析 → 历史可继续或删除。内置场景 12 条 + 用户自建场景合并展示；场景带难度标签（日常/进阶）和场景关键词（keyPhrases），聊天空态时展示为可点击的学习提示。
 
 | 视图 | 位置 |
 |------|------|
-| 场景选择页 | `!selectedScenario` 时渲染（`:566`），内置 + 自定义合并列表 `:634` |
+| 场景选择页 | `!selectedScenario` 时渲染，内置 + 自定义合并列表 |
 | 聊天页 | 选中场景后 |
-| 创建场景 | `:462` |
+| 创建场景 | 页内 Dialog |
 
-内置 `SCENARIOS` **只有 4 条，手写、不来自 `src/data/`**（`:86-123`）；自定义场景来自 `useCustomScenarios`（键 `__nativethink_custom_scenarios`）。
+内置 `SCENARIOS` 12 条手写（咖啡店/聊天/购物/酒店/餐厅/打车/派对/面试/看病/机场/电话/辩论/客服），每个带 `difficulty`（日常/进阶）和 `keyPhrases`（3 条场景关键词）。自定义场景来自 `useCustomScenarios`。
 
 ## 2. 实现方法
 
 | 能力 | 位置 | 说明 |
 |------|------|------|
-| AI 先开口 `requestOpening` | `:190`，`aiStream` `:200` | 失败提示 `:221` |
-| 发消息 | `:238`，`aiStream` `:269` | |
-| 逐句翻译 | `:432`，`aiChat` `:443` | 纯文本，`:450` 判空 ✅ |
-| 结束分析 | `:320`，`aiStream` `:339` | 空 → 关弹窗 + 提示 `:417` |
-| 继续 / 删除历史 | `:539` / `:558` | |
-| 无 Key 降级 | 平台插件 `:289/:400` | `getCapabilityClient()` 可能返回 `null` |
+| AI 先开口 `requestOpening` | `aiStream` | system prompt 由 `buildSystemPrompt()` 构造（含建议回复规则 + keyPhrases） |
+| 发消息 | `aiStream` | 流式回复完成后 `parseSuggestions()` 从末尾分离建议 |
+| **AI 建议回复** | `parseSuggestions()` + state `suggestions` | AI 在回复末尾按 `---SUGGEST---` 分隔符附 2-3 条英文建议；解析后渲染成可点击 chip，填入输入框 |
+| **场景关键词** | `keyPhrases` | 聊天空态时显示 3 条场景关键词按钮，一键填入 |
+| 逐句翻译 | `aiChat` | 纯文本，判空 ✅ |
+| 结束分析 | `aiStream` | 空 → 关弹窗 + 提示 |
+| 继续 / 删除历史 | | |
+| 无 Key 降级 | 平台插件 | `getCapabilityClient()` 可能返回 `null` |
 
-**全部 AI 输出都是 Markdown 纯文本，本页不解析 JSON** —— 所以它没有 `extractJson` 相关问题。
+**全部 AI 输出都是 Markdown 纯文本，本页不解析 JSON** —— 所以它没有 `extractJson` 相关问题。`parseSuggestions` 用简单的分隔符解析（`---SUGGEST---`），AI 不跟格式时回退到完整正文 + 无建议（`suggestions=[]`），UI 自动切回「卡住了？」提示。
 
-存储 `__nativethink_conversation_history`：`:76` 读、`:80` 装载、`:525/:561` 写，**每场景只留 1 条、最多 20 个场景、每条只留最后 100 消息**（`:519/:524`），800ms 防抖（`:507`）。页面记忆 `usePageMemory('conv-auto-read')`（`:148`）。
+**system prompt 构造**：`buildSystemPrompt(scenario)` 返回角色设定 + 5 条通用规则（英语、简短、入戏、纠错格式 `💡`、建议回复格式）+ 可选第 6 条（场景关键词）。老 prompt 内联在 `requestOpening`/`handleSend` 里的写法已收拢到这个函数。
 
-朗读：`autoRead` 开则开场白自动读（`:222`，默认语速），回复读**末 500 字符**、rate **0.95**（`:313-315`）；手动喇叭 `:990`。**未接** `__nativethink_vocab_autospeak`。
+存储 `__nativethink_conversation_history`：读、装载、写（`persistText`），**每场景只留 1 条、最多 20 个场景、每条只留最后 100 消息**，800ms 防抖。页面记忆 `usePageMemory('conv-auto-read')`。
 
-学习时长：只有 `:260` 一处 `creditOnce('conversation', creditKey('send', selectedScenario?.name, text))`，仍在 `await` 之前 —— 记的是"发了一句"这个动作，AI 回复失败不撤销它（与思维训练同口径）；闸门让**同一场景同一句话只记一次**，重发不再刷时长（`src/lib/study-credit.ts`，守卫 `npm run verify:study-credit`）。
+学习时长：`creditOnce('conversation', creditKey('send', selectedScenario?.name, text))`，仍在 `await` 之前。
 
 ## 3. 注意事项
 
