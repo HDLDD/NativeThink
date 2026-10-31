@@ -36,8 +36,8 @@ export default function MobileBottomNav() {
 
   return (
     <nav
-      className="lg:hidden fixed left-3 right-3 z-40 rounded-[20px] border border-white/10 bg-[var(--ink)]/95 shadow-[0_18px_40px_-18px_rgba(0,0,0,0.55)] backdrop-blur-xl"
-      style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}
+      className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[var(--ink)]/95 backdrop-blur-xl"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="flex items-center justify-between gap-0.5 px-1.5 py-1.5">
         {MOBILE_NAV.map(({ path, label, icon: Icon }) => {

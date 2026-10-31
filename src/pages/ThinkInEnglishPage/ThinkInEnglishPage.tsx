@@ -12,11 +12,13 @@ import {
   Volume2,
   X,
   History,
+  ChevronLeft,
   Repeat,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { thinkTabLabel, thinkTabTint, thinkTabTone } from './thinkTabTones';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -38,7 +40,14 @@ import { persistText } from '@/lib/capped-cache';
 import { persistJson, warnStorageFull } from '@/lib/capped-cache';
 import { cn, extractJson } from '@/lib/utils';
 import { useStableShuffle } from '@/lib/use-stable-shuffle';
-import { PatternReviewMode } from './PatternReviewMode';
+import { getWeakPatterns } from '@/lib/think-patterns';
+import { useThinkPatterns } from '@/lib/use-think-patterns';
+import { THINK_PATTERNS } from '@/data/think-patterns';
+import { PatternExtrasPanel } from './PatternExtrasPanel';
+import { PatternReviewMode, type PendingPatternAction } from './PatternReviewMode';
+import { ThinkOverview } from './ThinkOverview';
+import { PanelAside } from './PanelAside';
+
 
 const EXAMPLE_SENTENCES = [
   'i very like this book.',
@@ -51,7 +60,18 @@ export default function ThinkInEnglishPage() {
   const { isConfigured, streamChat: aiStream, chat: aiChat } = useAI();
   const { addFavorite, removeFavorite, isFavorited, favorites } = useFavorites();
   const tts = useTTS();
-  const [activeTab, setActiveTab] = usePageMemory('think-tab', 'patterns');
+  const [activeTab, setActiveTab] = usePageMemory('think-tab', 'overview');
+
+  // 「练习」tab 与模式训练共用同一份模式进度 store：各自挂载时读盘、订阅下行，读到的值一致。
+  // 练习 tab 的入口（体检/真实任务/口头任务/改写快练/延迟探测/指定模式/详情）本身住在
+  // PatternReviewMode 里，所以先记下指令、切回「模式训练」，由它挂载后执行一次。
+  const thinkExtras = useThinkPatterns();
+  const [pendingPatternAction, setPendingPatternAction] = useState<PendingPatternAction | null>(null);
+  const weakExtras = getWeakPatterns(THINK_PATTERNS, thinkExtras.progress);
+  const openPatternAction = (action: PendingPatternAction) => {
+    setPendingPatternAction(action);
+    setActiveTab('patterns');
+  };
 
   // Detector
   const [detectorInput, setDetectorInput] = useState('');
@@ -738,72 +758,77 @@ The chineseText should subtly embed English thinking patterns so learners discov
   };
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto w-full max-w-[1040px] space-y-8">
       {/* 页面标题 */}
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-2">
-            Think in English
-          </p>
-          <h1 className="text-3xl font-black italic text-foreground tracking-tight">
-            母语思维训练
-          </h1>
-          <p className="text-muted-foreground mt-2 text-sm font-medium">
-            把中文默认换成可切换的英语默认，练清晰、自然的表达
-          </p>
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <h1 className="text-2xl font-black italic text-foreground tracking-tight">
+              母语思维训练
+            </h1>
+            <p className="text-muted-foreground text-sm font-medium">
+              把中文默认换成可切换的英语默认，练清晰、自然的表达
+            </p>
+          </div>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-muted p-1.5 rounded-3xl h-auto flex-wrap">
-          <TabsTrigger
-            value="patterns"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
-          >
-            <Repeat className="size-4 mr-2" />
-            模式训练
-          </TabsTrigger>
-          <TabsTrigger
-            value="detector"
-            aria-label="中式英语检测"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
-          >
-            检测
-          </TabsTrigger>
-          <TabsTrigger
-            value="translation"
-            aria-label="思维转译"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
-          >
-            转译
-          </TabsTrigger>
-          <TabsTrigger
-            value="backTranslation"
-            aria-label="反翻译训练"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
-          >
-            反翻译
-          </TabsTrigger>
-          <TabsTrigger
-            value="nativeTranslate"
-            aria-label="思维还原"
-            className="rounded-2xl text-xs font-black uppercase tracking-wider data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-ink-teal data-[state=active]:shadow-sm"
-          >
-            还原
-          </TabsTrigger>
-        </TabsList>
+                {/* 不在首页时才出现的细线返回条：左边回目录，右边当前功能 + 一个小色点 */}
+        {activeTab !== 'overview' && (
+          <div className="mb-5 flex flex-wrap items-center gap-2.5 border-b border-border/70 pb-3">
+            <button
+              type="button"
+              onClick={() => setActiveTab('overview')}
+              className="inline-flex items-center gap-1 text-[11px] font-bold tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ChevronLeft className="size-3.5" aria-hidden />
+              全部功能
+            </button>
+            <span aria-hidden className="h-3 w-px bg-border" />
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-foreground">
+              <span
+                aria-hidden
+                className="size-[5px] rounded-full"
+                style={{ backgroundColor: thinkTabTone(activeTab) }}
+              />
+              {thinkTabLabel(activeTab)}
+            </span>
+          </div>
+        )}
 
-        {/* Pattern Training Tab — 五个 tab 里的第一位，默认落在这里 */}
-        <TabsContent value="patterns" className="space-y-6 mt-6">
-          <PatternReviewMode />
+        {/* Pattern Training Tab — 六个 tab 里的第一位，默认落在这里 */}
+        <TabsContent value="overview" className="space-y-6 mt-0">
+          <ThinkOverview
+            due={thinkExtras.stats.due}
+            reviewedToday={thinkExtras.stats.reviewedToday}
+            mastered={thinkExtras.stats.mastered}
+            extrasCount={thinkExtras.delayedQueue.length > 0 ? 5 : 4}
+            diagnostic={thinkExtras.diagnostic}
+            onGo={(tab) => setActiveTab(tab)}
+          />
         </TabsContent>
 
+        <TabsContent value="patterns" className="space-y-6 mt-0">
+          <PatternReviewMode
+            pendingAction={pendingPatternAction}
+            onPendingActionHandled={() => setPendingPatternAction(null)}
+            onOpenExtras={() => setActiveTab('extras')}
+          />
+        </TabsContent>
+
+        {/* 练习 Tab — 从模式训练搬出来的次级入口（体检/薄弱报告/趋势/真实任务/口头任务/自由训练/改写快练） */}
+
         {/* Detector Tab */}
-        <TabsContent value="detector" className="space-y-6 mt-6">
-          <Card className="rounded-[40px] border-border shadow-sm">
+        <TabsContent value="detector" className="space-y-6 mt-0">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+          <Card className="rounded-3xl border-border shadow-sm">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
-                <div className="size-9 text-ink-teal flex items-center justify-center">
+                <div
+                  className="size-12 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: thinkTabTint('detector', '1F'), color: thinkTabTone('detector') }}
+                >
                   <Search className="size-5.5" />
                 </div>
                 <div>
@@ -824,8 +849,8 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   placeholder="输入你想检测的英文句子，例如：I very like this book."
                   className="min-h-[140px] resize-y rounded-3xl border-border bg-muted/30 focus-visible:ring-2 focus-visible:ring-emerald-200 text-base"
                 />
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-4">
-                  <div className="flex gap-2 flex-wrap border-[#ec83e1]">
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <div className="flex min-w-0 flex-wrap gap-2">
                     {EXAMPLE_SENTENCES.map((s) => (
                       <div key={s} className="flex items-center gap-1">
                         <Button
@@ -849,6 +874,8 @@ The chineseText should subtly embed English thinking patterns so learners discov
                       </div>
                     ))}
                   </div>
+                </div>
+                <div className="mt-4 flex justify-end">
                   <Button
                     type="submit"
                     disabled={detectorLoading || !detectorInput.trim()}
@@ -869,7 +896,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </form>
 
               {detectorResult && (
-                <Card className="rounded-[20px] border-border bg-muted/25">
+                <Card className="rounded-3xl border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-ink-teal">
                       <Lightbulb className="size-4.5" />
@@ -895,7 +922,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
                       key={s}
                       onClick={() => setDetectorInput(s)}
                       title={s}
-                      className="px-3 py-1.5 rounded-full bg-muted hover:bg-emerald-500/10 hover:text-ink-teal text-xs font-bold text-muted-foreground max-w-[240px] truncate transition-colors"
+                      className="px-3 py-1.5 rounded-full bg-muted hover:bg-emerald-500/10 hover:text-ink-teal text-xs font-bold text-muted-foreground max-w-[260px] break-words text-left transition-colors"
                     >
                       {s}
                     </button>
@@ -904,14 +931,21 @@ The chineseText should subtly embed English thinking patterns so learners discov
               )}
             </CardContent>
           </Card>
+        
+          <PanelAside tab="detector" />
+        </div>
         </TabsContent>
 
         {/* Translation Tab */}
         <TabsContent value="translation" className="space-y-6 mt-0">
-          <Card className="rounded-[40px] border-border shadow-sm">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+          <Card className="rounded-3xl border-border shadow-sm">
             <CardHeader className="pb-4 flex flex-row items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="size-12 rounded-2xl bg-indigo-50 dark:bg-indigo-500/15 text-indigo-500 flex items-center justify-center">
+                <div
+                  className="size-12 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: thinkTabTint('translation', '1F'), color: thinkTabTone('translation') }}
+                >
                   <ArrowRight className="size-5.5" />
                 </div>
                 <div>
@@ -951,7 +985,8 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   size="sm"
                   onClick={handleGenerateTranslation}
                   disabled={genLoading === 'translation'}
-                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-violet-300 text-violet-500 hover:bg-violet-50 dark:bg-violet-500/15"
+                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider"
+                  style={{ borderColor: thinkTabTint('translation', '59'), color: thinkTabTone('translation') }}
                 >
                   {genLoading === 'translation' ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
                   AI 出题
@@ -965,7 +1000,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="p-5 rounded-[20px] bg-muted/25 border border-border">
+              <div className="p-5 rounded-3xl bg-muted/25 border border-border">
                 <div className="flex items-center gap-2 mb-4">
                   <Badge
                     variant="outline"
@@ -1026,7 +1061,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </form>
 
               {showNativeRef && (
-                <Card className="rounded-[20px] border-border bg-muted/25">
+                <Card className="rounded-3xl border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-emerald-600">
                       <CheckCircle2 className="size-4.5" />
@@ -1053,7 +1088,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               )}
 
               {translationResult && (
-                <Card className="rounded-[20px] border-border bg-muted/25">
+                <Card className="rounded-3xl border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-ink-teal">
                       <Lightbulb className="size-4.5" />
@@ -1069,14 +1104,21 @@ The chineseText should subtly embed English thinking patterns so learners discov
               )}
             </CardContent>
           </Card>
+        
+          <PanelAside tab="translation" />
+        </div>
         </TabsContent>
 
         {/* Back Translation Tab */}
         <TabsContent value="backTranslation" className="space-y-6 mt-0">
-          <Card className="rounded-[40px] border-border shadow-sm">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+          <Card className="rounded-3xl border-border shadow-sm">
             <CardHeader className="pb-4 flex flex-row items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="size-12 rounded-2xl bg-orange-50 dark:bg-orange-500/15 text-orange-500 flex items-center justify-center">
+                <div
+                  className="size-12 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: thinkTabTint('backTranslation', '1F'), color: thinkTabTone('backTranslation') }}
+                >
                   <XCircle className="size-5.5" />
                 </div>
                 <div>
@@ -1116,7 +1158,8 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   size="sm"
                   onClick={handleGenerateBack}
                   disabled={genLoading === 'back'}
-                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-violet-300 text-violet-500 hover:bg-violet-50 dark:bg-violet-500/15"
+                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider"
+                  style={{ borderColor: thinkTabTint('translation', '59'), color: thinkTabTone('translation') }}
                 >
                   {genLoading === 'back' ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
                   AI 出题
@@ -1130,7 +1173,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="p-6 rounded-[20px] border border-border bg-muted/25">
+              <div className="p-6 rounded-3xl border border-border bg-muted/25">
                 <div className="flex items-center gap-2 mb-4">
                   <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-[var(--brand)]/15 dark:bg-[var(--brand)]/25 text-ink-teal border-none">
                     关键词
@@ -1201,7 +1244,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </form>
 
               {showBackRef && (
-                <Card className="rounded-[20px] border-border bg-muted/25">
+                <Card className="rounded-3xl border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-emerald-600">
                       <CheckCircle2 className="size-4.5" />
@@ -1230,7 +1273,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               )}
 
               {backResult && (
-                <Card className="rounded-[20px] border-border bg-muted/25">
+                <Card className="rounded-3xl border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-ink-teal">
                       <Lightbulb className="size-4.5" />
@@ -1246,15 +1289,23 @@ The chineseText should subtly embed English thinking patterns so learners discov
               )}
             </CardContent>
           </Card>
+        
+          <PanelAside tab="backTranslation" />
+        </div>
         </TabsContent>
 
         {/* Native Thinking Translation Tab */}
         <TabsContent value="nativeTranslate" className="space-y-6 mt-0">
-          <Card className="rounded-[40px] border-border shadow-sm">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+          <Card className="rounded-3xl border-border shadow-sm">
             <CardHeader className="pb-4 flex flex-row items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="size-12 rounded-2xl bg-violet-50 dark:bg-violet-500/15 text-violet-500 flex items-center justify-center">
-                  </div>
+                <div
+                  className="size-12 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: thinkTabTint('nativeTranslate', '1F'), color: thinkTabTone('nativeTranslate') }}
+                >
+                  <Repeat className="size-5.5" />
+                </div>
                 <div>
                   <CardTitle className="text-xl font-[900] italic text-foreground">
                     思维还原
@@ -1292,7 +1343,8 @@ The chineseText should subtly embed English thinking patterns so learners discov
                   size="sm"
                   onClick={handleGenerateNative}
                   disabled={genLoading === 'native'}
-                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-violet-300 text-violet-500 hover:bg-violet-50 dark:bg-violet-500/15"
+                  className="shrink-0 gap-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider"
+                  style={{ borderColor: thinkTabTint('translation', '59'), color: thinkTabTone('translation') }}
                 >
                   {genLoading === 'native' ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
                   AI 出题
@@ -1306,7 +1358,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="p-5 rounded-[20px] border border-border bg-muted/25">
+              <div className="p-5 rounded-3xl border border-border bg-muted/25">
                 <div className="flex items-center gap-2 mb-4">
                   <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-violet-100 text-violet-600 border-none">
                     {nativeExercises[currentNativeIdx].category}
@@ -1364,7 +1416,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               </form>
 
               {showNativeThinkRef && (
-                <Card className="rounded-[20px] border-border bg-muted/25">
+                <Card className="rounded-3xl border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-violet-600">
                       <CheckCircle2 className="size-4.5" />
@@ -1398,7 +1450,7 @@ The chineseText should subtly embed English thinking patterns so learners discov
               )}
 
               {nativeResult && (
-                <Card className="rounded-[20px] border-border bg-muted/25">
+                <Card className="rounded-3xl border-border bg-muted/25">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-black uppercase tracking-wider flex items-center gap-2 text-violet-600">
                       <Lightbulb className="size-4.5" />
@@ -1414,6 +1466,39 @@ The chineseText should subtly embed English thinking patterns so learners discov
               )}
             </CardContent>
           </Card>
+        
+          <PanelAside tab="nativeTranslate" />
+        </div>
+        </TabsContent>
+
+        {/* 长文 · 对话 Tab — 母语思维训练的第六个模式；复用同一套状态机，进来直接落在 longTask */}
+        <TabsContent value="extras" className="space-y-6 mt-0">
+          {thinkExtras.loaded ? (
+            <PatternExtrasPanel
+              delayedQueue={thinkExtras.delayedQueue}
+              diagnostic={thinkExtras.diagnostic}
+              onDelayed={() => openPatternAction({ type: 'delayed' })}
+              onDiagnostic={() => openPatternAction({ type: 'diagnostic' })}
+              onRewrite={() => openPatternAction({ type: 'rewrite' })}
+              onRealTask={() => openPatternAction({ type: 'realTask' })}
+              onSpeaking={() => openPatternAction({ type: 'speaking' })}
+            />
+          ) : (
+            <Card className="rounded-3xl border-border shadow-sm">
+              <CardContent className="flex items-center justify-center gap-2 py-16 text-sm font-medium text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                正在读取复习进度…
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        <TabsContent value="longTask" className="space-y-6 mt-0">
+          <PatternReviewMode
+            key="long-task-standalone"
+            initialMode="longTask"
+            onOpenExtras={() => setActiveTab('extras')}
+            onExitStandalone={() => setActiveTab('patterns')}
+          />
         </TabsContent>
       </Tabs>
 

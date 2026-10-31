@@ -1,5 +1,8 @@
 # NativeThink 开发日志
 
+## 2026-10-31
+- chore: 收下 Qoder 夜间会话的列表筛选与文档同步 (`a96b347`)
+
 ## 2026-10-30
 - fix(conversation): 补齐新增场景图标注册与难度标签 (`6cdd9fb`)
 - feat(think): 模式库默认摊开并加层/状态筛选 (`4fc3ed1`)

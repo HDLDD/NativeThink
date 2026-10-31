@@ -1495,6 +1495,7 @@ const readUi = (rel) => {
 };
 const modeSrc = readUi('src/pages/ThinkInEnglishPage/PatternReviewMode.tsx');
 const overviewSrc = readUi('src/pages/ThinkInEnglishPage/PatternOverview.tsx');
+const panelSrc = readUi('src/pages/ThinkInEnglishPage/PatternExtrasPanel.tsx');
 const sessionSrc = readUi('src/pages/ThinkInEnglishPage/PatternReviewSession.tsx');
 const diagnosticSrc = readUi('src/pages/ThinkInEnglishPage/PatternDiagnostic.tsx');
 const rewriteSrc = readUi('src/pages/ThinkInEnglishPage/PatternRewriteDrill.tsx');
@@ -1561,11 +1562,18 @@ check((overviewSrc.match(/formatDate\(new Date\(/g) ?? []).length >= 2,
 check(/THINK_PATTERN_LAYERS/.test(overviewSrc) && /summarizeLayers\(/.test(overviewSrc) &&
   /renderPatternLibrary/.test(overviewSrc) && /filteredGroups\.map/.test(overviewSrc) &&
   /pattern\.layer === layer\.id/.test(overviewSrc),
-  'UI：模式库默认摊开，按四层分组并保留层统计');
+  'UI：模式库展开后按四层分组并保留层统计');
 check(/今日先练/.test(overviewSrc) && /hero\.name/.test(overviewSrc) &&
   /renderPatternLibrary\(\)/.test(overviewSrc) &&
-  !/showAll|showMap|全部 \$\{THINK_PATTERNS\.length\} 个模式/.test(overviewSrc),
-  'UI：保留单一「今日先练」焦点；模式库不再折叠');
+  /showLibrary/.test(overviewSrc) && /libraryOpen/.test(overviewSrc),
+  'UI：保留单一「今日先练」焦点；模式库默认展开、仍可收起（功能一个没删）');
+const freshSeedA = pure.buildReviewQueue({ patterns, progress: {}, now, today, freshSeed: 1 });
+const freshSeedB = pure.buildReviewQueue({ patterns, progress: {}, now, today, freshSeed: 4 });
+check(freshSeedA.length === 2 && freshSeedB.length === 2 && freshSeedA[0] !== freshSeedB[0],
+  '队列：新引入项按 freshSeed 轮转，不再永远从内容库第一个模式开始',
+  '${JSON.stringify(freshSeedA)} vs ${JSON.stringify(freshSeedB)}');
+check(/freshSeed/.test(hookCode) && /86_400_000/.test(hookCode),
+  'store：dueQueue 把「今天第几天」交给 buildReviewQueue 当轮转种子');
 check(/sortPatternsForLibrary\(/.test(overviewSrc) &&
   /layerFilter/.test(overviewSrc) && /statusFilter/.test(overviewSrc) &&
   /aria-pressed=\{layerFilter ===/.test(overviewSrc) &&
@@ -1575,7 +1583,7 @@ check(/sortPatternsForLibrary\(/.test(overviewSrc) &&
   'UI：模式库按层/状态筛选，空结果可一键清除');
 check(/renderPatternCard/.test(overviewSrc) && /onDetail\(pattern\.id\)/.test(overviewSrc) &&
   /onPractice\(\[pattern\.id\]\)/.test(overviewSrc) &&
-  /连续 \{reps\}\/4 · AI \{aiPasses\}\/2/.test(overviewSrc) &&
+  /连续 \{reps\}\/4/.test(overviewSrc) &&
   /lastAttempt\?\.on === today/.test(overviewSrc),
   'UI：每张模式卡有详情/直接练、连续通过点与今日已练标记');
 check(/data-pattern-id=\{pattern\.id\}/.test(overviewSrc) &&
@@ -1587,17 +1595,17 @@ check(/usePageMemory/.test(overviewSrc) && /think-library-filter/.test(overviewS
   'UI：模式库筛选跨详情返回/刷新仍保留，坏旧值回退全部');
 check(/到期 \{stats\.due\} · 今日已练 \{stats\.reviewedToday\}/.test(overviewSrc),
   'UI：概览统计收成一行，不再占三张卡');
-check(/自由训练/.test(overviewSrc) && /onPractice/.test(overviewSrc) && /混合训练/.test(overviewSrc),
-  'UI：概览有自由训练入口与混合训练按钮');
+check(!/混合训练/.test(panelSrc) && !/showPractice/.test(panelSrc),
+  'UI：练习页不再重复放自由训练（模式库每张卡直接「开始」）');
 check((overviewSrc.match(/onPractice\(\[pattern\.id\]\)/g) ?? []).length === 1,
   'UI：单模式快练只在模式卡一处（不再和自由训练网格重复）');
 check(/再练一组（5 个）/.test(overviewSrc) && /onPractice\(practiceIds\)/.test(overviewSrc),
   'UI：完成页可直接再练一组');
 check(/startPractice/.test(modeCode) && /onPractice=\{startPractice\}/.test(modeCode),
   'UI：自由训练接到独立队列（不经过 dueQueue 过滤）');
-check(/改写快练/.test(overviewSrc) && /onRewrite/.test(overviewSrc) &&
-  /onRewrite=\{\(\) => setMode\('rewrite'\)\}/.test(modeSrc),
-  'UI：概览有改写快练入口并接到状态机');
+check(/改写快练/.test(panelSrc) && /onRewrite/.test(panelSrc) &&
+  /case 'rewrite':\s*\n\s*setMode\('rewrite'\)/.test(modeSrc),
+  'UI：练习页有改写快练入口并接到状态机');
 check(/mode === 'rewrite'/.test(modeCode) && /<PatternRewriteDrill/.test(modeSrc) &&
   /items=\{THINK_PATTERN_REWRITES\}/.test(modeSrc),
   'UI：rewrite 模式渲染 75 道派生题');
@@ -1608,9 +1616,9 @@ check(!/onGrade|grade\(|applyPatternResult|toast\./.test(rewriteCode),
   'UI：改写快练不写 SM-2、不弹 toast');
 check(/offset \+ GROUP_SIZE/.test(rewriteCode),
   'UI：再来一组按 10 题轮换');
-check(/真实任务/.test(overviewSrc) && /onRealTask/.test(overviewSrc) &&
-  /onRealTask=\{\(\) => setMode\('realTask'\)\}/.test(modeSrc),
-  'UI：概览有真实任务入口并接到状态机');
+check(/真实任务/.test(panelSrc) && /onRealTask/.test(panelSrc) &&
+  /case 'realTask':\s*\n\s*setMode\('realTask'\)/.test(modeSrc),
+  'UI：练习页有真实任务入口并接到状态机');
 check(/mode === 'realTask'/.test(modeCode) && /<RealTaskAssessment/.test(modeSrc) &&
   /onAnalyze=\{analyzeRealTask\}/.test(modeSrc) && /onSave=\{saveRealTask\}/.test(modeSrc),
   'UI：realTask 模式接 AI 分析与保存');
@@ -1622,9 +1630,9 @@ check(/不是分数/.test(realTaskSrc) && /变化：/.test(realTaskSrc),
 check(/MIN_WORDS/.test(realTaskCode) && /MAX_WORDS/.test(realTaskCode) &&
   !/onGrade|grade\(|applyPatternResult|toast\./.test(realTaskCode),
   'UI：真实任务不写 SM-2、不弹 toast');
-check(/口头任务/.test(overviewSrc) && /onSpeaking/.test(overviewSrc) &&
-  /onSpeaking=\{\(\) => setMode\('speaking'\)\}/.test(modeSrc),
-  'UI：概览有口头任务入口并接到状态机');
+check(/口头任务/.test(panelSrc) && /onSpeaking/.test(panelSrc) &&
+  /case 'speaking':\s*\n\s*setMode\('speaking'\)/.test(modeSrc),
+  'UI：练习页有口头任务入口并接到状态机');
 check(/mode === 'speaking'/.test(modeCode) && /<SpeakingPractice/.test(modeSrc) &&
   /prompts=\{THINK_SPEAKING_PROMPTS\}/.test(modeSrc) && /onExit=\{\(\) => setMode\('overview'\)\}/.test(modeSrc),
   'UI：speaking 模式渲染口头任务并可退出');
@@ -1641,11 +1649,11 @@ check(!/SpeechRecognition|transcribe|upload|fetch\(|onGrade|grade\(|applyPattern
 check(/说顺了/.test(speakingSrc) && /还差一点/.test(speakingSrc) &&
   /不做发音评分/.test(speakingSrc) && /不上传/.test(speakingSrc),
   'UI：口头任务只做自评，并明说不评分/不上传');
-check(/长文 \/ 对话/.test(overviewSrc) && /onLongTask/.test(overviewSrc) &&
-  /onLongTask=\{\(\) => setMode\('longTask'\)\}/.test(modeSrc) &&
+check(!/onLongTask/.test(overviewSrc) && !/开始长文训练/.test(overviewSrc) &&
+  !/onLongTask/.test(modeSrc) &&
   /mode === 'longTask'/.test(modeCode) && /<LongTaskPractice/.test(modeSrc) &&
   /tasks=\{THINK_LONG_TASKS\}/.test(modeSrc),
-  'UI：概览有长文/对话入口并接到状态机');
+  'UI：模式训练页不再重复放长文卡片（长文只从第 6 个 tab 进）');
 check(/AI 再出一道/.test(longTaskSrc) && /onGenerate/.test(longTaskSrc) &&
   /onGenerate=\{generateLongTask\}/.test(modeSrc) &&
   /buildGeneratedPracticePrompt/.test(modeCode) && /validateGeneratedPracticeTask/.test(modeCode),
@@ -1663,10 +1671,8 @@ check(/task\.image/.test(longTaskSrc) && /<img/.test(longTaskSrc) &&
 check(!/onGrade|grade\(|applyPatternResult|toast\./.test(longTaskCode) &&
   /不写 SM-2/.test(longTaskSrc),
   'UI：长文任务不写 SM-2、不弹 toast');
-check(/薄弱报告/.test(overviewSrc) && /showWeak/.test(overviewSrc) &&
-  /最近反馈：/.test(overviewSrc) && /lapses \{p\.lapses\}/.test(overviewSrc) &&
-  /onDetail\(row\.pattern\.id\)/.test(overviewSrc),
-  'UI：薄弱报告列出 lapses/迁移率/最近反馈，点行进详情');
+check(!/showWeak/.test(panelSrc) && !/evidenceSuggestions/.test(panelSrc),
+  'UI：练习页不再重复放薄弱报告与跨模块证据（模式库已按到期/进行中/未开始/已掌握排序）');
 check(/mode === 'detail'/.test(modeCode) && /<PatternDetail/.test(modeSrc) &&
   /onPractice=\{\(patternId\) => startPractice\(\[patternId\]\)\}/.test(modeSrc) &&
   /onDetail=\{[^}]*setMode\('detail'\)/.test(modeCode),
@@ -1698,15 +1704,13 @@ check(todayPatternSrc.length > 0 && /useThinkPatterns\(/.test(todayPatternSrc) &
   'UI：首页今日模式卡用真实进度，没学过时整卡不渲染');
 check(/<TodayPatternCard onNavigate=\{navigate\} \/>/.test(dashboardSrc),
   'UI：首页真的挂上今日模式卡（只写组件不挂载 = 用户看不见）');
-check(/diagnosticHistory=\{diagnosticHistory\}/.test(modeSrc) && /trend=\{trend\}/.test(modeSrc),
-  'UI：体检历史与趋势从 store 传到概览');
-check(/近 7 天趋势/.test(overviewSrc) && /体检复测/.test(overviewSrc) &&
-  /trend\.map/.test(overviewSrc) && /diagnosticHistory/.test(overviewSrc),
-  'UI：概览渲染 7 天迁移柱与体检复测序列');
-check(/useCorrectionNotes/.test(overviewSrc) && /跨模块证据/.test(overviewSrc) &&
-  /suggestPatternsFromEvidence/.test(overviewSrc) && /onDetail\(row\.patternId\)/.test(overviewSrc) &&
-  /writing/.test(overviewSrc) && /conversation/.test(overviewSrc),
-  'UI：跨模块证据显示写作/对话来源，候选模式可进详情');
+const extrasPageCode = stripComments(readUi('src/pages/ThinkInEnglishPage/ThinkInEnglishPage.tsx'));
+check(!/diagnosticHistory/.test(panelSrc) && !/trend=\{/.test(panelSrc),
+  'UI：体检历史与趋势不再传进练习页（页头已有 到期/今日已练/已掌握）');
+check(!/showTrend/.test(panelSrc) && !/体检复测/.test(panelSrc),
+  'UI：练习页不再画 7 天迁移柱与体检复测序列');
+check(!/useCorrectionNotes/.test(panelSrc),
+  'UI：跨模块证据面板随薄弱报告一起下线（纠偏本数据本身保留）');
 check(/isClosedBook\(progress\)/.test(sessionSrc) && /closedBook \?/.test(sessionCode) &&
   /这次闭卷/.test(sessionSrc),
   'UI：迁移卡按 isClosedBook 切换闭卷提示');
@@ -1742,8 +1746,8 @@ check(/校准 \{calibrationHits\}\/\{calibrationAttempts\}/.test(overviewSrc),
   'UI：焦点卡显示校准命中/次数');
 check(/mode === 'diagnostic'/.test(modeCode) && /items=\{THINK_PATTERN_DIAGNOSTIC\}/.test(modeSrc),
   'UI：diagnostic 模式渲染体检题表');
-check(/思维体检/.test(overviewSrc) && /onDiagnostic/.test(overviewSrc) && /diagnostic=/.test(modeSrc),
-  'UI：概览有思维体检入口且接到状态机');
+check(/思维体检/.test(panelSrc) && /onDiagnostic/.test(panelSrc) && /case 'diagnostic':\s*\n\s*setMode\('diagnostic'\)/.test(modeSrc),
+  'UI：练习页有思维体检入口且接到状态机');
 check(/scoreDiagnostic\(/.test(diagnosticCode) && /onComplete\(next\)/.test(diagnosticCode),
   'UI：体检完成时只算 profile 并保存一次');
 check(!/grade\(|onGrade|applyPatternResult|setState\(\(prev\)[^)]*progress/.test(diagnosticCode),
@@ -1865,38 +1869,74 @@ const pageSrc = readUi('src/pages/ThinkInEnglishPage/ThinkInEnglishPage.tsx');
 const pageCode = stripComments(pageSrc);
 
 check(pageSrc.length > 0, '页面：ThinkInEnglishPage.tsx 存在');
-check(/import\s*\{\s*PatternReviewMode\s*\}\s*from\s*'\.\/PatternReviewMode'/.test(pageCode),
+check(/import\s*\{[^}]*\bPatternReviewMode\b[^}]*\}\s*from\s*'\.\/PatternReviewMode'/.test(pageCode),
   '页面：从 ./PatternReviewMode 导入组件');
-check(/<PatternReviewMode\s*\/>/.test(pageCode), '页面：渲染 PatternReviewMode');
-check(/usePageMemory\('think-tab', 'patterns'\)/.test(pageCode),
-  '页面：默认 tab 是 patterns（usePageMemory 第二参）');
+check(/<PatternReviewMode\b/.test(pageCode), '页面：渲染 PatternReviewMode');
+check(/usePageMemory\('think-tab', 'overview'\)/.test(pageCode),
+  '页面：默认 tab 是 overview（新增首页缓冲；第二个参数是首页而不是 patterns）');
+check(/<ThinkOverview\b/.test(pageCode), '页面：渲染 ThinkOverview 首页');
+check(/value="overview"/.test(pageCode), '页面：首页 TabsTrigger 存在');
 check(!/usePageMemory\('think-tab', 'detector'\)/.test(pageCode),
   '页面：旧默认 detector 已移除（两处默认值不许打架）');
 check(/<Tabs value=\{activeTab\}/.test(pageCode),
   '页面：Tabs 仍受 activeTab 控制（默认值不是死代码）');
 
-const lucideBlock = (pageCode.match(/import\s*\{([\s\S]*?)\}\s*from\s*'lucide-react'/) ?? [])[1] ?? '';
-check(/\bRepeat\b/.test(lucideBlock), '页面：Repeat 图标取自 lucide-react（不新增依赖）');
+const ovLucide = (stripComments(readUi('src/pages/ThinkInEnglishPage/ThinkOverview.tsx'))
+  .match(/import\s*\{([\s\S]*?)\}\s*from\s*'lucide-react'/) ?? [])[1] ?? '';
+check(/\bRepeat\b/.test(ovLucide), '首页：卡片图标取自 lucide-react（不新增依赖）');
 
-// 顺序按 JSX 出现次序逐个点名：patterns 在第一位，旧四个的相对顺序原样保留。
-const triggerOrder = [...pageCode.matchAll(/<TabsTrigger\s+value="([A-Za-z]+)"/g)].map((m) => m[1]);
-check(triggerOrder.join(',') === 'patterns,detector,translation,backTranslation,nativeTranslate',
-  '页面：五个 TabsTrigger 顺序（patterns 第一，旧四个不变）', triggerOrder.join(','));
+// 层级：**首页是目录，不是第八个 tab**。页面上不再有并排的 TabsList / TabsTrigger；
+// 进了某个功能之后，顶上才出现「← 全部功能 + 当前功能名」那一条。
+check(!/<TabsList\b/.test(pageCode), '页面：没有并排的 TabsList（首页不是第八个 tab）');
+check(!/<TabsTrigger\b/.test(pageCode), '页面：没有并排的 TabsTrigger（功能入口在首页卡片里，不在顶栏）');
+check(/activeTab !== 'overview' && \(/.test(pageCode), '页面：只有不在首页时，才渲染返回条');
+check(/onClick=\{\(\) => setActiveTab\('overview'\)\}/.test(pageCode),
+  '页面：「全部功能」按钮真的把 tab 切回首页');
+check(/import \{ thinkTabLabel, thinkTabTint, thinkTabTone \} from '\.\/thinkTabTones'/.test(pageCode),
+  '页面：返回条的名字与颜色都从 thinkTabTones 取（一处定义，不散落 hex）');
+check(/\{thinkTabLabel\(activeTab\)\}/.test(pageCode), '页面：返回条显示当前功能名');
+
+// 首页卡片：七张，一个功能一张，点哪张进哪张
+const ovSrc = stripComments(readUi('src/pages/ThinkInEnglishPage/ThinkOverview.tsx'));
+check(/onGo\(entry\.tab\)/.test(ovSrc), '首页：卡片点击进入对应功能（不是摆设）');
+check(/onGo\('patterns'\)/.test(ovSrc), '首页：主卡指向模式训练');
+const cardOrder = [...ovSrc.matchAll(/tab: '([A-Za-z]+)'/g)].map((m) => m[1]);
+check(cardOrder.join(',') === 'detector,translation,backTranslation,nativeTranslate,extras,longTask',
+  '首页：六张功能卡的顺序（练习倒数第二，长文排最后）', cardOrder.join(','));
+check(/thinkTabTone\(entry\.tab\)/.test(ovSrc) && /thinkTabTint\(entry\.tab/.test(ovSrc),
+  '首页：卡片用自己功能的颜色（淡底 + 实色竖条 + 同色图标）');
+check(/linear-gradient\(135deg/.test(ovSrc) && /今日先练/.test(ovSrc),
+  '首页：最上面那张深色主卡是焦点（模式训练，一天点这一个）');
+
+const toneSrc = readUi('src/pages/ThinkInEnglishPage/thinkTabTones.ts');
+const toneKeys = [...toneSrc.matchAll(/^\s{2}([A-Za-z]+):\s*'#[0-9a-fA-F]{6}',/gm)].map((m) => m[1]);
+check(toneKeys.join(',') === 'patterns,detector,translation,backTranslation,nativeTranslate,extras,longTask',
+  '配色：七个功能各一个色，且与子级 tab 表一一对应', toneKeys.join(','));
+check(/THINK_TAB_LABELS/.test(toneSrc) && /export function thinkTabLabel/.test(toneSrc),
+  '配色：功能中文名也在这张表里（返回条与首页共用一份，不各写各的）');
+check(!/^\s{2}overview:/m.test(toneSrc),
+  '配色：首页不占色（它是父级，用品牌色 --brand）');
+check(/<div className="mx-auto w-full max-w-\[1040px\] space-y-8">/.test(pageCode),
+  '页面：内容列限宽 1040 居中（宽屏上不再横铺满屏）');
 
 const contentOrder = [...pageCode.matchAll(/<TabsContent\s+value="([A-Za-z]+)"/g)].map((m) => m[1]);
-check(contentOrder.join(',') === 'patterns,detector,translation,backTranslation,nativeTranslate',
-  '页面：五个 TabsContent 顺序（patterns 第一，旧四个不变）', contentOrder.join(','));
+check(contentOrder.join(',') === 'overview,patterns,detector,translation,backTranslation,nativeTranslate,extras,longTask',
+  '页面：八个 TabsContent 顺序（patterns 第一，extras 第六，长文排最后）', contentOrder.join(','));
 
 // 面板体按自己的闭合标签切（非贪婪遇到第一个 </TabsContent> 就停）：
 // 不用「从这里往后 240 字里有没有组件」—— 窗口会跨过面板边界，把挂错 tab 的实现判绿（变异 M4 抓到的）。
 const contentBody = (value) =>
   (pageCode.match(new RegExp(`<TabsContent value="${value}"[\\s\\S]*?</TabsContent>`)) ?? [''])[0];
-check(/<PatternReviewMode\s*\/>/.test(contentBody('patterns')),
+check(/<PatternReviewMode\b/.test(contentBody('patterns')),
   '页面：patterns 面板里挂载组件（不是挂到别的 tab 里）');
-check((pageCode.match(/<PatternReviewMode\s*\/>/g) ?? []).length === 1,
-  '页面：PatternReviewMode 只挂一处（重复挂载会让两个面板同时跑状态机）');
-check(!/setActiveTab\(\s*['"]patterns['"]\s*\)/.test(pageCode),
-  '页面：没有挂载时强制回 patterns 的语句（旧存值仍然生效）');
+check((pageCode.match(/<PatternReviewMode\b/g) ?? []).length === 2,
+  '页面：PatternReviewMode 挂两处（模式训练 + 长文 tab，各自独立状态机）');
+check(/<PatternReviewMode\b[\s\S]*?initialMode="longTask"/.test(contentBody('longTask')),
+  '页面：长文 tab 用 initialMode="longTask" 直接落在长文模式');
+check((pageCode.match(/setActiveTab\(\s*['\"]patterns['\"]\s*\)/g) ?? []).length === 2 &&
+  /const openPatternAction = \(action: PendingPatternAction\) => \{[\s\S]{0,200}setActiveTab\('patterns'\)/.test(pageCode) &&
+  /onExitStandalone=\{\(\) => setActiveTab\('patterns'\)\}/.test(pageCode),
+  '页面：切回 patterns 只出现在「练习」跳转与长文退出两处');
 
 // 旧四个面板不只留了空壳：各自还接在自己的提交/题库状态上。
 check(contentBody('detector').includes('handleDetectorSubmit'),
@@ -2166,6 +2206,25 @@ await runPureMutation(
 );
 
 console.log('');
+// ── 练习页的右侧「怎么练」栏（2026-10-31）────────────────────────────
+// 这四页本体只有一张卡，卡片到头就是大片空白。右侧补一栏说明，
+// 既填上那块空白，也给一条「这页到底在练什么」的判据。
+const asideSrc = stripComments(readUi('src/pages/ThinkInEnglishPage/PanelAside.tsx'));
+for (const tab of ['detector', 'translation', 'backTranslation', 'nativeTranslate']) {
+  check(new RegExp(`<PanelAside tab="${tab}" />`).test(contentBody(tab)),
+    `练习页：${tab} 挂上了「怎么练」栏`);
+  check(new RegExp(`^  ${tab}: \\{`, 'm').test(asideSrc),
+    `练习页：${tab} 有自己的三条说明（不是所有页共用一段）`);
+}
+check((pageCode.match(/xl:grid-cols-\[minmax\(0,1fr\)_300px\]/g) ?? []).length === 4,
+  '练习页：四页都是「左练习卡 + 右说明栏」，窄屏自动落到下方');
+check(/练的是 ·/.test(asideSrc), '练习页：说明栏最后给一条判据（练的是 · …）');
+
+// 「练习」改名「加练」：这页不止一个玩法，叫练习会和其它页混淆
+check(/extras: '加练',/.test(toneSrc), '配色：extras 的中文名是「加练」');
+check(!/\{ tab: '[A-Za-z]+', label:/.test(ovSrc) && /thinkTabLabel\(entry\.tab\)/.test(ovSrc),
+  '首页：卡片名字只从 thinkTabTones 取（首页不再自己写一份，改一处两边都改）');
+
 console.log(`verify-think-patterns: ${pass} 通过, ${fail} 失败`);
 failures.forEach((f) => console.log(`  ✗ ${f}`));
 process.exit(fail ? 1 : 0);

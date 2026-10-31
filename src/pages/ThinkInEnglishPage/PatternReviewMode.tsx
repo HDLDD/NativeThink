@@ -1,12 +1,14 @@
 /**
  * 模式复习的顶层状态机：概览 ↔ 复习 → 完成页。
  *
- * 本组件只做三件事：
+ * 本组件做四件事：
  *  ① 从 useThinkPatterns 取进度/统计/到期队列；
  *  ② 维护**本轮会话**的队列、下标、回队次数与每个模式的结果（不落盘 —— 落盘由 store 的 grade 负责；
  *     编排本身是纯函数，见 `src/lib/think-patterns.ts` 的 createPatternSession / applySessionResult /
  *     advanceSession / sessionCounts）；
- *  ③ 把 PatternOverview 与 PatternReviewSession 接起来。
+ *  ③ 把 PatternOverview 与 PatternReviewSession 接起来；
+ *  ④ 消费练习 tab 跳过来的 pendingAction 指令（体检/真实任务/口头任务/改写快练/延迟探测/
+ *     指定模式/模式详情），并把概览页底的「其他练习 →」onOpenExtras 传下去。
  *
  * 四条容易改坏的约定：
  *  - 换卡必须用「pattern.id-index」组成的 key 重挂载会话组件（见下方 JSX）：重试卡要从对比阶段
@@ -18,7 +20,7 @@
  *
  * 练习界面零 toast（store 的 warnStorageFull 除外）。
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAI } from '@/hooks/use-ai';
 import { Card, CardContent } from '@/components/ui/card';
@@ -81,19 +83,53 @@ const JUDGE_TIMEOUT_MS = 15_000;
 const REAL_TASK_TIMEOUT_MS = 20_000;
 const KNOWN_PATTERN_IDS: ReadonlySet<string> = new Set(THINK_PATTERNS.map((pattern) => pattern.id));
 
-export function PatternReviewMode() {
+/**
+ * 「练习」tab 点过来的指令：本组件挂载（或收到新指令）后执行一次并回调清空。
+ * 子流程（体检/真实任务/口头任务/改写快练/复习会话/模式详情）都只住在模式训练这个 tab，
+ * 练习 tab 的入口先切回这里，再把要进哪个流程带过来。
+ */
+export type PendingPatternAction =
+  | { type: 'delayed' }
+  | { type: 'diagnostic' }
+  | { type: 'realTask' }
+  | { type: 'speaking' }
+  | { type: 'rewrite' }
+  | { type: 'practice'; patternIds: string[] }
+  | { type: 'detail'; patternId: string };
+
+export interface PatternReviewModeProps {
+  /** 练习 tab 跳转过来的待执行流程；执行完通过 onPendingActionHandled 让父级清空 */
+  pendingAction?: PendingPatternAction | null;
+  onPendingActionHandled?: () => void;
+  /** 概览页底「其他练习 →」文字链：切到练习 tab */
+  onOpenExtras: () => void;
+  /** 作为独立 tab 打开时从哪个模式起步（长文 tab 用 'longTask'） */
+  initialMode?: Mode;
+  /** 独立 tab 里退出长文：交给父级切回「模式训练」 */
+  onExitStandalone?: () => void;
+}
+
+export function PatternReviewMode({
+  pendingAction,
+  onPendingActionHandled,
+  onOpenExtras,
+  initialMode,
+  onExitStandalone,
+}: PatternReviewModeProps) {
   const {
     loaded, progress, stats, dueQueue, delayedQueue, diagnostic, diagnosticHistory, trend,
     realTask, grade, saveDiagnostic, saveRealTask,
   } = useThinkPatterns();
   const { isConfigured, chat: aiChat } = useAI();
   const { creditOnce } = useStudyCredit();
-  const [mode, setMode] = useState<Mode>('overview');
+  const [mode, setMode] = useState<Mode>(initialMode ?? 'overview');
   const [session, setSession] = useState<PatternSessionState>(() => createPatternSession([]));
   const [delayedSession, setDelayedSession] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [resumeSnapshot, setResumeSnapshot] = useState<PatternResumeSnapshot | null>(null);
   const [resumeInfo, setResumeInfo] = useState<PatternResumeSnapshot | null>(null);
+  /** 已消费过的练习 tab 指令：StrictMode 双挂载/依赖身份变化都不会把同一指令执行两次 */
+  const handledActionRef = useRef<PendingPatternAction | null>(null);
 
   // 概览才读断点；练习中不读（否则会把正在写的这一轮又当成“上次”）。
   useEffect(() => {
@@ -141,7 +177,7 @@ export function PatternReviewMode() {
     setMode('review');
   };
 
-  /** 独立的 7/21/60 天延迟探测，不混进普通到期队列 */
+  /** 独立的 7/21/60 天延迟探测：入口在「练习」tab，逻辑收在 pendingAction 的 'delayed' 分支 */
   const startDelayed = () => {
     if (!delayedQueue.length) return;
     dropOldResume();
@@ -174,6 +210,43 @@ export function PatternReviewMode() {
       formatDate(new Date(now)),
     ));
   };
+
+  /**
+   * 消费练习 tab 的指令：只认「新」指令（handledActionRef 防重——依赖里的
+   * handler 与 onPendingActionHandled 每轮渲染都换身份，靠 ref 挡住重复执行），
+   * 执行入口与概览里的原按钮一一对应（延迟探测/体检/真实任务/口头任务/
+   * 改写快练/指定模式/模式详情）。
+   */
+  useEffect(() => {
+    if (!loaded || !pendingAction) return;
+    if (handledActionRef.current === pendingAction) return;
+    handledActionRef.current = pendingAction;
+    switch (pendingAction.type) {
+      case 'diagnostic':
+        setMode('diagnostic');
+        break;
+      case 'realTask':
+        setMode('realTask');
+        break;
+      case 'speaking':
+        setMode('speaking');
+        break;
+      case 'rewrite':
+        setMode('rewrite');
+        break;
+      case 'delayed':
+        startDelayed();
+        break;
+      case 'practice':
+        startPractice(pendingAction.patternIds);
+        break;
+      case 'detail':
+        setDetailId(pendingAction.patternId);
+        setMode('detail');
+        break;
+    }
+    onPendingActionHandled?.();
+  }, [pendingAction, loaded, onPendingActionHandled, startDelayed, startPractice]);
 
   const current = session.queue[session.index];
   const pattern = THINK_PATTERNS.find((p) => p.id === current);
@@ -375,7 +448,7 @@ export function PatternReviewMode() {
         tasks={THINK_LONG_TASKS}
         onAnalyze={analyzeLongTask}
         onGenerate={generateLongTask}
-        onExit={() => setMode('overview')}
+        onExit={() => (onExitStandalone ? onExitStandalone() : setMode('overview'))}
       />
     );
   }
@@ -406,30 +479,22 @@ export function PatternReviewMode() {
       stats={stats}
       weak={weak}
       dueQueue={dueQueue}
-      delayedQueue={delayedQueue}
       progress={progress}
       mode={mode === 'complete' ? 'complete' : 'overview'}
       passed={passed}
       failed={failed}
       diagnostic={diagnostic}
-      diagnosticHistory={diagnosticHistory}
-      trend={trend}
       resume={resumeInfo}
       onResume={resumeSession}
       onDiscardResume={discardResume}
       onStart={start}
-      onDiagnostic={() => setMode('diagnostic')}
-      onDelayed={startDelayed}
       onPractice={startPractice}
-      onRewrite={() => setMode('rewrite')}
-      onRealTask={() => setMode('realTask')}
-      onSpeaking={() => setMode('speaking')}
-      onLongTask={() => setMode('longTask')}
       onDetail={(patternId) => {
         setDetailId(patternId);
         setMode('detail');
       }}
       onBack={() => setMode('overview')}
+      onOpenExtras={onOpenExtras}
     />
   );
 }

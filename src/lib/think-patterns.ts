@@ -140,6 +140,11 @@ export interface BuildReviewQueueInput {
   today: string;
   maxPatterns?: number;
   maxNewPerDay?: number;
+  /**
+   * 新引入那一批的轮转种子（一般传「今天是第几天」）。
+   * 省略=0，保持内容库原顺序；传了就让每天开学的第一个模式不一样。
+   */
+  freshSeed?: number;
 }
 
 export interface PatternWeakItem {
@@ -491,7 +496,7 @@ export function summarizeLayers(
  * 每日上限按「不同模式」算：maxPatterns=10、maxNewPerDay=2（今天已引入的计入额度）。
  */
 export function buildReviewQueue({
-  patterns, progress, now = Date.now(), today, maxPatterns = 10, maxNewPerDay = 2,
+  patterns, progress, now = Date.now(), today, maxPatterns = 10, maxNewPerDay = 2, freshSeed = 0,
 }: BuildReviewQueueInput): string[] {
   const knownIds = new Set(patterns.map((p) => p.id));
   const newIntroducedToday = Object.values(progress)
@@ -502,7 +507,13 @@ export function buildReviewQueue({
     .sort((a, b) => a.nextReview - b.nextReview)
     .map((p) => p.patternId);
   const known = new Set(Object.keys(progress));
-  const fresh = patterns.filter((p) => !known.has(p.id)).slice(0, newBudget).map((p) => p.id);
+  // 未开始的按 freshSeed 轮转：以前永远取内容库前两个，每天都从同一个模式开学。
+  const unknown = patterns.filter((p) => !known.has(p.id));
+  const start = unknown.length > 0
+    ? ((Math.trunc(freshSeed) % unknown.length) + unknown.length) % unknown.length
+    : 0;
+  const rotatedUnknown = [...unknown.slice(start), ...unknown.slice(0, start)];
+  const fresh = rotatedUnknown.slice(0, newBudget).map((p) => p.id);
   return [...due, ...fresh].slice(0, maxPatterns);
 }
 

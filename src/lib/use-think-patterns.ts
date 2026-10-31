@@ -378,6 +378,8 @@ export function useThinkPatterns(): IThinkPatternsApi {
       progress: state.progress,
       now,
       today: formatDate(new Date(now)),
+      // 每天轮转新引入的那一批，别让「今日先练」永远是同一个模式。
+      freshSeed: Math.floor(now / 86_400_000),
     });
   }, [state.progress]);
 
