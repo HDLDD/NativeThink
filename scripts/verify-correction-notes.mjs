@@ -209,16 +209,25 @@ ok(/思维检测.*写作批改.*对话分析/s.test(fav), '三处来源在列表
   // 反向断言（"不许出现 toast"）必须看**剥掉注释**的源码 —— 实现里那句"不弹 toast"的注释
   // 会把断言打红（2026-10-17 真红过一次，属于守卫自己的坑，不是产品缺陷）。
   const drillSrc = stripComments(read('src/pages/DeepVocabularyPage/components/CorrectionDrillMode.tsx'));
+  const vocabModesSrc = stripComments(read('src/lib/vocab-mode-hall.ts'));
   ok(/import CorrectionDrillMode from '\.\/components\/CorrectionDrillMode'/.test(page),
     '第 9 模式已 import（漏了不会报错，只会静默不显示）');
-  ok(/\{ key: 'correction', label: '纠偏重考'/.test(page), 'MODES 里有「纠偏重考」条目（模式列表与顶部标题同源）');
+  ok(/\{ key: 'correction', label: '纠偏重考'/.test(vocabModesSrc),
+    'VOCAB_MODES 里有「纠偏重考」条目（模式列表与顶部标题同源）');
 
-  // 接线总闸：MODES 每个 key 必须有对应 TabsContent（历史上"写了组件没挂载"就是这么露的）
-  const modesBlock = page.slice(page.indexOf('const MODES:'), page.indexOf('const REVIEW_MODES:'));
+  // 接线总闸：VOCAB_MODES 每个 key 必须有对应 TabsContent（历史上"写了组件没挂载"就是这么露的）
+  const modesBlock = vocabModesSrc.slice(
+    vocabModesSrc.indexOf('export const VOCAB_MODES'),
+    vocabModesSrc.indexOf('export function formatHallCount'),
+  );
   const modeKeys = [...modesBlock.matchAll(/\{ key: '([a-z0-9]+)'/g)].map((m) => m[1]);
-  ok(modeKeys.length >= 9, `MODES 条数抓到 ${modeKeys.length} 个 key`, modeKeys.join(','));
+  ok(modeKeys.length >= 9, `VOCAB_MODES 条数抓到 ${modeKeys.length} 个 key`, modeKeys.join(','));
   const orphan = modeKeys.filter((k) => !page.includes(`<TabsContent value="${k}"`));
-  ok(orphan.length === 0, 'MODES 每个 key 都有 TabsContent（无孤儿 = 列表里点得到的模式真的挂了组件）', orphan.join(','));
+  ok(orphan.length === 0, 'VOCAB_MODES 每个 key 都有 TabsContent（无孤儿 = 列表里点得到的模式真的挂了组件）', orphan.join(','));
+  ok(/const MODES = VOCAB_MODES\.map/.test(page), '页面 MODES 从 VOCAB_MODES 派生（标签不再重复一份）');
+  const iconBlock = page.slice(page.indexOf('const MODE_ICONS'), page.indexOf('const MODES'));
+  const missingIcons = modeKeys.filter((k) => !new RegExp(`\\b${k}\\s*:`).test(iconBlock));
+  ok(missingIcons.length === 0, '每个 VOCAB_MODES key 都有图标（漏了首页会出现空白图标块）', missingIcons.join(','));
   ok(/<TabsContent value="correction"[\s\S]{0,120}<CorrectionDrillMode\s*\/>/.test(page),
     'correction 的 TabsContent 渲染 CorrectionDrillMode');
 
@@ -283,9 +292,13 @@ ok(/思维检测.*写作批改.*对话分析/s.test(fav), '三处来源在列表
   ok(!/toast|sonner/.test(drill), '重考卡面（含送拼写这一步）零提示');
 
   const spellingPage = stripComments(read('src/pages/SpellingPage/SpellingPage.tsx'));
+  const spellingPools = stripComments(read('src/lib/spelling-pools.ts'));
   ok(/import \{ useSpellingSentences, SPELLING_SENTENCE_LIMIT, CORRECTION_LEVEL[^}]*\}/.test(spellingPage),
     '拼写页导入 correction 桶常量（而不是各处自己写字面量）');
-  ok(/correction:'纠偏表达'/.test(spellingPage), '词库触发器认得 correction → 「纠偏表达」');
+  ok(/import \{ CORRECTION_LEVEL, VIDEO_LEVEL \} from '@\/lib\/use-spelling-sentences'/.test(spellingPools) &&
+     /key: CORRECTION_LEVEL[\s\S]{0,80}label: '纠偏表达'/.test(spellingPools),
+    '题池表用 CORRECTION_LEVEL 作 key 并显示「纠偏表达」（标签与桶常量同一来源）');
+  ok(/SpellingPoolPicker/.test(spellingPage), '拼写页挂载题池选择器（纠偏入口不再写死在隐藏下拉里）');
   const branch = spellingPage.slice(spellingPage.indexOf('if (lvl === CORRECTION_LEVEL'));
   const branchBody = branch.slice(0, branch.indexOf('return;') + 7);
   ok(branch.length > 40 && branch.includes('CORRECTION_LEVEL'), '真跑脚手架：抓到纠偏桶的切书分支（抓空会让下面的反向断言真空通过）');

@@ -881,15 +881,20 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
    */
   const dvp = readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx'), 'utf8');
   const phraseLib = readFileSync(join(ROOT, 'src/lib/use-phrase-learning.ts'), 'utf8');
+  const vhSrc = readFileSync(join(ROOT, 'src/lib/vocab-mode-hall.ts'), 'utf8');
+  const hallSrc = readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/VocabModeHall.tsx'), 'utf8');
 
-  // ⑮a 接线：首页卡片 / 向导步骤 / 沉浸标题三处都从 MODES 表派生，登记一条就都带上
-  check(/\{ key: 'phrasecard', label: '短语闪卡', icon: Layers, color: '#14B8A6'/.test(dvp),
-    '⑮a MODES 登记第 7 个模式（首页卡片与向导步骤自动出现）');
+  // ⑮a 接线：模式标签/分组/颜色单点在 VOCAB_MODES，页面只登记图标；大厅按分组渲染
+  check(/\{ key: 'phrasecard', label: '短语闪卡',[\s\S]{0,80}group: 'review', color: '#14B8A6' \}/.test(vhSrc) &&
+    /phrasecard: Layers/.test(dvp),
+    '⑮a 短语闪卡登记在 VOCAB_MODES（标签/分组/颜色单点），页面只登记图标');
   check(/import PhraseFlashcardMode from '\.\/components\/PhraseFlashcardMode';/.test(dvp), '⑮a 组件被导入');
   check(/<TabsContent value="phrasecard" className="mt-0">/.test(dvp) && /<PhraseFlashcardMode level=\{selectedLevel\} \/>/.test(dvp),
     '⑮a TabsContent 挂载 + 传当前词书作默认短语库');
-  check(/MODES\.filter\(\(m\) => m\.key !== 'daily' && m\.key !== 'flashcard'\)/.test(dvp),
-    '⑮a 首页「其余模式」只排除每日学习/复习检测（把 phrasecard 加进排除名单＝把它藏起来）');
+  check(/VOCAB_MODE_GROUPS\.filter\(\(g\) => g\.key !== 'main'\)/.test(hallSrc) &&
+    /items\.map\(\(mode\) =>/.test(hallSrc) &&
+    !/key !== 'phrasecard'/.test(dvp + hallSrc),
+    '⑮a 首页按分组渲染全部非主线模式（短语闪卡不靠/不受排除名单影响）');
 
   // ⑮b 数据与进度：懒加载 + 去重 + 共享存储
   check(/loadPhrases\(bank\)\.then\(/.test(pfm), '⑮b 短语库按需懒加载（9 库共 ~7.6MB，不许全量进内存）');
@@ -1027,6 +1032,7 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   const pfmSrc = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/PhraseFlashcardMode.tsx'), 'utf8'));
   const dvpSrc = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx'), 'utf8'));
   const uwlSrc = stripComments(readFileSync(join(ROOT, 'src/lib/use-word-learning.ts'), 'utf8'));
+  const vhSrc = stripComments(readFileSync(join(ROOT, 'src/lib/vocab-mode-hall.ts'), 'utf8'));
 
   // ⑰a 队尾 → 完成页（正反双向：新形态在、旧形态不许回来）
   for (const [name, src] of [['复习检测', fcSrc], ['短语闪卡', pfmSrc]]) {
@@ -1055,8 +1061,8 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '⑰c 空态明说"其他词书还有 N 个到期"+ 一步切书按钮（去《X》复习（n 个））');
   check(/levels=\{LEVELS\} onLevelChange=\{handleSwitchBook\}/.test(dvpSrc),
     '⑰c 页面把 levels + onLevelChange 传给复习检测（复用"换书一步生效"路径）');
-  check(/其他词书 \{globalDue\} 个到期/.test(dvpSrc),
-    '⑰c 模式卡兜底提示（当前书 0 到期、全站 >0 时明说，别让用户以为角标在骗人）');
+  check(/其他词书 \$\{dueGlobal\} 个到期/.test(vhSrc) && /buildVocabModeHall/.test(dvpSrc),
+    '⑰c 模式卡兜底提示（当前书 0 到期、全站 >0 时明说；文案在单点状态层）');
 
   // ⑰d 换等级的状态回调必须走渲染期（effect 版有"旧书 state 写进新书键"的竞态，实测复现）
   check(/if \(stateLevel !== level\) \{/.test(uwlSrc) && /loadedFromStorageRef\.current = next;\s*\n\s*setState\(next\);\s*\n\s*\}/.test(uwlSrc),
@@ -1239,6 +1245,7 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
   const qchCode = stripComments(readFileSync(join(ROOT, 'src/lib/quickcard-history.ts'), 'utf8'));
   const fcCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/FlashcardMode.tsx'), 'utf8'));
   const dvpCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx'), 'utf8'));
+  const vhCode = stripComments(readFileSync(join(ROOT, 'src/lib/vocab-mode-hall.ts'), 'utf8'));
   const c2eCode = stripComments(readFileSync(join(ROOT, 'src/pages/DeepVocabularyPage/components/ChineseToEnglishMode.tsx'), 'utf8'));
   const uwlCode = stripComments(readFileSync(join(ROOT, 'src/lib/use-word-learning.ts'), 'utf8'));
 
@@ -1282,8 +1289,10 @@ check(/SWIPE_THRESHOLD/.test(fc) && !/const SWIPE_THRESHOLD/.test(fc), '阈值�
     '㉓b 清单分页展开（整书几千词不许一次铺进 DOM）');
 
   // ㉓c 中译英第 8 模式
-  check(/\{ key: 'c2e', label: '中译英'/.test(dvpCode) && /<TabsContent value="c2e"[\s\S]{0,60}<ChineseToEnglishMode level=\{selectedLevel\} \/>/.test(dvpCode),
-    '㉓c 词汇页 MODES 注册 c2e + TabsContent 挂载（挂了才点得到）');
+  check(/\{ key: 'c2e', label: '中译英'/.test(vhCode) &&
+    /c2e: Languages/.test(dvpCode) &&
+    /<TabsContent value="c2e"[\s\S]{0,60}<ChineseToEnglishMode level=\{selectedLevel\} \/>/.test(dvpCode),
+    '㉓c VOCAB_MODES 注册 c2e（页面登记图标）+ TabsContent 挂载（挂了才点得到）');
   check(/import ChineseToEnglishMode from '\.\/components\/ChineseToEnglishMode';/.test(dvpCode),
     '㉓c 组件 import 在场（正对照：不是只写了标签）');
   check(/sort\(\(a, b\) => a\.nextReview - b\.nextReview\)/.test(c2eCode) && /setQueue\(entries\)/.test(c2eCode),

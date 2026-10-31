@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BookOpen, Heart, Search, Volume2, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, ArrowRight, Notebook, NotebookPen, BookMarked, Plane, GraduationCap, Briefcase, Award, TrendingUp, Trophy, Zap, Library, Layers, Globe, Languages, type LucideIcon } from 'lucide-react';
+import { BookOpen, Heart, Search, Volume2, ChevronLeft, ChevronRight, Bot, Wand2, Loader2, X, Brain, RotateCw, SkipForward, Link2, ExternalLink, ArrowUpRight, Settings, Target, Lightbulb, ArrowLeft, Notebook, NotebookPen, BookMarked, Plane, GraduationCap, Briefcase, Award, TrendingUp, Trophy, Zap, Library, Layers, Globe, Languages, type LucideIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,7 +11,20 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFavorites } from '@/lib/use-favorites';
-import { useWordLearning, useGlobalDueCount } from '@/lib/use-word-learning';
+import { useWordLearning, useGlobalDueCount, loadSession } from '@/lib/use-word-learning';
+import { loadQuickCardSession, getQuickCardPending } from '@/lib/quickcard-history';
+import { loadPhraseSession } from '@/lib/use-phrase-learning';
+import { useCorrectionNotes } from '@/lib/correction-notes';
+import { PHRASE_LEVELS, PHRASE_LEVEL_LABELS, type PhraseLevel } from '@/data/phrase-bank';
+import {
+  VOCAB_MODES,
+  buildVocabModeHall,
+  parseDailySession,
+  parseOrderedSession,
+  parseVocabTestBest,
+  type IVocabHallInput,
+  type VocabModeKey,
+} from '@/lib/vocab-mode-hall';
 import { WordImage } from '@/components/WordImage';
 import { useAI } from '@/hooks/use-ai';
 import { safeStorage } from '@/lib/safe-storage';
@@ -28,6 +41,7 @@ import PhraseFlashcardMode from './components/PhraseFlashcardMode';
 import ChineseToEnglishMode from './components/ChineseToEnglishMode';
 import CorrectionDrillMode from './components/CorrectionDrillMode';
 import QuickCardMode from './components/QuickCardMode';
+import { VocabModeHall } from './components/VocabModeHall';
 import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
 import CollocationsTab from './components/CollocationsTab';
 import { VocabTestTab } from './components/VocabTestTab';
@@ -87,17 +101,19 @@ const BOOKS: { key: string; label: string; icon: LucideIcon; color: string; desc
   { key: 'advanced', label: '高阶词汇', icon: Award, color: '#64748B', desc: 'GRE 等高阶英语考试词汇', gradient: 'from-slate-50 to-gray-50 dark:from-slate-500/10 dark:to-gray-500/10' },
 ];
 
-const MODES: { key: string; label: string; icon: LucideIcon; color: string; desc: string }[] = [
-  { key: 'daily', label: '每日学习', icon: Brain, color: 'var(--brand)', desc: '按计划每天学新词' },
-  { key: 'quickcard', label: '快速闪卡', icon: Zap, color: '#0EA5E9', desc: '只单词 · 认识/不认识' },
-  { key: 'flashcard', label: '复习检测', icon: RotateCw, color: '#6C5CE7', desc: 'SM-2 间隔记忆复习' },
-  { key: 'phrasecard', label: '短语闪卡', icon: Layers, color: '#14B8A6', desc: '九个考试短语库 · SM-2 闪卡' },
-  { key: 'c2e', label: '中译英', icon: Languages, color: '#0EA5E9', desc: '看中文拼/选英文 · 主动提取' },
-  { key: 'correction', label: '纠偏重考', icon: Wand2, color: '#F97316', desc: 'AI 判过的中式表达 · 四选一重考' },
-  { key: 'browse', label: '词库浏览', icon: Library, color: '#64748B', desc: '自由浏览全部词汇' },
-  { key: 'collocations', label: '搭配学习', icon: Link2, color: '#F59E0B', desc: '常用搭配与短语' },
-  { key: 'vocabtest', label: '词汇量测试', icon: Target, color: '#EC4899', desc: '1分钟估算词汇量' },
-];
+/** 图标留在页面（lucide 组件不适合放进纯逻辑模块）；标签/分组/颜色单点在 vocab-mode-hall.ts */
+const MODE_ICONS: Record<VocabModeKey, LucideIcon> = {
+  daily: Brain,
+  quickcard: Zap,
+  flashcard: RotateCw,
+  phrasecard: Layers,
+  c2e: Languages,
+  correction: Wand2,
+  browse: Library,
+  collocations: Link2,
+  vocabtest: Target,
+};
+const MODES = VOCAB_MODES.map((m) => ({ ...m, icon: MODE_ICONS[m.key] }));
 
 const REVIEW_MODES: { key: string; label: string; icon: LucideIcon; color: string; desc: string }[] = [
   { key: 'sm2', label: '已学单词 (SM-2)', icon: Brain, color: '#6C5CE7', desc: '按间隔记忆算法复习需要巩固的单词' },
@@ -935,7 +951,8 @@ export default function DeepVocabularyPage() {
 
   // ── 沉浸式模式：进入某模式后隐藏其它模式入口，<- 返回模式选择 ──
   const [immersed, setImmersed] = useState(false);
-  const { dueForReview: homeDue, state: homeWordState, markLearned } = useWordLearning(selectedLevel);
+  const { dueForReview: homeDue, state: homeWordState, markLearned, dailyQuota } = useWordLearning(selectedLevel);
+  const { notes: correctionNotes } = useCorrectionNotes();
   /**
    * 全词书到期数（角标同源）—— 复习检测卡在「当前书没有到期」时给"其他词书 N 个到期"的
    * 兜底提示：全站口径是全部词书，而复习队列按当前书取，两者不一致时用户看到的
@@ -945,6 +962,52 @@ export default function DeepVocabularyPage() {
   const homeLearnedToday = Object.keys(homeWordState.progress).length > 0
     ? homeWordState.todayLearned.length
     : 0;
+
+  /** 短语闪卡的题库是独立记忆（phrase-card-bank），不是当前词书 */
+  const phraseBank = useMemo<PhraseLevel>(() => {
+    const fallback = (PHRASE_LEVELS as string[]).includes(selectedLevel)
+      ? selectedLevel as PhraseLevel
+      : 'cet4';
+    try {
+      const raw = safeStorage.getItem('phrase-card-bank');
+      const saved = raw ? JSON.parse(raw) : null;
+      return (PHRASE_LEVELS as string[]).includes(saved) ? saved as PhraseLevel : fallback;
+    } catch {
+      return fallback;
+    }
+    // 退出短语闪卡时重新读一次（用户在模式里换过题库）
+  }, [selectedLevel, immersed]);
+
+  /**
+   * 大厅状态。这里全是**廉价的 localStorage 读取**：
+   * 不 queryWords / preloadLevels / loadPhrases —— 首页不能为了一个角标把整本书拉进来。
+   */
+  const vocabHallState = useMemo<IVocabHallInput>(() => {
+    void immersed; // 退出模式回来时重读断点（这些读者不是响应式 state）
+    const quick = loadQuickCardSession(selectedLevel);
+    const flash = loadSession(selectedLevel);
+    const phrase = loadPhraseSession(phraseBank);
+    return {
+      todayLearned: homeLearnedToday,
+      dailyQuota,
+      dueCurrent: homeDue.length,
+      dueGlobal: globalDue,
+      dailyResume: parseDailySession(safeStorage.getItem(`__nativethink_daily_session_${selectedLevel}`)),
+      quickcardResume: quick ? { index: quick.index, total: quick.order.length } : null,
+      quickcardPending: getQuickCardPending(selectedLevel)?.words.length ?? 0,
+      flashcardResume: flash ? { index: flash.index, total: flash.order.length } : null,
+      phraseResume: phrase ? { index: phrase.index, total: phrase.order.length } : null,
+      phraseBankLabel: PHRASE_LEVEL_LABELS[phraseBank],
+      c2eResume: parseOrderedSession(safeStorage.getItem(`__nativethink_vocab_c2e_session_${selectedLevel}`)),
+      correctionPending: correctionNotes.filter((n) => !n.review).length,
+      correctionTotal: correctionNotes.length,
+      browseMemorized: memorizedWords.size,
+      vocabTestBest: parseVocabTestBest(safeStorage.getItem('__nativethink_vocab_test_best')),
+    };
+  }, [selectedLevel, dailyQuota, homeLearnedToday, homeDue.length, globalDue, correctionNotes, memorizedWords, phraseBank, immersed]);
+
+  const hall = useMemo(() => buildVocabModeHall(vocabHallState), [vocabHallState]);
+
   const enterMode = (key: string) => {
     // 首次使用还没选词书就关掉向导时，模式卡不能把人带进“词库加载中…”死路：
     // 预载被 setupDone 挡着，永远等不到数据。回到向导，先把书选完。
@@ -1049,62 +1112,7 @@ export default function DeepVocabularyPage() {
         看起来"点了没反应"；而且向导开着时卡片仍可点，点进模式后会停在"向导 + 空内容"的怪状态。
       */}
       {!immersed && !showWizard && (
-      <div className="flex flex-col gap-3 stagger">
-
-        {/* 主推：每日学习 */}
-        <button data-press="soft"
-          onClick={() => enterMode('daily')}
-          className="group relative overflow-hidden p-6 rounded-[28px] text-left transition-all duration-200 border-2 border-transparent bg-gradient-to-br from-[var(--brand)] to-emerald-500 shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30 hover:shadow-xl hover:-translate-y-0.5"
-        >
-          <Brain className="absolute -right-6 -top-4 size-[120px] text-white/10 select-none pointer-events-none" aria-hidden />
-          <span className="relative block text-[10px] font-black uppercase tracking-[0.2em] text-white/70 mb-1">Daily Learning · 主推</span>
-          <span className="relative flex items-center gap-2 mb-1">
-            <span className="text-xl font-black italic text-white">每日学习</span>
-            <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-black">今日已学 {homeLearnedToday}</span>
-          </span>
-          <span className="relative block text-xs text-white/80 font-medium">SM-2 间隔记忆 · 每天按计划推进新词</span>
-          <ArrowRight className="relative size-5 text-white absolute right-6 top-1/2 -translate-y-1/2 group-hover:translate-x-1 transition-transform" />
-        </button>
-
-        {/* 复习 */}
-        <button data-press="strong"
-          onClick={() => enterMode('flashcard')}
-          className="group flex items-center gap-4 p-4 rounded-[24px] border-2 border-border bg-card text-left transition-all duration-200 hover:border-[#6C5CE7]/40 hover:shadow-md hover:-translate-y-0.5"
-        >
-          <span className="size-12 rounded-2xl grid place-items-center shrink-0" style={{ background: '#6C5CE71a', color: '#6C5CE7' }}><RotateCw className="size-5.5" /></span>
-          <span className="flex-1 min-w-0">
-            <span className="flex items-center gap-2">
-              <span className="text-sm font-black text-foreground group-hover:text-ink-violet transition-colors">复习检测</span>
-              {homeDue.length > 0 ? (
-                <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 text-[10px] font-black">{homeDue.length} 个到期</span>
-              ) : globalDue > 0 ? (
-                /* 当前书没有到期、但别的书有 —— 明说，别让用户以为角标在骗人（点进去才空） */
-                <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px] font-black">其他词书 {globalDue} 个到期</span>
-              ) : null}
-            </span>
-            <span className="block text-[11px] text-muted-foreground mt-0.5">
-              SM-2 闪卡 · 巩固记忆{homeDue.length > 0 ? ' · 有到期单词待复习' : globalDue > 0 ? ' · 其他词书有到期单词' : ''}
-            </span>
-          </span>
-          <ChevronRight className="size-4 text-muted-foreground shrink-0 group-hover:text-ink-violet transition-colors" />
-        </button>
-
-        {/* 其余模式 */}
-        {MODES.filter((m) => m.key !== 'daily' && m.key !== 'flashcard').map((m) => (
-          <button data-press="soft"
-            key={m.key}
-            onClick={() => enterMode(m.key)}
-            className="group flex items-center gap-4 p-4 rounded-[24px] border-2 border-border bg-card text-left transition-all duration-200 hover:border-[var(--brand)]/40 hover:shadow-md hover:-translate-y-0.5"
-          >
-            <span className="size-12 rounded-2xl grid place-items-center shrink-0" style={{ background: `${m.color}1a`, color: m.color }}><m.icon className="size-5.5" /></span>
-            <span className="flex-1 min-w-0">
-              <span className="block text-sm font-black text-foreground group-hover:text-ink-teal transition-colors">{m.label}</span>
-              <span className="block text-[11px] text-muted-foreground mt-0.5">{m.desc}</span>
-            </span>
-            <ChevronRight className="size-4 text-muted-foreground shrink-0 group-hover:text-ink-teal transition-colors" />
-          </button>
-        ))}
-      </div>
+        <VocabModeHall hall={hall} icons={MODE_ICONS} onEnter={enterMode} />
       )}
 
 

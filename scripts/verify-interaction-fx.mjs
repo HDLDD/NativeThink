@@ -47,6 +47,7 @@ const CD = stripTs(read('src/pages/DeepVocabularyPage/components/CorrectionDrill
 const DL = stripTs(read('src/pages/DeepVocabularyPage/components/DailyLearningMode.tsx'));
 const PFM = stripTs(read('src/pages/DeepVocabularyPage/components/PhraseFlashcardMode.tsx'));
 const VPG = stripTs(read('src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx'));
+const VOCAB_HALL = stripTs(read('src/pages/DeepVocabularyPage/components/VocabModeHall.tsx'));
 
 /* ── ① 词汇只有一处定义，且用独立 scale ── */
 const tokenDefs = ['--fx-press-strong', '--fx-press-soft', '--fx-in', '--fx-out', '--fx-ripple', '--fx-ease'];
@@ -71,19 +72,27 @@ ok(/transition-property:\s*scale,\s*background-color/.test(CSS),
 const FACES = {
   FlashcardMode: FC, QuickCardMode: QC, ChunkFlashcards: CH, VideoLabPage: VL,
   ChineseToEnglishMode: C2E, CorrectionDrillMode: CD, DailyLearningMode: DL,
-  PhraseFlashcardMode: PFM, DeepVocabularyPage: VPG,
+  PhraseFlashcardMode: PFM, DeepVocabularyPage: VPG, VocabModeHall: VOCAB_HALL,
 };
 for (const [name, src] of Object.entries(FACES)) {
   const n = (src.match(/active:scale/g) || []).length;
   ok(n === 0, `② ${name} 里没有 ad-hoc 的 active:scale（当前 ${n} 处）`);
 }
+/**
+ * 首页 9 张模式卡的 9 处 data-press 移进了 VocabModeHall（hero 1 处 + 行模板 1 处，
+ * 行模板由 hall.groups 展开出 8 个按钮），所以页面本身从 30 降到 27；大厅单独计 2。
+ * 下面的 `data-vocab-mode` + `items.map` 断言确保这 2 处模板真的覆盖 9 个渲染按钮。
+ */
 const floors = { FlashcardMode: [FC, 2], QuickCardMode: [QC, 4], ChunkFlashcards: [CH, 4], VideoLabPage: [VL, 17],
   ChineseToEnglishMode: [C2E, 14], CorrectionDrillMode: [CD, 10], DailyLearningMode: [DL, 13],
-  PhraseFlashcardMode: [PFM, 8], DeepVocabularyPage: [VPG, 30] };
+  PhraseFlashcardMode: [PFM, 8], DeepVocabularyPage: [VPG, 27], VocabModeHall: [VOCAB_HALL, 2] };
 for (const [name, [src, floor]] of Object.entries(floors)) {
   const n = (src.match(/data-press=/g) || []).length;
   ok(n >= floor, `② ${name} 至少 ${floor} 个按钮走词汇（当前 ${n}）`, '只许涨不许跌：跌了就是有人把接线删了');
 }
+ok(/data-vocab-mode=\{mode\.key\}[\s\S]{0,220}data-press="soft"/.test(VOCAB_HALL) &&
+   /items\.map\(\(mode\) =>/.test(VOCAB_HALL),
+  '② VocabModeHall 的行模板带 data-press，并由 items.map 展开全部模式（2 处模板覆盖 9 个按钮）');
 ok(/data-press.*strong/.test(FC) && /data-press="strong"/.test(VL),
   '② 实心主键用 strong 档（不是所有按钮一律 soft）');
 

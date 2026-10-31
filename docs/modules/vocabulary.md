@@ -1,8 +1,8 @@
 # 词汇深度（`/vocabulary`）
 
-> 代码：`src/pages/DeepVocabularyPage/`（页面 1 个 + `components/` 8 个，约 10,000 行）+ `src/lib/` 里的支撑模块（SM-2 进度、短语进度、收藏、生词本、助记、纠偏本、会话与手势、断点）
-> 数据来自：[词库数据层](./wordbank-data.md) · 朗读见 [朗读引擎](./tts.md) · 守卫：`npm run verify:vocab-cards` + `node scripts/verify-correction-notes.mjs`
-> 最后校准：2026-10-16
+> 代码：`src/pages/DeepVocabularyPage/`（页面 1 个 + `components/` 9 个，约 10,000 行）+ `src/lib/` 里的支撑模块（SM-2 进度、短语进度、收藏、生词本、助记、纠偏本、会话与手势、断点、**模式大厅**）
+> 数据来自：[词库数据层](./wordbank-data.md) · 朗读见 [朗读引擎](./tts.md) · 守卫：`npm run verify:vocab-cards` + `node scripts/verify-correction-notes.mjs` + `node scripts/verify-vocab-hall.mjs`
+> 最后校准：2026-10-31
 
 ## 这个模块是什么
 
@@ -20,7 +20,22 @@
 | `collocations` | 搭配学习 | `components/CollocationsTab.tsx` | 高频搭配与短语 |
 | `vocabtest` | 词汇量测试 | `components/VocabTestTab.tsx` | 1 分钟估算词汇量，含近 10 次趋势 |
 
-模式清单定义在 `DeepVocabularyPage.tsx:89-99`（图标用 lucide 组件不用 emoji，原因见该处注释）。
+模式清单单点在 `src/lib/vocab-mode-hall.ts` 的 `VOCAB_MODES`（标签/分组/颜色）；页面只保留 `MODE_ICONS`（lucide 图标）并派生 `MODES = VOCAB_MODES.map(...)`。图标不用 emoji 的原因见页面 `MODE_ICONS` 上方的注释。
+
+## 模式大厅与状态行（2026-10-31）
+
+首页由 `components/VocabModeHall.tsx` 渲染，数据由 `src/lib/vocab-mode-hall.ts` 的 `buildVocabModeHall()` 生成：
+
+- **每日学习**是唯一的主行动块（hero），显示「今日已学 x/y 词 · 还可新学 n」、进度条，以及断点角标（`继续 5/10`）。
+- 其余 8 个模式按 **复习与巩固 / 主动输出 / 工具** 三组排列，每组标题带数量。
+- 每个模式最多一行**真实状态**，没有状态就显示模式说明；空状态不写「0 个到期」这种假 0：
+  - 复习检测：当前书到期 > 断点 > 其他词书到期 > 「当前书暂无到期」
+  - 快速闪卡：断点 > 当前累积余数 > 说明
+  - 短语闪卡 / 中译英：断点 > 说明
+  - 纠偏重考：未考过的条数（总数更多时写「待重考 1 条 · 共 2 条」）> 已重考完 > 「纠偏本还没有内容」
+  - 词库浏览：已记词数 > 说明；词汇量测试：最好成绩 > 说明；搭配学习：说明
+- 大厅只做**廉价的 localStorage 读取**（`loadQuickCardSession` / `loadSession` / `loadPhraseSession` / `parseDailySession` / `parseOrderedSession` / `parseVocabTestBest` / 纠偏本 / 已记 / `homeDue`），**不 queryWords / preloadLevels / loadPhrases** —— 角标不能把整本书拉进首页。
+- 向导、`?tab=` 深链、`setupDone` 闸门都保持原样：大厅在 `!immersed && !showWizard` 时渲染，点模式仍走 `enterMode` → `handleTabChange + setImmersed(true)`。
 
 ## 入口与状态机（改这里最容易出事）
 
@@ -28,7 +43,7 @@
 
 - `setupDone`（`:405-407`，键 `__nativethink_vocab_setup_done`）—— 是否完成过首启设置。
 - `showWizard`（`:410`）—— 向导遮罩是否显示。首次自动 `true`。
-- `immersed`（`:934`）—— 是否已进入某个模式。**模式内容写在 `{!showWizard && immersed && dataReady && <Tabs/>}`（`:1127`）里**，只改 `tab` 不改 `immersed` 的话，用户会"选完了却停在列表上"。反向同理：**模式卡列表在 `{!immersed && !showWizard && …}`（`:1042`）里** —— 向导打开时列表整块让位，否则向导被渲染在七张模式卡下面（真机 393×851 上从 y≈809 才开始，视口内只剩 42px，看起来就是"点了没反应"）。
+- `immersed`（`DeepVocabularyPage.tsx`）—— 是否已进入某个模式。**模式内容写在 `{!showWizard && immersed && dataReady && <Tabs/>}` 里**，只改 `tab` 不改 `immersed` 的话，用户会"选完了却停在列表上"。反向同理：**模式大厅在 `{!immersed && !showWizard && …}` 里** —— 向导打开时大厅整块让位，否则向导会被挤到模式列表下面（真机 393×851 上从 y≈809 才开始，视口内只剩 42px，看起来就是"点了没反应"）。
 - **`?tab=<模式 key>` 深链**（`:946-963`，2026-10-17 为首页纠偏横幅加的）：挂载后一次性校验 key ∈ `MODES` → `enterMode(key)`（同时 `setTab` + `setImmersed`）→ `setSearchParams({}, {replace:true})` 抹掉参数。三道门：`setupDone` 为假或向导开着不强进（那时该先选书）、key 不认识就无视（乱参数不该把人踢进某个模式）、只进一次（`deepLinkedRef`，`enterMode` 每次 render 重建所以不进依赖）。
 
 因此有两条完成路径，走的是两套代码：
@@ -82,7 +97,7 @@
 ### 一轮结束态与跨词书空态（2026-10-14 用户三连反馈）
 
 - **结束态**：`FlashcardMode.advance` 到队尾原先静默 `setIdx(0)` 回开头（短语闪卡同款），评过的卡全成"回看态"，**没有任何结束出口** —— 用户原话「复习完一轮单词，没有结束功能，只能往回查看单词」。现在队尾进**完成页**（`finished`：`FlashcardMode.tsx:102,418,563-608`；短语闪卡 `PhraseFlashcardMode.tsx:110,369,510-555` 同构）：本轮完成！ + 共 N 张 · 记得率 X% · 最佳连对 + 记得/需加强 + 「返回概览 / 回看本轮」双出口（回看=浏览已评卡，再走到队尾回到完成页）。完成页上键盘不参与（`if (finished) return;`，否则空格会把会话又搅起来）；复位点六处（开轮/续学/换书/返回/Esc）。基准 = 每日学习/快速闪卡既有的「本轮完成！」完成页。
-- **跨词书空态指路**：角标/首页横幅走 `getGlobalDueCount`（**全词书**），而复习队列按**当前词书**取 —— 当前书没学过、到期词都在别的书时是死路（实测：横幅 7 个到期、当前书「四六级高频」进复习检测显示"当前没有已学习的单词"）。空态现在按 `getDueCountsByLevel()`（`use-word-learning.ts:152`）给「《当前书》没有可复习的单词，其他词书还有 N 个到期」+「去《X》复习（n 个）」一步切书按钮（排除当前书与生词本，`FlashcardMode.tsx:623-666`）；模式卡在「当前书 0 到期、全站 >0」时显示「其他词书 N 个到期」兜底（`DeepVocabularyPage.tsx:926,1038-1044,1180` —— 页面把 `levels` + `onLevelChange=handleSwitchBook` 传给了复习检测）。⚠️ **单本词书看不见生词本**仍是设计（见注意事项 15 的提醒），所以指路按钮刻意不给 custom。
+- **跨词书空态指路**：角标/首页横幅走 `getGlobalDueCount`（**全词书**），而复习队列按**当前词书**取 —— 当前书没学过、到期词都在别的书时是死路（实测：横幅 7 个到期、当前书「四六级高频」进复习检测显示"当前没有已学习的单词"）。空态现在按 `getDueCountsByLevel()`（`use-word-learning.ts:152`）给「《当前书》没有可复习的单词，其他词书还有 N 个到期」+「去《X》复习（n 个）」一步切书按钮（排除当前书与生词本，`FlashcardMode.tsx:623-666`）；模式大厅在「当前书 0 到期、全站 >0」时显示「其他词书 N 个到期」兜底（状态层 `vocab-mode-hall.ts` 的 flashcard 分支；页面把 `homeDue` / `globalDue` 传进去；复习检测内部仍把 `levels` + `onLevelChange=handleSwitchBook` 用于空态一步切书）。⚠️ **单本词书看不见生词本**仍是设计（见注意事项 15 的提醒），所以指路按钮刻意不给 custom。
 - **换等级的状态切换必须走渲染期**（同批挖出的数据竞态，是"点进去还是空"的更深根因）：`useWordLearning` 的 reload effect 与 persist effect 同在 `[level]` 变化的 commit 里跑，persist 闭包握**旧 state** + **新 level** → 把旧书状态整份写进新书存储键。实测：空态点「去《中考》复习」后，中考的 3 个到期词被四六级高频的空状态冲掉，点进去仍空。现改为渲染期同步调整（`use-word-learning.ts:306-312`，React "adjusting state when props change"），persist 只剩"内容不变就不写"。**改这段前先读注释 —— effect 版会复现写坏新书存储键**（守卫 `verify-vocab-cards` ⑰d 正反双向锁）。
 
 ## 断点续学与存储键清单
@@ -203,7 +218,7 @@
 
 27. **收藏判重同时看两个 type（三处学习卡）**（2026-10-15 用户：「快速闪卡重练过程中收藏单词……同样单词但是收藏情况不同的列表」）：QC/DL/FM 的 `isFav`/`toggleFav` 原先只查 `'word'` 单一 type —— 词库浏览收藏过的词（`'vocabulary'`）在学习卡上显示未收藏，再点就**同词存两条**（收藏页出现两来源重复项）。修法 = 判重看 `'word' || 'vocabulary'`、取消移除任一来源那条、再收藏统一落 `'word'`（三模式同构，守卫 ㉑d 逐模式点名；实'verify'：注入 'vocabulary'-type 收藏 → QC 记录面板 chip 立即实心）。详见上方「收藏 / 生词本 / 助记」。
 
-28. **新增模式是"列表 + 挂载"两处登记，只写一处静默不显示**（2026-10-16 第 9 模式接线时落成总闸）：`MODES[]` 决定首页模式卡、向导第三步、顶栏标题（`:89-99`、`:972`），`<TabsContent value="…">` 决定点进去有没有内容 —— 漏了后者不报错、不白屏，就是"点了没反应"（AGENTS.md「功能两端都写了却点不到」的同族）。守卫 `verify-correction-notes` ⑥ 有一条**通用总闸**：剥注释后从 `const MODES:` 切到 `const REVIEW_MODES:`，抽出的每个 key 都必须能在页面里找到 `<TabsContent value="<key>"`，孤儿列表非空即红（变异 M13 只删组件挂载 → 红；M12 只删 MODES 条目 → 红）。⚠️ 抽 key 的正则要带数字（`c2e`），只写 `[a-z]+` 会静默漏掉一条、把总闸变成 8 个 key 的假绿。
+28. **新增模式是"三条登记"，漏一处静默不显示**（2026-10-31 模式大厅单点化后）：① `src/lib/vocab-mode-hall.ts` 的 `VOCAB_MODES`（标签/分组/颜色，决定大厅与向导）；② `DeepVocabularyPage.tsx` 的 `MODE_ICONS`（lucide 图标）；③ `<TabsContent value="…">`（点进去有没有内容）。漏了 ② 首页会出现空白图标块，漏了 ③ 不报错、不白屏，就是"点了没反应"（AGENTS.md「功能两端都写了却点不到」的同族）。守卫 `verify-correction-notes` ⑥ 的**通用总闸**现在从 `VOCAB_MODES` 抽 key，逐个对 `MODE_ICONS` 与 `<TabsContent>`；`verify-vocab-hall` 再覆盖 9 模式分组、状态优先级与大厅接线（变异 M13 只删组件挂载 → 红；M12 只删模式条目 → 红）。⚠️ 抽 key 的正则要带数字（`c2e`），只写 `[a-z]+` 会静默漏掉一条、把总闸变成 8 个 key 的假绿。
 
 29. **档位/筛选一加，"从哪个集合取"就要重新问一遍**（2026-10-17 错点归纳上线当场被抓）：纠偏重考原本从**本轮题池** `queue` 里抽干扰项 —— 不分池时题池=整本，加了"按类别只重考这一类"之后，某一类可能只剩 1 条，`queue` 就只有 1 条，于是 `options` 退化成**一个选项的必对卡**（无头实测：点「中式直译 1」→ 开始重考（1 题）→ 卡面上只有 `turn on the light` 一句）。修法 = 干扰项改从**整本 `notes`** 取并 `Set` 去重（`:87-93`）。教训有两条：① 任何"限定范围"的开关都要重新检查每个"取其它元素"的地方 —— 题面集合与干扰项来源本来就该是两个东西；② 题数显示与真实队列必须同源（按钮写 `drillPool.length` 而不是 `notes.length`，否则谎报题量）。守卫把两条都钉住（干扰项源 + 筛后题数），变异 M5-M8 逐条验红。同批另一条：`CATEGORY_RULES` 的顺序与证据优先级是**统计口径**本身，守卫用两条固定样本钉住（`时态和冠词都提到 → tense`、`note=冠词 / chineseHint=昨天完成 → article`），改顺序或换证据列立刻红。
 
@@ -215,9 +230,10 @@
 
 ```bash
 npm run typecheck
-node scripts/verify-vocab-cards.mjs      # 478 断言：手势决策表（含复习检测禁滑动评分 allowRate:false，短语闪卡正对照）、排卡、换卡节奏（数值锁）、答错重排延后、回看出口、断点、静默契约、换书一步生效、预载门、单词分档字号（DL/QC 手机档=FM 档，PFM 正对照）、词面按钮组整组换行（⑭b：四个模式长词不折两截）、快速闪卡卡内边距（⑭c）、每日学习卡片几何与答对零等待（⑯）、短语闪卡（接线/懒加载去重/会话同构/存储扩展）、复习结束态/跨词书空态/换等级竞态（⑰）、收藏轮转/已学清单/中译英/进度统一（㉑㉓）
-node scripts/verify-correction-notes.mjs # 89 断言：三源表格抽取真跑 + store 整段真跑（去重/记账/删除/只拒不裁/写失败可见）+ orderForDrill 真跑 + 第 9 模式接线总闸与卡面契约 + 拼写桶 + 错点归纳十类规则真跑（含规则顺序与证据优先级两条口径）与两处按类筛选接线
-node scripts/verify-vocab-caches.mjs     # 195 断言：缓存封顶、生词/助记保存失败与重试、阅读器失败不计复习、助记回填与切词隔离
+node scripts/verify-vocab-cards.mjs      # 492 断言：手势决策表（含复习检测禁滑动评分 allowRate:false，短语闪卡正对照）、排卡、换卡节奏（数值锁）、答错重排延后、回看出口、断点、静默契约、换书一步生效、预载门、单词分档字号、词面按钮组、每日学习卡片几何、短语闪卡、复习结束态/跨词书空态/换等级竞态、收藏轮转/已学清单/中译英/进度统一
+node scripts/verify-correction-notes.mjs # 93 断言：三源表格抽取真跑 + store 整段真跑 + orderForDrill 真跑 + VOCAB_MODES↔图标↔TabsContent 总闸 + 卡面契约 + 拼写桶 + 错点归纳十类规则
+node scripts/verify-vocab-hall.mjs       # 79 断言：9 模式覆盖/分组、状态优先级（到期>断点>其他书到期）、断点解析与坏数据、每日/纠偏/已记/词汇量状态、大厅不加载词库、向导与 ?tab= 深链闸门、4 条接线变异
+node scripts/verify-vocab-caches.mjs     # 213 断言：缓存封顶、生词/助记保存失败与重试、阅读器失败不计复习、助记回填与切词隔离
 node scripts/verify-guard-shape.mjs      # 7 断言：守卫自身的"恒真断言"扫描（AST）—— ok(/re/, src, name) 这种第一个实参是字面量本体的写法永远真
 ```
 交互类改动（"点了没反应"、状态不写回）静态检查看不出来 —— 用本机无头 Chrome + CDP 真点一遍（见 [验证体系](./verification.md)）。换卡耗时这类体感问题同样要按帧量：`TEMP/nt-flip-timing.mjs` 会点真实评分按钮、按帧采样卡片 DOM，直接报"进 DOM 毫秒数"。
