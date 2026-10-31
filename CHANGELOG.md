@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-10-31
+- docs: 清理重复验证文档并校准当前状态
 - docs(guards): 同步跨模块守卫与模块清单
 - feat(think): 新增读英文输入训练 (`e7dd3c3`)
 - feat(settings): 学习数据区与共享备份入口 (`b9ec4f2`)

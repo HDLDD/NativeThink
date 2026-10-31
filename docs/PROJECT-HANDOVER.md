@@ -1,7 +1,7 @@
 # NativeThink 项目交接手册（Agent Handover）
 
 > 面向**接手的 AI agent / 新同事**：只读这一份就能开工。
-> 最后校准：2026-09-30（**真机已更到 `versionCode=84 / 2.0.39`**（`adb install -r`，数据没清），当天 11 项改动全部在包里；两条待真机复看的都已实测：**阅读器顶栏**在真实 inset 下 `paddingTop=47`、顶栏按钮 `top=58`（不再被状态栏压住），**快速闪卡训练页**只剩只读卡数、12 项真点全绿。⚠️ 收尾时设备又掉线（`adb devices` 空），**最后一条 `force-stop` 没打成** —— 设备重连后补 `adb shell am force-stop com.nativethink.app` 归位。其余见 §8 末尾两张坑表与 §9）。
+> 最后校准：2026-10-31（当前 **2.0.105 / versionCode 150**；功能批次末 commit `9fe0c63`，文档清理随后；**9 种背单词模式、38 条契约守卫 / 10,288 断言**；本轮 7 个功能 commit 已提交，但**尚未 push、APK 未重打**。下方 §9 的 2026-09 条目按时间保留作沿革，**当前状态以本行 + `AGENTS.md` + [modules/verification.md](./modules/verification.md) 为准**）。
 > 相关文档：`AGENTS.md`（**索引**：跨模块约定 + 模块文档导航）、[`docs/modules/`](./modules/)（**每模块一篇：功能 / 实现方法 / 注意事项，带 `文件:行号`**）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
 
 ---
@@ -14,8 +14,8 @@
 | 形态 | Web SPA + Electron 桌面 + Capacitor Android（**同一份前端**）；没有独立业务服务，云端只有 Cloudflare Pages Functions + KV |
 | 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
-| 现在改哪 | 主要战场是 `src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-09 两轮全站质量优化已把拼写/跟读/写作/对话/语块也扫过一遍 |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 18 条可跑的 `scripts/verify-*.mjs` 断言脚本（另有 verify-wordbank-split 需基线参数、verify-all 是全量跑法）（2026-10-01 实测 vocab-cards 310；其余最近一次全绿记录与完整断言数见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
+| 现在改哪 | 主要战场是 **`/think`（母语思维主轴）**、`src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-10 已完成模式大厅、拼写题池、学习记录图表与设置页学习数据 |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 38 条可跑的 `scripts/verify-*.mjs` 断言脚本（另有 verify-wordbank-split 需基线参数、verify-all 是全量跑法）（当前 10,288 断言；完整表与最近全绿记录见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
 | 改某个模块前 | 读 [`docs/modules/`](./modules/) 里对应那一篇 —— 功能、实现方法、以及**逐条读代码核实过**的注意事项（本手册与 AGENTS.md 的若干旧说法在那里被推翻并已修正） |
 | 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
@@ -40,13 +40,17 @@
 | `/writing` | WritingPage | `writing` |
 | `/sentences` | SentenceLabPage | `sentences` |
 | `/spelling` | SpellingPage | `spelling` |
+| `/video` | VideoLabPage | `video` |
 | `/progress` | ProgressPage | — |
+| `/settings` | SettingsPage | — |
 
-**新增页面要同步四处**（否则侧边栏/进度环/统计会缺项）：
+**新增页面要同步六处**（否则侧边栏/进度环/统计会缺项；完整口径见 [`AGENTS.md`](../AGENTS.md) 路由地图）：
 1. `src/app.tsx` 路由 + `React.lazy`
-2. `src/components/AppSidebar.tsx` 的 `NAV_ITEMS` 与 `ROUTE_PREFETCH`
+2. `src/components/AppSidebar.tsx` 的 `NAV_ITEMS` 与 `ROUTE_PREFETCH`（`MobileBottomNav.tsx` 还复制了一份 7 条预取表）
 3. `src/pages/DashboardPage/constants.ts` 的 `MODULES`（进度环）
-4. `src/lib/use-learning-stats.ts` 的 `ILearningStats.moduleProgress`
+4. `src/lib/use-learning-stats.ts` 的 `ILearningStats.moduleProgress` 类型与默认值
+5. 同文件的 `MODULE_PROGRESS_KEYS` 白名单（漏了会被 `mergeStats` 丢弃）
+6. `src/pages/ProgressPage/components/ProgressCharts.tsx` 的模块颜色与名称（现在在 `src/lib/progress-page.ts`）
 
 ### 1.2 语料规模（改数据前先看这里）
 
@@ -64,14 +68,14 @@
 
 | 项 | 现状 |
 |---|---|
-| 分支 | `main`，HEAD = `3dcee7e`。**与 `origin/main` 完全同步**（`git rev-list --count origin/main..HEAD` = 0） |
-| 未提交改动 | 稳态两条：`M CHANGELOG.md` + `M public/CHANGELOG.md`（上一条提交的日志落入这一条，**是预期**）。`.wrangler/`（本地构建残留）已进 `.gitignore`；历史上的 2 个真机截图残留（`.screen1.png`/`.screen2.png`）已清理，反馈链路一轮已随 2026-10-05 的下架提交落地 |
+| 分支 | `main`。本轮功能批次末 `9fe0c63`，当时**领先 `origin/main` 12 个 commit 且尚未 push**（7 个功能 commit + 之前 5 个；文档清理随后还有提交）。具体以 `git rev-list --count origin/main..HEAD` 为准；push 即触发 Pages 生产构建 |
+| 未提交改动 | 本轮已按功能分组提交；工作树应为空。`post-commit` 会把当前提交标题追加进 CHANGELOG 并暂存给下一提交（**预期**，不要当脏数据清理）。`.wrangler/` 已进 `.gitignore` |
 | 远端 | `ssh://git@ssh.github.com:443/HDLDD/NativeThink.git`（**HTTPS 通道在本机不可用**：SSL unable to get local issuer certificate）。`core.sshCommand` 已指向系统 ssh，普通 `git push` 可用 |
 | 部署 | **Cloudflare Pages 的 Git 集成**从 `main` 构建并直接上 production（`nativethink.pages.dev`）—— 证据：Pages 部署记录里 production 那条的 Source 就是刚推的 commit sha，而 2026-09-28 那次 push 的两条 GitHub Actions 全是红的，线上照样更新。**仓库内不再有部署 workflow**（`deploy-cf.yml` 与 `deploy.yml` 已于 2026-09-28 删除：前者缺 `CLOUDFLARE_API_TOKEN` 长期失败、且与 Git 集成重复；后者指向从来没启用的 GitHub Pages，`hdlld.github.io/NativeThink` 实测 404）。**push 即上线**，所以 push 前必须跑过 typecheck + guards + 相关 verify 脚本 |
 | Git 钩子 | `core.hooksPath=.githooks`。`pre-commit` 跑 `npm run precommit`（typecheck + eslint，失败即阻断，**不要 `--no-verify`**）；`post-commit` 把提交标题追加进 `CHANGELOG.md` + `public/CHANGELOG.md` 并 `git add` |
 | 钩子缺陷史 | 日期标题 `###`/`##` 不一致**已修**（写与查都是 `## $COMMIT_DATE`）；空行堆积**已修（2026-10-05）**：旧 `sed i\` 每插入一个新日期就多堆一行空行（曾堆到 10 行），现改为一次全文件 awk 重写 —— 连续空行压成一行、新日期标题插在首个日期标题前且两侧各留一空行，存量空行已清 |
-| 稳态现象 | 工作树长期保留 **1 条已暂存的 CHANGELOG 行**（提交 N 的日志落入提交 N+1），这是预期，不要"清理干净" |
-| 版本线 | APK **2.x**（真机最新核验 2.0.43 / versionCode 88；`android/version.properties` 现为 2.0.44 / 89，本批未打包）。`android/version.properties` 的 `versionCode` 每次打包必须递增 |
+| 稳态现象 | 每次提交后 `CHANGELOG.md` / `public/CHANGELOG.md` 会留下**供下一提交使用的已暂存日志**（提交 N 的日志落入提交 N+1），这是预期 |
+| 版本线 | APK **2.x**（`android/version.properties` 现为 **2.0.105 / versionCode 150**，本轮未打包）。`versionCode` 每次打包必须递增 |
 
 ### 2.1 APK / 桌面产物约定
 
@@ -357,7 +361,19 @@ node scripts/device-eval.mjs back
 
 ## 9. 当前进度与未完成事项
 
-### 已完成（到 2.0.28 / `f1ddeb7`，另有 2026-09-29 未打包改动）
+### 2026-10-31 最新批次（已提交，未发布）
+
+- `1bdca84`：句子精讲/句型/语法搜索与分页
+- `e26cf3f`：拼写题池大厅 + 按队列续学（断点连队列一起存）
+- `a7b289e`：背单词 9 模式大厅与真实状态行
+- `4790a31`：学习记录页收藏总览、模块占比归一、日历/成就修正
+- `b9ec4f2`：设置页学习数据区 + 共享备份入口
+- `e7dd3c3`：「读英文」输入训练（24 题）
+- `9fe0c63`：跨模块守卫、文档与开发日志收口
+
+验证：`npm run verify:all` **39 项全绿**（38 条守卫 + typecheck，`verify-wordbank-split` 跳过），断言合计 **10,288**。**待发布**：push `main` → Pages → `version:apk-bump` 一次 → `package:apk` / `package:apk:emu` → 真机/模拟器走查。
+
+### 历史已完成（到 2.0.28 / `f1ddeb7`，2026-09 沿革）
 - **书库三层拆分（2026-09-29）**：`books-meta.ts`（元数据 5KB，书单用）/ `books.ts`（22 本节选正文 604KB，点开某本才下载）/ `book-clean.ts`（Gutenberg 清洗纯函数）。
   拆分前 `/articles` 冷加载要为"只是列个书单"下载 231KB gzip，而 `book-fulltext.ts` 只要一个纯函数也会把整个书库拖进阅读器依赖图。
   生成物由 `node scripts/gen-books-meta.cjs` 产出，元数据与正文逐字段对账由 `verify:books-meta` 第 ⑤ 节钉住。
@@ -408,7 +424,16 @@ node scripts/device-eval.mjs back
   ⚠️ 三条记录纪律：② 里那条"真机 83 看不到颜色行"最初被我当成 ③ 的证据，回头在 84 上复现不了（那篇文章其实带 `highlightWords=50`）→ 已把结论改挂到能复现的 A/B 上，教训写进 `docs/modules/verification.md` §4 第 6 条。
   ④ **收尾未完成**：设备在最后一条 `force-stop` 之前又掉线（`adb devices` 空，`kill-server/start-server` 没救回来）→ 重连后补 `adb shell am force-stop com.nativethink.app`。走查过程中答掉的十来张闪卡是真学习数据（SM-2 + 时长照计），选词面板的临时选择已复原成 0 词。
 
-### 未完成 / 已知短板
+### 当前开放项（2026-10-31）
+
+1. **发布收尾**：12 个 commit 未 push；APK 仍 2.0.105/150，未重打、未做本轮真机/模拟器走查。
+2. **学习提醒**（Capacitor 本地通知）：系统级唯一缺口。
+3. **词库真人发音包**：需要先定预录体积与打包方案。
+4. **语料回填**：语法条目、导入书离线翻译、书籍译文空段，剩余量需重新盘点。
+5. **跨模块主轴**：学习记录页「模式迁移」折线；首页「继续上次学习」升级为真实断点。
+6. **文档/工程债**：`verification.md` 重复副本已清；`ROADMAP` 与本文已校准；`generate-books.ts` 与 `books.ts` 仍不同步（重跑会抹平清洗与 gutenbergId）。
+
+### 历史未完成清单（保留沿革，已完成项带删除线）
 1. ~~**切换词书必须多走一步「学习方式」**~~（2026-09-29 用户报，**已修**）。
    根因留档：换书与首启共用同一个三步向导，而点书只 `setChosenLevel` + `setStep(1)`，真正写回页面状态的
    只有走完「选方式」后的 `handleWizardComplete → setSelectedLevel` —— 中途关向导等于没换。
@@ -484,23 +509,25 @@ node scripts/device-eval.mjs back
 
 
 ### 下一步建议顺序
-1. 学习提醒（本地通知）—— 目前唯一还缺的系统级能力。
-2. 词库真人发音包（预录 + 打包体积方案要先定，`public/` 不能塞大文件）。
-3. ROADMAP 里的语料回填项（语法条数、导入书离线翻译、待回填空段）。
-4. 顺手项：把 `使用攻略.md` 更到当前功能面（`post-commit` 空行治理已于 2026-10-05 完成）。
+1. 发布收尾（push + Pages + APK/模拟器走查）。
+2. 学习提醒（本地通知）。
+3. 词库真人发音包（预录 + 打包体积方案）。
+4. 语料回填（语法条数、导入书离线翻译、待回填空段）。
+5. 跨模块主轴：学习记录页模式迁移折线 + 首页真实续学。
+6. 工程债：修或废弃 `scripts/generate-books.ts`（当前重跑会抹平 `cleanBookParagraphs` 与 `gutenbergId`）。
 
 ---
 
 ## 10. 交接检查清单
 
 **开工前**
-- [ ] `git log --oneline -5` + `git status` 看清工作树（稳态只有 2 条已暂存的 CHANGELOG；调试残留别 commit）
+- [ ] `git log --oneline -5` + `git status` 看清工作树（按功能分组提交；`post-commit` 会为下一提交暂存 CHANGELOG，属预期）
 - [ ] `npm run typecheck && npm run lint:eslint` 确认基线是绿的
 - [ ] 读本文件第 6、8 节（约定 + 坑表）再动代码
 
 **改完代码**
 - [ ] `npm run typecheck`、`npm run lint:eslint`、`npm run build:web`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言（断言数以 [modules/verification.md](./modules/verification.md) 表格为准；2026-10-01 实测 vocab-cards 310 全绿）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言（断言数以 [modules/verification.md](./modules/verification.md) 表格为准；当前全量 10,288 断言）
 - [ ] 改过词库文件 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 真机装机验证（涉及 safe-area / 原生 TTS / 手势 / 持久化的改动**必须**真机验；动手前先报备，收尾 `force-stop`）
 

@@ -103,7 +103,7 @@ function writeOut(state) {
 //
 // 句子精讲 —— 每句的「翻译思路」与「语法点」，由 scripts/annotate-sentence-explain.cjs 生成。
 // translation：为什么这样译、怎么译（语序 / 词义 / 句式三层）
-// grammar：本句真正用到的语法结构，与 grammar-map 的条目对应（见 sentence-grammar-link.ts）
+// grammar：本句真正用到的语法结构，与 grammar-map 的条目对应（页面侧映射见 SentenceLabPage/components/SentenceExplain.tsx）
 
 export interface ISentenceExplain {
   translation: string[];

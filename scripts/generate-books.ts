@@ -3,6 +3,12 @@
  * Fetches 22 books' raw text, cleans + parses into paragraphs,
  * outputs with placeholder zh strings. AI translation runs client-side on first read.
  *
+ * ⚠️ 2026-10-31 未修，先别直接重跑：当前 `src/data/books.ts` 还会调用
+ * `cleanBookParagraphs(enParas)` 并写 `gutenbergId`；本脚本仍只写 `zh: ''`、
+ * 也不写 `gutenbergId`。照原样重跑会抹平清洗、章节结构与全文升级能力。
+ * 改书单/正文前先修本脚本（复用 `book-clean.ts` 并写 gutenbergId），
+ * 或只把它当历史参考。
+ *
  * Usage: NODE_OPTIONS="--use-system-ca" npx -y tsx scripts/generate-books.ts
  */
 
