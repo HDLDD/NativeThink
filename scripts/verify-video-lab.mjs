@@ -238,13 +238,15 @@ ok(typeof M.parseSrt === 'function' && typeof M.createVideoStore === 'function',
       const consts = strip(read('src/pages/DashboardPage/constants.ts'));
       const stats = strip(read('src/lib/use-learning-stats.ts'));
       const charts = strip(read('src/pages/ProgressPage/components/ProgressCharts.tsx'));
+      const progressLib = strip(read('src/lib/progress-page.ts'));
       ok(/path="video"/.test(app) && /lazy\(\(\) => import\("@\/pages\/VideoLabPage\/VideoLabPage"\)/.test(app)
         && /PageErrorFallback page="视频精听"/.test(app), '六件套①：路由 + lazy import + 独立 ErrorBoundary 都在 app.tsx');
       ok(/'\/video': \(\) => import\('@\/pages\/VideoLabPage\/VideoLabPage'\)/.test(side)
         && /path: '\/video', label: '视频精听'/.test(side), '六件套②：侧边栏预取表 + NAV_ITEMS 各一处');
       ok(/key: 'video'/.test(consts), '六件套③：首页进度环 MODULES');
       ok(/video/.test(stats) && /'video'/.test(stats), '六件套④⑤：moduleProgress 类型 + MODULE_PROGRESS_KEYS 白名单（漏白名单会被 mergeStats 丢弃）');
-      ok(/video:/.test(charts), '六件套⑥：ProgressCharts 颜色与名称');
+      ok(/video:/.test(progressLib) && /buildModuleShares/.test(charts),
+        '六件套⑥：ProgressCharts 从 progress-page 单一来源取颜色/名称（视频模块仍登记）');
       ok(/currentTime\s*=/.test(page) && /t0/.test(page), '点句跳转真的写 video.currentTime');
       ok(/loop|单句循环/.test(page), '单句循环有实现入口');
       ok(/revokeObjectURL/.test(page), 'blob URL 用完 revoke（泄漏比缓存贵）');
@@ -276,9 +278,12 @@ ok(typeof M.parseSrt === 'function' && typeof M.createVideoStore === 'function',
       ok(/disabled=\{inSpellingBook\}/.test(page) && /normSentenceKey\(s\.en\) === normSentenceKey\(cur\.text\)/.test(page),
         '已在听写本时按钮变状态（界面反馈，不弹 toast）');
       const spelling = strip(read('src/pages/SpellingPage/SpellingPage.tsx'));
+      const spellingPools = strip(read('src/lib/spelling-pools.ts'));
       ok(/VIDEO_LEVEL/.test(spelling) && /CORRECTION_LEVEL \|\| lvl === VIDEO_LEVEL/.test(spelling),
         '拼写页认得 video 桶，并和纠偏桶共用同一条早退分支（不许各写一份）');
-      ok(/video:\s*["']视频精听["']/.test(spelling), '拼写页词库触发器显示「视频精听」（容忍转译器的引号与空格规范化）');
+      ok(/key: VIDEO_LEVEL[\s\S]{0,80}label: '视频精听'/.test(spellingPools),
+        '题池表用 VIDEO_LEVEL 作 key 并显示「视频精听」（标签与桶常量同一来源）');
+      ok(/SpellingPoolPicker/.test(spelling), '拼写页挂载题池选择器（视频精听入口不再写死在隐藏下拉里）');
 
       /* ⑥ P1 跟读 + P2 双语：两条都必须在"通道不存在"时说实话 */
       ok(/onClick=\{shadowThis\}/.test(page) && /scoreSpeech\(cur\.text, t\)/.test(page),

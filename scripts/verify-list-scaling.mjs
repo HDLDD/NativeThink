@@ -96,6 +96,30 @@ const check = (cond, label, detail) => {
     '收藏页搜索/类型筛选 + 12 条增量，筛选空态仍保留入口');
 }
 
+/* ── 句子学习：句型库/语法地图搜索 + 分组筛选 + 空态 ── */
+{
+  const pattern = read('src/pages/SentenceLabPage/components/PatternLibrary.tsx');
+  const grammar = read('src/pages/SentenceLabPage/components/GrammarMap.tsx');
+  check(/pattern-library-filter/.test(pattern) && /没有匹配的句型/.test(pattern) &&
+    /data-pattern-id=\{p\.id\}/.test(pattern) &&
+    /grammar-map-filter/.test(grammar) && /没有匹配的语法点/.test(grammar) &&
+    /data-grammar-id=\{t\.id\}/.test(grammar),
+    '句型库/语法地图有搜索、筛选记忆、稳定 id 与空态（不误显示第一条）');
+}
+
+/* ── 句子精讲：搜索/筛选 + 12 句跳转列表 ── */
+{
+  const explain = read('src/pages/SentenceLabPage/components/SentenceExplain.tsx');
+  check(/visibleDeck = deck\.slice\(0, visibleListCount\)/.test(explain) &&
+    /setVisibleListCount\(\(count\) => count \+ 12\)/.test(explain) &&
+    /再显示 \{Math\.min\(12, remainingDeck\)\} 句/.test(explain) &&
+    /收起，只看前 12 句/.test(explain) &&
+    /sentence-explain-filter/.test(explain) &&
+    /data-sentence-id=\{sentence\.id\}/.test(explain) &&
+    /没有匹配的句子/.test(explain),
+    '句子精讲搜索/筛选 + 12 句跳转列表，空结果不误显示第一句');
+}
+
 /* ── 词库浏览分页（同一个不变量的另一处，防止被改回全量渲染） ── */
 {
   const src = read('src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx');
@@ -126,6 +150,16 @@ const check = (cond, label, detail) => {
     'A-Z 跳转目标仍逐段存在（折叠不能把跳转入口弄失效）');
   check(!/\{chunks\.map\(\(chunk\) =>/.test(src),
     '正对照：字母段内不再有对整段 chunks 的直接 .map 全量渲染');
+}
+
+/* ── 学习记录页收藏本：完整列表只在 /favorites，本页只留总览 ── */
+{
+  const page = read('src/pages/ProgressPage/ProgressPage.tsx');
+  check(/data-favorites-summary/.test(page) &&
+    /navigate\('\/favorites'\)/.test(page) &&
+    !/data-favorite-id=/.test(page) &&
+    !/filteredFavorites\.map/.test(page),
+    '学习记录页收藏本只留总览（完整列表/搜索/回顾只在收藏页）');
 }
 
 console.log('');

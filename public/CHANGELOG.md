@@ -1,6 +1,13 @@
 # NativeThink 开发日志
 
 ## 2026-10-31
+- docs(guards): 同步跨模块守卫与模块清单
+- feat(think): 新增读英文输入训练 (`e7dd3c3`)
+- feat(settings): 学习数据区与共享备份入口 (`b9ec4f2`)
+- feat(progress): 收藏总览、占比归一与日历成就修正 (`4790a31`)
+- feat(vocabulary): 9 模式大厅与真实状态行 (`a7b289e`)
+- feat(spelling): 题池大厅与按队列续学 (`e26cf3f`)
+- feat(sentence-lab): 句子精讲/句型/语法加搜索与分页 (`1bdca84`)
 - feat(think): 首页改成目录页，练习页加「怎么练」说明栏 (`bc302a6`)
 - chore: 收下 Qoder 夜间会话的列表筛选与文档同步 (`a96b347`)
 

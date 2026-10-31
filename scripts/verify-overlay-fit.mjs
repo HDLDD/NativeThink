@@ -219,14 +219,20 @@ function classNameOf(src, tagRe, label) {
     '⑦ 每个 useFramerMotion 组件的**每个宿主**都被 <LazyFramerProvider> 包住（"任意一个包住"是假绿）',
     unwrapped.join(', '));
 
-  // 逐个点名两处收藏回顾宿主（真机报障那处 + 一直正常那处，缺一条就是清单漂了）
+  // 收藏回顾现在只有一个宿主：收藏页；学习记录页只留总览并跳转过去（2026-10-31 去重）
   const strip = (s) => s.replace(/^[ \t]*\/\/[^\n]*/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
   const favPage = strip(readFileSync(join(ROOT, 'src/pages/FavoritesPage/FavoritesPage.tsx'), 'utf8'));
   const progPage = strip(readFileSync(join(ROOT, 'src/pages/ProgressPage/ProgressPage.tsx'), 'utf8'));
   check(/<LazyFramerProvider>[\s\S]{0,200}<FavoriteReviewMode/.test(favPage),
     '⑦ 收藏页的回顾分支确实把 FavoriteReviewMode 包在 Provider 里（2026-10-17 白屏那处）');
-  check(/<LazyFramerProvider>[\s\S]{0,200}<FavoriteReviewMode/.test(progPage),
-    '⑦ 正对照：学习记录页同样包住（同一个组件两个入口，口径必须一致）');
+  check(!/<FavoriteReviewMode/.test(progPage) &&
+    /data-favorites-summary/.test(progPage) &&
+    /navigate\('\/favorites'\)/.test(progPage),
+    '⑦ 学习记录页不再挂第二个收藏回顾宿主；完整回顾只在收藏页，本页只留总览与跳转');
+  check(/searchParams\.get\('reset'\)/.test(progPage) &&
+    /setShowResetDialog\(true\)/.test(progPage) &&
+    /next\.delete\('reset'\)/.test(progPage),
+    '⑦ 设置页「管理学习记录」深链会打开现有重置弹窗并抹掉 reset 参数（返回/刷新不重复弹）');
 
   // 正对照（按新语义重推）：缺 Provider 时**退化 + 一次性警告**，不再抛错掀翻整页。
   // 断言钉的是"不许把动画前置条件写成致命错误"，与上面两条一起构成双向锁。

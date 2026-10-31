@@ -35,11 +35,14 @@ AI 生成：`aiChat`（`:154`），system 要求**只返回一个 JSON 对象**�
 
 图表 + 各模块分项重置 + 导出/恢复。
 
-- `ProgressCharts.tsx:33-42` `MODULE_COLORS`、`:44-53` `MODULE_NAMES`：颜色**按 key 取**（此前按下标对位数组，错位且 conversation/spelling 同为 `#F59E0B`，饼图图例无法区分 —— 注释 `:31-32`）。缺 key 时回落灰 `#94A3B8` / 回落 key 名，**不报错**。
+- **模块占比图的单一来源是 `src/lib/progress-page.ts`**（2026-10-31）：`MODULE_COLORS` / `MODULE_NAMES` 按 key 取色；`buildModuleShares()` 先过滤 0/负数/NaN，再用**最大余数法**把舍入补到余数最大的项上，保证非空项相加恰好 100。`ProgressCharts.tsx` 只消费 `{name, value: percent, color}`，tooltip 的 `${value}%` 才是真份额 —— 旧实现把 `moduleProgress` 原始分直接塞给 Recharts，三个模块各 50 分时会显示三个 50%，实际份额各 33%。缺 key 时回落 key 名 + `#94A3B8`，不丢数据。
+- 饼图没有进度时显示空态（`data-chart-empty="pie"`）：「还没有模块进度 / 去任意模块学几分钟 / 回首页开始学习」。两张柱/线图的网格线改用 `var(--border)`（旧 `hsl(215 28% 20%)` 在浅色模式下是深灰线），卡片圆角回 24px。图表模块仍懒加载（recharts ~400KB）。
 - 重置是分类型的：学习统计 `:111`、句子拼写 `:119`、阅读 `:124-143`、词汇 `:174`、按词书 `:200`、短语库 `:208`、全部 `:277`。多数提示带「刷新页面后生效」—— 因为这些模块的 hook 不在本页，内存态还在（见 `cloud-sync.md` 的陈旧内存态问题）。
-- **窄屏分类条**（2026-10-28）：`ProgressPage.tsx:703-730` 在 `<sm` 隐藏四个 tab 的图标（`hidden sm:inline`）并给 `TabsList` 加 `max-w-full overflow-x-auto`。393px + 120% 字体下四个标签必须完整可见；退回原先的 `w-fit` 单行会把「成就徽章」裁出视口。收藏卡的「传送」链接加了 `py-1`（`:1001`），手机上不再只有 18px 高。
+- **窄屏分类条**（2026-10-28）：`ProgressPage.tsx` 在 `<sm` 隐藏四个 tab 的图标（`hidden sm:inline`）并给 `TabsList` 加 `max-w-full overflow-x-auto`。393px + 120% 字体下四个标签必须完整可见；退回原先的 `w-fit` 单行会把「成就徽章」裁出视口。
+- **日历不再能翻到未来**（2026-10-31）：`isCurrentMonth` / `canGoToNextMonth` 纯函数在 `progress-page.ts`；本月时下个月按钮禁用（`disabled={!canNextMonth}`），离开本月后出现「回到本月」；`nextMonth` 自己也有一道闸门，防键盘/程序触发绕过按钮态。
+- **成就已解锁排前**（2026-10-31）：`sortAchievements(definitions, unlocked ids)` 把已解锁放前、组内保持定义表原顺序；不再让解锁的和锁定的混排。未解锁卡仍有 🔒 与灰度样式。
+- **收藏本 tab 只留总览**（2026-10-31）：类型计数 + 最近 3 条 + 「去收藏页管理」；完整列表、搜索、类型筛选、12 条增量与「开始回顾」只在 `/favorites`。`data-favorites-summary` / `data-favorites-entry="manage"` 是稳定钩子。入口没有删——只是不再在 `/progress` 维护第二套完整收藏界面。
 - **重置学习统计不再虚报成功**（2026-10-29）：`use-learning-stats` 的 `resetAll()` 现在返回 stats/calendar 两次真实写入的与；`ProgressPage.tsx:112-119` 只在两者都成功时提示「学习统计已重置」，否则提示检查可用空间。「重置全部」同样按 `statsOk` 分流（`:251-287`）。核心进度写入统一走 `persistText`，守卫 `verify-vocab-caches` ⑧。
-- `FavoriteReviewMode.tsx`（460 行）：收藏的复习模式，也在这里。
 
 ## 3. 收藏 `/favorites`
 
@@ -54,10 +57,10 @@ LEGACY_KEY      = __nativethink_favorites_v2     （裸 localStorage，读一次
 - **去重口径 = `content + type` 相同即拒**（`:77`）。所以写作题收藏的是 `title`、句子学习收藏的是 `item.en`、句型收藏的是 `'模式:' + id`、造句收藏的是用户自己写的原文 —— **同一句英文在不同模块会产生不同条目**（`type` 不同），而 `type` 相同时靠 `content` 判重。
 - 跨实例广播 `nativethink-favorites-changed`（`:60,70`），并且它**是三个订阅 `nativethink-sync-down` 的 hook 之一**（`:53`）。
 - **读盘边界做形状清洗（2026-10-17）**：`sanitizeFavorites(raw)`（`use-favorites.ts:73`）先把每条收成合法形状 —— 缺 `id`/缺 `content` 的条目丢出视图、`content` 是对象就整条丢（直出会让 React 抛错、ErrorBoundary 接走**整页**）、数字/布尔收成字符串（**不丢用户的条目**）、`example` 为 null/缺失时不凭空造键。为什么必须有：收藏是全站唯一不校验的清单加载器，而它有**两条外部来源**（`__nativethink_favorites_v2` 旧键迁移 + 云同步下行），渲染层却是 `{f.content}` 直出 + `cleanText(f.example)`（对非字符串直接 `.replace`）。回写判据刻意用**条数变化**而不是序列化比较 —— 清洗会重建对象、键序变了，按比较结果写就会**每次挂载都落盘**。守卫 `verify-vocab-cards` ㉔ 真跑（11 条，变异 5 条逐条验红）。
-**收藏列表（2026-10-30）**：搜索收藏内容/释义/例句/分类；类型 chips 带计数（全部/单词/语块/表达…）；默认 12 条，按 12 条增量加载、可收起；筛选状态存 `favorites-filter`（`usePageMemory`），空结果仍保留搜索与类型入口并可清除。卡片带 `data-favorite-id` 稳定钩子。`verify-list-scaling` 24 条断言里新增了这一段。
+**收藏列表（2026-10-30）**：搜索收藏内容/释义/例句/分类；类型 chips 带计数（全部/单词/语块/表达…）；默认 12 条，按 12 条增量加载、可收起；筛选状态存 `favorites-filter`（`usePageMemory`），空结果仍保留搜索与类型入口并可清除。卡片带 `data-favorite-id` 稳定钩子。`verify-list-scaling` 27 条断言里同时钉住「`/progress` 不再维护第二套完整收藏列表」。
 
-- **收藏回顾（`FavoriteReviewMode`）有两个入口，必须各自带 `<LazyFramerProvider>`**：收藏页「开始回顾」（`FavoritesPage.tsx:92-105`）与学习记录页的收藏卡（`ProgressPage.tsx:944-946`）。该组件内部走 `useFramerMotion()`，旧实现在缺 provider 时**直接 throw** —— 2026-10-17 真机就是收藏页裸渲染，点「开始回顾」整页变「我的收藏页面出错」，而学习记录页一直正常（同一个组件两种命运）。现在 hook 缺 provider 时退化成无动画 + 一次性 `console.warn`（`lazy-framer-motion.tsx:69-81`），守卫 `verify-overlay-fit` ⑦ 改成**逐个宿主点名**（旧写法"任意一个宿主包了就放行"正是这条假绿的形状）。
-- `clearAll()` 是一次 `persist([])`，注释写明原因：「循环调 `removeFavorite` 会因陈旧闭包只删掉最后一条（ProgressPage 重置踩过）」（`:96-99`）。
+- **收藏回顾（`FavoriteReviewMode`）现在只有一个宿主**：`/favorites` 的「开始回顾」（`FavoritesPage.tsx`）。学习记录页 2026-10-31 起只留总览，不再渲染 `FavoriteReviewMode`；因此 `LazyFramerProvider` 只需要在收藏页包一层。该组件内部走 `useFramerMotion()`，旧实现在缺 provider 时**直接 throw**（2026-10-17 真机收藏页裸渲染），现在 hook 缺 provider 时退化成无动画 + 一次性 `console.warn`（`lazy-framer-motion.tsx`），守卫 `verify-overlay-fit` ⑦ 已收敛为**唯一宿主**。
+- `clearAll()` 是一次 `persist([])`，注释写明原因：「循环调 `removeFavorite` 会因陈旧闭包只删掉最后一条（ProgressPage 重置踩过）」（`:96-99`）。`/progress` 的重置仍走 `clearAll()`。
 - **空态出入口（2026-10-29）**：`FavoritesPage.tsx:241-256` 的 `EmptyState` 增加「去词汇学习」按钮（`navigate('/vocabulary')`），底部提示去掉 `/60` 透明度；393px 实测按钮 134×42、bottom 482 在首屏内。空态不再是只有说明、没有下一步的终点。
 
 
@@ -81,6 +84,7 @@ LEGACY_KEY      = __nativethink_favorites_v2     （裸 localStorage，读一次
 - `importBackup()`（`backup.ts:63`）：写入前校验 app/version/data/idb 与全部导入书形状；localStorage 返回 false 不计成功。原书按 id 覆盖同一本，保留其它本地书（`imported-books.ts:137`）；读取现有书库失败时禁止覆盖。译文只允许 `booktrans-` 键，逐条等待事务提交。
 - 返回 `restored/failed`、`restoredBooks/failedBooks`、`restoredIdb/failedIdb` 三组真实计数。UI（`ProgressPage.tsx:293`）互斥导出/恢复，原书数量明确显示；拿到恢复结果后先调用统一的 `emitSyncDown()`（`:333-335`），通知已挂载 hook 重读并沿用订阅者的缓存作废逻辑，避免陈旧收藏下一次写回覆盖刚恢复的条目。部分失败保留报告、不自动刷新，可重新选同一文件重试；完整成功也先通知，再报告并刷新（`:337-344`）。
 - 页面明确说明备份不含视频精听媒体及字幕，恢复覆盖同键进度，建议先导出当前数据。并非全部设备资产都在这个 JSON 中。
+- **单一实现（2026-10-31）**：导出/恢复搬进 `src/lib/use-backup-actions.ts`，`ProgressPage` 顶部按钮与 `SettingsPage` 的「学习数据」区共用 `useBackupActions()`；隐藏 file input 用共享的 `BackupFileInput`。导出成功后写 `__nativethink_last_backup_at`，设置页显示「上次备份」，失败不会更新该时间。设置页另显示 `measureLocalStorage` 的前缀内条目/字节与 `navigator.storage.estimate()` 估算（不支持时显示「—」）。「管理学习记录」跳 `/progress?reset=1`，记录页挂载时打开现有重置弹窗并把参数抹掉（刷新/返回不重复弹）。
 
 ## 5. 注意事项
 
@@ -98,7 +102,7 @@ LEGACY_KEY      = __nativethink_favorites_v2     （裸 localStorage，读一次
    `booktrans-*` **只存在于 IndexedDB**，所以 `manifestKeys` 恒空 → `idb` 恒 `undefined`、`idbCount` 恒 0，`idb.ts` 也没有枚举键的 API（只有 `idbGet/idbSet/idbDelete/idbHas/idbClear`）。
 
    现在的形态：`book-translation.ts` 新增 `dumpBookTranslationCache(bookId, maxBytes)`（**键格式知识留在拥有它的模块里**，按 manifest 登记的章节导出，含清单键本身）；`backup.ts` 用 `BOOK_META` + `loadImportedBooks()` 拿到随包 22 本与用户导入书的 id，逐本导出，累计到 `IDB_LIMIT_BYTES` 就停并如实标 `idbSkipped`。
-   **守卫：`npm run verify:backup-idb`（94 断言，18 组变异）** —— 真跑译文导出、IDB 提交、导入书往返与真实页面 callback。书库失败夹具保留全 `abort`，另用 `readonly` 成功 / `readwrite` abort（`verify-backup-idb.mjs:192-208,305-313`）明确断言写入已尝试、未提交且 `failedBooks=1`；否则失败停在 `loadImportedBooks`，根本测不到 `persist`。页面判据（`:328-358`）钉恢复结束→通知重读→报告的顺序，部分失败不刷新且保留报告，完整成功再刷新。新增 M13–M18（`:416-430`）分别检出漏通知、仅成功通知、提前通知、延后通知、清空失败报告、吞掉 `persist` 错误；每组均有基线真与变异假两条断言。
+   **守卫：`npm run verify:backup-idb`（106 断言，18 组变异）** —— 真跑译文导出、IDB 提交、导入书往返与共享 hook 的恢复 callback，另钉两页挂载、LAST_BACKUP 时间戳、本地占用统计与 reset 深链。书库失败夹具保留全 `abort`，另用 `readonly` 成功 / `readwrite` abort（`verify-backup-idb.mjs:192-208,305-313`）明确断言写入已尝试、未提交且 `failedBooks=1`；否则失败停在 `loadImportedBooks`，根本测不到 `persist`。页面判据（`:328-358`）钉恢复结束→通知重读→报告的顺序，部分失败不刷新且保留报告，完整成功再刷新。新增 M13–M18（`:416-430`）分别检出漏通知、仅成功通知、提前通知、延后通知、清空失败报告、吞掉 `persist` 错误；每组均有基线真与变异假两条断言。
 5. **`importBackup` 会覆盖同键进度**，拿旧备份恢复仍可能让进度回退；页面已明示。导入书按 id 合并而非整库替换，坏格式在任何写入前拒绝，存储错误则如实报告部分恢复，不声称跨 localStorage/IDB 原子回滚。
 6. **收藏的判重是 `content + type`**，所以想给同一句英文做"跨模块统一收藏"需要显式设计，不是把 `type` 改一改就能合并 —— 历史数据已经按 type 分开了。
 7. **`use-achievements` 只在自身文件里读写**（`:5,121,135`），不订阅 `nativethink-sync-down`（订阅者只有 3 个，见 `cloud-sync.md`）→ 云同步下来的新成就要点开首页才重算。
