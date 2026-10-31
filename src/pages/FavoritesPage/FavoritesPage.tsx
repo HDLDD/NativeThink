@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Heart,
@@ -9,9 +9,12 @@ import {
   Copy,
   Lightbulb,
   Keyboard,
+  Search,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { usePageMemory } from '@/lib/use-page-memory';
 import { useFavorites } from '@/lib/use-favorites';
 import { useCorrectionNotes, type ICorrectionNote, type CorrectionCategory, CATEGORY_LABELS, CATEGORY_TIPS, classifyCorrection, summarizeCorrections } from '@/lib/correction-notes';
 import { useTTS } from '@/lib/use-tts';
@@ -75,13 +78,32 @@ export default function FavoritesPage() {
     }
   };
   const tts = useTTS();
-  const [filterType, setFilterType] = useState<string>('all');
+  const [favoriteFilter, setFavoriteFilter] = usePageMemory<{ type: string; query: string }>(
+    'favorites-filter',
+    { type: 'all', query: '' },
+  );
+  const [visibleFavoriteCount, setVisibleFavoriteCount] = useState(12);
   const [reviewMode, setReviewMode] = useState(false);
+  const filterType = favoriteFilter.type;
+  const setFilterType = (type: string) => setFavoriteFilter((prev) => ({ ...prev, type }));
+  const favoriteQuery = favoriteFilter.query.trim().toLowerCase();
 
   const filteredFavorites = useMemo(() => {
-    if (filterType === 'all') return favorites;
-    return favorites.filter((f) => f.type === filterType);
-  }, [favorites, filterType]);
+    return favorites.filter((f) => {
+      if (filterType !== 'all' && f.type !== filterType) return false;
+      if (favoriteQuery) {
+        const haystack = `${f.content} ${f.meaning} ${f.example ?? ''} ${f.category ?? ''} ${TYPE_LABELS[f.type] ?? ''}`.toLowerCase();
+        if (!haystack.includes(favoriteQuery)) return false;
+      }
+      return true;
+    });
+  }, [favorites, filterType, favoriteQuery]);
+  const visibleFavorites = filteredFavorites.slice(0, visibleFavoriteCount);
+  const remainingFavorites = filteredFavorites.length - visibleFavoriteCount;
+
+  useEffect(() => {
+    setVisibleFavoriteCount(12);
+  }, [filterType, favoriteQuery]);
 
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = { all: favorites.length };
@@ -296,40 +318,75 @@ export default function FavoritesPage() {
 
       {correctionBlock}
       {/* Empty filtered state */}
+      <div className="space-y-2 rounded-2xl border border-border bg-muted/20 p-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input
+            value={favoriteFilter.query}
+            onChange={(event) => setFavoriteFilter((prev) => ({ ...prev, query: event.target.value }))}
+            placeholder="搜索收藏内容、释义或分类…"
+            className="rounded-2xl pl-9"
+          />
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="按收藏类型筛选">
+          {FILTER_TYPES.map((type) => {
+            const count = typeCounts[type];
+            if (!count) return null;
+            const isActive = filterType === type;
+            return (
+              <button
+                key={type}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => setFilterType(type)}
+                className={cn(
+                  'px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border-2',
+                  isActive
+                    ? 'border-rose-300 bg-rose-50 dark:bg-rose-500/10 text-rose-500'
+                    : 'border-border bg-muted text-muted-foreground hover:border-muted-foreground/30',
+                )}
+              >
+                {type === 'all' ? `全部 (${count})` : `${TYPE_LABELS[type] || type} (${count})`}
+              </button>
+            );
+          })}
+          <span className="ml-auto text-[10px] font-bold text-muted-foreground">
+            匹配 {filteredFavorites.length}/{favorites.length}
+          </span>
+        </div>
+      </div>
+
       {filteredFavorites.length === 0 ? (
-        <EmptyState icon={Heart} size="sm" title="该分类暂无收藏内容" className="py-12" />
+        <div className="rounded-2xl border border-border bg-muted/20 p-6 text-center">
+          <EmptyState icon={Heart} size="sm" title="没有匹配的收藏" description="换个关键词，或清除筛选。" className="py-6" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full"
+            onClick={() => setFavoriteFilter({ type: 'all', query: '' })}
+          >
+            清除筛选
+          </Button>
+        </div>
       ) : (
         <>
-          {/* Type count chips */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {FILTER_TYPES.map((type) => {
-              const count = typeCounts[type];
-              if (!count) return null;
-              const isActive = filterType === type;
-              return (
-                <button
-                  key={type}
-                  onClick={() => setFilterType(type)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border-2',
-                    isActive
-                      ? 'border-rose-300 bg-rose-50 dark:bg-rose-500/10 text-rose-500'
-                      : 'border-border bg-muted text-muted-foreground hover:border-muted-foreground/30',
-                  )}
-                >
-                  {type === 'all' ? `全部 (${count})` : `${TYPE_LABELS[type] || type} (${count})`}
-                </button>
-              );
-            })}
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+              收藏内容
+            </p>
+            <span className="text-[10px] font-bold text-muted-foreground">
+              显示 {visibleFavorites.length}/{filteredFavorites.length}
+            </span>
           </div>
 
           {/* Card grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredFavorites.map((item) => {
+            {visibleFavorites.map((item) => {
               const tc = TYPE_COLORS[item.type] || TYPE_COLORS.vocabulary;
               return (
                 <Card
                   key={item.id}
+                  data-favorite-id={item.id}
                   className="rounded-[28px] border-border hover:border-rose-200/50 hover:shadow-md transition-all duration-300 group"
                 >
                   <CardContent className="p-5">
@@ -464,6 +521,24 @@ export default function FavoritesPage() {
               );
             })}
           </div>
+          {remainingFavorites > 0 && (
+            <button
+              type="button"
+              onClick={() => setVisibleFavoriteCount((count) => count + 12)}
+              className="w-full rounded-2xl border-2 border-dashed border-border py-3 text-xs font-black text-muted-foreground transition-colors hover:border-rose-300/60 hover:text-rose-500"
+            >
+              再显示 {Math.min(12, remainingFavorites)} 条（还剩 {remainingFavorites} 条，共 {filteredFavorites.length} 条）
+            </button>
+          )}
+          {visibleFavoriteCount > 12 && (
+            <button
+              type="button"
+              onClick={() => setVisibleFavoriteCount(12)}
+              className="w-full py-2 text-[11px] font-bold text-muted-foreground hover:text-foreground"
+            >
+              收起，只看前 12 条
+            </button>
+          )}
         </>
       )}
     </div>

@@ -70,6 +70,7 @@
 | `__nativethink_custom_shadowing` | `:117-122` 读 / `:124-128` 写，失败经 `persistJson`→`warnStorageFull()` | AI 生成材料不可重算 → **不裁剪** |
 | `__nativethink_shadowing_extra` | `:152-157` 读 / `:159-161` 写，按语料 id 分桶，写失败同上 | 追加式；AI 追加句是用户资产不裁剪，键数受用过的语料篇数约束 |
 | `shadowing-rate` / `shadowing-filter` / `shadowing-autoplay` | `:98` / `:144` / `:432`（`usePageMemory`） | — |
+| `shadowing-search` / `shadowing-progress-filter` | 语料列表搜索与进度筛选（`usePageMemory`），刷新保留 | — |
 
 时长：`:417` 点播放即 +1（**纯听也算**）、`:482` 完成一句 +0.5。
 
@@ -98,10 +99,10 @@
 1. **【已修，2026-09-29】两处分析调用现在都先判空串**：`setAiAnalysis(result)` 前有 `if (!result.trim())` + `toast.error('AI 服务暂不可用…')`（`:665-668`、`:728-731`）。修的原因：`use-ai.ts:80-84` 已经把异常吞成返回 `''`（AbortError 也一样），本页的 `catch` **永不触发** —— 原先用户会看到「分析中 → 一片空白且无任何提示」。守卫：`verify-shadowing-completion` 静态断言两处 `!result.trim()` 都在（断言数 = `setAiAnalysis` 出现数）。
 2. **【已修，2026-09-30（`40b5b39`）】autoplay effect 的依赖数组**。原写法只写 `[currentSentenceIdx]`：开着自动播放时改语速/换口音**不会对当前句生效**；反过来 `currentSentenceIdx` 不变但句子内容变了（追加/删除句子后索引复用）也不会重读。现在依赖是 `[autoPlay, currentSentence, tts.speak]`（`:442-449`，原委注释 `:433-441`）：`currentSentence` 是"句子身份"，换语料/换句都会重读；`playbackRate`/`accent` **刻意不进依赖** —— 它们是"下一句起生效"的参数，拖语速滑杆时若重新触发，每动一格就把当前句从头再读一遍，比原来更糟。
 3. **渲染期间直接写 ref**：`:301/:303/:386/:389` 在 render 体内赋 `allSentencesRef/rateRef/isSpeakingRef/loopSpeakRef`。并发渲染下（Suspense / transition）可能与实际提交的值不一致；本页目前没用到这些边界，但把它当地基就是隐患。
-4. **两栏都是全量渲染 —— 但量过之后判定不动**：左栏 117 篇直接 map（`:1086`），右栏句列表同样全量（`:1579-1580`，只有 `max-h-[400px]` 滚动，无虚拟列表）。headless Chrome 393×851 / DPR 3 实测 `/shadowing` 挂载后 **2,219 个 DOM 元素、页高 2,256px**，与写作页折叠后的 2,634px 同量级，不是短语库（4,805）那种规模 —— 所以这轮**没有为它改代码**：没有测量证据就加折叠，等于白白削弱「一眼看完全部语料」的入口。真要动之前先重跑测量，并参照 `verify-list-scaling.mjs` 补断言。（同一份 harness 里 longtask 观察器装在 navigate 之前会因文档切换而丢失，所以这里的结论只建立在 DOM 节点数与页高上。）
+4. **语料列表改为 12 篇增量 + 搜索/进度筛选（2026-10-30）**：左栏 117 篇不再一次 map；默认 12 篇，`再显示 12 篇` 追加、`收起，只看前 12 篇` 回收。搜索匹配标题/描述/类别；进度筛选按 `countCompletedForCorpus` 派生（未开始/进行中/已完成），卡片显示 `已听 x/y` 与细进度条，已完成标「已完成」。两个筛选值存 `shadowing-search` / `shadowing-progress-filter`，刷新保留。右栏句子列表仍是全量（有 `max-h-[400px]` 滚动）——**两栏的取舍不同**：语料需要跨篇找，句子是当前篇内的连续阅读，不要把右栏也切碎。`verify-list-scaling`（23 条）里新增了左栏的增量断言。
 5. **`cancelPendingAdvance` 的覆盖点**：`:453`（prev）/ `:462`（next）/ `:496`（selectCorpus）/ `:351`（卸载）都取消了 400ms 自动前进 ✅；`markCompleted` 自己重排前也先撤（`:484`）。**句行直达（`:1588`）不撤** —— 400ms 窗口内点其它句子，在途定时器仍会 +1（小窗口、未修）。新增"离开当前句"的路径时请保持这个约定。
 6. **【已修，2026-10-05】`__nativethink_shadowing_completed` 条数 + 字节双封顶**：原来无上限、整份 JSON 每次变更重写（每篇 579 句全记下来还行，语料越多写越贵）。现在落盘前先 `trimOldest([...completedSentences], 2000, 64KB)`（常量 `:101-103`，落盘 `:110-114`），保留最新、从最旧的标记丢；写失败不再静默（`warnStorageFull()`）。守卫：`verify-vocab-caches` ⑥。
-7. **守卫覆盖面**：`node scripts/verify-shadowing-completion.mjs`（27 断言）守 §3.1 的索引契约（纯函数真跑 + 接线）与第 8 条的语音标注渲染；`node scripts/verify-shadowing-asr.mjs`（51 断言）守路线 2（WAV 编码、provider 顺序、响应归一、页面接线、旧 Web Speech 必须消失）；`node scripts/verify-speech-analysis.mjs`（39 断言）守路线 1（合成波形的音量/停顿/音高/语速，以及 SpeakBack/跟读页共用 analyzeBlob）。其余交互仍靠无头 Chrome 真点。
+7. **守卫覆盖面**：`node scripts/verify-shadowing-completion.mjs`（27 断言）守 §3.1 的索引契约（纯函数真跑 + 接线）与第 8 条的语音标注渲染；语料列表的 12 篇增量由 `verify-list-scaling` 守；`node scripts/verify-shadowing-asr.mjs`（51 断言）守路线 2（WAV 编码、provider 顺序、响应归一、页面接线、旧 Web Speech 必须消失）；`node scripts/verify-speech-analysis.mjs`（39 断言）守路线 1（合成波形的音量/停顿/音高/语速，以及 SpeakBack/跟读页共用 analyzeBlob）。其余交互仍靠无头 Chrome 真点。
 
 8. **【已修，2026-10-05】「语音标注」面板曾把 `<u>` 重读标签整个剥掉 —— 标注形同不存在**（HelpGuide 审计时发现：帮助里写着「每句附语音标注（重读提示）」，界面上却与原句一字不差）。数据层一直是对的：`src/data/shadowing.ts` 用 `<u>…</u>` 圈重读处；两处 AI prompt（`:209`、`:560`）要求产出这个标签，`validateMaterial`（`:502`）还校验开闭配对（`:511-513`）。坏的是渲染站点 `:1225`：对 `annotatedText` 直接 `.replace(/<u>/g, '').replace(/<\/u>/g, '')`。现在改走文件尾的 `renderAnnotated`（`:1658-1672`，函数声明提升；**刻意放文件尾** —— 本页文档的 `文件:行号` 引用全部落在组件段内，插在中间会让它们整体漂移）：只认 `<u>`，重读处渲染为青色加粗下划线，其余按纯文本渲染并剥掉残标签（**不走**危险 HTML 注入 —— annotatedText 可能来自 AI）。守卫：`verify-shadowing-completion` 新增 4 条（渲染接线 / 旧剥标签写法正对照 / 识别逻辑存在 / 剥注释后全页无危险注入），变异实测退回旧写法红两条；行为侧 2026-10-05 无头 Chrome CDP 实测 9/9（句 1 `day`；切到句 2 双标记 `dium`/`tte`；青色 rgb(0,184,148) + 600 字重 + 无标签字面量漏出）。
 

@@ -18,6 +18,7 @@
 | 字数区间写法 | 第 1–24 题 `max` 一律 9999 = 「≥min 词」，渲染分支 `:1024,1205`；25–100 有真实区间 |
 | 自定义题 | localStorage `__nativethink_custom_prompts`（`:435,443`），id 前缀 `ai_${Date.now()}` → `isAi = id.startsWith('ai_')`（`:1125`） |
 | tab 记忆 | `usePageMemory('writing-prompt-tab')`（`:366`） |
+| 题库筛选记忆 | `usePageMemory('writing-prompt-filter')`：搜索词 / 难度 / 已写状态，跨刷新保留 |
 
 ### 2.2 批改
 
@@ -29,9 +30,11 @@
 
 `aiChat` + `extractJson`（`:628,659`），`temperature 0.9 / maxTokens 1024`（`:653`），入参只有分类/难度/关键词三项（`:640,642,650`），成功后立刻 `startWriting(newPrompt)`（`:674`）。
 
-### 2.4 默认只渲染 12 张卡
+### 2.4 搜索/筛选 + 每页 12 张
 
-`PromptGrid`（`:1110-1138`）：`visible = showAll ? list : list.slice(0, 12)`（`:1120`），`list.length > 12` 时给「展开其余 N 题（共 M 题）」/「收起，只看前 12 题」（`:1133`）。实测依据：全量渲染时手机页高 17,604px（≈21 屏），挂载期长任务合计 1055ms（4× CPU 节流）；改后 2,634px / 118ms。对照数据抄在 `scripts/verify-list-scaling.mjs:4-8`。
+题库工具条（`WritingPage.tsx`）：搜索题目/描述/类别/提示；按难度（全部/初级/中级/高级）和练习状态（全部/未写过/已写过）筛选；筛选值存 `writing-prompt-filter`，跨刷新保留。已写过的题卡标「已写过」，状态来自 `history` 里的 `prompt` 标题集合。
+
+`PromptGrid`：默认 `PAGE_SIZE = 12`，`list.slice(0, visibleCount)`；底部「再显示 12 题（还剩 N 题）」按 12 增量追加，超过 12 时给「收起，只看前 12 题」；筛选变化由父层 key 重挂载，自动回到第一页。空筛选显示「没有符合条件的写作题目」。实测依据：全量渲染时手机页高 17,604px（≈21 屏），挂载期长任务合计 1055ms（4× CPU 节流）；默认 12 张时 2,634px / 118ms。对照数据抄在 `scripts/verify-list-scaling.mjs:4-8`。
 
 ### 2.5 其它状态
 
@@ -52,5 +55,5 @@
 5. **去重只喂了内置 100 题的标题**（`:627` 用 `WRITING_PROMPTS` 而不是 `allPrompts`）：**已生成的自定义题不参与去重**，所以会重复出题。
 6. **每块 `setFeedback(full)` → 整篇 `ReactMarkdown` 重渲染**（`:563,576`；渲染在固定 `h-[400px]` 的 ScrollArea 里 `:1075-1078`）。长反馈在低端机上是持续重排源；改成节流要保住"实时看到字在出"的体验。
 7. **写作页没有「不再出现」**：全仓 `不再出现` 只在背单词链路（`use-word-learning.ts:38,364` 的屏蔽开关及其组件入口）与阅读复习词出队（`reading.ts:45`）里出现。这里唯一的"消失"入口是删除 AI 题（`handleDeletePrompt` `:685-688`，X 按钮仅 `isAi` 时渲染 `:1183-1191`）—— 内置题删不掉是设计。
-8. **有守卫**：`node scripts/verify-list-scaling.mjs`（18 断言；写作段守题库 ≥100、`slice(0, 12)`、展开/收起两入口、两个 `TabsContent` 面板都走 `PromptGrid`，正对照是「不存在 `allPrompts.map(` 全量渲染」；另两段是词库浏览分页与短语库字母段折叠这两个同类不变量）。把折叠改回去会立刻变红。
+8. **有守卫**：`node scripts/verify-list-scaling.mjs`（18 断言；写作段守题库 ≥100、`PAGE_SIZE = 12` / `slice(0, visibleCount)`、12 题增量追加/收起、空筛选兜底与已写标记、两个 `TabsContent` 面板都走 `PromptGrid`，正对照是「不存在 `allPrompts.map(` 全量渲染」；另两段是词库浏览分页与短语库字母段折叠这两个同类不变量）。把增量展开改回去会立刻变红。
 9. **窄屏分类条与收藏点击区**（2026-10-28）：`WritingPage.tsx:811` 的五个分类在 393px + 120% 字体下必须完整可见 —— `TabsList` 带 `max-w-full overflow-x-auto`，trigger 用 `px-1 sm:px-2`；退回 `w-fit` 单行会让「议论文」被裁出视口。题目卡右上的收藏是纯图标按钮，`p-2.5`（34px 命中区）并带 `aria-label/title`（`:1182-1189`），别缩回 `p-1` 的 22px。

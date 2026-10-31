@@ -18,6 +18,7 @@ import { useFavorites } from '@/lib/use-favorites';
 import { usedReviewWordKeys, reviewWordRecord, planRvBatches, coveredReviewWords, rvParaCount, rvRegenKeys, buildRvPrompt } from '@/lib/rv-articles';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { safeStorage } from '@/lib/safe-storage';
+import { usePageMemory } from '@/lib/use-page-memory';
 import { persistText } from '@/lib/capped-cache';
 import { cn, cleanText, extractJson } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
@@ -218,6 +219,16 @@ export default function ArticlePage() {
 
   // ── Tab + config state ──
   const [mainTab, setMainTab] = useState<MainTab>('books');
+  const [bookFilter, setBookFilter] = usePageMemory<{
+    query: string;
+    difficulty: 'all' | 'beginner' | 'intermediate' | 'advanced';
+    progress: 'all' | 'reading' | 'unread' | 'finished';
+  }>('article-book-filter', { query: '', difficulty: 'all', progress: 'all' });
+  const [aiArticleFilter, setAiArticleFilter] = usePageMemory<{
+    query: string;
+    source: 'all' | 'review' | 'free';
+  }>('article-ai-filter', { query: '', source: 'all' });
+  const [aiVisibleCount, setAiVisibleCount] = useState(12);
   const [level, setLevel] = useState<Level>('intermediate');
   const [topic, setTopic] = useState('tech');
 
@@ -545,6 +556,64 @@ export default function ArticlePage() {
     if (total <= 0) return 0;
     return Math.min(100, Math.max(0, Math.round((p.page / total) * 100)));
   };
+
+  /* ── 书籍列表筛选：搜索 + 难度 + 阅读状态（状态由真实阅读进度派生） ── */
+  const bookQuery = bookFilter.query.trim().toLowerCase();
+  const bookDifficulty = (['all', 'beginner', 'intermediate', 'advanced'] as const)
+    .includes(bookFilter.difficulty) ? bookFilter.difficulty : 'all';
+  const bookProgressFilter = (['all', 'reading', 'unread', 'finished'] as const)
+    .includes(bookFilter.progress) ? bookFilter.progress : 'all';
+  const bookEntries = allBooks.map((book) => {
+    const progress = getBookProgress(book.id);
+    const started = !!progress && hasProgress(progress, book.id);
+    const pct = progress ? progressPct(progress, book.id, pageCountOf(book)) : 0;
+    return { book, progress, started, pct, finished: started && pct >= 100 };
+  });
+  const bookCounts = {
+    all: bookEntries.length,
+    reading: bookEntries.filter((entry) => entry.started && !entry.finished).length,
+    unread: bookEntries.filter((entry) => !entry.started).length,
+    finished: bookEntries.filter((entry) => entry.finished).length,
+    beginner: bookEntries.filter((entry) => entry.book.difficulty === 'beginner').length,
+    intermediate: bookEntries.filter((entry) => entry.book.difficulty === 'intermediate').length,
+    advanced: bookEntries.filter((entry) => entry.book.difficulty === 'advanced').length,
+  };
+  const filteredBookEntries = bookEntries.filter((entry) => {
+    if (bookDifficulty !== 'all' && entry.book.difficulty !== bookDifficulty) return false;
+    if (bookProgressFilter === 'reading' && !(entry.started && !entry.finished)) return false;
+    if (bookProgressFilter === 'unread' && entry.started) return false;
+    if (bookProgressFilter === 'finished' && !entry.finished) return false;
+    if (bookQuery) {
+      const haystack = `${entry.book.zhTitle} ${entry.book.title} ${entry.book.zhAuthor} ${entry.book.author} ${entry.book.topic}`.toLowerCase();
+      if (!haystack.includes(bookQuery)) return false;
+    }
+    return true;
+  });
+
+  /* ── 已保存 AI 文章筛选：搜索 + 来源（自由生成 / 复习词汇） ── */
+  const aiArticleQuery = aiArticleFilter.query.trim().toLowerCase();
+  const aiArticleSource = (['all', 'review', 'free'] as const)
+    .includes(aiArticleFilter.source) ? aiArticleFilter.source : 'all';
+  const aiArticleCounts = {
+    all: aiArticles.length,
+    review: aiArticles.filter((article) => article.source === '复习词汇生成').length,
+    free: aiArticles.filter((article) => article.source !== '复习词汇生成').length,
+  };
+  const filteredAiArticles = aiArticles.filter((article) => {
+    if (aiArticleSource === 'review' && article.source !== '复习词汇生成') return false;
+    if (aiArticleSource === 'free' && article.source === '复习词汇生成') return false;
+    if (aiArticleQuery) {
+      const haystack = `${article.zhTitle || ''} ${article.title} ${article.topic || ''} ${(article.rvWords ?? []).join(' ')}`.toLowerCase();
+      if (!haystack.includes(aiArticleQuery)) return false;
+    }
+    return true;
+  });
+  const visibleAiArticles = filteredAiArticles.slice(0, aiVisibleCount);
+  const remainingAiArticles = filteredAiArticles.length - aiVisibleCount;
+
+  useEffect(() => {
+    setAiVisibleCount(12);
+  }, [aiArticleQuery, aiArticleSource]);
 
   // Load speech data when speeches tab is first selected
   useEffect(() => {
@@ -971,10 +1040,85 @@ export default function ArticlePage() {
       {/* ── BOOKS TAB ── */}
       {mainTab === 'books' && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Library className="size-5 text-ink-teal" />
-            <span className="text-sm font-black">{books ? `${books.length} 本公版书籍` : '加载中...'} · 点击阅读</span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Library className="size-5 text-ink-teal" />
+              <span className="text-sm font-black">{books ? `${bookEntries.length} 本书籍` : '加载中...'} · 点击阅读</span>
+            </div>
+            {books && (
+              <span className="text-[11px] font-bold text-muted-foreground">
+                显示 {filteredBookEntries.length}/{bookEntries.length}
+              </span>
+            )}
           </div>
+          {books && (
+            <div className="space-y-2 rounded-2xl border border-border bg-muted/20 p-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                <Input
+                  value={bookFilter.query}
+                  onChange={(event) => setBookFilter((prev) => ({ ...prev, query: event.target.value }))}
+                  placeholder="搜索书名、作者或主题…"
+                  className="rounded-2xl pl-9"
+                />
+              </div>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="按书籍难度筛选">
+                {([
+                  { key: 'all', label: '全部难度', count: bookCounts.all },
+                  { key: 'beginner', label: '初级', count: bookCounts.beginner },
+                  { key: 'intermediate', label: '中级', count: bookCounts.intermediate },
+                  { key: 'advanced', label: '高级', count: bookCounts.advanced },
+                ] as const).map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    aria-pressed={bookDifficulty === option.key}
+                    onClick={() => setBookFilter((prev) => ({ ...prev, difficulty: option.key }))}
+                    className={cn(
+                      'rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors',
+                      bookDifficulty === option.key
+                        ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
+                        : 'border-border bg-card text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {option.label} {option.count}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="按阅读状态筛选">
+                {([
+                  { key: 'all', label: '全部状态', count: bookCounts.all },
+                  { key: 'reading', label: '在读', count: bookCounts.reading },
+                  { key: 'unread', label: '未开始', count: bookCounts.unread },
+                  { key: 'finished', label: '已读完', count: bookCounts.finished },
+                ] as const).map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    aria-pressed={bookProgressFilter === option.key}
+                    onClick={() => setBookFilter((prev) => ({ ...prev, progress: option.key }))}
+                    className={cn(
+                      'rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors',
+                      bookProgressFilter === option.key
+                        ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
+                        : 'border-border bg-card text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {option.label} {option.count}
+                  </button>
+                ))}
+                {(bookQuery || bookDifficulty !== 'all' || bookProgressFilter !== 'all') && (
+                  <button
+                    type="button"
+                    onClick={() => setBookFilter({ query: '', difficulty: 'all', progress: 'all' })}
+                    className="rounded-full border border-dashed border-border px-2.5 py-1 text-[11px] font-bold text-muted-foreground hover:text-foreground"
+                  >
+                    清除筛选
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {!books ? (
             <div className="stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -993,14 +1137,25 @@ export default function ArticlePage() {
                 </div>
               ))}
             </div>
+          ) : filteredBookEntries.length === 0 ? (
+            <Card className="rounded-[24px] border-border p-8 text-center">
+              <p className="text-sm font-black text-foreground">没有符合条件的书籍</p>
+              <p className="mt-1 text-xs text-muted-foreground">换个关键词，或清除难度/阅读状态筛选。</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 rounded-full"
+                onClick={() => setBookFilter({ query: '', difficulty: 'all', progress: 'all' })}
+              >
+                清除筛选
+              </Button>
+            </Card>
           ) : (
           <div className="stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {allBooks.map((book) => {
-              const progress = getBookProgress(book.id);
-              const pct = progress ? progressPct(progress, book.id, pageCountOf(book)) : 0;
-              return (
+            {filteredBookEntries.map(({ book, progress, pct }) => (
               <Card
                 key={book.id}
+                data-book-id={book.id}
                 className="rounded-[20px] border-border hover:border-foreground/25 transition-colors cursor-pointer group"
                 onClick={() => { void openBookFromList(book).then((ok) => { if (!ok) toast.error('书本内容加载失败，请重试'); }); saveToHistory(book.zhTitle, '', 'books', { bookId: book.id }); }}
               >
@@ -1039,8 +1194,7 @@ export default function ArticlePage() {
                   </div>
                 </CardContent>
               </Card>
-              );
-            })}
+            ))}
           </div>
           )}
         </div>
@@ -1421,15 +1575,67 @@ export default function ArticlePage() {
           {/* Saved AI articles */}
           {aiArticles.length > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">
-                  已保存的 AI 文章 ({aiArticles.length})
+                  已保存的 AI 文章 ({filteredAiArticles.length}/{aiArticles.length})
                 </h3>
+                <span className="text-[10px] font-bold text-muted-foreground">
+                  显示 {visibleAiArticles.length}
+                </span>
               </div>
+              <div className="mb-3 space-y-2 rounded-2xl border border-border bg-muted/20 p-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                  <Input
+                    value={aiArticleFilter.query}
+                    onChange={(event) => setAiArticleFilter((prev) => ({ ...prev, query: event.target.value }))}
+                    placeholder="搜索 AI 文章标题、主题或复习词…"
+                    className="rounded-2xl pl-9"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="按 AI 文章来源筛选">
+                  {([
+                    { key: 'all', label: '全部来源', count: aiArticleCounts.all },
+                    { key: 'review', label: '复习词汇', count: aiArticleCounts.review },
+                    { key: 'free', label: '自由生成', count: aiArticleCounts.free },
+                  ] as const).map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      aria-pressed={aiArticleSource === option.key}
+                      onClick={() => setAiArticleFilter((prev) => ({ ...prev, source: option.key }))}
+                      className={cn(
+                        'rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors',
+                        aiArticleSource === option.key
+                          ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
+                          : 'border-border bg-card text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {option.label} {option.count}
+                    </button>
+                  ))}
+                  {(aiArticleQuery || aiArticleSource !== 'all') && (
+                    <button
+                      type="button"
+                      onClick={() => setAiArticleFilter({ query: '', source: 'all' })}
+                      className="rounded-full border border-dashed border-border px-2.5 py-1 text-[11px] font-bold text-muted-foreground hover:text-foreground"
+                    >
+                      清除筛选
+                    </button>
+                  )}
+                </div>
+              </div>
+              {filteredAiArticles.length === 0 ? (
+                <Card className="rounded-2xl border-border p-6 text-center">
+                  <p className="text-sm font-black text-foreground">没有符合条件的 AI 文章</p>
+                  <p className="mt-1 text-xs text-muted-foreground">换个关键词，或清除来源筛选。</p>
+                </Card>
+              ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {aiArticles.map((a) => (
+                {visibleAiArticles.map((a) => (
                   <Card
                     key={a.id}
+                    data-ai-article-id={a.id}
                     className="rounded-2xl border-border hover:border-[var(--brand)]/40 hover:shadow-sm transition-all cursor-pointer group"
                     onClick={() => openReader(a)}
                     title={a.rvWords?.length ? `复习词：${a.rvWords.join(', ')}` : undefined}
@@ -1489,6 +1695,23 @@ export default function ArticlePage() {
                   </Card>
                 ))}
               </div>
+              )}
+              {remainingAiArticles > 0 && (
+                <button
+                  onClick={() => setAiVisibleCount((count) => count + 12)}
+                  className="mt-3 w-full rounded-2xl border-2 border-dashed border-border py-3 text-xs font-black text-muted-foreground transition-colors hover:border-[var(--brand)]/50 hover:text-ink-teal"
+                >
+                  再显示 {Math.min(12, remainingAiArticles)} 篇（还剩 {remainingAiArticles} 篇，共 {filteredAiArticles.length} 篇）
+                </button>
+              )}
+              {aiVisibleCount > 12 && (
+                <button
+                  onClick={() => setAiVisibleCount(12)}
+                  className="mt-2 w-full py-2 text-[11px] font-bold text-muted-foreground hover:text-foreground"
+                >
+                  收起，只看前 12 篇
+                </button>
+              )}
             </div>
           )}
         </div>

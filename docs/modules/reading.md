@@ -39,6 +39,8 @@ src/data/books-meta.ts   # 只含元数据，由 scripts/gen-books-meta.cjs 生�
 
 列表页只读 `BOOK_META`，点开书才 `import('@/data/books')`（`ArticlePage.tsx:274` `openBookFromList`）—— 这是首屏从 1055KB 降到 376KB 的关键。**生成 `books-meta.ts` 时必须用真实 `buildPages`**，用 stub 会把 `pageCount` 算错。
 
+**列表筛选（2026-10-30）**：书籍页支持搜索书名/作者/主题、难度（初级/中级/高级）与阅读状态（在读/未开始/已读完，状态由 `getBookProgress` + `hasProgress` + `progressPct` 派生）；已保存 AI 文章支持搜索标题/主题/复习词、来源（全部/复习词汇/自由生成），并按 **12 篇增量加载**（`aiVisibleCount`，另有「收起，只看前 12 篇」）。两套筛选分别存 `article-book-filter` / `article-ai-filter`（`usePageMemory`），刷新保留。书籍卡/AI 文章卡带 `data-book-id` / `data-ai-article-id` 稳定钩子；`verify-list-scaling` 21 条断言守「AI 列表不许退回一次渲染全部」。样式与写作/对话/模式库的筛选条一致：搜索框 + 两行胶囊 + 空态清除。
+
 ### 2.2 运行时全文升级
 
 `books.ts` 里是节选，打开书后 `fetchFullBook()`（`src/data/book-fulltext.ts:60`）把它换成古腾堡完整版：

@@ -112,7 +112,7 @@ node scripts/verify-vocab-cards.mjs               # 492  背单词卡片契约 +
 node scripts/verify-vocab-caches.mjs              # 213  缓存封顶 + 存储写失败可见（替身真跑）+ 核心学习进度/阅读进度/批注/草稿/对话历史统一 persistText + 生词/助记保存失败不污染旧值 + trimOldest 滚动窗口双封顶
 node scripts/verify-overlay-fit.mjs               # 41   窄视口浮层契约 + 全屏层自带 safe-area + 全站唯一 Toaster 出口 + ⑥ 手机抽屉导航后必须关 + ⑦ 每个 useFramerMotion 组件的每个宿主都包 LazyFramerProvider
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
-node scripts/verify-list-scaling.mjs              # 18   长列表必须折叠/分页（写作题库 + 词库浏览 + 短语库字母段）
+node scripts/verify-list-scaling.mjs              # 24   长列表必须折叠/分页（写作题库 12+增量 + 文章 AI 列表 + 跟读语料/精听课表 + 收藏页 + 词库浏览 + 短语库字母段）
 node scripts/verify-shadowing-completion.mjs      # 27   跟读完成标记的索引契约（纯函数真跑 + 接线）+ 语音标注 <u> 渲染接线
 node scripts/verify-shadowing-asr.mjs             # 51   跟读音频链路：WAV 编码/provider 顺序/响应归一真跑 + 页面接线 + 旧 Web Speech 必须消失
 node scripts/verify-speech-analysis.mjs           # 39   离线跟读分析：合成波形的音量/停顿/音高/语速 + SpeakBack/跟读页共用 analyzeBlob
@@ -352,7 +352,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 492 · vocab-caches 213 · tts-progress 6175 · tts-hardening **31** · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 18 · shadowing 27 · **shadowing-asr 51** · **speech-analysis 39** · backup-idb 94 · cloud-sync **73** · sentence-lab 16 · spelling-resume 24 · spelling-logic **41** · **video-lab 154** · ai-parse **11** · app-version 11 · brand-fonts 35 · char-hygiene 9 · rv-articles 104 · study-credit **89** · **think-patterns 1380** · think-abort **36** · chain-verdict 36 · dashboard-glance 25 · correction-notes **90** · guard-shape **7** · **interaction-fx 107** · **imports-tracked 8** · **settings-themes 45**；合计 **9,867**，2026-10-30 复测）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 492 · vocab-caches 213 · tts-progress 6175 · tts-hardening **31** · **native-tts 45** · chunks-data **55** · overlay-fit **41** · bundle-budget 10 · list-scaling 24 · shadowing 27 · **shadowing-asr 51** · **speech-analysis 39** · backup-idb 94 · cloud-sync **73** · sentence-lab 16 · spelling-resume 24 · spelling-logic **41** · **video-lab 154** · ai-parse **11** · app-version 11 · brand-fonts 35 · char-hygiene 9 · rv-articles 104 · study-credit **89** · **think-patterns 1380** · think-abort **36** · chain-verdict 36 · dashboard-glance 25 · correction-notes **90** · guard-shape **7** · **interaction-fx 107** · **imports-tracked 8** · **settings-themes 45**；合计 **9,873**，2026-10-30 复测）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs` + `node scripts/verify-char-hygiene.mjs`（清了坏字符还要递增 `CACHE_VERSION`，否则老缓存挡住修复）
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过 `android/app/build.gradle` 的 `abiFilters` 或任何打包脚本 → 至少跑一次 `npm run package:apk:emu`（它收尾会读 APK 自己的 zip 中央目录自证：x86_64 的 sherpa `.so` 在、www/books/piper/tts 资产在、arm 0 条）；模拟器装机走 `node scripts/phone-emu.mjs check`

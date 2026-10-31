@@ -513,13 +513,16 @@ ok(typeof M.parseSrt === 'function' && typeof M.createVideoStore === 'function',
         '系统选择器里点"取消"要清掉上一次的媒体 —— 不清就会把上一段视频悄悄绑进下一课');
       ok(/已选视频：\{pendingName\}[\s\S]{0,220}pendingMedia\.current = null; setPendingName\(''\)/.test(page),
         '选了视频要在界面上写明是哪一份，并给反悔入口（原来只又弹一个选择器，用户不知道发生了什么）');
-      ok(/if \(confirmDel !== m\.id\) \{\s*setConfirmDel\(m\.id\);[\s\S]{0,160}6000\);[\s\S]{0,80}return;/.test(page),
+      ok(/if \(confirmDel !== meta\.id\) \{\s*setConfirmDel\(meta\.id\);[\s\S]{0,180}6000\);[\s\S]{0,90}return;/.test(page),
         '删课两段式确认（一次点击就带走整课媒体+字幕+译文太危险），并且 6 秒自己收回确认态');
       ok(/再点一次删除/.test(page), '确认态是界面文案（练习界面零提示口径：不弹 toast）');
       ok(/delete all\[id\];\s*persistJson\(PROGRESS_KEY, all\)/.test(page),
         '删课把这一课的进度记录一起清掉：否则重导入同一份字幕跳回老位置，看着像"没删干净"');
-      ok(/\(showAllList \? list : list\.slice\(0, 12\)\)/.test(page) && /展开全部 \$\{list\.length\} 课/.test(page),
-        '课表折叠必须配「展开全部 N 课」入口（>12 课以前点不到，属削弱用户入口）');
+      ok(/visibleLessonRows = filteredLessonRows\.slice\(0, visibleLessonCount\)/.test(page) &&
+        /setVisibleLessonCount\(\(count\) => count \+ 12\)/.test(page) &&
+        /再显示 \{Math\.min\(12, remainingLessons\)\} 课/.test(page) &&
+        /收起，只看前 12 课/.test(page),
+        '课表必须有 12 课增量与收起入口（>12 课以前点不到，属削弱用户入口）');
       ok(/onClick=\{replayCur\}/.test(page) && /const replayCur = useCallback\(\(\) => \{[\s\S]{0,320}if \(el\.paused\)[\s\S]{0,24}el\.play\(\)/.test(page),
         '「重播本句」在暂停态点了要真的播起来（只设 currentTime 就是"点了没反应"）');
       ok(/lookupRef\.current\?\.scrollIntoView\(\{ block: 'nearest' \}\)/.test(page),

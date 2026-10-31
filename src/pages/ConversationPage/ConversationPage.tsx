@@ -28,6 +28,7 @@ import {
   Languages,
   Volume2,
   History,
+  Search,
   type LucideIcon,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -304,6 +305,10 @@ export default function ConversationPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [autoRead, setAutoRead] = usePageMemory('conv-auto-read', false);
   const [convHistory, setConvHistory] = useState<ISavedConversation[]>(loadConvHistory);
+  const [scenarioFilter, setScenarioFilter] = usePageMemory<{
+    query: string;
+    kind: 'all' | 'daily' | 'advanced' | 'custom';
+  }>('conv-scenario-filter', { query: '', kind: 'all' });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
   /**
@@ -745,6 +750,46 @@ export default function ConversationPage() {
     });
   };
 
+  const scenarioCards = [
+    ...SCENARIOS.map((s) => ({ ...s, isCustom: false } as IScenario & { isCustom: boolean })),
+    ...customScenarios.map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      role: s.role,
+      icon: ICON_MAP[s.icon] ?? MessageCircle,
+      color: s.color,
+      bg: s.bg,
+      isCustom: true,
+    } as IScenario & { isCustom: boolean })),
+  ];
+  const scenarioHistoryIds = new Set(convHistory.map((item) => item.scenarioId));
+  const scenarioKind = (['all', 'daily', 'advanced', 'custom'] as const).includes(scenarioFilter.kind)
+    ? scenarioFilter.kind
+    : 'all';
+  const scenarioQuery = scenarioFilter.query.trim().toLowerCase();
+  const scenarioCounts = {
+    all: scenarioCards.length,
+    daily: scenarioCards.filter((s) => s.difficulty === '日常').length,
+    advanced: scenarioCards.filter((s) => s.difficulty === '进阶').length,
+    custom: scenarioCards.filter((s) => s.isCustom).length,
+  };
+  const filteredScenarioCards = scenarioCards.filter((scenario) => {
+    if (scenarioKind === 'daily' && scenario.difficulty !== '日常') return false;
+    if (scenarioKind === 'advanced' && scenario.difficulty !== '进阶') return false;
+    if (scenarioKind === 'custom' && !scenario.isCustom) return false;
+    if (scenarioQuery && !`${scenario.name} ${scenario.description}`.toLowerCase().includes(scenarioQuery)) {
+      return false;
+    }
+    return true;
+  });
+  const scenarioChipClass = (selected: boolean) => cn(
+    'rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors',
+    selected
+      ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
+      : 'border-border bg-card text-muted-foreground hover:text-foreground',
+  );
+
   if (!selectedScenario) {
     return (
       <div className="space-y-8">
@@ -812,23 +857,61 @@ export default function ConversationPage() {
           </Card>
         )}
 
+        <div className="space-y-2 rounded-2xl border border-border bg-muted/20 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <Input
+                value={scenarioFilter.query}
+                onChange={(event) => setScenarioFilter((prev) => ({ ...prev, query: event.target.value }))}
+                placeholder="搜索场景名称或描述…"
+                className="rounded-2xl pl-9"
+              />
+            </div>
+            <span className="text-[11px] font-bold text-muted-foreground">
+              显示 {filteredScenarioCards.length}/{scenarioCards.length}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="按场景类型筛选">
+            {([
+              { key: 'all', label: '全部场景', count: scenarioCounts.all },
+              { key: 'daily', label: '日常', count: scenarioCounts.daily },
+              { key: 'advanced', label: '进阶', count: scenarioCounts.advanced },
+              { key: 'custom', label: '自定义', count: scenarioCounts.custom },
+            ] as const).map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={scenarioKind === option.key}
+                className={scenarioChipClass(scenarioKind === option.key)}
+                onClick={() => setScenarioFilter((prev) => ({ ...prev, kind: option.key }))}
+              >
+                {option.label} {option.count}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="stagger grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[...SCENARIOS.map((s) => ({ ...s, isCustom: false } as IScenario & { isCustom: boolean })),
-            ...customScenarios.map((s) => ({
-              id: s.id,
-              name: s.name,
-              description: s.description,
-              role: s.role,
-              icon: ICON_MAP[s.icon],
-              color: s.color,
-              bg: s.bg,
-              isCustom: true,
-            } as IScenario & { isCustom: boolean })),
-          ].map((scenario) => {
+          {filteredScenarioCards.length === 0 ? (
+            <Card className="rounded-[32px] border-border p-6 md:col-span-2 text-center">
+              <p className="text-sm font-bold text-foreground">没有符合条件的场景</p>
+              <p className="mt-1 text-xs text-muted-foreground">换个关键词，或清除筛选。</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 rounded-full"
+                onClick={() => setScenarioFilter({ query: '', kind: 'all' })}
+              >
+                清除筛选
+              </Button>
+            </Card>
+          ) : filteredScenarioCards.map((scenario) => {
             const Icon = scenario.icon;
             return (
               <Card
                 key={scenario.id}
+                data-scenario-id={scenario.id}
                 onClick={() => startScenario(scenario)}
                 className="cursor-pointer hover:shadow-md transition-all duration-300 hover:-translate-y-1 group rounded-[32px] border-border overflow-hidden relative"
               >
@@ -862,6 +945,14 @@ export default function ConversationPage() {
                         )}
                       >
                         {scenario.difficulty}
+                      </Badge>
+                    )}
+                    {scenarioHistoryIds.has(scenario.id) && (
+                      <Badge
+                        variant="outline"
+                        className="rounded-full px-2 py-0.5 text-[9px] font-black border-emerald-500/40 text-emerald-600"
+                      >
+                        有记录
                       </Badge>
                     )}
                   </div>

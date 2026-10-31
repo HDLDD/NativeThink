@@ -31,7 +31,9 @@
 
 **system prompt 构造**：`buildSystemPrompt(scenario)` 返回角色设定 + 5 条通用规则（英语、简短、入戏、纠错格式 `💡`、建议回复格式）+ 可选第 6 条（场景关键词）。老 prompt 内联在 `requestOpening`/`handleSend` 里的写法已收拢到这个函数。
 
-存储 `__nativethink_conversation_history`：读、装载、写（`persistText`），**每场景只留 1 条、最多 20 个场景、每条只留最后 100 消息**，800ms 防抖。页面记忆 `usePageMemory('conv-auto-read')`。
+存储 `__nativethink_conversation_history`：读、装载、写（`persistText`），**每场景只留 1 条、最多 20 个场景、每条只留最后 100 消息**，800ms 防抖。页面记忆 `usePageMemory('conv-auto-read')`，场景筛选 `usePageMemory('conv-scenario-filter')`。
+
+场景选择页有搜索（名称/描述）与类型筛选（全部场景 / 日常 / 进阶 / 自定义），显示 `x/总数`；筛选跨刷新保留，空结果可清除。已有历史的场景卡标「有记录」。
 
 学习时长：`creditOnce('conversation', creditKey('send', selectedScenario?.name, text))`，仍在 `await` 之前。
 

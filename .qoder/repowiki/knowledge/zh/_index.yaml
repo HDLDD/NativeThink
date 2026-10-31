@@ -1,0 +1,31 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+commit: 5e4123fd35258c42ec2146c070501f9a798e7086
+branch: main
+exported_at: "2026-10-24T04:13:05Z"
+modules:
+    root:
+        dir_name: NativeThink 项目脚手架与构建配置
+        title: NativeThink 项目脚手架与构建配置
+        scope:
+            - README.md
+            - CLAUDE.md
+            - .gitignore
+            - .npmrc
+            - .spark_project
+            - package.json
+            - package-lock.json
+            - vite.config.ts
+            - tsconfig.json
+            - tsconfig.app.json
+            - tsconfig.node.json
+            - eslint.config.mjs
+            - index.html
+            - capacitor.config.json
+            - components.json
+            - wrangler.toml
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []

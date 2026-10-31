@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Clock,
   BookOpen,
+  Search,
   Heart,
   Bot,
   Wand2,
@@ -142,6 +143,12 @@ export default function ShadowingPage() {
 
   const [showGenDialog, setShowGenDialog] = useState(false);
   const [filterCategory, setFilterCategory] = usePageMemory('shadowing-filter', 'all');
+  const [filterQuery, setFilterQuery] = usePageMemory('shadowing-search', '');
+  const [filterProgress, setFilterProgress] = usePageMemory<'all' | 'unstarted' | 'active' | 'completed'>(
+    'shadowing-progress-filter',
+    'all',
+  );
+  const [visibleMaterialCount, setVisibleMaterialCount] = useState(12);
   const [genCategory, setGenCategory] = useState<string>('daily');
   const [genDifficulty, setGenDifficulty] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
   const [genTopic, setGenTopic] = useState('');
@@ -289,6 +296,45 @@ Match the topic and difficulty. Each sentence 5-20 words. Mark 1-2 stressed word
     [completedSentences, selectedCorpus],
   );
   const progressPercent = totalSentences > 0 ? Math.min(100, (totalCompleted / totalSentences) * 100) : 0;
+
+  /* ── 语料库列表：搜索 + 主题 + 跟读进度 + 12 条增量 ── */
+  const materialRows = useMemo(() => [...customMaterials, ...MOCK_SHADOWING_MATERIALS].map((corpus) => {
+    const total = corpus.sentences.length + (extraSentences[corpus.id]?.length ?? 0);
+    const done = countCompletedForCorpus(completedSentences, corpus.id);
+    return {
+      corpus,
+      done,
+      total,
+      started: done > 0,
+      finished: total > 0 && done >= total,
+    };
+  }), [customMaterials, completedSentences, extraSentences]);
+  const materialProgressFilter = (['all', 'unstarted', 'active', 'completed'] as const)
+    .includes(filterProgress) ? filterProgress : 'all';
+  const materialQuery = filterQuery.trim().toLowerCase();
+  const materialCounts = {
+    all: materialRows.length,
+    unstarted: materialRows.filter((row) => !row.started).length,
+    active: materialRows.filter((row) => row.started && !row.finished).length,
+    completed: materialRows.filter((row) => row.finished).length,
+  };
+  const filteredMaterialRows = materialRows.filter((row) => {
+    if (filterCategory !== 'all' && row.corpus.category !== filterCategory) return false;
+    if (materialProgressFilter === 'unstarted' && row.started) return false;
+    if (materialProgressFilter === 'active' && !(row.started && !row.finished)) return false;
+    if (materialProgressFilter === 'completed' && !row.finished) return false;
+    if (materialQuery) {
+      const haystack = `${row.corpus.title} ${row.corpus.description} ${CATEGORY_LABEL_MAP[row.corpus.category] || ''}`.toLowerCase();
+      if (!haystack.includes(materialQuery)) return false;
+    }
+    return true;
+  });
+  const visibleMaterialRows = filteredMaterialRows.slice(0, visibleMaterialCount);
+  const remainingMaterials = filteredMaterialRows.length - visibleMaterialCount;
+
+  useEffect(() => {
+    setVisibleMaterialCount(12);
+  }, [filterCategory, filterQuery, filterProgress]);
 
   const currentSentence = allSentences[currentSentenceIdx];
   /** 当前句的完成标记键 —— 按**合并索引**构造，与 markCompleted / 句行绿勾同源 */
@@ -942,7 +988,7 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                 <div>
                   <CardTitle className="text-lg font-black italic text-foreground">语料库</CardTitle>
                   <CardDescription className="text-xs font-medium">
-                    共 {allMaterials.length} 篇语料
+                    共 {allMaterials.length} 篇 · 显示 {visibleMaterialRows.length}/{filteredMaterialRows.length}
                   </CardDescription>
                 </div>
               </div>
@@ -951,6 +997,38 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
               <div className="flex flex-col flex-1 min-h-0">
                 {/* Category filter + AI Generate */}
                 <div className="mb-3 shrink-0 space-y-2">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                    <Input
+                      value={filterQuery}
+                      onChange={(event) => setFilterQuery(event.target.value)}
+                      placeholder="搜索语料标题或描述…"
+                      className="rounded-2xl pl-9"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label="按跟读进度筛选">
+                    {([
+                      { key: 'all', label: '全部', count: materialCounts.all },
+                      { key: 'unstarted', label: '未开始', count: materialCounts.unstarted },
+                      { key: 'active', label: '进行中', count: materialCounts.active },
+                      { key: 'completed', label: '已完成', count: materialCounts.completed },
+                    ] as const).map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        aria-pressed={materialProgressFilter === option.key}
+                        onClick={() => setFilterProgress(option.key)}
+                        className={cn(
+                          'rounded-full border px-2.5 py-1 text-[10px] font-bold transition-colors',
+                          materialProgressFilter === option.key
+                            ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
+                            : 'border-border bg-card text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {option.label} {option.count}
+                      </button>
+                    ))}
+                  </div>
                   <Select value={filterCategory} onValueChange={setFilterCategory}>
                     <SelectTrigger className="w-full rounded-2xl bg-muted border-none text-xs font-bold h-9">
                       <SelectValue placeholder="筛选主题" />
@@ -1083,11 +1161,27 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                 </Dialog>
 
                 <div className="flex-1 overflow-y-auto space-y-2">
-                  {allMaterials.filter(
-                    (c) => filterCategory === 'all' || c.category === filterCategory,
-                  ).map((corpus) => (
+                  {filteredMaterialRows.length === 0 ? (
+                    <div className="rounded-2xl border border-border bg-muted/20 p-4 text-center">
+                      <p className="text-xs font-bold text-foreground">没有符合条件的语料</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">换个关键词，或清除进度/主题筛选。</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 rounded-full"
+                        onClick={() => {
+                          setFilterQuery('');
+                          setFilterProgress('all');
+                          setFilterCategory('all');
+                        }}
+                      >
+                        清除筛选
+                      </Button>
+                    </div>
+                  ) : visibleMaterialRows.map(({ corpus, done, total, finished }) => (
                       <button
                         key={corpus.id}
+                        data-material-id={corpus.id}
                         onClick={() => selectCorpus(corpus.id)}
                         className={cn(
                           'w-full text-left p-4 rounded-2xl transition-all duration-200',
@@ -1137,15 +1231,45 @@ Be encouraging but precise. Focus on the most impactful improvements for a Chine
                             <Badge variant="secondary" className="text-[9px] font-black uppercase rounded-full px-2 py-0.5 bg-muted">
                               {corpus.difficulty === 'beginner' ? '初级' : corpus.difficulty === 'intermediate' ? '中级' : '高级'}
                             </Badge>
+                            {finished && (
+                              <Badge variant="outline" className="text-[9px] font-black rounded-full border-emerald-500/40 text-emerald-600">
+                                已完成
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                          <span className="flex items-center gap-1"><Clock className="size-3" />{corpus.sentences.length} 句</span>
+                          <span className="flex items-center gap-1"><Clock className="size-3" />{total} 句</span>
                           <span>{corpus.accent === 'US' ? '美音' : '英音'}</span>
                           <span>{CATEGORY_LABEL_MAP[corpus.category] || corpus.category}</span>
+                          <span className="ml-auto normal-case tracking-normal">{done}/{total}</span>
+                        </div>
+                        <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted" aria-hidden>
+                          <div
+                            className="h-full rounded-full bg-[var(--brand)]"
+                            style={{ width: `${total > 0 ? Math.round((done / total) * 100) : 0}%` }}
+                          />
                         </div>
                       </button>
                     ))}
+                  {remainingMaterials > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setVisibleMaterialCount((count) => count + 12)}
+                      className="w-full rounded-2xl border-2 border-dashed border-border py-2.5 text-[11px] font-black text-muted-foreground transition-colors hover:border-[var(--brand)]/50 hover:text-ink-teal"
+                    >
+                      再显示 {Math.min(12, remainingMaterials)} 篇（还剩 {remainingMaterials} 篇）
+                    </button>
+                  )}
+                  {visibleMaterialCount > 12 && (
+                    <button
+                      type="button"
+                      onClick={() => setVisibleMaterialCount(12)}
+                      className="w-full py-2 text-[10px] font-bold text-muted-foreground hover:text-foreground"
+                    >
+                      收起，只看前 12 篇
+                    </button>
+                  )}
                 </div>
               </div>
             </CardContent>

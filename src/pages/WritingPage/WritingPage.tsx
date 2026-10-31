@@ -17,6 +17,7 @@ import {
   Plus,
   Volume2,
   X,
+  Search,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -365,6 +366,11 @@ export default function WritingPage() {
   const { isConfigured, streamChat: aiStream, chat: aiChat } = useAI();
   const tts = useTTS();
   const [promptTab, setPromptTab] = usePageMemory('writing-prompt-tab', 'all');
+  const [promptFilter, setPromptFilter] = usePageMemory<{
+    query: string;
+    difficulty: 'all' | 'beginner' | 'intermediate' | 'advanced';
+    progress: 'all' | 'unwritten' | 'written';
+  }>('writing-prompt-filter', { query: '', difficulty: 'all', progress: 'all' });
 
   const [selectedPrompt, setSelectedPrompt] = useState<IWritingPrompt | null>(null);
   const [essay, setEssay] = useState('');
@@ -691,6 +697,37 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
   };
 
   const allPrompts = [...customPrompts, ...WRITING_PROMPTS];
+  const writtenTitles = new Set(history.map((item) => item.prompt));
+  const promptQuery = promptFilter.query.trim().toLowerCase();
+  const difficultyFilter = (['all', 'beginner', 'intermediate', 'advanced'] as const)
+    .includes(promptFilter.difficulty) ? promptFilter.difficulty : 'all';
+  const progressFilter = (['all', 'unwritten', 'written'] as const)
+    .includes(promptFilter.progress) ? promptFilter.progress : 'all';
+  const difficultyCounts = {
+    all: allPrompts.length,
+    beginner: allPrompts.filter((prompt) => prompt.difficulty === 'beginner').length,
+    intermediate: allPrompts.filter((prompt) => prompt.difficulty === 'intermediate').length,
+    advanced: allPrompts.filter((prompt) => prompt.difficulty === 'advanced').length,
+  };
+  const baseFilteredPrompts = allPrompts.filter((prompt) => {
+    if (difficultyFilter !== 'all' && prompt.difficulty !== difficultyFilter) return false;
+    if (promptQuery) {
+      const haystack = `${prompt.title} ${prompt.description} ${prompt.category} ${prompt.tips.join(' ')}`.toLowerCase();
+      if (!haystack.includes(promptQuery)) return false;
+    }
+    return true;
+  });
+  const promptProgressCounts = {
+    all: baseFilteredPrompts.length,
+    written: baseFilteredPrompts.filter((prompt) => writtenTitles.has(prompt.title)).length,
+    unwritten: baseFilteredPrompts.filter((prompt) => !writtenTitles.has(prompt.title)).length,
+  };
+  const filteredPrompts = baseFilteredPrompts.filter((prompt) => {
+    if (progressFilter === 'written') return writtenTitles.has(prompt.title);
+    if (progressFilter === 'unwritten') return !writtenTitles.has(prompt.title);
+    return true;
+  });
+  const promptFilterKey = `${promptQuery}|${difficultyFilter}|${progressFilter}`;
 
   if (!selectedPrompt) {
     return (
@@ -807,6 +844,77 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
           )}
         </div>
 
+        <div className="mb-4 space-y-2 rounded-2xl border border-border bg-muted/20 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <Input
+                value={promptFilter.query}
+                onChange={(event) => setPromptFilter((prev) => ({ ...prev, query: event.target.value }))}
+                placeholder="搜索题目、描述、类别或提示…"
+                className="rounded-2xl pl-9"
+              />
+            </div>
+            <span className="text-[11px] font-bold text-muted-foreground">
+              匹配 {filteredPrompts.length}/{allPrompts.length}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="按难度筛选">
+            {([
+              { key: 'all', label: '全部难度', count: difficultyCounts.all },
+              { key: 'beginner', label: '初级', count: difficultyCounts.beginner },
+              { key: 'intermediate', label: '中级', count: difficultyCounts.intermediate },
+              { key: 'advanced', label: '高级', count: difficultyCounts.advanced },
+            ] as const).map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={difficultyFilter === option.key}
+                onClick={() => setPromptFilter((prev) => ({ ...prev, difficulty: option.key }))}
+                className={cn(
+                  'rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors',
+                  difficultyFilter === option.key
+                    ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
+                    : 'border-border bg-card text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {option.label} {option.count}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="按练习状态筛选">
+            {([
+              { key: 'all', label: '全部状态', count: promptProgressCounts.all },
+              { key: 'unwritten', label: '未写过', count: promptProgressCounts.unwritten },
+              { key: 'written', label: '已写过', count: promptProgressCounts.written },
+            ] as const).map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={progressFilter === option.key}
+                onClick={() => setPromptFilter((prev) => ({ ...prev, progress: option.key }))}
+                className={cn(
+                  'rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors',
+                  progressFilter === option.key
+                    ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
+                    : 'border-border bg-card text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {option.label} {option.count}
+              </button>
+            ))}
+            {(promptQuery || difficultyFilter !== 'all' || progressFilter !== 'all') && (
+              <button
+                type="button"
+                onClick={() => setPromptFilter({ query: '', difficulty: 'all', progress: 'all' })}
+                className="rounded-full border border-dashed border-border px-2.5 py-1 text-[11px] font-bold text-muted-foreground hover:text-foreground"
+              >
+                清除筛选
+              </button>
+            )}
+          </div>
+        </div>
+
         <Tabs value={promptTab} onValueChange={setPromptTab} className="w-full">
           <TabsList className="bg-muted p-1.5 rounded-3xl h-auto mb-6 max-w-full overflow-x-auto flex-nowrap justify-start [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <TabsTrigger
@@ -842,7 +950,13 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
           </TabsList>
 
           <TabsContent value="all" className="mt-0">
-            <PromptGrid list={allPrompts} onSelect={startWriting} onDelete={handleDeletePrompt} />
+            <PromptGrid
+              key={`all-${promptFilterKey}`}
+              list={filteredPrompts}
+              writtenTitles={writtenTitles}
+              onSelect={startWriting}
+              onDelete={handleDeletePrompt}
+            />
           </TabsContent>
           {['narrative', 'opinion', 'workplace', 'essay'].map((cat) => {
             const catMap: Record<string, string> = {
@@ -853,7 +967,13 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
             };
             return (
               <TabsContent key={cat} value={cat} className="mt-0">
-                <PromptGrid list={allPrompts.filter((p) => p.category === catMap[cat])} onSelect={startWriting} onDelete={handleDeletePrompt} />
+                <PromptGrid
+                  key={`${cat}-${promptFilterKey}`}
+                  list={filteredPrompts.filter((p) => p.category === catMap[cat])}
+                  writtenTitles={writtenTitles}
+                  onSelect={startWriting}
+                  onDelete={handleDeletePrompt}
+                />
               </TabsContent>
             );
           })}
@@ -1111,28 +1231,57 @@ The prompt should be practical and relevant to daily life, work, or study. Make 
  */
 function PromptGrid({
   list,
+  writtenTitles,
   onSelect,
   onDelete,
 }: {
   list: IWritingPrompt[];
+  writtenTitles?: Set<string>;
   onSelect: (p: IWritingPrompt) => void;
   onDelete?: (e: React.MouseEvent, id: string) => void;
 }) {
-  const [showAll, setShowAll] = useState(false);
-  const visible = showAll ? list : list.slice(0, 12);
+  const PAGE_SIZE = 12;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const visible = list.slice(0, visibleCount);
+  const remaining = list.length - visibleCount;
+
+  if (list.length === 0) {
+    return (
+      <Card className="rounded-[32px] border-border p-8 text-center">
+        <p className="text-sm font-black text-foreground">没有符合条件的写作题目</p>
+        <p className="mt-1 text-xs text-muted-foreground">换个关键词，或清除难度/状态筛选。</p>
+      </Card>
+    );
+  }
+
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {visible.map((prompt) => (
-          <PromptCard key={prompt.id} prompt={prompt} onSelect={onSelect} isAi={prompt.id.startsWith('ai_')} onDelete={onDelete} />
+          <PromptCard
+            key={prompt.id}
+            prompt={prompt}
+            written={writtenTitles?.has(prompt.title)}
+            onSelect={onSelect}
+            isAi={prompt.id.startsWith('ai_')}
+            onDelete={onDelete}
+          />
         ))}
       </div>
-      {list.length > 12 && (
+      {remaining > 0 && (
         <button
-          onClick={() => setShowAll((v) => !v)}
+          onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
           className="mt-4 w-full py-3 rounded-2xl border-2 border-dashed border-border text-xs font-black text-muted-foreground hover:border-[var(--brand)]/50 hover:text-ink-teal transition-colors"
         >
-          {showAll ? '收起，只看前 12 题' : `展开其余 ${list.length - 12} 题（共 ${list.length} 题）`}
+          再显示 {Math.min(PAGE_SIZE, remaining)} 题（还剩 {remaining} 题，共 {list.length} 题）
+        </button>
+      )}
+      {visibleCount > PAGE_SIZE && (
+        <button
+          onClick={() => setVisibleCount(PAGE_SIZE)}
+          className="mt-2 w-full py-2 text-[11px] font-bold text-muted-foreground hover:text-foreground"
+        >
+          收起，只看前 {PAGE_SIZE} 题
         </button>
       )}
     </>
@@ -1144,11 +1293,13 @@ function PromptCard({
   onSelect,
   isAi,
   onDelete,
+  written,
 }: {
   prompt: IWritingPrompt;
   onSelect: (p: IWritingPrompt) => void;
   isAi?: boolean;
   onDelete?: (e: React.MouseEvent, id: string) => void;
+  written?: boolean;
 }) {
   const { addFavorite, removeFavorite, isFavorited, favorites } = useFavorites();
   const favorited = isFavorited(prompt.title, 'writing_prompt');
@@ -1163,6 +1314,7 @@ function PromptCard({
   };
   return (
     <Card
+      data-prompt-id={prompt.id}
       className="cursor-pointer hover:shadow-md transition-all duration-300 hover:-translate-y-1 group rounded-[32px] border-border"
       onClick={() => onSelect(prompt)}
     >
@@ -1172,6 +1324,14 @@ function PromptCard({
             {isAi && (
               <Badge className="shrink-0 text-[8px] font-black uppercase rounded-full px-1.5 py-0 bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white border-0">
                 AI
+              </Badge>
+            )}
+            {written && (
+              <Badge
+                variant="outline"
+                className="shrink-0 text-[8px] font-black rounded-full border-emerald-500/40 text-emerald-600"
+              >
+                已写过
               </Badge>
             )}
             <h3 className="text-lg font-black text-foreground group-hover:text-ink-teal transition-colors truncate">

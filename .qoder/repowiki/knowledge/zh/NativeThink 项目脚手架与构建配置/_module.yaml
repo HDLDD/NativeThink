@@ -1,0 +1,65 @@
+schema_version: 1
+module_path: root
+title: NativeThink 项目脚手架与构建配置
+scope:
+    - README.md
+    - CLAUDE.md
+    - .gitignore
+    - .npmrc
+    - .spark_project
+    - package.json
+    - package-lock.json
+    - vite.config.ts
+    - tsconfig.json
+    - tsconfig.app.json
+    - tsconfig.node.json
+    - eslint.config.mjs
+    - index.html
+    - capacitor.config.json
+    - components.json
+    - wrangler.toml
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: 4dcf5958-3ac3-4fbd-be81-8aeafe4656d8
+kk_cards:
+    architecture_design:
+        id: bd133623-9f36-4088-8593-717d6ec1464f
+        title: NativeThink 项目脚手架与构建配置
+    coding_conventions:
+        id: 04576eb1-033f-4b41-8423-4a8c566f8d6a
+        title: NativeThink 项目脚手架与构建配置
+    overview:
+        id: 9a733043-8333-421f-a0c4-5df1de0030c2
+        title: NativeThink 项目脚手架与构建配置
+    tech_stack:
+        id: 8e26d291-c9ca-4fe0-ada5-2056b29ddd0a
+        title: NativeThink 项目脚手架与构建配置
+    unique_setup_and_commands:
+        id: 178f4f13-2c47-4592-b087-1f726ddd8638
+        title: NativeThink 项目脚手架与构建配置
+    build_system:
+        id: b9421819-0f87-4906-9744-16c9a07894bd
+        title: NativeThink 多端构建与发布系统（Vite + Capacitor + Electron + Cloudflare Pages）
+    configuration_system:
+        id: 07a92ebb-0d30-4aaf-b0e8-3d38009b97bf
+        title: NativeThink 多端运行配置体系：构建期注入、运行时环境与平台探测
+    dependency_management:
+        id: c83debc4-d89e-4772-86a9-619dc8098799
+        title: NPM + Vite 多端依赖管理（镜像源、锁定文件与脚本编排）
+    error_handling:
+        id: d707ab2f-048f-43f5-bc61-882735a14224
+        title: NativeThink 前端与 Cloudflare Functions 的错误处理体系
+    frontend_style:
+        id: ac2ff5ca-dc61-41c3-8199-5a30313695cb
+        title: Tailwind v4 + shadcn/ui 设计系统与多主题体系
+    logging_system:
+        id: b51c8bb0-798e-4792-ac28-6d809cc66d6e
+        title: 原生 console 输出 + Cloudflare Functions 结构化日志
+kk_repo_cards:
+    - build_system
+    - configuration_system
+    - dependency_management
+    - error_handling
+    - frontend_style
+    - logging_system

@@ -54,6 +54,8 @@ LEGACY_KEY      = __nativethink_favorites_v2     （裸 localStorage，读一次
 - **去重口径 = `content + type` 相同即拒**（`:77`）。所以写作题收藏的是 `title`、句子学习收藏的是 `item.en`、句型收藏的是 `'模式:' + id`、造句收藏的是用户自己写的原文 —— **同一句英文在不同模块会产生不同条目**（`type` 不同），而 `type` 相同时靠 `content` 判重。
 - 跨实例广播 `nativethink-favorites-changed`（`:60,70`），并且它**是三个订阅 `nativethink-sync-down` 的 hook 之一**（`:53`）。
 - **读盘边界做形状清洗（2026-10-17）**：`sanitizeFavorites(raw)`（`use-favorites.ts:73`）先把每条收成合法形状 —— 缺 `id`/缺 `content` 的条目丢出视图、`content` 是对象就整条丢（直出会让 React 抛错、ErrorBoundary 接走**整页**）、数字/布尔收成字符串（**不丢用户的条目**）、`example` 为 null/缺失时不凭空造键。为什么必须有：收藏是全站唯一不校验的清单加载器，而它有**两条外部来源**（`__nativethink_favorites_v2` 旧键迁移 + 云同步下行），渲染层却是 `{f.content}` 直出 + `cleanText(f.example)`（对非字符串直接 `.replace`）。回写判据刻意用**条数变化**而不是序列化比较 —— 清洗会重建对象、键序变了，按比较结果写就会**每次挂载都落盘**。守卫 `verify-vocab-cards` ㉔ 真跑（11 条，变异 5 条逐条验红）。
+**收藏列表（2026-10-30）**：搜索收藏内容/释义/例句/分类；类型 chips 带计数（全部/单词/语块/表达…）；默认 12 条，按 12 条增量加载、可收起；筛选状态存 `favorites-filter`（`usePageMemory`），空结果仍保留搜索与类型入口并可清除。卡片带 `data-favorite-id` 稳定钩子。`verify-list-scaling` 24 条断言里新增了这一段。
+
 - **收藏回顾（`FavoriteReviewMode`）有两个入口，必须各自带 `<LazyFramerProvider>`**：收藏页「开始回顾」（`FavoritesPage.tsx:92-105`）与学习记录页的收藏卡（`ProgressPage.tsx:944-946`）。该组件内部走 `useFramerMotion()`，旧实现在缺 provider 时**直接 throw** —— 2026-10-17 真机就是收藏页裸渲染，点「开始回顾」整页变「我的收藏页面出错」，而学习记录页一直正常（同一个组件两种命运）。现在 hook 缺 provider 时退化成无动画 + 一次性 `console.warn`（`lazy-framer-motion.tsx:69-81`），守卫 `verify-overlay-fit` ⑦ 改成**逐个宿主点名**（旧写法"任意一个宿主包了就放行"正是这条假绿的形状）。
 - `clearAll()` 是一次 `persist([])`，注释写明原因：「循环调 `removeFavorite` 会因陈旧闭包只删掉最后一条（ProgressPage 重置踩过）」（`:96-99`）。
 - **空态出入口（2026-10-29）**：`FavoritesPage.tsx:241-256` 的 `EmptyState` 增加「去词汇学习」按钮（`navigate('/vocabulary')`），底部提示去掉 `/60` 透明度；393px 实测按钮 134×42、bottom 482 在首屏内。空态不再是只有说明、没有下一步的终点。

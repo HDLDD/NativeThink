@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { cn, cleanText } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
 import { useFavorites } from '@/lib/use-favorites';
@@ -29,6 +31,7 @@ import { queryWords, preloadCoreOnly } from '@/data/wordbank';
 import type { IWordEntry } from '@/data/wordbank';
 import { safeStorage } from '@/lib/safe-storage';
 import { persistJson } from '@/lib/capped-cache';
+import { usePageMemory } from '@/lib/use-page-memory';
 import { useAI } from '@/hooks/use-ai';
 import { parseBatchTranslation } from '@/data/book-translation';
 import {
@@ -117,8 +120,11 @@ export default function VideoLabPage() {
   /** 选了视频要先让用户看见"选的是哪个文件"，并留着反悔的入口（原来只弹字幕框，界面无反馈） */
   const [pendingName, setPendingName] = useState('');
   const [dragOver, setDragOver] = useState(false);
-  /** 课表折叠 + 展开入口（超过 12 课不许点不到） */
-  const [showAllList, setShowAllList] = useState(false);
+  const [listFilter, setListFilter] = usePageMemory<{
+    query: string;
+    progress: 'all' | 'unstarted' | 'active' | 'finished';
+  }>('video-list-filter', { query: '', progress: 'all' });
+  const [visibleLessonCount, setVisibleLessonCount] = useState(12);
   /** 删除要两段式确认：手机上一根手指点中 14px 的垃圾桶就永久没了 */
   const [confirmDel, setConfirmDel] = useState('');
   /** 这一课"到达过"的最远句（换课/重进都从进度里读回来，用来给"听完了"的反馈） */
@@ -659,6 +665,46 @@ export default function VideoLabPage() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [lesson, idx, sentences.length, cur, toggle, seekTo, replayCur, toggleLoop]);
 
+  /* ── 课表筛选：搜索 + 听力进度 + 12 课增量 ── */
+  const videoProgressMap = useMemo(() => {
+    try {
+      return JSON.parse(safeStorage.getItem(PROGRESS_KEY) || '{}') as Record<string, IVideoProgress>;
+    } catch {
+      return {};
+    }
+  }, [list, lesson]);
+  const lessonRows = useMemo(() => list.map((meta) => {
+    const listenedCount = Math.max(0, Math.min(videoProgressMap[meta.id]?.listened ?? 0, meta.sentenceCount));
+    return {
+      meta,
+      listened: listenedCount,
+      started: listenedCount > 0,
+      finished: meta.sentenceCount > 0 && listenedCount >= meta.sentenceCount,
+    };
+  }), [list, videoProgressMap]);
+  const lessonProgressFilter = (['all', 'unstarted', 'active', 'finished'] as const)
+    .includes(listFilter.progress) ? listFilter.progress : 'all';
+  const lessonQuery = listFilter.query.trim().toLowerCase();
+  const lessonCounts = {
+    all: lessonRows.length,
+    unstarted: lessonRows.filter((row) => !row.started).length,
+    active: lessonRows.filter((row) => row.started && !row.finished).length,
+    finished: lessonRows.filter((row) => row.finished).length,
+  };
+  const filteredLessonRows = lessonRows.filter((row) => {
+    if (lessonProgressFilter === 'unstarted' && row.started) return false;
+    if (lessonProgressFilter === 'active' && !(row.started && !row.finished)) return false;
+    if (lessonProgressFilter === 'finished' && !row.finished) return false;
+    if (lessonQuery && !row.meta.title.toLowerCase().includes(lessonQuery)) return false;
+    return true;
+  });
+  const visibleLessonRows = filteredLessonRows.slice(0, visibleLessonCount);
+  const remainingLessons = filteredLessonRows.length - visibleLessonCount;
+
+  useEffect(() => {
+    setVisibleLessonCount(12);
+  }, [lessonQuery, lessonProgressFilter]);
+
   /* ── 渲染 ── */
   if (!lesson) {
     return (
@@ -735,40 +781,113 @@ export default function VideoLabPage() {
 
             {list.length > 0 && (
               <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">已导入 {list.length} 课</p>
-                {(showAllList ? list : list.slice(0, 12)).map((m) => (
-                  <button key={m.id} onClick={() => { setConfirmDel(''); openLesson(m.id); }}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                    已导入 {list.length} 课
+                  </p>
+                  <span className="text-[10px] font-bold text-muted-foreground">
+                    显示 {visibleLessonRows.length}/{filteredLessonRows.length}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                    <Input
+                      value={listFilter.query}
+                      onChange={(event) => setListFilter((prev) => ({ ...prev, query: event.target.value }))}
+                      placeholder="搜索课程名…"
+                      className="rounded-2xl pl-9"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label="按听力进度筛选">
+                    {([
+                      { key: 'all', label: '全部', count: lessonCounts.all },
+                      { key: 'unstarted', label: '未开始', count: lessonCounts.unstarted },
+                      { key: 'active', label: '进行中', count: lessonCounts.active },
+                      { key: 'finished', label: '已完成', count: lessonCounts.finished },
+                    ] as const).map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        aria-pressed={lessonProgressFilter === option.key}
+                        onClick={() => setListFilter((prev) => ({ ...prev, progress: option.key }))}
+                        className={cn(
+                          'rounded-full border px-2.5 py-1 text-[10px] font-bold transition-colors',
+                          lessonProgressFilter === option.key
+                            ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-ink-teal'
+                            : 'border-border bg-card text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {option.label} {option.count}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {filteredLessonRows.length === 0 ? (
+                  <div className="rounded-2xl border border-border bg-muted/20 p-4 text-center">
+                    <p className="text-xs font-bold text-foreground">没有符合条件的课程</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">换个关键词，或清除进度筛选。</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 rounded-full"
+                      onClick={() => setListFilter({ query: '', progress: 'all' })}
+                    >
+                      清除筛选
+                    </Button>
+                  </div>
+                ) : visibleLessonRows.map(({ meta, listened: lessonListened, finished }) => (
+                  <button key={meta.id} data-lesson-id={meta.id} onClick={() => { setConfirmDel(''); openLesson(meta.id); }}
                     className="w-full text-left px-3 py-2.5 rounded-2xl border border-border/60 bg-muted/20 hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-2">
-                      <span className="text-[12px] font-black text-foreground truncate flex-1">{m.title}</span>
-                      <span className="text-[9px] font-bold text-muted-foreground tabular-nums shrink-0">{fmt(m.duration)}</span>
+                      <span className="text-[12px] font-black text-foreground truncate flex-1">{meta.title}</span>
+                      {finished && (
+                        <Badge variant="outline" className="shrink-0 text-[8px] font-black rounded-full border-emerald-500/40 text-emerald-600">
+                          已完成
+                        </Badge>
+                      )}
+                      <span className="text-[9px] font-bold text-muted-foreground tabular-nums shrink-0">{fmt(meta.duration)}</span>
                       {/* 两段式确认：误触一次不会把整课（媒体 + 字幕 + 译文 + 进度）带走 */}
                       <span role="button" tabIndex={-1}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirmDel !== m.id) {
-                            setConfirmDel(m.id);
-                            setTimeout(() => setConfirmDel((v) => (v === m.id ? '' : v)), 6000);
+                          if (confirmDel !== meta.id) {
+                            setConfirmDel(meta.id);
+                            setTimeout(() => setConfirmDel((v) => (v === meta.id ? '' : v)), 6000);
                             return;
                           }
                           setConfirmDel('');
-                          void removeLesson(m.id);
+                          void removeLesson(meta.id);
                         }}
                         className={cn('shrink-0 px-1.5 py-1 rounded-lg text-[9px] font-black flex items-center gap-1',
-                          confirmDel === m.id ? 'text-rose-500 border border-rose-300/70' : 'text-muted-foreground/50 hover:text-rose-400')}>
-                        <Trash2 className="size-3.5" />{confirmDel === m.id ? '再点一次删除' : ''}
+                          confirmDel === meta.id ? 'text-rose-500 border border-rose-300/70' : 'text-muted-foreground/50 hover:text-rose-400')}>
+                        <Trash2 className="size-3.5" />{confirmDel === meta.id ? '再点一次删除' : ''}
                       </span>
                     </div>
                     <p className="text-[9px] font-bold text-muted-foreground mt-0.5">
-                      {m.sentenceCount} 句 · {m.hasWords ? '逐词时间戳' : '句级时间戳'} · {m.bytes ? `${(m.bytes / 2 ** 20).toFixed(0)} MB 原声` : '仅字幕'}{m.hasZh ? ' · 已翻译' : ''}
+                      {meta.sentenceCount} 句 · {meta.hasWords ? '逐词时间戳' : '句级时间戳'} · {meta.bytes ? `${(meta.bytes / 2 ** 20).toFixed(0)} MB 原声` : '仅字幕'}{meta.hasZh ? ' · 已翻译' : ''}
+                      {' · '}已听 {lessonListened}/{meta.sentenceCount}
                     </p>
                   </button>
                 ))}
-                {/* 折叠必须有展开入口（AGENTS「长列表」那条口径，不许切成看不见的 12 课） */}
-                {list.length > 12 && (
-                  <button data-press="soft" onClick={() => setShowAllList((v) => !v)}
-                    className="text-[10px] font-bold text-teal-600 hover:underline">
-                    {showAllList ? '收回前 12 课' : `展开全部 ${list.length} 课`}
+                {remainingLessons > 0 && (
+                  <button
+                    type="button"
+                    data-press="soft"
+                    onClick={() => setVisibleLessonCount((count) => count + 12)}
+                    className="w-full rounded-2xl border-2 border-dashed border-border py-2.5 text-[10px] font-black text-muted-foreground transition-colors hover:border-[var(--brand)]/50 hover:text-ink-teal"
+                  >
+                    再显示 {Math.min(12, remainingLessons)} 课（还剩 {remainingLessons} 课）
+                  </button>
+                )}
+                {visibleLessonCount > 12 && (
+                  <button
+                    type="button"
+                    data-press="soft"
+                    onClick={() => setVisibleLessonCount(12)}
+                    className="w-full py-2 text-[10px] font-bold text-muted-foreground hover:text-foreground"
+                  >
+                    收起，只看前 12 课
                   </button>
                 )}
               </div>

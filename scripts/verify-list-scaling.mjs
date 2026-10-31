@@ -34,9 +34,14 @@ const check = (cond, label, detail) => {
   const gEnd = src.indexOf('\nfunction ', gStart + 10);
   const grid = gStart >= 0 && gEnd > gStart ? src.slice(gStart, gEnd) : '';
   check(grid.length > 200, `脚手架自检：抓到 PromptGrid 组件体（${grid.length} 字符）`);
-  check(/list\.slice\(0, 12\)/.test(grid), '题卡默认只渲染前 12 张');
-  check(/showAll \? list : list\.slice/.test(grid), '展开后渲染完整列表（折叠不是丢内容）');
-  check(/展开其余 \$\{list\.length - 12\} 题/.test(grid) && /收起/.test(grid), '有"展开其余 N 题"与"收起"两个入口');
+  check(/const PAGE_SIZE = 12/.test(grid) && /list\.slice\(0, visibleCount\)/.test(grid),
+    '题卡默认只渲染前 12 张（可见数量由 PAGE_SIZE 控制）');
+  check(/setVisibleCount\(\(count\) => count \+ PAGE_SIZE\)/.test(grid) &&
+    /再显示 \{Math\.min\(PAGE_SIZE, remaining\)\} 题/.test(grid) && /还剩 \{remaining\} 题/.test(grid),
+    '按 12 题增量展开，不一次渲染整份题库');
+  check(/收起，只看前 \{PAGE_SIZE\} 题/.test(grid) &&
+    /没有符合条件的写作题目/.test(grid) && /writtenTitles\?\.has/.test(grid),
+    '可收起、空筛选有兜底、已写过状态有标记');
 
   // 源码里只有两个字面 TabsContent 块（四个分类由 .map 生成），两处都必须走 PromptGrid
   const panels = (src.match(/<TabsContent[\s\S]{0,400}?<\/TabsContent>/g) || []).filter((b) => /PromptCard|PromptGrid/.test(b));
@@ -44,6 +49,51 @@ const check = (cond, label, detail) => {
   check(panels.every((b) => /<PromptGrid/.test(b)), '全部题目与分类模板面板都走 PromptGrid（没有漏网的全量 map）');
   check(!/allPrompts\.map\(/.test(src) && !/catMap\[cat\)\]\.map\(/.test(src),
     '正对照：不再存在对整份题库的直接 .map 渲染');
+}
+
+/* ── 文章页：书籍/AI 文章筛选 + AI 保存列表增量 ── */
+{
+  const src = read('src/pages/ArticlePage/ArticlePage.tsx');
+  check(/visibleAiArticles = filteredAiArticles\.slice\(0, aiVisibleCount\)/.test(src) &&
+    /setAiVisibleCount\(\(count\) => count \+ 12\)/.test(src) &&
+    /再显示 \{Math\.min\(12, remainingAiArticles\)\} 篇/.test(src) &&
+    /收起，只看前 12 篇/.test(src),
+    'AI 已保存文章按 12 篇增量展开，不一次渲染全部');
+  check(/article-book-filter/.test(src) && /article-ai-filter/.test(src) &&
+    /bookCounts\.reading/.test(src) && /aiArticleCounts\.review/.test(src),
+    '书籍/AI 文章筛选持久化，状态计数来自阅读进度/文章源的派生值');
+  check(/data-book-id=\{book\.id\}/.test(src) && /data-ai-article-id=\{a\.id\}/.test(src),
+    '书籍与 AI 文章卡有稳定数据 id（便于分页/筛选与运行时走查）');
+}
+
+/* ── 口语/听力列表：影子跟读语料 + 视频精听课表 ── */
+{
+  const shadow = read('src/pages/ShadowingPage/ShadowingPage.tsx');
+  check(/visibleMaterialRows = filteredMaterialRows\.slice\(0, visibleMaterialCount\)/.test(shadow) &&
+    /setVisibleMaterialCount\(\(count\) => count \+ 12\)/.test(shadow) &&
+    /再显示 \{Math\.min\(12, remainingMaterials\)\} 篇/.test(shadow) &&
+    /收起，只看前 12 篇/.test(shadow) &&
+    /data-material-id=\{corpus\.id\}/.test(shadow),
+    '影子跟读语料按 12 篇增量展开，筛选/进度状态可见');
+  const video = read('src/pages/VideoLabPage/VideoLabPage.tsx');
+  check(/visibleLessonRows = filteredLessonRows\.slice\(0, visibleLessonCount\)/.test(video) &&
+    /setVisibleLessonCount\(\(count\) => count \+ 12\)/.test(video) &&
+    /再显示 \{Math\.min\(12, remainingLessons\)\} 课/.test(video) &&
+    /收起，只看前 12 课/.test(video) &&
+    /data-lesson-id=\{meta\.id\}/.test(video),
+    '视频精听课表按 12 课增量展开，听力进度筛选可见');
+}
+
+/* ── 收藏页：搜索 + 类型筛选 + 12 条增量 ── */
+{
+  const fav = read('src/pages/FavoritesPage/FavoritesPage.tsx');
+  check(/visibleFavorites = filteredFavorites\.slice\(0, visibleFavoriteCount\)/.test(fav) &&
+    /setVisibleFavoriteCount\(\(count\) => count \+ 12\)/.test(fav) &&
+    /再显示 \{Math\.min\(12, remainingFavorites\)\} 条/.test(fav) &&
+    /收起，只看前 12 条/.test(fav) &&
+    /favorites-filter/.test(fav) &&
+    /data-favorite-id=\{item\.id\}/.test(fav),
+    '收藏页搜索/类型筛选 + 12 条增量，筛选空态仍保留入口');
 }
 
 /* ── 词库浏览分页（同一个不变量的另一处，防止被改回全量渲染） ── */
