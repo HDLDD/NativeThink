@@ -7,7 +7,7 @@
  *   ③ 最上面那排数字 —— 今天到哪儿了。
  * 颜色在这里是**识别**用的，不是装饰：同一种青 / 赭 / 蓝灰…… 在卡片、返回条、图标上是同一个色。
  */
-import { Repeat, Layers, Search, ArrowRight, Languages, RefreshCw, BookOpen } from 'lucide-react';
+import { Repeat, Layers, Search, ArrowRight, Languages, RefreshCw, BookOpen, Eye } from 'lucide-react';
 import { THINK_PATTERNS } from '@/data/think-patterns';
 import type { IThinkPatternDiagnosticRecord } from '@/lib/think-patterns';
 import { thinkTabLabel, thinkTabTint, thinkTabTone } from './thinkTabTones';
@@ -40,6 +40,7 @@ export function ThinkOverview({
   const heroTone = thinkTabTone('patterns');
 
   const others: IEntry[] = [
+    { tab: 'input', desc: '读英文的时候，别在脑子里逐词翻。', icon: Eye },
     { tab: 'detector', desc: '查一句话有没有中式表达，指出来。', icon: Search },
     { tab: 'translation', desc: '看中文场景，直接用英语描述。', icon: ArrowRight },
     { tab: 'backTranslation', desc: '看英文，还原背后的中文思维。', icon: Languages },
@@ -108,7 +109,7 @@ export function ThinkOverview({
                 backgroundColor: thinkTabTint(entry.tab, '0A'),
                 borderColor: thinkTabTint(entry.tab, '38'),
               }}
-              className="group relative flex w-full items-start gap-3 overflow-hidden rounded-2xl border py-3 pr-3.5 pl-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
+              className="group relative flex w-full items-start gap-3 overflow-hidden rounded-2xl border py-3 pr-3.5 pl-4 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md"
             >
               <span
                 aria-hidden

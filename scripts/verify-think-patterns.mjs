@@ -1901,8 +1901,8 @@ const ovSrc = stripComments(readUi('src/pages/ThinkInEnglishPage/ThinkOverview.t
 check(/onGo\(entry\.tab\)/.test(ovSrc), '首页：卡片点击进入对应功能（不是摆设）');
 check(/onGo\('patterns'\)/.test(ovSrc), '首页：主卡指向模式训练');
 const cardOrder = [...ovSrc.matchAll(/tab: '([A-Za-z]+)'/g)].map((m) => m[1]);
-check(cardOrder.join(',') === 'detector,translation,backTranslation,nativeTranslate,extras,longTask',
-  '首页：六张功能卡的顺序（练习倒数第二，长文排最后）', cardOrder.join(','));
+check(cardOrder.join(',') === 'input,detector,translation,backTranslation,nativeTranslate,extras,longTask',
+  '首页：七张功能卡的顺序（读英文紧挨模式训练，长文排最后）', cardOrder.join(','));
 check(/thinkTabTone\(entry\.tab\)/.test(ovSrc) && /thinkTabTint\(entry\.tab/.test(ovSrc),
   '首页：卡片用自己功能的颜色（淡底 + 实色竖条 + 同色图标）');
 check(/linear-gradient\(135deg/.test(ovSrc) && /今日先练/.test(ovSrc),
@@ -1910,8 +1910,8 @@ check(/linear-gradient\(135deg/.test(ovSrc) && /今日先练/.test(ovSrc),
 
 const toneSrc = readUi('src/pages/ThinkInEnglishPage/thinkTabTones.ts');
 const toneKeys = [...toneSrc.matchAll(/^\s{2}([A-Za-z]+):\s*'#[0-9a-fA-F]{6}',/gm)].map((m) => m[1]);
-check(toneKeys.join(',') === 'patterns,detector,translation,backTranslation,nativeTranslate,extras,longTask',
-  '配色：七个功能各一个色，且与子级 tab 表一一对应', toneKeys.join(','));
+check(toneKeys.join(',') === 'patterns,input,detector,translation,backTranslation,nativeTranslate,extras,longTask',
+  '配色：八个功能各一个色，且与子级 tab 表一一对应', toneKeys.join(','));
 check(/THINK_TAB_LABELS/.test(toneSrc) && /export function thinkTabLabel/.test(toneSrc),
   '配色：功能中文名也在这张表里（返回条与首页共用一份，不各写各的）');
 check(!/^\s{2}overview:/m.test(toneSrc),
@@ -1920,8 +1920,8 @@ check(/<div className="mx-auto w-full max-w-\[1040px\] space-y-8">/.test(pageCod
   '页面：内容列限宽 1040 居中（宽屏上不再横铺满屏）');
 
 const contentOrder = [...pageCode.matchAll(/<TabsContent\s+value="([A-Za-z]+)"/g)].map((m) => m[1]);
-check(contentOrder.join(',') === 'overview,patterns,detector,translation,backTranslation,nativeTranslate,extras,longTask',
-  '页面：八个 TabsContent 顺序（patterns 第一，extras 第六，长文排最后）', contentOrder.join(','));
+check(contentOrder.join(',') === 'overview,patterns,input,detector,translation,backTranslation,nativeTranslate,extras,longTask',
+  '页面：九个 TabsContent 顺序（patterns 第一、input 第二，长文排最后）', contentOrder.join(','));
 
 // 面板体按自己的闭合标签切（非贪婪遇到第一个 </TabsContent> 就停）：
 // 不用「从这里往后 240 字里有没有组件」—— 窗口会跨过面板边界，把挂错 tab 的实现判绿（变异 M4 抓到的）。
@@ -2224,6 +2224,87 @@ check(/练的是 ·/.test(asideSrc), '练习页：说明栏最后给一条判据
 check(/extras: '加练',/.test(toneSrc), '配色：extras 的中文名是「加练」');
 check(!/\{ tab: '[A-Za-z]+', label:/.test(ovSrc) && /thinkTabLabel\(entry\.tab\)/.test(ovSrc),
   '首页：卡片名字只从 thinkTabTones 取（首页不再自己写一份，改一处两边都改）');
+
+console.log('');
+// ── 读英文（输入向）题库（2026-10-31）────────────────────────────────
+// 15 个模式全在练「中文 → 英文」的改写，那是输出端。输入端是另一件事：
+// 读的时候脑子里还在逐词翻中文，句尾一到就得回头重读。
+// 这一册练四个动作：按意群切 / 先找主干 / 认指代 / 别逐字翻。
+// 它是**独立一册**：不改 15 个模式、不进 SM-2、不参与「体检」——所以上面的断言一条没动。
+const INPUT_FILE = 'src/data/think-input-drills.ts';
+const loadInputDrills = () => {
+  const src = readFileSync(join(ROOT, INPUT_FILE), 'utf8');
+  const js = ts.transpileModule(src, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const file = join(mkdtempSync(join(tmpdir(), 'nt-input-')), 'input.mjs');
+  writeFileSync(file, js, 'utf8');
+  return import(pathToFileURL(file).href);
+};
+
+const EXPECTED_INPUT_KINDS = ['chunk', 'main', 'ref', 'idiom'];
+const inputMod = await loadInputDrills();
+const inputKinds = asArray(inputMod.THINK_INPUT_KINDS);
+const inputDrills = asArray(inputMod.THINK_INPUT_DRILLS);
+
+check(Array.isArray(inputMod.THINK_INPUT_KINDS) && inputKinds.length === 4,
+  '读英文：恰好 4 类练法', `实际 ${inputKinds.length}`);
+check(inputKinds.map((k) => k?.id).join(',') === EXPECTED_INPUT_KINDS.join(','),
+  '读英文：四类 id 与预期逐一对应（含顺序）', inputKinds.map((k) => k?.id).join(','));
+check(inputKinds.every((k) => filled(k?.name) && filled(k?.oneLiner)),
+  '读英文：每类都有名称与一句话原则');
+
+check(Array.isArray(inputMod.THINK_INPUT_DRILLS) && inputDrills.length === 24,
+  '读英文：恰好 24 道题', `实际 ${inputDrills.length}`);
+const inputIds = inputDrills.map((d) => d?.id);
+check(inputIds.every(filled), '读英文：每题都有非空 id', inputIds.filter((id) => !filled(id)).join(','));
+check(new Set(inputIds).size === inputIds.length, '读英文：题目 id 唯一',
+  inputIds.filter((id, i) => inputIds.indexOf(id) !== i).join(','));
+check(new Set(inputDrills.map((d) => d?.kind)).size === 4 &&
+  inputDrills.every((d) => EXPECTED_INPUT_KINDS.includes(d?.kind)),
+  '读英文：每题的 kind 都是合法类');
+
+const perInputKind = EXPECTED_INPUT_KINDS.map(
+  (kind) => inputDrills.filter((d) => d?.kind === kind).length,
+);
+check(perInputKind.every((n) => n === 6), '读英文：每类恰好 6 题', perInputKind.join('/'));
+
+for (const drill of inputDrills) {
+  const did = filled(drill?.id) ? drill.id : '(缺 id)';
+  check(filled(drill?.english) && filled(drill?.question) &&
+    filled(drill?.explanation) && filled(drill?.cue),
+    `读英文：${did} 英文/题干/解释/方法四个字段完整`);
+  const opts = asArray(drill?.options);
+  check(opts.length === 3, `读英文：${did} 三个选项`, `实际 ${opts.length}`);
+  check(opts.every(filled), `读英文：${did} 选项非空`);
+  check(new Set(opts).size === opts.length, `读英文：${did} 选项不重复`);
+  check(drill?.answer === 0 || drill?.answer === 1 || drill?.answer === 2,
+    `读英文：${did} answer 合法`, String(drill?.answer));
+  // 选项里不能有「以上都不对」这种逃逸项：四类练法都要有人真去做一遍。
+  check(opts.every((o) => !/以上(都|均)?(不对|不是|错)/.test(o)),
+    `读英文：${did} 不靠「以上都不对」凑选项`);
+  check(!/[ABC]\s*(?:[/／、]\s*[ABC]\s*)?[\u4e00-\u9fff]/.test(drill?.explanation ?? ''),
+    `读英文：${did} 解释不按 A/B/C 字母指代选项`, drill?.explanation);
+}
+
+// 答案不能全押在同一个下标上：押 0 会让「点第一个」变成全对。
+const inputAnswerCounts = ANSWER_INDICES.map(
+  (index) => inputDrills.filter((d) => d?.answer === index).length,
+);
+check(inputAnswerCounts.every((n) => n > 0),
+  '读英文：三个下标都出现过（防「点第一个就全对」）', inputAnswerCounts.join('/'));
+
+// 「别逐字翻」这一类是整册存在的理由（字面翻会反），钉住至少 4 题，防哪天被删空。
+check(inputDrills.filter((d) => d?.kind === 'idiom').length >= 4,
+  '读英文：别逐字翻这一类至少 4 题');
+
+// 读英文页面要挂真组件，不能是空壳。
+const inputPanelSrc = readUi('src/pages/ThinkInEnglishPage/InputDrillPanel.tsx');
+check(/THINK_INPUT_DRILLS/.test(inputPanelSrc) && /THINK_INPUT_KINDS/.test(inputPanelSrc),
+  '读英文：面板直接吃题库（不另抄一份题）');
+check(/drill\.answer/.test(inputPanelSrc) && /drill\.explanation/.test(inputPanelSrc),
+  '读英文：面板按 answer 判分、按 explanation 给解释（不是只给对错）');
+check(/drill\.cue/.test(inputPanelSrc), '读英文：面板把 cue 显示出来（带走一句话方法）');
 
 console.log(`verify-think-patterns: ${pass} 通过, ${fail} 失败`);
 failures.forEach((f) => console.log(`  ✗ ${f}`));

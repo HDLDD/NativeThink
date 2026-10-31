@@ -47,6 +47,7 @@ import { PatternExtrasPanel } from './PatternExtrasPanel';
 import { PatternReviewMode, type PendingPatternAction } from './PatternReviewMode';
 import { ThinkOverview } from './ThinkOverview';
 import { PanelAside } from './PanelAside';
+import { InputDrillPanel } from './InputDrillPanel';
 
 
 const EXAMPLE_SENTENCES = [
@@ -815,6 +816,11 @@ The chineseText should subtly embed English thinking patterns so learners discov
             onPendingActionHandled={() => setPendingPatternAction(null)}
             onOpenExtras={() => setActiveTab('extras')}
           />
+        </TabsContent>
+
+        {/* 读英文 Tab — 输入端：切意群 / 找主干 / 认指代 / 别逐字翻（2026-10-31） */}
+        <TabsContent value="input" className="space-y-6 mt-0">
+          <InputDrillPanel />
         </TabsContent>
 
         {/* 练习 Tab — 从模式训练搬出来的次级入口（体检/薄弱报告/趋势/真实任务/口头任务/自由训练/改写快练） */}
