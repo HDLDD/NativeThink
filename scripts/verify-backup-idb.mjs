@@ -312,7 +312,9 @@ ok(writeFail.db.state.writes === 1 && !writeFail.db.values.has(BOOK_KEY), '书�
 ok(blockedWrite.restoredBooks === 0 && blockedWrite.failedBooks === 1, '书库事务失败不计恢复成功');
 const cacheFail = await backupHarness({ cacheFailed: true }).backup.exportBackup();
 ok(cacheFail.idbSkipped === true, '派生缓存导出失败明确报告省略');
-const PROGRESS_RAW = fs.readFileSync(path.join(ROOT, 'src/pages/ProgressPage/ProgressPage.tsx'), 'utf8').replace(/\r\n/g, '\n');
+const BACKUP_HOOK_RAW = fs.readFileSync(path.join(ROOT, 'src/lib/use-backup-actions.ts'), 'utf8').replace(/\r\n/g, '\n');
+const PROGRESS_PAGE_RAW = fs.readFileSync(path.join(ROOT, 'src/pages/ProgressPage/ProgressPage.tsx'), 'utf8');
+const SETTINGS_PAGE_RAW = fs.readFileSync(path.join(ROOT, 'src/pages/SettingsPage/SettingsPage.tsx'), 'utf8');
 const ARTICLE_RAW = fs.readFileSync(path.join(ROOT, 'src/pages/ArticlePage/ArticlePage.tsx'), 'utf8');
 function callback(source, name, globals) {
   const ast = ts.createSourceFile('page.tsx', source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TSX);
@@ -349,11 +351,11 @@ const PARTIAL_RESULT = { restored: 1, restoredIdb: 0, restoredBooks: 0, failed: 
 const COMPLETE_RESULT = { restored: 1, restoredIdb: 2, restoredBooks: 3, failed: 0, failedIdb: 0, failedBooks: 0 };
 // 忽略开始时清空报告，但不能忽略恢复后的通知或报告的先后顺序。
 const feedbackOrder = (events) => events.filter(([event, report]) => event !== 'report' || report).map(([event]) => event).join(',');
-const partial = await importFeedback(PROGRESS_RAW, PARTIAL_RESULT);
+const partial = await importFeedback(BACKUP_HOOK_RAW, PARTIAL_RESULT);
 ok(!partial.some(([event]) => event === 'success' || event === 'reload') && partial.some(([event]) => event === 'error'), '部分恢复失败不报成功、不自动刷新');
 ok(partial.filter(([event]) => event === 'report').at(-1)?.[1]?.includes('未恢复'), '部分恢复结果留在页面供重试前核对');
 ok(feedbackOrder(partial) === 'import-start,imported,sync,report,error', '部分恢复先等写入结束再通知 hook 重读，随后保留失败报告且不刷新', feedbackOrder(partial));
-const complete = await importFeedback(PROGRESS_RAW, COMPLETE_RESULT);
+const complete = await importFeedback(BACKUP_HOOK_RAW, COMPLETE_RESULT);
 ok(complete.some(([event, text]) => event === 'success' && text.includes('3 本')) && complete.some(([event]) => event === 'reload'), '完整恢复展示原书数量并刷新');
 ok(feedbackOrder(complete) === 'import-start,imported,sync,report,success,reload', '完整恢复同样先通知 hook 重读，再报告成功并刷新', feedbackOrder(complete));
 const deletion = [];
@@ -395,7 +397,7 @@ await mutation('M7 导入书校验不可省略', BK_RAW, 'if (file.importedBooks
   const h = backupHarness({ backupSource });
   return rejects(() => h.backup.importBackup({ ...oldBackup, importedBooks: [{}] }));
 });
-await mutation('M8 部分恢复不走全成功', PROGRESS_RAW, 'if (failed + failedIdb + failedBooks > 0)', 'if (false)', async (source) => {
+await mutation('M8 部分恢复不走全成功', BACKUP_HOOK_RAW, 'if (failed + failedIdb + failedBooks > 0)', 'if (false)', async (source) => {
   const events = await importFeedback(source, { restored: 1, restoredIdb: 0, restoredBooks: 0, failed: 1, failedIdb: 0, failedBooks: 0 });
   return events.some(([event]) => event === 'error') && !events.some(([event]) => event === 'reload' || event === 'success');
 });
@@ -413,13 +415,13 @@ await mutation('M12 原书恢复失败必须计数', BK_RAW, 'catch { failedBook
 });
 const partialNotification = async (source) => feedbackOrder(await importFeedback(source, PARTIAL_RESULT)) === 'import-start,imported,sync,report,error';
 const completeNotification = async (source) => feedbackOrder(await importFeedback(source, COMPLETE_RESULT)) === 'import-start,imported,sync,report,success,reload';
-await mutation('M13 恢复后不能省略重读通知', PROGRESS_RAW, '      emitSyncDown();', '', partialNotification);
-await mutation('M14 不能只在全成功时通知', PROGRESS_RAW, '      emitSyncDown();', '      if (failed + failedIdb + failedBooks === 0) emitSyncDown();', partialNotification);
+await mutation('M13 恢复后不能省略重读通知', BACKUP_HOOK_RAW, '      emitSyncDown();', '', partialNotification);
+await mutation('M14 不能只在全成功时通知', BACKUP_HOOK_RAW, '      emitSyncDown();', '      if (failed + failedIdb + failedBooks === 0) emitSyncDown();', partialNotification);
 const importResultLine = '      const { restored, restoredIdb, restoredBooks, failed, failedIdb, failedBooks } = await importBackup(parsed);';
 const importThenNotify = `${importResultLine}\n      // 部分恢复不刷新，也必须重读已落盘数据，避免陈旧 hook 下一次写回覆盖它。\n      emitSyncDown();`;
-await mutation('M15 不能在恢复落盘前通知', PROGRESS_RAW, importThenNotify, `      emitSyncDown();\n${importResultLine}`, partialNotification);
-await mutation('M16 完整恢复通知不能延后到反馈之后', PROGRESS_RAW, '      emitSyncDown();', '      Promise.resolve().then(emitSyncDown);', completeNotification);
-await mutation('M17 部分恢复报告不能随后被清空', PROGRESS_RAW, "        toast.error('部分数据未恢复，请查看下方结果并重试');", "        toast.error('部分数据未恢复，请查看下方结果并重试');\n        setBackupReport('');", async (source) => {
+await mutation('M15 不能在恢复落盘前通知', BACKUP_HOOK_RAW, importThenNotify, `      emitSyncDown();\n${importResultLine}`, partialNotification);
+await mutation('M16 完整恢复通知不能延后到反馈之后', BACKUP_HOOK_RAW, '      emitSyncDown();', '      Promise.resolve().then(emitSyncDown);', completeNotification);
+await mutation('M17 部分恢复报告不能随后被清空', BACKUP_HOOK_RAW, "        toast.error('部分数据未恢复，请查看下方结果并重试');", "        toast.error('部分数据未恢复，请查看下方结果并重试');\n        setBackupReport('');", async (source) => {
   const events = await importFeedback(source, PARTIAL_RESULT);
   return events.filter(([event]) => event === 'report').at(-1)?.[1]?.includes('未恢复');
 });
@@ -428,6 +430,66 @@ await mutation('M18 persist 不得吞掉原书写入错误', IMPORTED_RAW, '  aw
   const r = await h.backup.importBackup({ ...oldBackup, data: {}, idb: {}, importedBooks: [book] });
   return h.db.state.writes === 1 && !h.db.values.has(BOOK_KEY) && r.restoredBooks === 0 && r.failedBooks === 1;
 });
+
+/* ───────────── E. 设置页「学习数据」与共享备份实现 ───────────── */
+const usageSrc = fs.readFileSync(path.join(ROOT, 'src/lib/storage-usage.ts'), 'utf8');
+const usageFile = path.join(TMP, 'storage-usage.mjs');
+fs.writeFileSync(usageFile, ts.transpileModule(usageSrc, {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+}).outputText);
+const usage = await import(pathToFileURL(usageFile).href);
+const usageEntries = new Map([['scope:a', 'xx'], ['other:b', 'secret'], ['scope:c', 'yyyy']]);
+const fakeStorage = {
+  length: usageEntries.size,
+  key: (i) => [...usageEntries.keys()][i] ?? null,
+  getItem: (k) => usageEntries.get(k) ?? null,
+};
+const measured = usage.measureLocalStorage(fakeStorage, 'scope:');
+ok(measured.entries === 2 && measured.bytes === 40,
+  '本地占用只数当前用户前缀，UTF-16 字节数按 (key+value)×2 计', JSON.stringify(measured));
+ok(usage.formatBytes(0) === '0 B' && usage.formatBytes(1023) === '1023 B' &&
+  usage.formatBytes(1024) === '1 KB' && usage.formatBytes(1536) === '1.5 KB' &&
+  usage.formatBytes(1024 * 1024) === '1 MB',
+  '存储容量格式化（B/KB/MB，去掉多余 .0）');
+
+const exportBlock = BACKUP_HOOK_RAW.slice(
+  BACKUP_HOOK_RAW.indexOf('const exportLearningData'),
+  BACKUP_HOOK_RAW.indexOf('const handleImportFile'),
+);
+ok(exportBlock.length > 100 && /await exportBackup\(\)/.test(exportBlock),
+  '导出逻辑在共享 hook 里调用真实 exportBackup');
+ok(/safeStorage\.setItem\(LAST_BACKUP_KEY, completedAt\)/.test(exportBlock) &&
+  exportBlock.indexOf('await exportBackup()') < exportBlock.indexOf('setLastBackupAt(completedAt)'),
+  '上次备份时间只在导出成功后写入（失败不能谎报备份时间）');
+ok(/setLastBackupAt\(completedAt\)/.test(exportBlock),
+  '设置页可在导出完成后立即看到上次备份时间');
+ok(/from '@\/lib\/use-backup-actions'/.test(PROGRESS_PAGE_RAW) &&
+  /useBackupActions\(\)/.test(PROGRESS_PAGE_RAW) &&
+  /<BackupFileInput/.test(PROGRESS_PAGE_RAW),
+  '学习记录页改用共享 hook + 共享文件输入');
+ok(!/const \[backupBusy/.test(PROGRESS_PAGE_RAW) &&
+  !/const \[backupReport/.test(PROGRESS_PAGE_RAW) &&
+  !/exportBackup|importBackup/.test(PROGRESS_PAGE_RAW),
+  '学习记录页不再自己维护第二套备份实现');
+ok(/from '@\/lib\/use-backup-actions'/.test(SETTINGS_PAGE_RAW) &&
+  /useBackupActions\(\)/.test(SETTINGS_PAGE_RAW) &&
+  /<BackupFileInput/.test(SETTINGS_PAGE_RAW),
+  '设置页复用同一套导出/恢复与文件输入');
+ok(/measureLocalStorage/.test(SETTINGS_PAGE_RAW) &&
+  /navigator\.storage\?\.estimate/.test(SETTINGS_PAGE_RAW) &&
+  /formatBytes/.test(SETTINGS_PAGE_RAW),
+  '设置页展示本地条目/字节与浏览器存储估算（不支持时显示 —）');
+ok(/data-settings-data/.test(SETTINGS_PAGE_RAW) &&
+  /lastBackupAt/.test(SETTINGS_PAGE_RAW) &&
+  /还没有导出过/.test(SETTINGS_PAGE_RAW),
+  '学习数据区有稳定标记，并显示上次备份/未导出态');
+ok(/navigate\('\/progress\?reset=1'\)/.test(SETTINGS_PAGE_RAW),
+  '设置页「管理学习记录」走 /progress?reset=1 深链');
+ok(/searchParams\.get\('reset'\)/.test(PROGRESS_PAGE_RAW) &&
+  /setShowResetDialog\(true\)/.test(PROGRESS_PAGE_RAW) &&
+  /next\.delete\('reset'\)/.test(PROGRESS_PAGE_RAW) &&
+  /setSearchParams\(next, \{ replace: true \}\)/.test(PROGRESS_PAGE_RAW),
+  '记录页消费 reset 深链：打开现有弹窗并抹掉参数（不重复弹）');
 
 /* ───────────── 汇总 ───────────── */
 const failed = results.filter((r) => !r.pass);

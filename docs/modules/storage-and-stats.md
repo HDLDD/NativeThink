@@ -59,6 +59,14 @@
 
 词库侧的策略是 **IndexedDB 为主、localStorage 为兜底**：`saveToCache` 先 `idbSet`，只有在 IDB 抛错时才镜像进 localStorage（`wordbank.ts`），避免同一份数据写两遍挤爆配额。
 
+### 2.5 备份导出/恢复的单一实现与设置页入口（2026-10-31）
+
+- 唯一实现：`src/lib/use-backup-actions.ts`。`ProgressPage` 顶部按钮与 `SettingsPage` 的「学习数据」区都调 `useBackupActions()`，隐藏文件选择器共用 `components/BackupFileInput.tsx`；两页都不再直接 import `exportBackup`/`importBackup`。
+- 导出成功后写 `__nativethink_last_backup_at`（`LAST_BACKUP_KEY`），设置页显示「上次备份」；导出失败**不**更新时间。恢复成功后完整刷新；部分失败保留报告、不刷新，可重试。
+- 设置页占用统计：`src/lib/storage-usage.ts` 的 `measureLocalStorage` 只数当前 safeStorage 前缀内的键（`(key+value)×2` UTF-16 字节），`formatBytes` 输出 B/KB/MB；`navigator.storage.estimate()` 是**浏览器级估算**（含缓存/IndexedDB，不等于备份文件大小），不支持时显示「—」。
+- 「管理学习记录」从设置页跳 `/progress?reset=1`；记录页挂载时打开现有重置弹窗并 `next.delete('reset')` + `setSearchParams(..., {replace:true})`，刷新/返回不会重复弹。
+- 守卫：`verify-backup-idb`（106，含共享 hook 的反馈顺序、两页挂载、时间戳、占用统计与深链）+ `verify-overlay-fit`（42，深链弹窗）。
+
 ## 3. 注意事项
 
 ### 3.1 日期

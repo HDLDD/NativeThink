@@ -1,12 +1,17 @@
-import { useEffect, useState, type ReactNode, type ButtonHTMLAttributes } from 'react';
+import { useCallback, useEffect, useState, type ReactNode, type ButtonHTMLAttributes } from 'react';
 import {
   Sun, Moon, ChevronLeft, ChevronRight, Volume2, Cpu, HelpCircle, ScrollText, ExternalLink, Target, Palette, Info,
+  Database, Download, Upload, RotateCcw,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '@/lib/use-theme';
 import { UI_THEMES, useUiTheme } from '@/lib/ui-theme';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { platformTag } from '@/lib/app-env';
+import { safeStorage } from '@/lib/safe-storage';
+import { useBackupActions } from '@/lib/use-backup-actions';
+import { measureLocalStorage, formatBytes, type IStorageUsage } from '@/lib/storage-usage';
+import { BackupFileInput } from '@/components/BackupFileInput';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import TTSSettings from '@/components/TTSSettings';
@@ -43,7 +48,7 @@ function Row({ icon: Icon, label, desc, ...rest }: {
     <button
       type="button"
       {...rest}
-      className="w-full flex items-center gap-3 rounded-[14px] border border-border px-4 py-3 text-left transition-colors hover:bg-muted/50"
+      className="w-full flex items-center gap-3 rounded-[14px] border border-border px-4 py-3 text-left transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50"
     >
       <Icon className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.8} />
       <span className="min-w-0 flex-1">
@@ -62,10 +67,50 @@ export default function SettingsPage() {
   const { uiTheme, setUiTheme } = useUiTheme();
   const { stats, setDailyGoal } = useLearningStats();
   const [version, setVersion] = useState('—');
+  const backup = useBackupActions();
+  const [storageUsage, setStorageUsage] = useState<IStorageUsage | null>(null);
+  const [storageEstimate, setStorageEstimate] = useState<{ usage: number; quota: number } | null>(null);
 
   useEffect(() => {
     setVersion(document.querySelector('meta[name="app-version"]')?.getAttribute('content') || '—');
   }, []);
+
+  const refreshStorage = useCallback(() => {
+    try {
+      setStorageUsage(measureLocalStorage(localStorage, safeStorage.getPrefixedKey('')));
+    } catch {
+      setStorageUsage(null);
+    }
+    let alive = true;
+    const estimate = typeof navigator !== 'undefined' ? navigator.storage?.estimate?.() : undefined;
+    if (estimate) {
+      estimate.then((e) => {
+        if (!alive) return;
+        setStorageEstimate(
+          typeof e?.usage === 'number' && typeof e?.quota === 'number'
+            ? { usage: e.usage, quota: e.quota }
+            : null,
+        );
+      }).catch(() => { if (alive) setStorageEstimate(null); });
+    } else {
+      setStorageEstimate(null);
+    }
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    const cleanup = refreshStorage();
+    return cleanup;
+  }, [refreshStorage, backup.lastBackupAt, backup.backupBusy]);
+
+  const lastBackupLabel = backup.lastBackupAt
+    ? (() => {
+        const d = new Date(backup.lastBackupAt);
+        return Number.isNaN(d.getTime())
+          ? '—'
+          : d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      })()
+    : '还没有导出过';
 
   return (
     <div className="max-w-3xl mx-auto pb-24">
@@ -83,7 +128,7 @@ export default function SettingsPage() {
         </button>
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Preferences</p>
         <h1 className="mt-1 text-[26px] font-extrabold tracking-tight text-foreground">设置</h1>
-        <p className="text-[12px] text-muted-foreground mt-1">外观、学习目标、朗读与 AI、帮助 —— 都收在这里。</p>
+        <p className="text-[12px] text-muted-foreground mt-1">外观、学习目标、学习数据、朗读与 AI、帮助 —— 都收在这里。</p>
       </header>
 
       <div className="space-y-4">
@@ -137,6 +182,59 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
+        </Section>
+
+        <Section icon={Database} title="学习数据" desc="导出/恢复备份，查看本地占用；重置学习记录仍在记录页。">
+          <div data-settings-data className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div className="rounded-2xl bg-muted/50 p-3">
+              <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">本地数据</p>
+              <p className="mt-1 truncate text-[11px] font-black tabular-nums text-foreground">
+                {storageUsage ? `${storageUsage.entries} 项 · ${formatBytes(storageUsage.bytes)}` : '统计中…'}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-muted/50 p-3">
+              <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">上次备份</p>
+              <p className="mt-1 truncate text-[11px] font-black text-foreground">{lastBackupLabel}</p>
+            </div>
+            <div className="col-span-2 rounded-2xl bg-muted/50 p-3 sm:col-span-1">
+              <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">浏览器存储</p>
+              <p className="mt-1 truncate text-[11px] font-black tabular-nums text-foreground">
+                {storageEstimate ? `${formatBytes(storageEstimate.usage)} / ${formatBytes(storageEstimate.quota)}` : '—'}
+              </p>
+            </div>
+          </div>
+          <p className="mb-3 text-[10px] leading-relaxed text-muted-foreground">
+            浏览器存储估算含缓存与 IndexedDB，不等于备份文件大小。
+          </p>
+          <div className="space-y-2">
+            <Row
+              icon={Download}
+              label="导出备份"
+              desc={backup.backupBusy ? '正在导出…' : backup.lastBackupAt ? `上次导出：${lastBackupLabel}` : '导出学习数据、导入书正文与阅读译文'}
+              onClick={backup.exportLearningData}
+              disabled={backup.backupBusy}
+            />
+            <Row
+              icon={Upload}
+              label="从备份恢复"
+              desc="选择 JSON 备份文件；覆盖同名数据与同 ID 书籍"
+              onClick={backup.openImportPicker}
+              disabled={backup.backupBusy}
+            />
+            <Row
+              icon={RotateCcw}
+              label="管理学习记录"
+              desc="重置统计、拼写、阅读、词汇或全部数据"
+              onClick={() => navigate('/progress?reset=1')}
+            />
+          </div>
+          <BackupFileInput inputRef={backup.fileInputRef} onFile={backup.handleImportFile} />
+          {backup.backupReport && (
+            <p role="status" className="mt-3 text-xs leading-relaxed text-foreground">{backup.backupReport}</p>
+          )}
+          <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
+            备份含学习数据、导入书正文和阅读译文，不含视频精听媒体及字幕；恢复会覆盖同名数据和同 ID 书籍，保留其他本地书。
+          </p>
         </Section>
 
         <Section icon={Volume2} title="工具" desc="朗读与 AI 的配置都在这里打开。">

@@ -30,6 +30,8 @@
 | 词汇深度 | `DeepVocabularyPage.tsx` | `/vocabulary` | 一级 | 导航 |
 | 学习记录 | `ProgressPage.tsx` | `/progress` | 一级 | 导航 |
 
+> 2026-10-31 补充：`/settings` 现在包含「学习数据」区 —— 本地占用、上次备份时间、导出备份、从备份恢复、管理学习记录（跳 `/progress?reset=1`）。备份实现单点在 `src/lib/use-backup-actions.ts`，设置页与学习记录页共用；重置仍在学习记录页的现有弹窗里完成。
+
 ---
 
 ## 插件规划
