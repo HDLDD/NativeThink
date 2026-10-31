@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BookMarked, Lightbulb, Volume2 } from 'lucide-react';
+import { AlertTriangle, BookMarked, Lightbulb, Search, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { usePageMemory } from '@/lib/use-page-memory';
 import { useTTS } from '@/lib/use-tts';
 import { cn } from '@/lib/utils';
 import { GRAMMAR_TOPICS, GRAMMAR_GROUPS, type IGrammarTopic } from '@/data/grammar-map';
@@ -15,23 +17,43 @@ import { SENTENCE_PATTERNS } from '@/data/sentence-patterns';
  * 而是中文里根本不存在的机制（时态变形、冠词、从句后置）。
  */
 export function GrammarMap({ onJumpToPattern, jumpToTopic }: { onJumpToPattern?: (patternId: string) => void; jumpToTopic?: string | null }) {
-  const [group, setGroup] = useState<string>('全部');
+  const [filter, setFilter] = usePageMemory<{ group: string; query: string }>(
+    'grammar-map-filter',
+    { group: '全部', query: '' },
+  );
+  const groupChoices = ['全部', ...GRAMMAR_GROUPS] as const;
+  const group = groupChoices.find((g) => g === filter.group) ?? '全部';
+  const query = filter.query.trim().toLowerCase();
   const [activeId, setActiveId] = useState(GRAMMAR_TOPICS[0].id);
   const { speak } = useTTS();
 
   const list = useMemo(
-    () => (group === '全部' ? GRAMMAR_TOPICS : GRAMMAR_TOPICS.filter((t) => t.group === group)),
-    [group],
+    () => GRAMMAR_TOPICS.filter((t) => {
+      if (group !== '全部' && t.group !== group) return false;
+      if (query) {
+        const haystack = [
+          t.name, t.group, t.essence, t.zhGap,
+          ...t.points.map((p) => `${p.title} ${p.body} ${p.example?.en ?? ''} ${p.example?.zh ?? ''}`),
+          ...t.pitfalls.map((p) => `${p.wrong} ${p.right} ${p.why}`),
+        ].join(' ').toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      return true;
+    }),
+    [group, query],
   );
-  // 从句子精讲跳进来时，直接打开对应语法条目
+  // 从句子精讲跳进来时，直接打开对应语法条目（先清筛选，避免目标被筛掉）
   useEffect(() => {
     if (jumpToTopic && GRAMMAR_TOPICS.some((t) => t.id === jumpToTopic)) {
       setActiveId(jumpToTopic);
-      setGroup('全部');
+      setFilter({ group: '全部', query: '' });
     }
   }, [jumpToTopic]);
+  useEffect(() => {
+    if (list.length > 0 && !list.some((t) => t.id === activeId)) setActiveId(list[0].id);
+  }, [list, activeId]);
 
-  const active: IGrammarTopic = GRAMMAR_TOPICS.find((t) => t.id === activeId) ?? list[0];
+  const active: IGrammarTopic | undefined = list.find((t) => t.id === activeId) ?? list[0];
 
   const patternName = (pid: string) => SENTENCE_PATTERNS.find((p) => p.id === pid)?.name;
 
@@ -48,12 +70,22 @@ export function GrammarMap({ onJumpToPattern, jumpToTopic }: { onJumpToPattern?:
 
       {/* 左：分组 + 条目 */}
       <div className="space-y-3">
-        <div className="flex flex-wrap gap-1.5">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input
+            value={filter.query}
+            onChange={(event) => setFilter((prev) => ({ ...prev, query: event.target.value }))}
+            placeholder="搜索语法点、本质或错例…"
+            className="rounded-2xl pl-9"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="按语法分组筛选">
           {['全部', ...GRAMMAR_GROUPS].map((g) => (
             <button
               key={g}
               type="button"
-              onClick={() => setGroup(g)}
+              aria-pressed={group === g}
+              onClick={() => setFilter((prev) => ({ ...prev, group: g }))}
               className={cn(
                 'px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
                 group === g
@@ -65,29 +97,46 @@ export function GrammarMap({ onJumpToPattern, jumpToTopic }: { onJumpToPattern?:
             </button>
           ))}
         </div>
-        <div className="space-y-1.5 max-h-[560px] overflow-y-auto pr-1">
-          {list.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setActiveId(t.id)}
-              className={cn(
-                'w-full text-left rounded-2xl border p-3 transition-all',
-                active?.id === t.id
-                  ? 'border-[var(--brand)] bg-[var(--brand)]/5'
-                  : 'border-border/60 bg-card hover:border-muted-foreground/30',
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-black text-foreground leading-snug">{t.name}</span>
-                <span className="text-[9px] font-black text-muted-foreground shrink-0">
-                  {t.level === 'beginner' ? '基础' : t.level === 'intermediate' ? '进阶' : '高阶'}
-                </span>
-              </div>
-              <p className="text-[10px] font-bold text-muted-foreground mt-1 line-clamp-2">{t.essence}</p>
+        <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground">
+          <span>匹配 {list.length}/{GRAMMAR_TOPICS.length}</span>
+          {(query || group !== '全部') && (
+            <button type="button" onClick={() => setFilter({ group: '全部', query: '' })}
+              className="hover:text-foreground">
+              清除筛选
             </button>
-          ))}
+          )}
         </div>
+        {list.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-muted/20 p-4 text-center">
+            <p className="text-xs font-black text-foreground">没有匹配的语法点</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">换个关键词，或清除分组筛选。</p>
+          </div>
+        ) : (
+          <div className="space-y-1.5 max-h-[560px] overflow-y-auto pr-1">
+            {list.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                data-grammar-id={t.id}
+                onClick={() => setActiveId(t.id)}
+                className={cn(
+                  'w-full text-left rounded-2xl border p-3 transition-all',
+                  active?.id === t.id
+                    ? 'border-[var(--brand)] bg-[var(--brand)]/5'
+                    : 'border-border/60 bg-card hover:border-muted-foreground/30',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black text-foreground leading-snug">{t.name}</span>
+                  <span className="text-[9px] font-black text-muted-foreground shrink-0">
+                    {t.level === 'beginner' ? '基础' : t.level === 'intermediate' ? '进阶' : '高阶'}
+                  </span>
+                </div>
+                <p className="text-[10px] font-bold text-muted-foreground mt-1 line-clamp-2">{t.essence}</p>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 右：详情 */}

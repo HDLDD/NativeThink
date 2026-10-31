@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   AlertTriangle, BookMarked, ChevronLeft, ChevronRight, Eye, EyeOff, Heart, Info,
-  Languages, ListTree, Shuffle, Volume2,
+  Languages, ListTree, Search, Shuffle, Volume2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { usePageMemory } from '@/lib/use-page-memory';
 import { useTTS } from '@/lib/use-tts';
 import { useFavorites } from '@/lib/use-favorites';
 import { cn } from '@/lib/utils';
@@ -55,23 +57,128 @@ function findGrammarTopic(name: string) {
 export function SentenceExplain({ onJumpToGrammar }: { onJumpToGrammar?: (topicId: string) => void }) {
   const [idx, setIdx] = useState(0);
   const [showZh, setShowZh] = useState(true);
-  const [srcFilter, setSrcFilter] = useState<SourceFilter>('全部');
-  const [lvFilter, setLvFilter] = useState<LevelFilter>('全部');
+  const [showList, setShowList] = useState(false);
+  const [visibleListCount, setVisibleListCount] = useState(12);
+  const [filter, setFilter] = usePageMemory<{
+    source: SourceFilter;
+    level: LevelFilter;
+    query: string;
+  }>('sentence-explain-filter', { source: '全部', level: '全部', query: '' });
   const { speak } = useTTS();
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
 
+  const srcFilter = (['全部', '书籍', '演讲', '刊物'] as const).includes(filter.source)
+    ? filter.source
+    : '全部';
+  const lvFilter = (['全部', '入门', '进阶', '高阶'] as const).includes(filter.level)
+    ? filter.level
+    : '全部';
+  const query = filter.query.trim().toLowerCase();
   const deck = useMemo(
-    () => SENTENCE_LAB.filter(
-      (s) => (srcFilter === '全部' || srcOf(s) === srcFilter) && (lvFilter === '全部' || lvLabel(s.level) === lvFilter),
-    ),
-    [srcFilter, lvFilter],
+    () => SENTENCE_LAB.filter((s) => {
+      if (srcFilter !== '全部' && srcOf(s) !== srcFilter) return false;
+      if (lvFilter !== '全部' && lvLabel(s.level) !== lvFilter) return false;
+      if (query) {
+        const haystack = `${s.en} ${s.zh} ${s.source} ${s.backboneGloss}`.toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      return true;
+    }),
+    [srcFilter, lvFilter, query],
   );
-  const item: ISentenceLabItem = deck[Math.min(idx, Math.max(0, deck.length - 1))] ?? SENTENCE_LAB[0];
-  const explain = SENTENCE_EXPLAIN[item.id];
-  const resolved = useMemo(() => resolveSegments(item), [item]);
-  const coreCount = item.segments.filter((s) => s.r === 'core').length;
-  const faved = isFavorited(item.en, 'expression');
+  const setSrcFilter = (source: SourceFilter) => {
+    setFilter((prev) => ({ ...prev, source }));
+    setIdx(0);
+  };
+  const setLvFilter = (level: LevelFilter) => {
+    setFilter((prev) => ({ ...prev, level }));
+    setIdx(0);
+  };
+  const setQuery = (value: string) => {
+    setFilter((prev) => ({ ...prev, query: value }));
+    setIdx(0);
+  };
+  const clearFilters = () => {
+    setFilter({ source: '全部', level: '全部', query: '' });
+    setIdx(0);
+  };
+
+  useEffect(() => {
+    setVisibleListCount(12);
+  }, [srcFilter, lvFilter, query]);
+
+  const filterPanel = (
+    <div className="space-y-2 rounded-2xl border border-border bg-muted/20 p-3">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+        <Input
+          value={filter.query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="搜索英文原句、中文或来源…"
+          className="rounded-2xl pl-9"
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="按来源筛选">
+        {(['全部', '书籍', '演讲', '刊物'] as SourceFilter[]).map((s) => (
+          <button key={s} type="button" aria-pressed={srcFilter === s} onClick={() => setSrcFilter(s)}
+            className={cn('px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
+              srcFilter === s ? 'border-[var(--brand)] bg-[var(--brand)]/5 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40')}>
+            {s === '全部' ? '全部来源' : s}
+          </button>
+        ))}
+        <span className="w-px h-4 bg-border" aria-hidden />
+        {(['全部', '入门', '进阶', '高阶'] as LevelFilter[]).map((s) => (
+          <button key={s} type="button" aria-pressed={lvFilter === s} onClick={() => setLvFilter(s)}
+            className={cn('px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
+              lvFilter === s ? 'border-[var(--brand)] bg-[var(--brand)]/5 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40')}>
+            {s === '全部' ? '全部阶段' : s}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button type="button" onClick={() => setShowList((v) => !v)} disabled={deck.length === 0}
+          className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground hover:text-foreground disabled:opacity-40">
+          <ListTree className="size-3.5" />
+          {showList ? '收起句子列表' : `展开句子列表（${deck.length}）`}
+        </button>
+        <span className="text-[10px] font-bold text-muted-foreground">
+          匹配 {deck.length}/{SENTENCE_LAB.length}
+        </span>
+      </div>
+    </div>
+  );
+
+  const itemCandidate = deck.length > 0 ? deck[Math.min(idx, deck.length - 1)] : null;
+  const explain = itemCandidate ? SENTENCE_EXPLAIN[itemCandidate.id] : undefined;
+  const resolved = useMemo(
+    () => (itemCandidate ? resolveSegments(itemCandidate) : null),
+    [itemCandidate],
+  );
+  const coreCount = itemCandidate
+    ? itemCandidate.segments.filter((s) => s.r === 'core').length
+    : 0;
+  const faved = itemCandidate ? isFavorited(itemCandidate.en, 'expression') : false;
+
+  if (!itemCandidate) {
+    return (
+      <div className="space-y-4">
+        {filterPanel}
+        <div className="rounded-3xl border border-border/60 bg-card p-8 text-center">
+          <AlertTriangle className="mx-auto size-6 text-amber-500" aria-hidden />
+          <p className="mt-2 text-sm font-black text-foreground">没有匹配的句子</p>
+          <p className="mt-1 text-xs text-muted-foreground">换个关键词，或清除来源/阶段筛选。</p>
+          <Button variant="outline" size="sm" className="mt-3 rounded-full" onClick={clearFilters}>
+            清除筛选
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const item: ISentenceLabItem = itemCandidate;
   const goto = (n: number) => setIdx(((n % deck.length) + deck.length) % deck.length);
+  const visibleDeck = deck.slice(0, visibleListCount);
+  const remainingDeck = deck.length - visibleListCount;
 
   const toggleFav = () => {
     if (faved) {
@@ -86,24 +193,55 @@ export function SentenceExplain({ onJumpToGrammar }: { onJumpToGrammar?: (topicI
 
   return (
     <div className="space-y-4">
-      {/* 筛选 + 导航 */}
-      <div className="flex flex-wrap items-center gap-2">
-        {(['全部', '书籍', '演讲', '刊物'] as SourceFilter[]).map((s) => (
-          <button key={s} type="button" onClick={() => { setSrcFilter(s); setIdx(0); }}
-            className={cn('px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
-              srcFilter === s ? 'border-[var(--brand)] bg-[var(--brand)]/5 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40')}>
-            {s}
-          </button>
-        ))}
-        <span className="w-px h-4 bg-border" />
-        {(['全部', '入门', '进阶', '高阶'] as LevelFilter[]).map((s) => (
-          <button key={s} type="button" onClick={() => { setLvFilter(s); setIdx(0); }}
-            className={cn('px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
-              lvFilter === s ? 'border-[var(--brand)] bg-[var(--brand)]/5 text-ink-teal' : 'border-border text-muted-foreground hover:border-muted-foreground/40')}>
-            {s}
-          </button>
-        ))}
-      </div>
+      {filterPanel}
+
+      {showList && (
+        <div className="space-y-2 rounded-2xl border border-border bg-muted/20 p-2">
+          <div className="max-h-[320px] space-y-1 overflow-y-auto overscroll-contain">
+            {visibleDeck.map((sentence, listIndex) => (
+              <button
+                key={sentence.id}
+                type="button"
+                data-sentence-id={sentence.id}
+                aria-current={sentence.id === item.id ? 'true' : undefined}
+                onClick={() => {
+                  setIdx(listIndex);
+                  setShowList(false);
+                }}
+                className={cn(
+                  'w-full rounded-xl border px-3 py-2 text-left transition-colors',
+                  sentence.id === item.id
+                    ? 'border-[var(--brand)]/40 bg-[var(--brand)]/5'
+                    : 'border-transparent bg-card hover:border-border',
+                )}
+              >
+                <p className="text-[12px] font-bold text-foreground line-clamp-1">{sentence.en}</p>
+                <p className="mt-0.5 text-[10px] font-bold text-muted-foreground">
+                  {sentence.source} · {lvLabel(sentence.level)}
+                </p>
+              </button>
+            ))}
+          </div>
+          {remainingDeck > 0 && (
+            <button
+              type="button"
+              onClick={() => setVisibleListCount((count) => count + 12)}
+              className="w-full rounded-xl border-2 border-dashed border-border py-2 text-[10px] font-black text-muted-foreground hover:border-[var(--brand)]/50 hover:text-ink-teal"
+            >
+              再显示 {Math.min(12, remainingDeck)} 句（还剩 {remainingDeck} 句）
+            </button>
+          )}
+          {visibleListCount > 12 && (
+            <button
+              type="button"
+              onClick={() => setVisibleListCount(12)}
+              className="w-full py-1.5 text-[10px] font-bold text-muted-foreground hover:text-foreground"
+            >
+              收起，只看前 12 句
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="rounded-3xl border border-border/60 bg-card p-5 space-y-4">
         {/* 头部：进度 + 换句 */}

@@ -32,6 +32,14 @@ src/data/sentence-lab.ts:448-452
 - 语法点名 → 条目匹配是「名字互含 + 正则兜底映射到 gXX」两级（`SentenceExplain.tsx:35-53`），匹配不到按钮 disabled 并提示「语法地图里暂无对应条目」（`:199-207`）。
 - **造句题库不来自 sentence-lab**，复用反翻译数据 `MOCK_BACK_TRANSLATIONS`（`src/data/backtranslation.ts:12`，201 条），过滤 `referenceSentence && keyword` 后 `slice(0, 400)`（`BuildPractice.tsx:40-43`）。
 
+### 2.1.1 精讲搜索与跳转列表（2026-10-30）
+
+`SentenceExplain.tsx` 增加：搜索英文原句/中文/来源/主干；来源（全部来源/书籍/演讲/刊物）与阶段（全部阶段/入门/进阶/高阶）筛选；筛选值存 `sentence-explain-filter`（`usePageMemory`），跨 tab 切换保留。`展开句子列表（N）` 打开当前匹配集的跳转列表，默认 12 句、可再显示 12 句、可收起；每条带 `data-sentence-id`，点击直接切到该句。**筛到 0 条时显示「没有匹配的句子」和清除入口，绝不回落到 `SENTENCE_LAB[0]` 误显示第一句**（旧实现的真实缺陷）。守卫 `verify-list-scaling` 25 条里新增这一段。
+
+### 2.1.2 句型库 / 语法地图搜索（2026-10-30）
+
+`PatternLibrary.tsx` 与 `GrammarMap.tsx` 都补了搜索和筛选记忆：句型按名称/骨架/中文思维/why/例句搜索，分类筛选存 `pattern-library-filter`；语法按名称/本质/中文差异/要点/例句/错例搜索，分组筛选存 `grammar-map-filter`。左侧列表显示 `匹配 x/15`、`匹配 x/30`，空结果有明确空态和清除入口；列表项带 `data-pattern-id` / `data-grammar-id`。筛选后若当前详情不在结果集里，会自动落到结果第一项；从句子精讲跳转时先清筛选，保证目标可见。守卫 `verify-list-scaling` 26 条里新增这一段。
+
 ### 2.2 意群定位：`src/lib/sentence-parse.ts`
 
 数据里只存 `segments[]`（每个意群的文本 + 角色 `r`），**位置全靠运行时逐块定位回字符区间**：

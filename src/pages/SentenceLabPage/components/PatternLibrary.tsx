@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Heart, Lightbulb, Volume2, Wand2, ArrowRight } from 'lucide-react';
+import { Heart, Lightbulb, Volume2, Wand2, ArrowRight, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { usePageMemory } from '@/lib/use-page-memory';
 import { useTTS } from '@/lib/use-tts';
 import { useFavorites } from '@/lib/use-favorites';
 import { cn } from '@/lib/utils';
@@ -25,24 +26,48 @@ function buildSentence(p: ISentencePattern, values: Record<string, string>): str
  * 左侧选句型，右侧看结构、读思维差异、照着造一句。
  */
 export function PatternLibrary({ initialPatternId }: { initialPatternId?: string | null }) {
-  const [cat, setCat] = useState<string>('全部');
+  const [filter, setFilter] = usePageMemory<{ category: string; query: string }>(
+    'pattern-library-filter',
+    { category: '全部', query: '' },
+  );
+  const categoryChoices = ['全部', ...PATTERN_CATEGORIES] as const;
+  const cat = categoryChoices.find((c) => c === filter.category) ?? '全部';
+  const query = filter.query.trim().toLowerCase();
+  const setCat = (category: string) => {
+    setFilter((prev) => ({ ...prev, category }));
+    setValues({});
+  };
   const [activeId, setActiveId] = useState(initialPatternId || SENTENCE_PATTERNS[0].id);
   const [values, setValues] = useState<Record<string, string>>({});
   const { speak } = useTTS();
   const { favorites, addFavorite, removeFavorite, isFavorited } = useFavorites();
 
-  // 从语法页跳进来时，直接打开对应句型
+  // 从语法页跳进来时，直接打开对应句型（先清掉筛选，避免目标被筛掉）
   useEffect(() => {
     if (initialPatternId && SENTENCE_PATTERNS.some((p) => p.id === initialPatternId)) {
       setActiveId(initialPatternId);
+      setFilter({ category: '全部', query: '' });
     }
   }, [initialPatternId]);
 
   const list = useMemo(
-    () => (cat === '全部' ? SENTENCE_PATTERNS : SENTENCE_PATTERNS.filter((p) => p.category === cat)),
-    [cat],
+    () => SENTENCE_PATTERNS.filter((p) => {
+      if (cat !== '全部' && p.category !== cat) return false;
+      if (query) {
+        const haystack = `${p.name} ${p.category} ${p.frame.join('')} ${p.zhThinking} ${p.why} ${p.examples.map((e) => `${e.en} ${e.zh}`).join(' ')}`.toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      return true;
+    }),
+    [cat, query],
   );
-  const active = SENTENCE_PATTERNS.find((p) => p.id === activeId) || list[0];
+  useEffect(() => {
+    if (list.length > 0 && !list.some((p) => p.id === activeId)) {
+      setActiveId(list[0].id);
+      setValues({});
+    }
+  }, [list, activeId]);
+  const active = list.find((p) => p.id === activeId) ?? list[0];
   const built = active ? buildSentence(active, values) : '';
   const builtReady = active ? active.slots.every((s) => (values[s.key] || '').trim()) : false;
   const faved = active ? isFavorited(`模式:${active.id}`, 'expression') : false;
@@ -69,11 +94,21 @@ export function PatternLibrary({ initialPatternId }: { initialPatternId?: string
     <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
       {/* 左：句型列表 */}
       <div className="space-y-3">
-        <div className="flex flex-wrap gap-1.5">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input
+            value={filter.query}
+            onChange={(event) => setFilter((prev) => ({ ...prev, query: event.target.value }))}
+            placeholder="搜索句型、骨架或例句…"
+            className="rounded-2xl pl-9"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="按句型分类筛选">
           {['全部', ...PATTERN_CATEGORIES].map((c) => (
             <button
               key={c}
               type="button"
+              aria-pressed={cat === c}
               onClick={() => setCat(c)}
               className={cn(
                 'px-2.5 py-1 rounded-full text-[10px] font-black border transition-all',
@@ -86,29 +121,46 @@ export function PatternLibrary({ initialPatternId }: { initialPatternId?: string
             </button>
           ))}
         </div>
-        <div className="space-y-1.5 max-h-[520px] overflow-y-auto pr-1">
-          {list.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => { setActiveId(p.id); setValues({}); }}
-              className={cn(
-                'w-full text-left rounded-2xl border p-3 transition-all',
-                active?.id === p.id
-                  ? 'border-[var(--brand)] bg-[var(--brand)]/5'
-                  : 'border-border/60 bg-card hover:border-muted-foreground/30',
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-black text-foreground truncate">{p.name}</span>
-                <span className="text-[9px] font-black text-muted-foreground shrink-0">
-                  {p.level === 'beginner' ? '入门' : p.level === 'intermediate' ? '进阶' : '高阶'}
-                </span>
-              </div>
-              <p className="text-[10px] font-bold text-muted-foreground mt-1 line-clamp-2">{p.frame.join('')}</p>
+        <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground">
+          <span>匹配 {list.length}/{SENTENCE_PATTERNS.length}</span>
+          {(query || cat !== '全部') && (
+            <button type="button" onClick={() => setFilter({ category: '全部', query: '' })}
+              className="hover:text-foreground">
+              清除筛选
             </button>
-          ))}
+          )}
         </div>
+        {list.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-muted/20 p-4 text-center">
+            <p className="text-xs font-black text-foreground">没有匹配的句型</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">换个关键词，或清除分类筛选。</p>
+          </div>
+        ) : (
+          <div className="space-y-1.5 max-h-[520px] overflow-y-auto pr-1">
+            {list.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                data-pattern-id={p.id}
+                onClick={() => { setActiveId(p.id); setValues({}); }}
+                className={cn(
+                  'w-full text-left rounded-2xl border p-3 transition-all',
+                  active?.id === p.id
+                    ? 'border-[var(--brand)] bg-[var(--brand)]/5'
+                    : 'border-border/60 bg-card hover:border-muted-foreground/30',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black text-foreground truncate">{p.name}</span>
+                  <span className="text-[9px] font-black text-muted-foreground shrink-0">
+                    {p.level === 'beginner' ? '入门' : p.level === 'intermediate' ? '进阶' : '高阶'}
+                  </span>
+                </div>
+                <p className="text-[10px] font-bold text-muted-foreground mt-1 line-clamp-2">{p.frame.join('')}</p>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 右：详情 */}
