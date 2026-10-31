@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useRef, lazy, Suspense, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   BarChart3,
   Calendar,
@@ -12,46 +12,39 @@ import {
   Clock,
   BookOpen,
   Trash2,
-  Filter,
   Puzzle,
   MessageSquare,
-  Volume2,
   RotateCw,
   Download,
   Upload,
   AlertTriangle,
   ExternalLink,
+  ChevronRight,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatTile } from '@/components/StatTile';
-import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useLearningStats } from '@/lib/use-learning-stats';
 import { useFavorites } from '@/lib/use-favorites';
 import { useAchievements } from '@/lib/use-achievements';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useTTS } from '@/lib/use-tts';
 import { usePageMemory } from '@/lib/use-page-memory';
 import { EmptyState } from '@/components/EmptyState';
 import { safeStorage } from '@/lib/safe-storage';
 import { persistText } from '@/lib/capped-cache';
-import { exportBackup, importBackup, type IBackupFile } from '@/lib/backup';
-import { emitSyncDown } from '@/lib/sync-down';
 import { clearAllResume, resumeStorageWithKeys } from '@/lib/spelling-resume';
 import { WORD_COUNTS } from '@/data/wordbank/meta';
-import { cn, cleanText, formatDate } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { useBackupActions } from '@/lib/use-backup-actions';
+import { BackupFileInput } from '@/components/BackupFileInput';
 import { toast } from 'sonner';
-import FavoriteReviewMode from './components/FavoriteReviewMode';
-import { LazyFramerProvider } from '@/lib/lazy-framer-motion';
+import {
+  canGoToNextMonth,
+  isCurrentMonth,
+  sortAchievements,
+} from '@/lib/progress-page';
 
 // Lazy-load charts (recharts ~400KB) — only needed when "学习统计" tab is active
 const LazyProgressCharts = lazy(() => import('./components/ProgressCharts'));
@@ -82,6 +75,18 @@ function buildCalendarDays(calendar: { date: string; checkedIn: boolean; minutes
 
 const WEEK_DAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
+const TYPE_LABEL_MAP: Record<string, string> = {
+  chunk: '语块',
+  expression: '表达',
+  vocabulary: '词汇',
+  think: '思维训练',
+  shadowing: '影子跟读',
+  article: '文章',
+  word: '单词',
+  spelling: '句子拼写',
+  writing_prompt: '写作提示',
+};
+
 const VOCAB_LEVELS: { key: string; label: string; icon: typeof BookOpen; color: string }[] = [
   { key: 'zhongkao', label: '中考词库', icon: BookOpen, color: 'text-red-500' },
   { key: 'gaokao', label: '高考词库', icon: BookOpen, color: 'text-orange-500' },
@@ -98,16 +103,28 @@ const VOCAB_LEVELS: { key: string; label: string; icon: typeof BookOpen; color: 
 
 export default function ProgressPage() {
   const { stats, calendar, loaded, resetAll } = useLearningStats();
-  const { favorites, removeFavorite, addFavorite, clearAll } = useFavorites();
+  const { favorites, clearAll } = useFavorites();
   const { unlocked, definitions, isUnlocked, resetAchievements } = useAchievements();
-  const tts = useTTS();
+  const backup = useBackupActions();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [filterType, setFilterType] = usePageMemory('progress-filter', 'all');
   const [tab, setTab] = usePageMemory('progress-tab', 'calendar');
-  const [favReviewMode, setFavReviewMode] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [resetConfirm, setResetConfirm] = useState<string | null>(null);
+  const resetDeepLinkRef = useRef(false);
+
+  // 设置页「管理学习记录」→ /progress?reset=1：打开现有弹窗并抹掉参数，
+  // 避免刷新/返回时又弹一次；resetDeepLinkRef 防参数清除前的重复触发。
+  useEffect(() => {
+    if (resetDeepLinkRef.current) return;
+    if (searchParams.get('reset') !== '1') return;
+    resetDeepLinkRef.current = true;
+    setShowResetDialog(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('reset');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // Reset handlers
   const handleResetStats = () => {
@@ -293,80 +310,19 @@ export default function ProgressPage() {
     return buildCalendarDays(calendar, currentMonth.getFullYear(), currentMonth.getMonth());
   }, [currentMonth, calendar]);
 
-  const [backupBusy, setBackupBusy] = useState(false);
-  const backupBusyRef = useRef(false);
-  const [backupReport, setBackupReport] = useState('');
-  const exportLearningData = useCallback(async () => {
-    if (backupBusyRef.current) return;
-    backupBusyRef.current = true;
-    setBackupBusy(true);
-    setBackupReport('');
-    try {
-      const { file, localStorageCount, idbCount, importedBookCount, idbSkipped } = await exportBackup();
-      const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `nativethink-backup-${formatDate(new Date())}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      const summary = `已导出 ${localStorageCount} 项数据、${importedBookCount} 本导入书、${idbCount} 份翻译缓存`;
-      setBackupReport(`${summary}${idbSkipped ? '；部分翻译缓存过大或读取失败，已省略，可重新翻译' : ''}`);
-      if (idbSkipped) toast.warning('备份已导出，但部分翻译缓存未包含，请查看下方说明');
-      else toast.success(summary);
-    } catch {
-      const message = '导出失败：未能完整读取本地数据，请重试；不要卸载应用';
-      setBackupReport(message);
-      toast.error(message);
-    } finally {
-      backupBusyRef.current = false;
-      setBackupBusy(false);
-    }
-  }, []);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const handleImportFile = useCallback(async (file: File) => {
-    if (backupBusyRef.current) return;
-    backupBusyRef.current = true;
-    setBackupBusy(true);
-    setBackupReport('');
-    try {
-      const text = await file.text();
-      const parsed = JSON.parse(text) as IBackupFile;
-      const { restored, restoredIdb, restoredBooks, failed, failedIdb, failedBooks } = await importBackup(parsed);
-      // 部分恢复不刷新，也必须重读已落盘数据，避免陈旧 hook 下一次写回覆盖它。
-      emitSyncDown();
-      const summary = `已恢复 ${restored} 项数据、${restoredBooks} 本导入书、${restoredIdb} 份翻译缓存`;
-      if (failed + failedIdb + failedBooks > 0) {
-        setBackupReport(`${summary}；未恢复 ${failed} 项数据、${failedBooks} 本导入书、${failedIdb} 份翻译缓存。请检查可用存储空间后重新选择备份重试；已恢复的数据不会回滚。`);
-        toast.error('部分数据未恢复，请查看下方结果并重试');
-        return;
-      }
-      setBackupReport(summary);
-      toast.success(`${summary}，页面即将刷新`);
-      setTimeout(() => window.location.reload(), 1200);
-    } catch (e) {
-      const message = e instanceof Error && e.message.includes('格式') ? e.message : '恢复失败：文件无法解析或备份组件无法加载';
-      setBackupReport(message);
-      toast.error(message);
-    } finally {
-      backupBusyRef.current = false;
-      setBackupBusy(false);
-    }
-  }, []);
-
-  const filteredFavorites = useMemo(() => {
-    if (filterType === 'all') return favorites;
-    return favorites.filter((f) => f.type === filterType);
-  }, [favorites, filterType]);
+  const viewingCurrentMonth = isCurrentMonth(currentMonth.getFullYear(), currentMonth.getMonth());
+  const canNextMonth = canGoToNextMonth(currentMonth.getFullYear(), currentMonth.getMonth());
 
   const prevMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
   };
 
   const nextMonth = () => {
+    if (!canNextMonth) return;
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
   };
+
+  const goToCurrentMonth = () => setCurrentMonth(new Date());
 
   const monthLabel = `${currentMonth.getFullYear()}年 ${currentMonth.getMonth() + 1}月`;
 
@@ -377,32 +333,23 @@ export default function ProgressPage() {
     return 'bg-[var(--brand)]';
   };
 
-  const typeLabelMap: Record<string, string> = {
-    chunk: '语块',
-    expression: '表达',
-    vocabulary: '词汇',
-    think: '思维训练',
-    shadowing: '影子跟读',
-    article: '文章',
-    word: '单词',
-    spelling: '句子拼写',
-    writing_prompt: '写作提示',
-  };
+  const favoriteTypeSummary = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const f of favorites) counts.set(f.type, (counts.get(f.type) ?? 0) + 1);
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([type, count]) => ({ type, count, label: TYPE_LABEL_MAP[type] || type }));
+  }, [favorites]);
 
-  const getFavPortal = (type: string): string | null => {
-    const portals: Record<string, string> = {
-      shadowing: '/shadowing',
-      think: '/think',
-      chunk: '/chunks',
-      vocabulary: '/vocabulary',
-      expression: '/vocabulary',
-      word: '/vocabulary',
-      article: '/articles',
-      spelling: '/spelling',
-      writing_prompt: '/writing',
-    };
-    return portals[type] || null;
-  };
+  const recentFavorites = useMemo(
+    () => [...favorites].sort((a, b) => b.createdAt - a.createdAt).slice(0, 3),
+    [favorites],
+  );
+
+  const sortedAchievements = useMemo(
+    () => sortAchievements(definitions, unlocked.map((u) => u.id)),
+    [definitions, unlocked],
+  );
 
   if (!loaded) {
     return (
@@ -434,8 +381,8 @@ export default function ProgressPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={exportLearningData}
-              disabled={backupBusy}
+              onClick={backup.exportLearningData}
+              disabled={backup.backupBusy}
               className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
             >
               <Download className="size-3.5 mr-1.5" />
@@ -444,29 +391,19 @@ export default function ProgressPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={backupBusy}
+              onClick={backup.openImportPicker}
+              disabled={backup.backupBusy}
               className="rounded-2xl text-[10px] font-black uppercase tracking-wider border-border hover:border-[var(--brand)] hover:text-ink-teal"
             >
               <Upload className="size-3.5 mr-1.5" />
               从备份恢复
             </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void handleImportFile(f);
-                e.target.value = '';
-              }}
-            />
+            <BackupFileInput inputRef={backup.fileInputRef} onFile={backup.handleImportFile} />
           </div>
           <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
             备份含学习数据、导入书正文和阅读译文，不含视频精听媒体及字幕。恢复会覆盖同名数据和同 ID 书籍，保留其他本地书；建议先导出当前数据。
           </p>
-          {backupReport && <p role="status" className="mt-2 text-sm leading-relaxed">{backupReport}</p>}
+          {backup.backupReport && <p role="status" className="mt-2 text-sm leading-relaxed">{backup.backupReport}</p>}
         </div>
       </div>
 
@@ -737,7 +674,7 @@ export default function ProgressPage() {
         <TabsContent value="calendar" className="mt-6">
           <Card className="rounded-[24px] border-border">
             <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <Calendar className="size-5 text-ink-teal" strokeWidth={1.8} />
                   <div>
@@ -749,11 +686,23 @@ export default function ProgressPage() {
                     </CardDescription>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {!viewingCurrentMonth && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={goToCurrentMonth}
+                      className="rounded-full bg-muted px-3 text-[10px] font-black text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                    >
+                      <Calendar className="size-3.5" />
+                      回到本月
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={prevMonth}
+                    aria-label="上个月"
                     className="rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
                   >
                     <TrendingUp className="size-4 rotate-180" />
@@ -762,7 +711,10 @@ export default function ProgressPage() {
                     variant="ghost"
                     size="icon"
                     onClick={nextMonth}
-                    className="rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                    disabled={!canNextMonth}
+                    aria-label="下个月"
+                    title={canNextMonth ? '下个月' : '已经是本月'}
+                    className="rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground disabled:opacity-35"
                   >
                     <TrendingUp className="size-4" />
                   </Button>
@@ -784,7 +736,7 @@ export default function ProgressPage() {
               {/* 日期格子 */}
               <div className="mx-auto grid max-w-[560px] grid-cols-7 gap-1.5">
                 {calendarDays.map((day, idx) => {
-                  const isCurrentMonth = day.date.getMonth() === currentMonth.getMonth();
+                  const isDayInMonth = day.date.getMonth() === currentMonth.getMonth();
                   const isToday =
                     day.date.toDateString() === new Date().toDateString();
                   return (
@@ -792,7 +744,7 @@ export default function ProgressPage() {
                       key={idx}
                       className={cn(
                         'h-11 sm:h-12 rounded-[10px] flex flex-col items-center justify-center text-[11px] transition-all',
-                        isCurrentMonth ? '' : 'opacity-30',
+                        isDayInMonth ? '' : 'opacity-30',
                         isToday && 'ring-1 ring-inset ring-[var(--brand)]',
                       )}
                     >
@@ -849,13 +801,13 @@ export default function ProgressPage() {
           </Suspense>
         </TabsContent>
 
-        {/* 收藏本 */}
+        {/* 收藏本：只留总览，完整列表/搜索/回顾在 /favorites */}
         <TabsContent value="favorites" className="mt-6">
-          <Card className="rounded-[24px] border-border">
+          <Card data-favorites-summary className="rounded-[24px] border-border">
             <CardHeader className="pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <div className="flex items-center gap-3">
-                  <div className="size-12 rounded-2xl bg-pink-50 dark:bg-pink-500/15 text-pink-500 flex items-center justify-center">
+                  <div className="flex size-12 items-center justify-center rounded-2xl bg-pink-50 text-pink-500 dark:bg-pink-500/15">
                     <Heart className="size-5.5" />
                   </div>
                   <div>
@@ -863,166 +815,78 @@ export default function ProgressPage() {
                       收藏的地道表达
                     </CardTitle>
                     <CardDescription className="mt-0.5 text-[11px] font-medium">
-                      共 {favorites.length} 条收藏
+                      共 {favorites.length} 条收藏 · 搜索、筛选与回顾在收藏页
                     </CardDescription>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Filter className="size-4 text-muted-foreground" />
-                    <Select value={filterType} onValueChange={setFilterType}>
-                      <SelectTrigger className="w-[120px] rounded-2xl border-border bg-muted text-xs font-bold uppercase tracking-wider">
-                        <SelectValue placeholder="分类" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-2xl">
-                        <SelectItem value="all" className="text-xs font-bold">
-                          全部
-                        </SelectItem>
-                        <SelectItem value="chunk" className="text-xs font-bold">
-                          语块
-                        </SelectItem>
-                        <SelectItem value="expression" className="text-xs font-bold">
-                          表达
-                        </SelectItem>
-                        <SelectItem value="vocabulary" className="text-xs font-bold">
-                          词汇
-                        </SelectItem>
-                        <SelectItem value="think" className="text-xs font-bold">
-                          思维训练
-                        </SelectItem>
-                        <SelectItem value="shadowing" className="text-xs font-bold">
-                          影子跟读
-                        </SelectItem>
-                        <SelectItem value="article" className="text-xs font-bold">
-                          文章
-                        </SelectItem>
-                        <SelectItem value="word" className="text-xs font-bold">
-                          单词
-                        </SelectItem>
-                        <SelectItem value="spelling" className="text-xs font-bold">
-                          句子拼写
-                        </SelectItem>
-                        <SelectItem value="writing_prompt" className="text-xs font-bold">
-                          写作提示
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    variant={favReviewMode ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => { setFavReviewMode((v) => !v); }}
-                    className={cn(
-                      'rounded-xl text-[10px] font-black uppercase tracking-wider',
-                      favReviewMode
-                        ? 'bg-[var(--brand)] text-white shadow-lg shadow-emerald-200/50'
-                        : 'border-border hover:border-[var(--brand)] hover:text-ink-teal',
-                    )}
-                  >
-                    {favReviewMode ? '浏览模式' : '开始回顾'}
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-favorites-entry="manage"
+                  onClick={() => navigate('/favorites')}
+                  className="rounded-xl border-border text-[10px] font-black uppercase tracking-wider hover:border-[var(--brand)] hover:text-ink-teal"
+                >
+                  去收藏页管理
+                  <ExternalLink className="size-3.5" />
+                </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              {favReviewMode ? (
-                <LazyFramerProvider>
-                  <FavoriteReviewMode favorites={filteredFavorites} onExit={() => setFavReviewMode(false)} />
-                </LazyFramerProvider>
-              ) : filteredFavorites.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {filteredFavorites.map((item) => (
-                    <Card
-                      key={item.id}
-                      className="rounded-[28px] border-border hover:border-[var(--brand)]/30 hover:shadow-md transition-all duration-300 group"
-                    >
-                      <CardContent className="p-5">
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <Badge className="text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal border-none">
-                            {typeLabelMap[item.type] || item.type}
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              removeFavorite(item.id);
-                              // 误删可撤销：闭包里还留着完整条目
-                              toast.success(`已删除「${item.content.slice(0, 20)}」`, {
-                                duration: 5000,
-                                action: {
-                                  label: '撤销',
-                                  onClick: () => addFavorite({ type: item.type, content: item.content, meaning: item.meaning, example: item.example, category: item.category }),
-                                },
-                              });
-                            }}
-                            className="rounded-xl size-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/15"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="text-lg font-black text-foreground group-hover:text-ink-teal transition-colors">
-                            {item.content}
-                          </h4>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => tts.speak(item.content)}
-                            className="rounded-xl size-7 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-                          >
-                            <Volume2 className="size-3.5" />
-                          </Button>
-                        </div>
-                        <p className="text-sm text-muted-foreground font-medium mb-3">
-                          {item.meaning}
-                        </p>
-                        {item.example && (
-                          <div className="p-3 rounded-xl bg-muted/50 flex items-start gap-2 group/example">
-                            <p className="text-xs text-foreground/80 italic flex-1">「{cleanText(item.example)}」</p>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => tts.speak(cleanText(item.example))}
-                              className="rounded-lg size-6 text-muted-foreground hover:text-ink-teal shrink-0 opacity-0 group-hover/example:opacity-100 focus-visible:opacity-100 transition-opacity"
-                            >
-                              <Volume2 className="size-3" />
-                            </Button>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between mt-3">
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant="secondary"
-                              className="text-[9px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 bg-muted"
-                            >
-                              {item.category}
-                            </Badge>
-                            {/* Portal link to source module */}
-                            {getFavPortal(item.type) && (
-                              <button
-                                onClick={() => navigate(getFavPortal(item.type)!)}
-                                className="shrink-0 py-1 text-[10px] font-bold text-ink-teal hover:underline flex items-center gap-0.5"
-                                title={`前往${typeLabelMap[item.type] || item.type}`}
-                              >
-                                <ExternalLink className="size-3" />传送
-                              </button>
-                            )}
-                          </div>
-                          <span className="text-[10px] font-bold text-muted-foreground">
-                            {new Date(item.createdAt).toLocaleDateString('zh-CN')}
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
+            <CardContent className="space-y-5">
+              {favorites.length === 0 ? (
                 <EmptyState
                   icon={Heart}
                   title="还没有收藏"
-                  description="在学习过程中点击心形图标收藏你喜欢的表达"
-                  className="py-14"
+                  description="在学习过程中点击心形图标收藏你喜欢的表达；收藏页负责搜索、筛选和回顾。"
+                  className="py-12"
+                  action={(
+                    <Button
+                      onClick={() => navigate('/vocabulary')}
+                      className="rounded-full bg-[var(--brand)] px-6 text-[var(--on-brand)] hover:bg-[var(--brand-strong)]"
+                    >
+                      去词汇学习
+                    </Button>
+                  )}
                 />
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-1.5">
+                    {favoriteTypeSummary.map(({ type, count, label }) => (
+                      <span
+                        key={type}
+                        className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-black text-muted-foreground"
+                      >
+                        {label} <span className="text-foreground">{count}</span>
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                      最近收藏
+                    </p>
+                    {recentFavorites.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => navigate('/favorites')}
+                        className="flex w-full items-start gap-3 rounded-2xl border border-border/60 p-3 text-left transition-colors hover:border-rose-200/60 hover:bg-muted/20"
+                      >
+                        <span className="mt-0.5 shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-black text-ink-teal dark:bg-emerald-500/10">
+                          {TYPE_LABEL_MAP[item.type] || item.type}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-black text-foreground">{item.content}</span>
+                          <span className="mt-0.5 block truncate text-[10px] font-bold text-muted-foreground">{item.meaning}</span>
+                        </span>
+                        <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" />
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="text-[10px] font-bold text-muted-foreground/70">
+                    搜索、按类型筛选、12 条增量加载与「开始回顾」都在收藏页；这里只留总览。
+                  </p>
+                </>
               )}
             </CardContent>
           </Card>
@@ -1054,7 +918,7 @@ export default function ProgressPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {definitions.map((achievement) => {
+                {sortedAchievements.map((achievement) => {
                   const unlocked_ = isUnlocked(achievement.id);
                   const found = unlocked.find((u) => u.id === achievement.id);
                   return (

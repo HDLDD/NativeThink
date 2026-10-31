@@ -14,8 +14,10 @@ import {
   Line,
   Legend,
 } from 'recharts';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { BarChart3, Target, TrendingUp, Flame, BookOpen } from 'lucide-react';
+import { buildModuleShares } from '@/lib/progress-page';
 
 // ── Props ──
 interface ProgressChartsProps {
@@ -26,34 +28,6 @@ interface ProgressChartsProps {
     moduleProgress: Record<string, number>;
   };
 }
-
-// ── Module config ──
-// 颜色按 **key** 取，必须与 DashboardPage/constants.ts 的 MODULES[].color 一致 ——
-// 此前按下标对位数组，错位且 conversation/spelling 同为 #F59E0B，饼图图例无法区分
-const MODULE_COLORS: Record<string, string> = {
-  think: 'var(--brand)',
-  chunks: '#1F2937',
-  conversation: '#6366F1',
-  shadowing: '#F97316',
-  vocabulary: '#EC4899',
-  writing: '#8B5CF6',
-  articles: '#0EA5E9',
-  spelling: '#F43F5E',
-  video: '#14B8A6',
-  sentences: '#F59E0B',
-};
-const MODULE_NAMES: Record<string, string> = {
-  vocabulary: '词汇深度',
-  articles: '文章阅读',
-  spelling: '句子拼写',
-  video: '视频精听',
-  think: '思维训练',
-  chunks: '语块训练',
-  conversation: '对话练习',
-  shadowing: '影子跟读',
-  sentences: '句子学习',
-  writing: '写作练习',
-};
 
 export default function ProgressCharts({ calendar, stats }: ProgressChartsProps) {
   // Chart data: last 7 days from real calendar
@@ -74,13 +48,12 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
   }, [calendar]);
 
   // Pie chart: module distribution
-  const pieData = useMemo(() => {
-    return Object.entries(stats.moduleProgress).map(([key, value]) => ({
-      name: MODULE_NAMES[key] || key,
-      value,
-      color: MODULE_COLORS[key] || '#94A3B8',
-    }));
-  }, [stats.moduleProgress]);
+  // `moduleProgress` 是进度分，不是分钟；先归一成整数百分比（最大余数补差），
+  // tooltip 的 `${value}%` 才是真份额。原始分值直接画会导致三个 50 分显示三个 50%。
+  const pieData = useMemo(
+    () => buildModuleShares(stats.moduleProgress).map((s) => ({ name: s.name, value: s.percent, color: s.color })),
+    [stats.moduleProgress],
+  );
 
   // Line chart: 30-day trend from real calendar data
   const trendData = useMemo(() => {
@@ -104,7 +77,7 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
       {/* 第一行：柱状图 + 饼图 */}
       <div className="grid grid-cols-12 gap-6">
         {/* 近 7 天学习时长柱状图 */}
-        <Card className="col-span-12 lg:col-span-7 rounded-[40px] border-border shadow-sm">
+        <Card className="col-span-12 lg:col-span-7 rounded-[24px] border-border shadow-sm">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
               <div className="size-12 rounded-2xl bg-indigo-50 dark:bg-indigo-500/15 text-indigo-500 flex items-center justify-center">
@@ -123,7 +96,7 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={weekData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(215 28% 20%)" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis
                   dataKey="day"
                   tick={{ fontSize: 12, fontWeight: 700 }}
@@ -158,7 +131,7 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
         </Card>
 
         {/* 各模块占比饼图 */}
-        <Card className="col-span-12 lg:col-span-5 rounded-[40px] border-border shadow-sm">
+        <Card className="col-span-12 lg:col-span-5 rounded-[24px] border-border shadow-sm">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
               <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center">
@@ -169,45 +142,54 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
                   模块学习占比
                 </CardTitle>
                 <CardDescription className="text-sm font-medium mt-1">
-                  各模块完成度分布
+                  各模块进度分占比（不是学习时长）
                 </CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={95}
-                  paddingAngle={3}
-                  dataKey="value"
-                  strokeWidth={0}
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <RechartsTooltip
-                  contentStyle={{
-                    borderRadius: 16,
-                    border: 'none',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
-                  formatter={(value: number, name: string) => [`${value}%`, name]}
-                />
-                <Legend
-                  wrapperStyle={{ fontSize: 11, fontWeight: 700 }}
-                  iconType="circle"
-                  iconSize={8}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            {pieData.length === 0 ? (
+              <div data-chart-empty="pie" className="flex h-[260px] flex-col items-center justify-center gap-2 text-center">
+                <Target className="size-9 text-muted-foreground/25" />
+                <p className="text-sm font-black text-foreground">还没有模块进度</p>
+                <p className="text-xs font-medium text-muted-foreground">去任意模块学几分钟，这里就会亮起来。</p>
+                <Link to="/" className="mt-1 text-xs font-black text-ink-teal hover:underline">回首页开始学习 →</Link>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={95}
+                    paddingAngle={3}
+                    dataKey="value"
+                    strokeWidth={0}
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip
+                    contentStyle={{
+                      borderRadius: 16,
+                      border: 'none',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                    formatter={(value: number, name: string) => [`${value}%`, name]}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: 11, fontWeight: 700 }}
+                    iconType="circle"
+                    iconSize={8}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -215,7 +197,7 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
       {/* 第二行：折线图 + 暗色统计 */}
       <div className="grid grid-cols-12 gap-6">
         {/* 30天趋势折线图 */}
-        <Card className="col-span-12 lg:col-span-8 rounded-[40px] border-border shadow-sm">
+        <Card className="col-span-12 lg:col-span-8 rounded-[24px] border-border shadow-sm">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
               <div className="size-12 rounded-2xl bg-orange-50 dark:bg-orange-500/15 text-orange-500 flex items-center justify-center">
@@ -234,7 +216,7 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={trendData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(215 28% 20%)" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis
                   dataKey="date"
                   tick={{ fontSize: 10, fontWeight: 700 }}
@@ -273,7 +255,7 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
 
         {/* 暗色迷你统计卡 */}
         <div className="col-span-12 lg:col-span-4 space-y-4">
-          <Card className="rounded-[32px] bg-[var(--ink)] border-none shadow-xl relative overflow-hidden group">
+          <Card className="rounded-[24px] bg-[var(--ink)] border-none shadow-xl relative overflow-hidden group">
             <CardContent className="p-6 relative z-10">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
@@ -291,7 +273,7 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
             </CardContent>
             </Card>
 
-          <Card className="rounded-[32px] border-border shadow-sm">
+          <Card className="rounded-[24px] border-border shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
