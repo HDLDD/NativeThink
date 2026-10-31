@@ -53,23 +53,46 @@ const js = ts.transpileModule(src, {
 const outFile = path.join(TMP, 'spelling-resume-under-test.mjs');
 fs.writeFileSync(outFile, js);
 const m = await import(pathToFileURL(outFile).href);
-for (const fn of ['resumeKeyFor', 'readResumeIndex', 'readLastResumeLevel', 'persistResume', 'migrateLegacyResume', 'clearAllResume']) {
+for (const fn of ['resumeKeyFor', 'readResumeIndex', 'readResumeQueue', 'readLastResumeLevel', 'persistResume', 'migrateLegacyResume', 'clearAllResume']) {
   if (typeof m[fn] !== 'function') { console.error(`脚手架错误：没导出 ${fn}`); process.exit(2); }
 }
 
 /* ───────────── A. 行为 ───────────── */
 // A1 脚手架自检：读写往返
 const st = makeStore();
-m.persistResume('cet4', 7, st);
+m.persistResume('cet4', 7, null, st);
 ok(m.readResumeIndex('cet4', st) === 7, '脚手架自检：persistResume → readResumeIndex 往返正确');
 ok(m.readLastResumeLevel(st) === 'cet4', 'persistResume 记下"上次在哪一本"');
 ok(m.readResumeIndex('gaokao', st) === null,
   '没练过的词书返回 null（不能返回 0 冒充"有断点"，否则位置会被无谓地重置）');
 
+// A1b 本轮队列往返：只存下标不够，切回来重新洗牌会落到另一句
+m.persistResume('cet4', 7, ['s1', 's2', 's3'], st);
+ok(JSON.stringify(m.readResumeQueue('cet4', st)) === '["s1","s2","s3"]',
+  'persistResume 把本轮队列按原顺序存下，readResumeQueue 原样读回');
+ok(m.readResumeIndex('cet4', st) === 7, '带队列时位置仍然可读');
+
+// A1c 老断点没有 queue 字段：位置照读，队列返回 null（调用方回退新建队列）
+const stOld = makeStore();
+stOld.setItem(m.resumeKeyFor('gaokao'), JSON.stringify({ currentIndex: 4 }));
+ok(m.readResumeIndex('gaokao', stOld) === 4, '老格式断点仍能读位置');
+ok(m.readResumeQueue('gaokao', stOld) === null, '老格式断点没有队列 → null，不强迫迁移');
+
+// A1d 队列形状清洗：只留非空字符串，最多 500 个
+const stQueue = makeStore();
+stQueue.setItem(m.resumeKeyFor('cet6'), JSON.stringify({ currentIndex: 1, queue: ['a', '', null, 2, 'b'] }));
+ok(JSON.stringify(m.readResumeQueue('cet6', stQueue)) === '["a","b"]',
+  '队列里的空值/非字符串被清掉，不会把 NaN/undefined 传进题目队列');
+m.persistResume('toefl', 0, Array.from({ length: 600 }, (_, i) => `id${i}`), stQueue);
+ok(m.readResumeQueue('toefl', stQueue).length === 500,
+  '队列最多存 500 个 id（与本轮句数上限同量级）');
+m.persistResume('ielts', 2, [], stQueue);
+ok(m.readResumeQueue('ielts', stQueue) === null, '空队列不写 queue 字段');
+
 // A2 跨书互不覆盖（这就是原来的缺陷）
-m.persistResume('cet4', 20, st);
-m.persistResume('gaokao', 3, st);
-m.persistResume('cet4', 20, st);
+m.persistResume('cet4', 20, null, st);
+m.persistResume('gaokao', 3, null, st);
+m.persistResume('cet4', 20, null, st);
 const backToCet4 = m.readResumeIndex('cet4', st);
 const gaokaoIdx = m.readResumeIndex('gaokao', st);
 ok(backToCet4 === 20 && gaokaoIdx === 3,
@@ -95,7 +118,7 @@ ok(st2.getItem(m.RESUME_LEGACY_KEY) === null, '迁移后删除旧全局键（不
 
 // A4 迁移不得覆盖已有新数据
 const st3 = makeStore();
-m.persistResume('toefl', 40, st3);
+m.persistResume('toefl', 40, null, st3);
 st3.setItem(m.RESUME_LEGACY_KEY, JSON.stringify({ activeLevel: 'toefl', currentIndex: 2 }));
 m.migrateLegacyResume(st3);
 ok(m.readResumeIndex('toefl', st3) === 40, '目标键已有数据时不被旧全局值覆盖（新数据优先）');
@@ -115,9 +138,9 @@ ok(m.readResumeIndex('cet6', st5) === null, '负数下标按无断点处理（�
 
 // A6 重置必须按前缀枚举清干净
 const st6 = makeStore();
-m.persistResume('cet4', 5, st6);
-m.persistResume('gaokao', 9, st6);
-m.persistResume('all', 2, st6);
+m.persistResume('cet4', 5, null, st6);
+m.persistResume('gaokao', 9, null, st6);
+m.persistResume('all', 2, null, st6);
 // 3 本词书各一把位置键 + 一把 `_last` 指针 = 4 把；断言按实际应有数量推导，不是"越大越好"
 const cleared = m.clearAllResume(st6);
 ok(cleared === 4 && st6.keys().filter((k) => k.startsWith(m.RESUME_PREFIX)).length === 0,
@@ -136,8 +159,18 @@ ok(!/safeStorage\.setItem\('__nativethink_spelling_resume'/.test(page) &&
   '正对照：页面里不再有"写单个全局断点键"的旧代码');
 ok((page.match(/persistResume\(|readResumeIndex\(|readLastResumeLevel\(|migrateLegacyResume\(/g) || []).length >= 4,
   'persist / 读位置 / 读上一本 / 迁移 四个调用都在');
-ok(/setTimeout\(\(\) => persistResume\(level, idx\), 200\)/.test(page),
+ok(/setTimeout\(\(\) => persistResume\(level, idx, queue\), 200\)/.test(page),
   '落盘仍是 200ms 防抖（连续翻句不要每跳一次就写一次 storage）');
+ok((page.match(/readResumeQueue\(/g) || []).length >= 3 &&
+   /pendingResumeQueue/.test(page),
+  '切书 / 自动恢复 / 挂载恢复三处都读回本轮队列');
+ok(/persistResume\(level, startIndex, queue\)/.test(page),
+  '建队后立刻把队列与起点一起落盘（不靠 200ms 防抖的那次）');
+ok(/savedQueue\.every\(\(id\) => filteredIds\.has\(id\)\)/.test(page) &&
+   /buildSessionQueue\(filtered/.test(page),
+  '旧队列有缺失时回退新建队列（不能拿半个队列续学）');
+ok(/persistPosition\(activeLevel, currentIndex, sessionQueue\)/.test(page),
+  '翻句落盘带上当前队列（切回来顺序不变）');
 ok(/clearAllResume\(resumeStorageWithKeys\(\)\)/.test(progress),
   '「重置句子拼写」调用 clearAllResume（按前缀枚举，而不是写死清单）');
 

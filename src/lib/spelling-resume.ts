@@ -48,13 +48,48 @@ export function readLastResumeLevel(st: IResumeStorage = safeStorage): string | 
   try { return st.getItem(RESUME_LAST_KEY) || null; } catch { return null; }
 }
 
-/** 写断点：分键存位置，另存一本指针。**只有这一处**写这两个键 */
-export function persistResume(level: string, currentIndex: number, st: IResumeStorage = safeStorage): void {
+/**
+ * 写断点：分键存位置 + 本轮队列，另存一本指针。**只有这一处**写这两个键。
+ *
+ * 只存下标不够：切走再回来会重新 buildSessionQueue，队列顺序变了，
+ * 「上次第 2 句」会落到另一句。队列里的 id 是稳定的（`_wbId` / 句子库 id），
+ * 所以把本轮 id 顺序一起存下来，回来时按原队列续学；老断点没有 queue 字段，
+ * 仍按旧行为（位置近似）恢复，不强制迁移。
+ */
+export function persistResume(
+  level: string,
+  currentIndex: number,
+  queue?: string[] | null,
+  st: IResumeStorage = safeStorage,
+): void {
   const idx = Number.isFinite(currentIndex) && currentIndex >= 0 ? Math.floor(currentIndex) : 0;
+  const payload: { currentIndex: number; queue?: string[] } = { currentIndex: idx };
+  if (Array.isArray(queue) && queue.length > 0) {
+    const ids = queue
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      .slice(0, 500);
+    if (ids.length > 0) payload.queue = ids;
+  }
   try {
-    st.setItem(resumeKeyFor(level), JSON.stringify({ currentIndex: idx }));
+    st.setItem(resumeKeyFor(level), JSON.stringify(payload));
     st.setItem(RESUME_LAST_KEY, level);
   } catch { /* 配额满：断点丢一次可接受，不能让页面炸 */ }
+}
+
+/** 读本轮队列；老断点 / 没有队列 / 队列全是坏值都返回 null（调用方回退到新建队列） */
+export function readResumeQueue(level: string, st: IResumeStorage = safeStorage): string[] | null {
+  try {
+    const raw = st.getItem(resumeKeyFor(level));
+    if (raw == null) return null;
+    const parsed = JSON.parse(raw) as { queue?: unknown };
+    if (!Array.isArray(parsed?.queue)) return null;
+    const ids = parsed.queue
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      .slice(0, 500);
+    return ids.length > 0 ? ids : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

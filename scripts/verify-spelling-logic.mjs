@@ -175,9 +175,11 @@ ok(/bg-foreground\/55[^\n]*group-hover:bg-foreground\/75/.test(pageCode),
   '空格下划线用前景色 55% / hover 75% —— 旧 bg-white/90 在浅色卡片上几乎看不见');
 ok(/border-muted-foreground\/40 hover:border-muted-foreground\/60/.test(pageCode),
   '填空模式的空位边框同步加深（空位和听写下划线要一样看得见）');
-ok(/const queue = buildSessionQueue\(filtered, Math\.max\(1, roundSizeRef\.current\)\)/.test(pageCode)
+ok(/buildSessionQueue\(filtered, Math\.max\(1, roundSizeRef\.current\)\)/.test(pageCode)
+  && /canRestoreQueue/.test(pageCode)
+  && /savedQueue\.every/.test(pageCode)
   && !/buildSessionQueue\(filtered\)\.slice/.test(pageCode),
-  '本轮句数传给 buildSessionQueue，先截断后 markServed');
+  '新建队列时本轮句数传给 buildSessionQueue（先截断后 markServed）；恢复旧队列不重新截断');
 ok(/completedInPool >= poolIds\.size/.test(pageCode),
   '自动重排按当前桶的完成比例判断，不再混用全站完成数 / hook 句子条数');
 ok(/pendingResumeIndex\.current = readResumeIndex\(lvl\)/.test(pageCode),

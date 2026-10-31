@@ -20,15 +20,11 @@ import {
   ChevronRight as ChevronRightIcon,
   Loader2,
   Mic,
-  ChevronDown,
-  Heart,
   Library,
   Lightbulb,
   Film,
+  Sparkles,
 } from 'lucide-react';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/EmptyState';
 import {
@@ -47,6 +43,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -65,6 +62,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { safeStorage } from '@/lib/safe-storage';
 import {
   readResumeIndex,
+  readResumeQueue,
   readLastResumeLevel,
   persistResume,
   migrateLegacyResume,
@@ -79,6 +77,8 @@ import { useLearningStats } from '@/lib/use-learning-stats';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { queryWords, preloadLevels, isLevelReady } from '@/data/wordbank';
+import { SPELLING_POOLS, type ISpellingPoolProgress } from '@/lib/spelling-pools';
+import { SpellingPoolPicker } from './components/SpellingPoolPicker';
 import type {
   ISpellingSentence,
   SpellingMode,
@@ -87,6 +87,15 @@ import type {
 } from '@/types/spelling';
 
 // ── Helpers ──
+
+/** 玩法与本轮句数是跨会话偏好：首屏选完、练习页里改了，都写同一把键 */
+const SPELLING_MODE_KEY = '__nativethink_spelling_mode';
+const SPELLING_ROUND_KEY = '__nativethink_spelling_round_size';
+
+const ALL_LEVELS = [
+  'zhongkao', 'gaokao', 'cet4', 'cet6', 'cet46freq', 'cet46elite',
+  'ielts', 'toefl', 'postgraduate', 'professional', 'advanced',
+] as const;
 
 // ── Global word bank sentence cache (not React state — no cascading re-renders) ──
 const _wbCache: Record<string, ISpellingSentence[]> = {};
@@ -397,7 +406,9 @@ export default function SpellingPage() {
   const { addStudyMinutes } = useLearningStats();
 
   // Mode state
-  const [mode, setMode] = useState<SpellingMode>('dictation');
+  const [mode, setMode] = useState<SpellingMode>(() => {
+    try { return safeStorage.getItem(SPELLING_MODE_KEY) === 'fill' ? 'fill' : 'dictation'; } catch { return 'dictation'; }
+  });
   const [audioMode, setAudioMode] = useState<SpellingAudioMode>('sentence');
 
   // ── 逐词播放 ──
@@ -451,6 +462,9 @@ export default function SpellingPage() {
   const [fillParts, setFillParts] = useState<ReturnType<typeof splitForFill> | null>(null);
 
   // UI state
+  const [showPoolPicker, setShowPoolPicker] = useState(false);
+  /** 首屏选过题池后即使池子是空的也要离开大厅，去练习页看空态指引 */
+  const [hallEntered, setHallEntered] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
   const [showAIDialog, setShowAIDialog] = useState(false);
   const [showManageDialog, setShowManageDialog] = useState(false);
@@ -468,7 +482,7 @@ export default function SpellingPage() {
   // 本轮句数（像背单词的"每日学习量"一样，控制一轮学习的句子数量）
   const [roundSize, setRoundSize] = useState<number>(() => {
     try {
-      const v = parseInt(safeStorage.getItem('__nativethink_spelling_round_size') || '', 10);
+      const v = parseInt(safeStorage.getItem(SPELLING_ROUND_KEY) || '', 10);
       return v > 0 && v <= 500 ? v : 10;
     } catch { return 10; }
   });
@@ -496,17 +510,29 @@ export default function SpellingPage() {
         return;
       }
       const filtered = level === 'all' ? allSentences : allSentences.filter((s) => s.level === level);
+      // 有完整可用的旧队列就按原顺序续学；只存下标不够 —— 新队列会重新洗牌，
+      // 「上次第 2 句」会落到另一句。队列里有句子被删/导入变更时回退到新建队列。
+      const filteredIds = new Set(filtered.map((s) => s.id));
+      const savedQueue = pendingResumeQueue.current;
+      pendingResumeQueue.current = null;
+      const canRestoreQueue = !!savedQueue
+        && savedQueue.length > 0
+        && savedQueue.every((id) => filteredIds.has(id));
       // 截断到本轮句数（像背单词的每日学习量，避免 6966 句的大山）
-      const queue = buildSessionQueue(filtered, Math.max(1, roundSizeRef.current));
-      setSessionQueue(queue);
+      const queue = canRestoreQueue
+        ? savedQueue
+        : buildSessionQueue(filtered, Math.max(1, roundSizeRef.current));
 
-      // Restore resume index if pending, else start at 0
+      let startIndex = 0;
       if (pendingResumeIndex.current !== null && pendingResumeIndex.current < queue.length) {
-        setCurrentIndex(pendingResumeIndex.current);
-        pendingResumeIndex.current = null;
-      } else {
-        setCurrentIndex(0);
+        startIndex = pendingResumeIndex.current;
       }
+      pendingResumeIndex.current = null;
+
+      setSessionQueue(queue);
+      setCurrentIndex(startIndex);
+      // 队列一建好就落盘：切走再回来/刷新都按同一轮继续（200ms 防抖只给翻句用）
+      persistResume(level, startIndex, queue);
       setSubmitted(false);
       setResults(null);
       setCompletionShown(false);
@@ -514,15 +540,21 @@ export default function SpellingPage() {
     [sentences, buildSessionQueue, activeLevel],
   );
 
-  /** 切换本轮句数 — 立即重新排队（选择新一轮的句子） */
-  const changeRoundSize = useCallback((n: number) => {
-    const v = Math.max(1, Math.min(500, n));
+  /** 只记偏好、不排队 —— 首屏还没选词书时用 */
+  const persistRoundSize = useCallback((n: number) => {
+    const v = Math.max(1, Math.min(500, Math.floor(n)));
     setRoundSize(v);
     roundSizeRef.current = v;
-    try { safeStorage.setItem('__nativethink_spelling_round_size', String(v)); } catch { /* ignore */ }
+    try { safeStorage.setItem(SPELLING_ROUND_KEY, String(v)); } catch { /* ignore */ }
+    return v;
+  }, []);
+
+  /** 切换本轮句数 — 立即重新排队（选择新一轮的句子） */
+  const changeRoundSize = useCallback((n: number) => {
+    const v = persistRoundSize(n);
     rebuildSession();
     toast.success(`本轮改为 ${v} 句，已重新排队`, { duration: 1500 });
-  }, [rebuildSession]);
+  }, [persistRoundSize, rebuildSession]);
 
   // Initialize session on sentences load — auto-reset completed if all done
   useEffect(() => {
@@ -595,6 +627,7 @@ export default function SpellingPage() {
   const handleModeChange = useCallback((next: SpellingMode) => {
     if (next === mode) return;
     setMode(next);
+    try { safeStorage.setItem(SPELLING_MODE_KEY, next); } catch { /* ignore */ }
     setSubmitted(false);
     setResults(null);
   }, [mode]);
@@ -879,7 +912,49 @@ export default function SpellingPage() {
     return 'intermediate';
   }, []);
 
-  const ALL_LEVELS = ['zhongkao','gaokao','cet4','cet6','cet46freq','cet46elite','ielts','toefl','postgraduate','professional','advanced'];
+  /**
+   * 题池卡的进度 / 断点。
+   *
+   * 词库句子是懒加载的（全局缓存不是 React state），所以：
+   *  - 纠偏/精听：句子钩子里就有，随时能算；
+   *  - 词书：只有已经加载过的池子有 total/completed，未加载的显示词数；
+   *  - 断点：readResumeIndex 不依赖加载，所有池子都能显示"上次第 N 句"。
+   * activeLevel / currentIndex / levelLoading / building 变化意味着缓存可能刚被填充，必须重算。
+   */
+  const poolProgress = useMemo(() => {
+    const completed = new Set(completedSentenceIds);
+    const stat = (items: ISpellingSentence[], resumeIndex: number | null): ISpellingPoolProgress => ({
+      loaded: items.length > 0,
+      total: items.length,
+      completed: items.reduce((n, s) => n + (completed.has(s.id) ? 1 : 0), 0),
+      resumeIndex,
+    });
+    /** 当前池的位置直接取 currentIndex —— storage 落盘有 200ms 防抖，读它会把刚翻的一句显示成上一句 */
+    const resumeOf = (level: string): number | null =>
+      level === activeLevel && sessionQueue.length > 0 ? currentIndex : readResumeIndex(level);
+    const map: Record<string, ISpellingPoolProgress> = {};
+    for (const key of [CORRECTION_LEVEL, VIDEO_LEVEL]) {
+      map[key] = stat(sentences.filter((s) => s.level === key), resumeOf(key));
+    }
+    // 「全部词库」只有 11 本都进过缓存才算已加载 —— 否则会把只加载了四级时的
+    // 6,827 句当成全部池子的总数，显示「已完成 0/6,827 句」。
+    let allWordbooksLoaded = true;
+    for (const level of ALL_LEVELS) {
+      const items = getWBSentences(level);
+      if (items.length === 0) allWordbooksLoaded = false;
+      map[level] = stat(items, resumeOf(level));
+    }
+    map.all = allWordbooksLoaded
+      ? stat(getAllSentences(sentences), resumeOf('all'))
+      : { loaded: false, total: 0, completed: 0, resumeIndex: resumeOf('all') };
+    return map;
+    // 这些状态变化代表词库缓存可能刚被填充 —— 缓存本身不是响应式的
+  }, [sentences, completedSentenceIds, activeLevel, currentIndex, sessionQueue.length, levelLoading, building]);
+
+  const favoriteWordCount = useMemo(
+    () => favorites.filter((f) => f.type === 'word').length,
+    [favorites],
+  );
 
   /** Cache extracted sentences per level to avoid redundant work */
   const levelSentencesCache = useRef<Record<string, Omit<ISpellingSentence, 'id' | 'createdAt'>[]>>({});
@@ -919,7 +994,9 @@ export default function SpellingPage() {
 
       // 按 level 分键的断点真正接回来：切走再切回同一本书，从上次的位置继续，
       // 而不是永远从第 1 句重新开始（此前只在刷新自动进入时读过断点）。
+      // 队列也一起读回来 —— 新队列会重新洗牌，只恢复下标会落到另一句。
       pendingResumeIndex.current = readResumeIndex(lvl);
+      pendingResumeQueue.current = readResumeQueue(lvl);
 
       // 「纠偏表达」「视频精听」都不是词库，是句子库里的一个桶（分别由纠偏本 / 精听页送进来）——
       // 走词库那条路会 preload 一个不存在的 level 并误报"该词库没有例句"。
@@ -1032,26 +1109,64 @@ export default function SpellingPage() {
     setBuilding(false);
   }, [extractLevelSentences, rebuildSession]);
 
+  const activePoolLabel = useMemo(
+    () => SPELLING_POOLS.find((p) => p.key === activeLevel)?.label
+      ?? (activeLevel === 'favorites' ? '收藏单词' : activeLevel),
+    [activeLevel],
+  );
+
+  /** 从首屏或练习页选一个题池；当前池且队列健康时只关面板，不重排 */
+  const pickPool = useCallback((level: string) => {
+    setShowPoolPicker(false);
+    if (level === 'favorites-import') {
+      importFavoriteWords();
+      return;
+    }
+    setHallEntered(true);
+    if (level === 'all') {
+      if (activeLevel === 'all' && sessionQueue.length > 0) return;
+      // 全部词库走建库路径，不经过 handleLevelChange —— 断点要在这里自己读回来
+      pendingResumeIndex.current = readResumeIndex('all');
+      pendingResumeQueue.current = readResumeQueue('all');
+      void handleBuildDatabase();
+      return;
+    }
+    if (level === activeLevel) {
+      if (sessionQueue.length === 0) {
+        pendingResumeIndex.current = readResumeIndex(level);
+        pendingResumeQueue.current = readResumeQueue(level);
+        rebuildSession({ level });
+      }
+      return;
+    }
+    void handleLevelChange(level);
+  }, [activeLevel, sessionQueue.length, importFavoriteWords, handleBuildDatabase, handleLevelChange, rebuildSession]);
+
   // ── Position memory (resume last position) ──
   const resumeTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const pendingResumeIndex = useRef<number | null>(null);
+  /** 待恢复的本轮队列；只有所有 id 仍在当前池里才按原顺序续学 */
+  const pendingResumeQueue = useRef<string[] | null>(null);
   const resumeDoneRef = useRef(false);
   /** 落盘按 level 分键 —— 在 A 书写下的位置不会因为切去 B 书而被抹掉 */
-  const persistPosition = useCallback((level: string, idx: number) => {
+  const persistPosition = useCallback((level: string, idx: number, queue: string[]) => {
     if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
-    resumeTimerRef.current = setTimeout(() => persistResume(level, idx), 200);
+    resumeTimerRef.current = setTimeout(() => persistResume(level, idx, queue), 200);
   }, []);
 
   // Save position when index or level changes
   const prevIndexRef = useRef(0);
   const prevLevelRef = useRef('all');
   useEffect(() => {
+    // 切书瞬间 activeLevel 先变、队列还没建好（sessionQueue=[]）—— 此时落盘会用空队列
+    // 把 rebuildSession 刚写好的本轮队列覆盖掉。等队列真的有了再记位置。
+    if (sessionQueue.length === 0) return;
     if (prevIndexRef.current !== currentIndex || prevLevelRef.current !== activeLevel) {
       prevIndexRef.current = currentIndex;
       prevLevelRef.current = activeLevel;
-      persistPosition(activeLevel, currentIndex);
+      persistPosition(activeLevel, currentIndex, sessionQueue);
     }
-  }, [currentIndex, activeLevel, persistPosition]);
+  }, [currentIndex, activeLevel, sessionQueue, persistPosition]);
 
   // ── 自动恢复：刷新后直接载入上次的词书，跳过选择页 ──
   const [autoEntering, setAutoEntering] = useState(false);
@@ -1063,15 +1178,18 @@ export default function SpellingPage() {
     const savedLevel = readLastResumeLevel();
     if (!savedLevel) return; // 首次使用 → 显示词书选择页
     const savedIndex = readResumeIndex(savedLevel) ?? 0;
+    const savedQueue = readResumeQueue(savedLevel);
     (async () => {
       setAutoEntering(true);
       pendingResumeIndex.current = savedIndex;
+      pendingResumeQueue.current = savedQueue;
       try {
         if (savedLevel === 'all') await handleBuildDatabase();
         else await handleLevelChange(savedLevel);
       } catch { /* ignore */ }
-      // 加载失败（缓存仍为空）→ 回退到词书选择页
-      if (getWBSentences().length === 0) setAutoEntering(false);
+      // 无论成功失败都要退出"自动恢复中"：失败时缓存为空，页面自然回退到词书选择页；
+      // 成功后若一直留 true，之后手动加载任何词书都会误显示"正在加载词书…"整屏。
+      setAutoEntering(false);
     })();
   }, []);
 
@@ -1083,6 +1201,7 @@ export default function SpellingPage() {
     const savedLevel = readLastResumeLevel();
     if (savedLevel && savedLevel !== 'all' && savedLevel !== activeLevel) {
       pendingResumeIndex.current = readResumeIndex(savedLevel) ?? 0;
+      pendingResumeQueue.current = readResumeQueue(savedLevel);
       handleLevelChange(savedLevel);
     }
   }, [sentences.length]);
@@ -1103,61 +1222,92 @@ export default function SpellingPage() {
   }
 
   // ── 词书选择首屏：选一本词书直接进入，无需手动建库 ──
-  if (sentences.length === 0 && getWBSentences().length === 0 && !autoEntering) {
-    const WORDBOOK_CARDS: { level: string; label: string; desc: string }[] = [
-      { level: 'cet4', label: '四级', desc: '大学基础 · 例句丰富' },
-      { level: 'gaokao', label: '高考', desc: '高中核心词汇' },
-      { level: 'zhongkao', label: '中考', desc: '初中入门' },
-      { level: 'cet6', label: '六级', desc: '大学进阶' },
-      { level: 'cet46freq', label: '四六级高频', desc: '真题考频精选' },
-      { level: 'cet46elite', label: '四六级高分', desc: '六级拔高词' },
-      { level: 'ielts', label: '雅思', desc: '出国留学' },
-      { level: 'toefl', label: '托福', desc: '北美学术' },
-      { level: 'postgraduate', label: '考研', desc: '研究生考试' },
-      { level: 'professional', label: '专业', desc: '职场专业术语' },
-      { level: 'advanced', label: '高阶', desc: '母语者语料' },
-      { level: 'all', label: '全部词库', desc: '全量加载（较多数据）' },
-    ];
-    const pickWordbook = (level: string) => {
-      if (level === 'all') handleBuildDatabase();
-      else handleLevelChange(level);
-    };
+  if (!hallEntered && sentences.length === 0 && getWBSentences().length === 0 && !autoEntering) {
+    const loadingLevel = building ? 'all' : levelLoading ? activeLevel : null;
     return (
-      <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
+      <div className="max-w-3xl mx-auto px-4 py-10 space-y-6">
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--brand)]/10 text-ink-teal text-[10px] font-black uppercase tracking-wider">
             Spelling Practice
           </div>
           <h1 className="text-3xl font-black italic text-foreground">句子拼写</h1>
-          <p className="text-sm text-muted-foreground">选择一本词书，立即开始随机拼写练习</p>
+          <p className="text-sm text-muted-foreground">先选题池，再选玩法；纠偏表达和精听原句单独成池。</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {WORDBOOK_CARDS.map((wb) => {
-            const loadingThis = (building || levelLoading) && activeLevel === wb.level;
-            return (
-              <button
-                key={wb.level}
-                onClick={() => pickWordbook(wb.level)}
-                disabled={building || levelLoading}
-                className={cn(
-                  'group p-4 rounded-2xl border-2 border-border text-left transition-all duration-200',
-                  'hover:border-[var(--brand)]/40 hover:shadow-md hover:-translate-y-0.5',
-                  'disabled:opacity-60 disabled:cursor-wait',
-                )}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <BookOpen className="size-4 text-ink-teal" />
-                  <span className="text-sm font-black text-foreground group-hover:text-ink-teal transition-colors">
-                    {wb.label}
-                  </span>
-                  {loadingThis && <RefreshCw className="size-3.5 animate-spin text-ink-teal ml-auto" />}
-                </div>
-                <p className="text-[11px] text-muted-foreground">{wb.desc}</p>
-              </button>
-            );
-          })}
+        {/* 玩法与本轮句数 —— 首屏就定下来，不让人进去再找 */}
+        <div className="space-y-3 rounded-3xl border border-border/60 bg-card p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">玩法</span>
+              <div className="flex rounded-xl border border-border bg-muted/50 p-0.5">
+                {([
+                  ['dictation', '句子拼写'],
+                  ['fill', '单词拼写'],
+                ] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={mode === key}
+                    onClick={() => handleModeChange(key)}
+                    className={cn(
+                      'rounded-[10px] px-3.5 py-1.5 text-xs font-bold transition-colors',
+                      mode === key
+                        ? 'bg-[var(--brand)] text-[var(--on-brand)] shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
+              <span className="mr-0.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground">本轮</span>
+              {[5, 10, 20, 50].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => persistRoundSize(n)}
+                  className={cn(
+                    'rounded-lg px-2 py-0.5 text-[10px] font-bold transition-colors',
+                    roundSize === n
+                      ? 'bg-[var(--brand)] text-[var(--on-brand)] shadow-sm'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                  )}
+                >
+                  {n}句
+                </button>
+              ))}
+              <input
+                type="number"
+                min={1}
+                max={500}
+                value={roundSize}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  if (v > 0 && v <= 500) persistRoundSize(v);
+                }}
+                title="自定义本轮句数"
+                aria-label="自定义本轮句数"
+                className="w-12 appearance-none rounded-lg bg-muted px-1.5 py-0.5 text-center text-[10px] font-black outline-none focus:ring-2 focus:ring-[var(--brand)]/30 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+            </div>
+          </div>
+          <p className="text-[11px] font-bold leading-relaxed text-muted-foreground">
+            句子拼写：整句逐词输入；单词拼写：只填句中被挖空的词。选完题池直接开始。
+          </p>
         </div>
+
+        <SpellingPoolPicker
+          activeLevel=""
+          progressByKey={poolProgress}
+          favoriteWordCount={favoriteWordCount}
+          loadingLevel={loadingLevel}
+          disabled={building || levelLoading}
+          onPick={pickPool}
+          onImportFavorites={importFavoriteWords}
+        />
 
         <div className="text-center">
           <p className="text-xs text-muted-foreground/60 mb-2">或者用 AI 生成自定义句子</p>
@@ -1287,78 +1437,22 @@ export default function SpellingPage() {
             {autoRead ? '🔊 自动' : '🔇 静音'}
           </button>
 
-          {/* 词书切换（右上角 — 刻意远离操作流，避免误改） */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={building || levelLoading}
-                className="rounded-[10px] gap-1.5 text-xs font-bold h-8 border-border hover:border-[var(--brand)]/40"
-                title="切换词书"
-              >
-                <Library className="size-3.5 text-ink-teal" />
-                {activeLevel === 'all' ? '全部词库' : ({correction:'纠偏表达',video:'视频精听',zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',cet46freq:'四六级高频',cet46elite:'四六级高分',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[activeLevel] || activeLevel}
-                {building || levelLoading
-                  ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
-                  : <ChevronDown className="size-3.5 text-muted-foreground" />}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[170px] max-h-[320px] overflow-y-auto">
-              {/* 收藏单词导入 */}
-              <DropdownMenuItem onClick={importFavoriteWords} className="gap-2 text-xs font-bold">
-                <Heart className="size-3.5 text-rose-500" />
-                导入收藏单词 {favorites.filter((f) => f.type === 'word').length > 0 && (
-                  <span className="ml-auto text-[10px] text-muted-foreground">{favorites.filter((f) => f.type === 'word').length}</span>
-                )}
-              </DropdownMenuItem>
-              <div className="h-px bg-border my-1" />
-              <DropdownMenuItem
-                onClick={() => handleLevelChange('all')}
-                disabled={activeLevel === 'all'}
-                className="gap-2 text-xs font-bold"
-              >
-                <BookOpen className="size-3.5 text-muted-foreground" />
-                全部词库
-              </DropdownMenuItem>
-              <div className="h-px bg-border my-1" />
-              {/* 纠偏表达 = 句子库里的一个桶（母语思维/写作批改/对话分析里被判中式的表达，
-                  在收藏页或纠偏重考里点「拼写这句」送进来）。放最前：这是"自己的错句"，
-                  比几千条例句更该练。 */}
-              <DropdownMenuItem
-                onClick={() => handleLevelChange(CORRECTION_LEVEL)}
-                disabled={activeLevel === CORRECTION_LEVEL}
-                className="gap-2 text-xs font-bold"
-              >
-                <Lightbulb className={cn('size-3.5', activeLevel === CORRECTION_LEVEL ? 'text-orange-500' : 'text-orange-400')} />
-                纠偏表达
-                {activeLevel === CORRECTION_LEVEL && <Check className="size-3.5 text-ink-teal ml-auto" />}
-              </DropdownMenuItem>
-              {/* 视频精听 = 同一个桶制：精听页字幕卡上点「听写这句」送进来的原句 */}
-              <DropdownMenuItem
-                onClick={() => handleLevelChange(VIDEO_LEVEL)}
-                disabled={activeLevel === VIDEO_LEVEL}
-                className="gap-2 text-xs font-bold"
-              >
-                <Film className={cn('size-3.5', activeLevel === VIDEO_LEVEL ? 'text-teal-600' : 'text-teal-400')} />
-                视频精听
-                {activeLevel === VIDEO_LEVEL && <Check className="size-3.5 text-ink-teal ml-auto" />}
-              </DropdownMenuItem>
-              <div className="h-px bg-border my-1" />
-              {(['zhongkao','gaokao','cet4','cet6','cet46freq','cet46elite','ielts','toefl','postgraduate','professional','advanced'] as const).map((lvl) => (
-                <DropdownMenuItem
-                  key={lvl}
-                  onClick={() => handleLevelChange(lvl)}
-                  disabled={activeLevel === lvl}
-                  className="gap-2 text-xs font-bold"
-                >
-                  <BookOpen className={cn('size-3.5', activeLevel === lvl ? 'text-ink-teal' : 'text-muted-foreground')} />
-                  {({zhongkao:'中考',gaokao:'高考',cet4:'四级',cet6:'六级',cet46freq:'四六级高频',cet46elite:'四六级高分',ielts:'雅思',toefl:'托福',postgraduate:'考研',professional:'专业',advanced:'高级'} as Record<string, string>)[lvl]}
-                  {activeLevel === lvl && <Check className="size-3.5 text-ink-teal ml-auto" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* 词书与题池：显式入口，不再藏进右上角下拉 */}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={building || levelLoading}
+            onClick={() => setShowPoolPicker(true)}
+            className="h-8 w-full justify-start gap-1.5 rounded-[10px] border-border text-xs font-bold hover:border-[var(--brand)]/40 sm:w-auto"
+            title="切换词书与题池"
+          >
+            <Library className="size-3.5 text-ink-teal" />
+            词书与题池
+            <span className="max-w-[150px] truncate text-muted-foreground">· {activePoolLabel}</span>
+            {building || levelLoading
+              ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+              : <ChevronRight className="size-3.5 text-muted-foreground" />}
+          </Button>
         </div>
 
         {/* Loading indicator — like DeepVocabularyPage */}
@@ -1392,7 +1486,7 @@ export default function SpellingPage() {
                 </Badge>
               );
             })()}
-            <Badge variant="secondary" className="rounded-lg text-[10px] font-bold">
+            <Badge variant="secondary" className="hidden rounded-lg text-[10px] font-bold sm:inline-block">
               今日 {learningStats.todayPracticed} 句
             </Badge>
           </div>
@@ -1424,12 +1518,12 @@ export default function SpellingPage() {
                 if (v > 0 && v <= 500) {
                   setRoundSize(v);
                   roundSizeRef.current = v;
-                  try { safeStorage.setItem('__nativethink_spelling_round_size', String(v)); } catch { /* ignore */ }
+                  try { safeStorage.setItem(SPELLING_ROUND_KEY, String(v)); } catch { /* ignore */ }
                 }
               }}
               onBlur={() => { if (roundSize !== sessionQueue.length) { rebuildSession(); toast.success(`本轮 ${roundSize} 句`, { duration: 1200 }); } }}
               title="自定义本轮句数（失焦后生效）"
-              className="w-12 px-1.5 py-0.5 rounded-lg bg-muted text-[10px] font-black text-center outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+              className="w-12 appearance-none rounded-lg bg-muted px-1.5 py-0.5 text-center text-[10px] font-black outline-none focus:ring-2 focus:ring-[var(--brand)]/30 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
 
@@ -1441,7 +1535,8 @@ export default function SpellingPage() {
               onClick={() => setShowAIDialog(true)}
               className="rounded-xl h-8 text-xs font-bold gap-1.5"
             >
-              <span className="hidden sm:inline">AI 添加</span>
+              <Sparkles className="size-3.5" />
+              <span>AI 添加</span>
             </Button>
             <Button
               variant="ghost"
@@ -1450,11 +1545,46 @@ export default function SpellingPage() {
               className="rounded-xl h-8 text-xs font-bold gap-1.5"
             >
               {showFavorites ? <PanelRightClose className="size-3.5" /> : <PanelRightOpen className="size-3.5" />}
-              <span className="hidden sm:inline">收藏 ({favorites.filter((f) => f.type === 'spelling').length})</span>
+              <span>收藏 ({favorites.filter((f) => f.type === 'spelling').length})</span>
             </Button>
           </div>
         </div>
       </Card>
+
+      {/* 词书与题池切换 */}
+      <Dialog open={showPoolPicker} onOpenChange={setShowPoolPicker}>
+        <DialogContent className="rounded-2xl sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-black">
+              <Library className="size-5 text-ink-teal" />
+              词书与题池
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              纠偏表达和视频精听单独成池；每个池子按自己的断点继续。
+            </DialogDescription>
+          </DialogHeader>
+          <SpellingPoolPicker
+            activeLevel={activeLevel}
+            progressByKey={poolProgress}
+            favoriteWordCount={favoriteWordCount}
+            loadingLevel={building ? 'all' : levelLoading ? activeLevel : null}
+            disabled={building || levelLoading}
+            onPick={pickPool}
+            onImportFavorites={importFavoriteWords}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* 首次加载全部词库：给一张明确的加载卡，不只靠按钮上的小转圈 */}
+      {building && sessionQueue.length === 0 && (
+        <Card className="rounded-2xl border-border/50 shadow-sm">
+          <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
+            <Loader2 className="size-6 animate-spin text-ink-teal" />
+            <p className="text-sm font-black text-foreground">正在加载全部词库…</p>
+            <p className="text-xs font-bold text-muted-foreground">首次会读取 11 本词书，之后切换会快很多。</p>
+          </div>
+        </Card>
+      )}
 
       {/* ── 空桶：纠偏/精听还没送句子，或词库没有例句 ── */}
       {sessionQueue.length === 0 && !building && !levelLoading && (
