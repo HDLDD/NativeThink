@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-11-01
+- docs(device): 记录真机 2.0.107 三处新功能凭据与两份 adb 抢设备的 offline 坑 (`fbc69f1`)
 - docs(release): 记录 2.0.107 已上线与装机走查 37/37 (`bc9845e`)
 - test(device): 走查 ③ 段跟着题池大厅重写（36 → 37 项） (`b699776`)
 - chore(release): 对齐 APK 实际版本 2.0.107 / versionCode 152 并修掉误导性的手动 bump 前置说明 (`d9aa6d9`)
