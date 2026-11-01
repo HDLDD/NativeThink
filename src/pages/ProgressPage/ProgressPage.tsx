@@ -45,6 +45,13 @@ import {
   isCurrentMonth,
   sortAchievements,
 } from '@/lib/progress-page';
+import {
+  achievementProgress,
+  achievementRatio,
+  buildAchievementStats,
+  formatAchievementGap,
+} from '@/lib/achievements-data';
+import { readAchievementCounts } from '@/lib/achievement-sources';
 
 // Lazy-load charts (recharts ~400KB) — only needed when "学习统计" tab is active
 const LazyProgressCharts = lazy(() => import('./components/ProgressCharts'));
@@ -349,6 +356,12 @@ export default function ProgressPage() {
   const sortedAchievements = useMemo(
     () => sortAchievements(definitions, unlocked.map((u) => u.id)),
     [definitions, unlocked],
+  );
+
+  /** 成就卡的「还差多少」：天数/分钟来自学习统计，次数读各自的真实存储 */
+  const achievementStats = useMemo(
+    () => buildAchievementStats(stats, readAchievementCounts()),
+    [stats],
   );
 
   if (!loaded) {
@@ -921,6 +934,8 @@ export default function ProgressPage() {
                 {sortedAchievements.map((achievement) => {
                   const unlocked_ = isUnlocked(achievement.id);
                   const found = unlocked.find((u) => u.id === achievement.id);
+                  const progress = achievementProgress(achievement, achievementStats);
+                  const gap = formatAchievementGap(progress);
                   return (
                     <div
                       key={achievement.id}
@@ -943,7 +958,23 @@ export default function ProgressPage() {
                           {new Date(found.unlockedAt).toLocaleDateString('zh-CN')} 解锁
                         </p>
                       )}
-                      {!unlocked_ && (
+                      {!unlocked_ && progress && gap && (
+                        <div className="mt-3" data-achievement-progress={achievement.id}>
+                          <div className="h-1 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-[var(--brand)]"
+                              style={{ width: `${achievementRatio(progress)}%` }}
+                            />
+                          </div>
+                          <p className="mt-2 text-[10px] font-black text-foreground">
+                            {gap}
+                            <span className="ml-1 font-bold text-muted-foreground">
+                              · {progress.current}/{progress.target} {progress.unit}
+                            </span>
+                          </p>
+                        </div>
+                      )}
+                      {!unlocked_ && (!progress || !gap) && (
                         <div className="mt-3">
                           <div className="size-6 mx-auto rounded-full bg-muted flex items-center justify-center">
                             <span className="text-[10px] text-muted-foreground">🔒</span>

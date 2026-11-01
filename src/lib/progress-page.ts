@@ -79,6 +79,70 @@ export function buildModuleShares(
     .sort((a, b) => b.percent - a.percent || a.key.localeCompare(b.key));
 }
 
+/* ───────────── 思维迁移趋势（学习记录页） ───────────── */
+
+export interface ITransferTrendSummary {
+  attempts: number;
+  passes: number;
+  /** 0–100 的整数；一次都没练时为 null —— 不把「没练过」画成 0% */
+  passRate: number | null;
+  calibrationAttempts: number;
+  calibrationHits: number;
+  calibrationRate: number | null;
+  /** 当天至少有 1 次迁移尝试的天数（补零的日子不算） */
+  activeDays: number;
+}
+
+/** `2026-11-01` → `11/1`（与页面既有图表标签同形；不经过 Date，避开时区） */
+export function formatTransferTrendLabel(date: string): string {
+  const parts = String(date).split('-');
+  if (parts.length !== 3) return String(date);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  if (!Number.isFinite(month) || !Number.isFinite(day)) return String(date);
+  return `${month}/${day}`;
+}
+
+/**
+ * 把最近 N 天的迁移/校准计数收成一组可展示的汇总。
+ * 输入来自 think store 的 `dailyStats`（读盘时已清洗、31 天窗口），这里仍做数值兜底：
+ * 负数/NaN 记 0，通过数按尝试数封顶，避免坏数据把通过率算到 100% 以上。
+ */
+export function summarizeTransferTrend(
+  points: ReadonlyArray<{
+    attempts: number;
+    passes: number;
+    calibrationAttempts: number;
+    calibrationHits: number;
+  }>,
+): ITransferTrendSummary {
+  const safe = (value: number) => (Number.isFinite(value) && value > 0 ? value : 0);
+  let attempts = 0;
+  let passes = 0;
+  let calibrationAttempts = 0;
+  let calibrationHits = 0;
+  let activeDays = 0;
+  for (const point of points) {
+    const dayAttempts = safe(point.attempts);
+    attempts += dayAttempts;
+    passes += safe(point.passes);
+    calibrationAttempts += safe(point.calibrationAttempts);
+    calibrationHits += safe(point.calibrationHits);
+    if (dayAttempts > 0) activeDays += 1;
+  }
+  const rate = (hits: number, total: number) =>
+    total > 0 ? Math.min(100, Math.round((hits / total) * 100)) : null;
+  return {
+    attempts,
+    passes,
+    passRate: rate(Math.min(passes, attempts), attempts),
+    calibrationAttempts,
+    calibrationHits,
+    calibrationRate: rate(Math.min(calibrationHits, calibrationAttempts), calibrationAttempts),
+    activeDays,
+  };
+}
+
 export function isCurrentMonth(year: number, month: number, now: Date = new Date()): boolean {
   return year === now.getFullYear() && month === now.getMonth();
 }

@@ -5,6 +5,7 @@ import AppSidebar from '@/components/AppSidebar';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import Header from '@/components/Header';
 import { useFocusMode } from '@/lib/focus-mode';
+import { useAchievementCheck } from '@/lib/use-achievements';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { safeStorage } from '@/lib/safe-storage';
@@ -85,6 +86,8 @@ const location = useLocation();
   const moduleKey = location.pathname.split('/')[1] || '';
   const moduleAccent = MODULE_ACCENTS['/' + moduleKey];
   const { focused } = useFocusMode();
+  // 成就判定挂在外壳：任何一次学习时长/真实计数变化都会重判一轮（解锁才提示）。
+  useAchievementCheck();
 
   // Route change UX: reset scroll to top, retrigger the page-enter animation,
   // and remember the last visited module (for "继续上次学习" on the dashboard)

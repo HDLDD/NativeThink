@@ -18,6 +18,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { BarChart3, Target, TrendingUp, Flame, BookOpen } from 'lucide-react';
 import { buildModuleShares } from '@/lib/progress-page';
+import TransferTrendCard from './TransferTrendCard';
 
 // ── Props ──
 interface ProgressChartsProps {
@@ -292,6 +293,9 @@ export default function ProgressCharts({ calendar, stats }: ProgressChartsProps)
           </Card>
         </div>
       </div>
+
+      {/* 第三行：思维迁移趋势（/think 主轴的近 14 天真实计数） */}
+      <TransferTrendCard />
     </div>
   );
 }
