@@ -17,12 +17,23 @@
  *     没学习时尾部是昨天，柱状图整体错位一天）；更不许 toISOString（东八区凌晨
  *     错天，全站禁用）。
  *
+ * 第 4 条（2026-11-01）：续学条从"只说模块名"升级成**真实断点**（`resume-overview.ts`）。
+ * 这条最容易坏在两个地方，所以两头都钉：
+ *  ① **键名漂移** —— 断点是各模块自己写的，首页只是读；写入方改键名，首页会静默退回
+ *     只写模块名（守卫把六个键的字面量在写入方与读取方各查一遍）。
+ *  ② **读出口径与续学口径不一致** —— 位置解析一律复用模块自己的
+ *     parseOrderedSession / parseDailySession / loadPatternResume，所以真跑用它们的
+ *     真实形状灌数据，并验「下标越界 / 老断点缺 queue / 快照过期」三类都不许谎报。
+ *
  * 变异测试在内存里做（不落盘、跑完不写回），每条变异必须让至少一条断言变红。
  * 用法：node scripts/verify-dashboard-glance.mjs
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import ts from 'typescript';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -32,7 +43,25 @@ const FILES = {
   week: 'src/pages/DashboardPage/WeekGlanceCard.tsx',
   notedrill: 'src/pages/DashboardPage/NoteDrillCard.tsx',
   vocab: 'src/pages/DeepVocabularyPage/DeepVocabularyPage.tsx',
+  resume: 'src/lib/resume-overview.ts',
+  // 断点键的**写入方**：首页只是读，键名漂了必须在这里红，而不是静默失去断点
+  wFlashcard: 'src/lib/use-word-learning.ts',
+  wDaily: 'src/pages/DeepVocabularyPage/components/DailyLearningMode.tsx',
+  wC2e: 'src/pages/DeepVocabularyPage/components/ChineseToEnglishMode.tsx',
+  wQuickcard: 'src/lib/quickcard-history.ts',
+  wPhrase: 'src/lib/use-phrase-learning.ts',
+  wChunk: 'src/pages/ChunkTrainingPage/ChunkTrainingPage.tsx',
 };
+
+/** [写入方文件, 键名, 说明] —— 两侧都必须出现同一个字面量 */
+const RESUME_KEYS = [
+  ['wFlashcard', '__nativethink_vocab_session_', '复习检测'],
+  ['wDaily', '__nativethink_daily_session_', '每日学习'],
+  ['wC2e', '__nativethink_vocab_c2e_session_', '中译英'],
+  ['wQuickcard', '__nativethink_quickcard_session', '快速闪卡'],
+  ['wPhrase', '__nativethink_phrase_session_', '短语闪卡'],
+  ['wChunk', '__nativethink_chunk_review_session', '语块复习'],
+];
 
 const originals = {};
 for (const [k, p] of Object.entries(FILES)) originals[k] = fs.readFileSync(path.join(ROOT, p), 'utf8');
@@ -102,6 +131,32 @@ function runChecks(srcs) {
   ok(/if \(!setupDone \|\| showWizard\) return;/.test(vpage),
     '首设向导没走完不强进模式（那时该让用户先选书）');
 
+  /* 5. 续学条的真实断点（2026-11-01）：键名两侧对齐 + 页面接线 */
+  const resume = srcs.resume;
+  for (const [writerFile, literal, what] of RESUME_KEYS) {
+    ok(srcs[writerFile].includes(literal) && resume.includes(literal),
+      `断点键「${what}」写入方与首页读的是同一个字面量（${literal}）`,
+      `写入方缺=${!srcs[writerFile].includes(literal)} 首页缺=${!resume.includes(literal)}`);
+  }
+  ok(srcs.vocab.includes("const MEMORY_KEY = 'vocab-page'") && resume.includes("VOCAB_MEMORY_KEY = 'vocab-page'"),
+    '词汇页的页面记忆键（level + 模式）两侧同源');
+  ok(srcs.vocab.includes("safeStorage.getItem('phrase-card-bank')") && resume.includes("PHRASE_BANK_KEY = 'phrase-card-bank'"),
+    '短语题库记忆键两侧同源（读不到就不写位置）');
+  ok(!/from '@\/data\//.test(resume),
+    'resume-overview 零数据依赖（标签表由页面注入，首页不为一行文案拖进词库数据）');
+  ok(/import \{ findResumeSpot \} from '@\/lib\/resume-overview'/.test(dash) &&
+    /findResumeSpot\(parsed\.path, \{ getItem: \(key\) => safeStorage\.getItem\(key\) \}, RESUME_LABELS\)/.test(dash),
+    '首页把断点读取接到 safeStorage（不是另开一条裸 localStorage 通道）');
+  ok(/const RESUME_LABELS = \{[\s\S]*level: LEVEL_LABELS,[\s\S]*SPELLING_POOLS\.map/.test(dash),
+    '词书 / 题池中文名从单点标签表注入（纠偏、精听两个桶不在词书表里）');
+  ok(/onClick=\{\(\) => navigate\(lastVisit\.href\)\}/.test(dash) &&
+    !/onClick=\{\(\) => navigate\(lastVisit\.path\)\}/.test(dash),
+    '续学条点的是带 ?tab= 深链的 href（只跳模块 = 进去还要自己找回那个模式）');
+  ok(/\{lastVisit\.detail && \(/.test(dash) && /data-dashboard-resume-detail/.test(dash),
+    '没有断点时不渲染位置行（界面退回只写模块名，不拿空串占位）');
+  ok((resume.match(/detail: null/g) ?? []).length >= 6,
+    '读不到断点一律 detail: null（不许造 0 / 「上次」）', String((resume.match(/detail: null/g) ?? []).length));
+
   return results;
 }
 
@@ -134,6 +189,16 @@ const MUTATIONS = [
     from: '    enterMode(want);', to: '    setTab(want);' },
   { name: '深链不校验 key（任意 tab 参数都硬切）', file: 'vocab',
     from: "if (!want || !MODES.some((m) => m.key === want)) return;", to: 'if (!want) return;' },
+  { name: '断点键漂移：写入方改了键名而首页还在读旧的（复习检测）', file: 'wFlashcard',
+    from: '`__nativethink_vocab_session_${level}`', to: '`__nativethink_vocab_breakpoint_${level}`' },
+  { name: '断点键漂移：语块复习写入方改键', file: 'wChunk',
+    from: "'__nativethink_chunk_review_session'", to: "'__nativethink_chunk_review_breakpoint'" },
+  { name: '续学条丢深链（点进去还要自己找回那个模式）', file: 'dashboard',
+    from: 'onClick={() => navigate(lastVisit.href)}', to: 'onClick={() => navigate(lastVisit.path)}' },
+  { name: '没有断点也渲染位置行（拿空串占位）', file: 'dashboard',
+    from: '{lastVisit.detail && (', to: '{true && (' },
+  { name: '页面记忆键漂移（词汇页改了键，首页读不到 level/tab）', file: 'resume',
+    from: "VOCAB_MEMORY_KEY = 'vocab-page'", to: "VOCAB_MEMORY_KEY = 'vocab-memory'" },
 ];
 
 let mutationOk = 0;
@@ -155,11 +220,209 @@ ok_mutation: {
   }
 }
 
+/* ───────────── 真跑：把 resume-overview 连同它的三个依赖编译进临时目录后 import ─────────────
+   断点位置是"读别人的键 + 按别人的口径解析"，静态正则证明不了读出来是第几张 ——
+   只能真跑。依赖图刻意收小：safe-storage 用替身（真跑一律注入 store），
+   think-session-resume 走裸 localStorage，所以给它一个假 window。 */
+const TMP = mkdtempSync(path.join(tmpdir(), 'nt-resume-spot-'));
+fs.writeFileSync(path.join(TMP, 'safe-storage-shim.mjs'),
+  'export const safeStorage = { getItem: () => null, setItem: () => false, removeItem: () => false };\n');
+
+const compileInto = (rel, outName, rewrites = []) => {
+  let src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+  for (const [from, to] of rewrites) src = src.split(from).join(to);
+  const js = ts.transpileModule(src, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  fs.writeFileSync(path.join(TMP, outName), js);
+  return outName;
+};
+
+compileInto('src/lib/vocab-mode-hall.ts', 'vocab-mode-hall.mjs');
+compileInto('src/lib/spelling-resume.ts', 'spelling-resume.mjs',
+  [["from './safe-storage'", "from './safe-storage-shim.mjs'"]]);
+compileInto('src/lib/think-session-resume.ts', 'think-session-resume.mjs');
+const RESUME_REWRITES = [
+  ["from '@/lib/vocab-mode-hall'", "from './vocab-mode-hall.mjs'"],
+  ["from '@/lib/spelling-resume'", "from './spelling-resume.mjs'"],
+  ["from '@/lib/think-session-resume'", "from './think-session-resume.mjs'"],
+];
+let loadSeq = 0;
+const loadSpot = async (sourceRewrites = []) => {
+  let src = fs.readFileSync(path.join(ROOT, 'src/lib/resume-overview.ts'), 'utf8');
+  for (const [from, to] of sourceRewrites) {
+    if (!src.includes(from)) throw new Error(`真跑变异未命中锚点：${from}`);
+    src = src.split(from).join(to);
+  }
+  for (const [from, to] of RESUME_REWRITES) src = src.split(from).join(to);
+  const out = compileIntoTmp(src, `resume-${++loadSeq}.mjs`);
+  return import(pathToFileURL(path.join(TMP, out)).href);
+};
+const compileIntoTmp = (src, outName) => {
+  const js = ts.transpileModule(src, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  fs.writeFileSync(path.join(TMP, outName), js);
+  return outName;
+};
+
+const LABELS = { level: { cet4: '四级', cet6: '六级' }, spellingPool: { correction: '纠偏表达', video: '视频精听' } };
+const makeStore = (entries) => ({ getItem: (key) => (Object.prototype.hasOwnProperty.call(entries, key) ? entries[key] : null) });
+const orderedSession = (total, index) => JSON.stringify({ order: Array.from({ length: total }, (_, i) => `w${i}`), index });
+const dailySession = (total, index) => JSON.stringify({ words: Array.from({ length: total }, (_, i) => `w${i}`), index });
+
+// 三稿会话走裸 localStorage：给一个只读替身
+const rawStore = { map: new Map(), getItem(key) { return this.map.has(key) ? this.map.get(key) : null; } };
+globalThis.window = { localStorage: rawStore };
+const THINK_KEY = '__nativethink_think_session_resume';
+const thinkSnapshot = (overrides = {}) => JSON.stringify({
+  v: 1, patternId: 'subject-first', delayed: false,
+  session: { queue: ['subject-first', 'verb-driven'], index: 0, retries: {}, results: {} },
+  stage: 'writing', round: 1, selected: null, answer: 'He said that...', confidence: null,
+  results: [null, null, null], rewriteAttempts: 0, recognitionIndex: 0, transferIndex: 0,
+  updatedAt: Date.now(), ...overrides,
+});
+
+const spot = await loadSpot();
+if (typeof spot.findResumeSpot !== 'function') { console.error('脚手架错误：findResumeSpot 没导出'); process.exit(2); }
+const realRun = [];
+const okr = (cond, name, detail) => realRun.push({ pass: !!cond, name, detail: detail === undefined ? '' : JSON.stringify(detail) });
+
+/* 没有断点概念的模块 */
+okr(spot.findResumeSpot('/articles', makeStore({}), LABELS) === null, '未登记的路由 → null（首页保持只写模块名）');
+
+/* 词汇：五个模式的断点 + 深链 */
+const vocabStore = (tab, extra = {}) => makeStore({
+  'vocab-page': JSON.stringify({ level: 'cet4', tab }), ...extra,
+});
+okr(spot.findResumeSpot('/vocabulary',
+  vocabStore('flashcard', { '__nativethink_vocab_session_cet4': orderedSession(20, 11) }), LABELS)
+    ?.detail === '复习检测 · 四级 · 第 12/20 张' &&
+  spot.findResumeSpot('/vocabulary', vocabStore('flashcard', { '__nativethink_vocab_session_cet4': orderedSession(20, 11) }), LABELS)?.href === '/vocabulary?tab=flashcard',
+  '复习检测：位置 + ?tab= 深链都对（下标 11 报成第 12 张）',
+  spot.findResumeSpot('/vocabulary', vocabStore('flashcard', { '__nativethink_vocab_session_cet4': orderedSession(20, 11) }), LABELS));
+okr(spot.findResumeSpot('/vocabulary',
+  vocabStore('daily', { '__nativethink_daily_session_cet4': dailySession(5, 2) }), LABELS)?.detail === '每日学习 · 四级 · 第 3/5 张',
+  '每日学习按 words 计数（不是 order）');
+okr(spot.findResumeSpot('/vocabulary',
+  vocabStore('c2e', { '__nativethink_vocab_c2e_session_cet4': orderedSession(10, 0) }), LABELS)?.detail === '中译英 · 四级 · 第 1/10 题',
+  '中译英的量词是「题」不是「张」');
+okr(spot.findResumeSpot('/vocabulary',
+  makeStore({ 'vocab-page': JSON.stringify({ level: '', tab: 'quickcard' }), '__nativethink_quickcard_session_all': orderedSession(30, 7) }), LABELS)?.detail === '快速闪卡 · 第 8/30 张',
+  'level 为空落到 all 键，且不硬塞一个词书名');
+const phraseOk = spot.findResumeSpot('/vocabulary',
+  vocabStore('phrasecard', { 'phrase-card-bank': JSON.stringify('cet4'), '__nativethink_phrase_session_cet4': orderedSession(12, 3) }), LABELS);
+okr(phraseOk?.detail === '短语闪卡 · 第 4/12 张' && phraseOk?.href === '/vocabulary?tab=phrasecard',
+  '短语闪卡吃独立的题库记忆（不是当前词书）', phraseOk);
+const phraseNoBank = spot.findResumeSpot('/vocabulary', vocabStore('phrasecard'), LABELS);
+okr(phraseNoBank?.detail === null && phraseNoBank?.href === '/vocabulary?tab=phrasecard',
+  '题库记忆缺失 → 宁可不写位置，也不猜一本', phraseNoBank);
+const noSession = spot.findResumeSpot('/vocabulary', vocabStore('flashcard'), LABELS);
+okr(noSession?.detail === null && noSession?.href === '/vocabulary?tab=flashcard',
+  '该模式没有断点（从没练过）→ detail null，深链仍在', noSession);
+okr(spot.findResumeSpot('/vocabulary',
+  vocabStore('flashcard', { '__nativethink_vocab_session_cet4': orderedSession(20, 25) }), LABELS)?.detail === null,
+  '正对照：下标越界的坏数据不谎报位置');
+okr(spot.findResumeSpot('/vocabulary', vocabStore('browse', { '__nativethink_vocab_session_cet4': orderedSession(20, 3) }), LABELS)?.detail === null,
+  '词库浏览没有会话断点概念 → 不去读别的模式的键');
+
+/* 拼写 */
+okr(spot.findResumeSpot('/spelling', makeStore({
+  '__nativethink_spelling_resume_last': 'cet4',
+  '__nativethink_spelling_resume_cet4': JSON.stringify({ currentIndex: 2, queue: ['a', 'b', 'c', 'd'] }),
+}), LABELS)?.detail === '四级 · 第 3/4 句', '拼写按存下来的队列报总数');
+okr(spot.findResumeSpot('/spelling', makeStore({
+  '__nativethink_spelling_resume_last': 'cet4',
+  '__nativethink_spelling_resume_cet4': JSON.stringify({ currentIndex: 4 }),
+}), LABELS)?.detail === '四级 · 第 5 句', '老断点没有 queue → 只报第 N 句，不编一个总数');
+okr(spot.findResumeSpot('/spelling', makeStore({
+  '__nativethink_spelling_resume_last': 'correction',
+  '__nativethink_spelling_resume_correction': JSON.stringify({ currentIndex: 0, queue: ['x'] }),
+}), LABELS)?.detail === '纠偏表达 · 第 1/1 句', '纠偏 / 精听两个桶走注入的题池标签表');
+okr(spot.findResumeSpot('/spelling', makeStore({}), LABELS)?.detail === null, '没选过题池 → null');
+
+/* 语块复习 */
+const chunkIds = Array.from({ length: 12 }, (_, i) => `c${i}`);
+okr(spot.findResumeSpot('/chunks', makeStore({
+  '__nativethink_chunk_review_session': JSON.stringify({ ids: chunkIds, index: 3 }),
+}), LABELS)?.detail === '语块复习 · 第 4/12 个', '语块复习位置（ids + index）');
+okr(spot.findResumeSpot('/chunks', makeStore({
+  '__nativethink_chunk_review_session': JSON.stringify({ ids: chunkIds, index: 12 }),
+}), LABELS)?.detail === null, '语块断点下标越界（本轮已走完）→ null');
+
+/* 三稿会话 */
+rawStore.map.set(THINK_KEY, thinkSnapshot());
+okr(spot.findResumeSpot('/think', makeStore({}), LABELS)?.detail === '第 4/5 步 · 改写',
+  '思维断点复用 resumeStepLabel（writing + round 1 = 第 4/5 步 · 改写）');
+rawStore.map.set(THINK_KEY, thinkSnapshot({
+  delayed: true, stage: 'feedback', round: 2,
+  // feedback 阶段必须带着已出的反馈，否则整份快照按坏数据丢掉（sanitizePatternResume 的口径）
+  results: [null, null, {
+    pass: true, feedback: '更地道了', source: 'ai', answer: 'He said that...',
+    transfer: {
+      id: 't1', situation: '向同事说明进展', rubricFocus: '主语先行', why: '先给人再给事',
+      modelAnswer: 'He said the report is done.', thinkingSteps: ['先定主语', '再挑动词', '句尾落重点'],
+    },
+  }],
+}));
+okr(spot.findResumeSpot('/think', makeStore({}), LABELS)?.detail === '延迟探测 · 第 5/5 步 · 最终反馈',
+  '延迟探测与最终反馈一并带出');
+rawStore.map.set(THINK_KEY, thinkSnapshot({ updatedAt: Date.now() - 3 * 24 * 3600 * 1000 }));
+okr(spot.findResumeSpot('/think', makeStore({}), LABELS)?.detail === null,
+  '超过两天的旧快照作废（与练习页同一口径，不各判一次）');
+rawStore.map.delete(THINK_KEY);
+okr(spot.findResumeSpot('/think', makeStore({}), LABELS)?.detail === null, '没练过 → null');
+
+/* 坏数据一律不抛 */
+const garbage = makeStore({
+  'vocab-page': '{bad', 'phrase-card-bank': 'not json',
+  '__nativethink_spelling_resume_last': 'cet4', '__nativethink_spelling_resume_cet4': '[1,2,3]',
+  '__nativethink_chunk_review_session': 'null', '__nativethink_vocab_session_cet4': '""',
+});
+let threw = null;
+try {
+  for (const route of ['/vocabulary', '/spelling', '/chunks', '/think', '/writing']) {
+    spot.findResumeSpot(route, garbage, LABELS);
+  }
+} catch (e) { threw = String(e); }
+okr(threw === null, '满仓坏 JSON 也不抛错（首页不能为一行文案白屏）', threw);
+
+/* 真跑变异：改坏实现，上面的期望必须落空 */
+const realMutations = [
+  { name: '位置漏掉 +1（0 基下标直接给用户看）', from: 'return `第 ${index + 1}/${total} ${unit}`;', to: 'return `第 ${index}/${total} ${unit}`;' },
+  { name: '老断点也硬编一个总数（queue.length 为 0 时报「第 5/0 句」）',
+    from: 'queue.length ? positionText(index, queue.length, \'句\')', to: 'true ? positionText(index, queue.length, \'句\')' },
+  { name: '语块断点不校验下标（走完本轮还催着续学）',
+    from: 'if (!ids.length || !Number.isFinite(index) || index < 0 || index >= ids.length) return plain;', to: 'if (!ids.length) return plain;' },
+];
+let realMutationOk = 0;
+for (const m of realMutations) {
+  const mutated = await loadSpot([[m.from, m.to]]);
+  const brokeFlashcard = mutated.findResumeSpot('/vocabulary',
+    vocabStore('flashcard', { '__nativethink_vocab_session_cet4': orderedSession(20, 11) }), LABELS)?.detail !== '复习检测 · 四级 · 第 12/20 张';
+  const brokeSpelling = mutated.findResumeSpot('/spelling', makeStore({
+    '__nativethink_spelling_resume_last': 'cet4', '__nativethink_spelling_resume_cet4': JSON.stringify({ currentIndex: 4 }),
+  }), LABELS)?.detail !== '四级 · 第 5 句';
+  const brokeChunk = mutated.findResumeSpot('/chunks', makeStore({
+    '__nativethink_chunk_review_session': JSON.stringify({ ids: chunkIds, index: 12 }),
+  }), LABELS)?.detail !== null;
+  const hit = m.name.includes('漏掉 +1') ? brokeFlashcard : m.name.includes('老断点') ? brokeSpelling : brokeChunk;
+  if (hit) realMutationOk += 1;
+  else console.log(`  ✗ 真跑变异后行为未变（断言没在管事）：${m.name}`);
+}
+realRun.push({
+  pass: realMutationOk === realMutations.length,
+  name: `真跑变异 ${realMutationOk}/${realMutations.length} 全部验红`,
+  detail: '',
+});
+results.push(...realRun);
+
 /* ───────────── 汇总 ───────────── */
 const failedFinal = results.filter((r) => !r.pass);
+for (const r of failedFinal) console.log(`  ✗ ${r.name}${r.detail ? '  [' + r.detail + ']' : ''}`);
 for (const r of results.filter((x) => x.pass && x.name.startsWith('变异测试'))) {
   console.log(`  · ${r.name}`);
 }
 console.log(`\n断言 ${results.length - failedFinal.length}/${results.length} 通过`);
 if (failedFinal.length) { console.log('✗ 有失败'); process.exit(1); }
-console.log('✓ 首页内容扩展三条契约成立（续学标签表 / 待复习横幅口径 / 本周柱状日期与高度）');
+console.log('✓ 首页四条契约成立（续学标签表与真实断点 / 待复习横幅口径 / 本周柱状日期与高度 / ?tab= 深链）');

@@ -29,6 +29,15 @@ import { TodayPatternCard } from './TodayPatternCard';
 import { useCorrectionNotes } from '@/lib/correction-notes';
 import { WeekGlanceCard } from './WeekGlanceCard';
 import { LEARNING_OPTIONS } from './constants';
+import { findResumeSpot } from '@/lib/resume-overview';
+import { LEVEL_LABELS } from '@/data/wordbank/meta';
+import { SPELLING_POOLS } from '@/lib/spelling-pools';
+
+/** 断点文案里的词书 / 题池中文名（标签表由页面注入，resume-overview 因此零数据依赖） */
+const RESUME_LABELS = {
+  level: LEVEL_LABELS,
+  spellingPool: Object.fromEntries(SPELLING_POOLS.map((p) => [p.key, p.label])),
+};
 
 /** 每日一句 AI 生成的返回形态（提示词要求单个 JSON 对象，见 handleAiGenerateChunk） */
 interface IAiChunkFields {
@@ -267,7 +276,9 @@ export default function DashboardPage() {
   }, []);
 
   // ── 继续上次学习（hook 必须在条件 return 之前） ──
-  const [lastVisit, setLastVisit] = useState<{ path: string; label: string } | null>(null);
+  const [lastVisit, setLastVisit] = useState<{
+    path: string; label: string; href: string; detail: string | null;
+  } | null>(null);
   useEffect(() => {
     try {
       const raw = safeStorage.getItem('__nativethink_last_visit');
@@ -288,7 +299,14 @@ export default function DashboardPage() {
         '/progress': '学习记录',
       };
       if (parsed?.path && labels[parsed.path] && Date.now() - (parsed.ts || 0) < 14 * 24 * 3600 * 1000) {
-        setLastVisit({ path: parsed.path, label: labels[parsed.path] });
+        // 各模块早就把会话断点落盘了：能读出位置就一并写出来，点进去还直接落回那个模式。
+        const spot = findResumeSpot(parsed.path, { getItem: (key) => safeStorage.getItem(key) }, RESUME_LABELS);
+        setLastVisit({
+          path: parsed.path,
+          label: labels[parsed.path],
+          href: spot?.href ?? parsed.path,
+          detail: spot?.detail ?? null,
+        });
       }
     } catch { /* ignore */ }
   }, []);
@@ -316,7 +334,7 @@ export default function DashboardPage() {
         <div className="grid gap-3 lg:grid-cols-2 lg:items-stretch">
           {lastVisit && (
             <button
-              onClick={() => navigate(lastVisit.path)}
+              onClick={() => navigate(lastVisit.href)}
               className="w-full flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3 text-left hover:border-[var(--brand)]/40 hover:shadow-md transition-all group"
             >
               <span className="size-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 text-ink-teal flex items-center justify-center shrink-0">
@@ -325,6 +343,11 @@ export default function DashboardPage() {
               <span className="flex-1 min-w-0">
                 <span className="block text-[10px] font-black uppercase tracking-wider text-muted-foreground">继续上次学习</span>
                 <span className="block text-sm font-black text-foreground group-hover:text-ink-teal transition-colors truncate">{lastVisit.label}</span>
+                {lastVisit.detail && (
+                  <span className="block text-[11px] font-bold text-muted-foreground truncate" data-dashboard-resume-detail>
+                    {lastVisit.detail}
+                  </span>
+                )}
               </span>
               <span className="text-[10px] font-black uppercase tracking-wider text-ink-teal opacity-0 group-hover:opacity-100 transition-opacity shrink-0">进入 →</span>
             </button>
