@@ -349,7 +349,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 6. **改词库后必须重跑 `npm run wordbank:split`**：`src/data/wordbank/data/<level>.ts` 只保留核心字段，detail 在 `<level>.detail.ts`。任何词库生成器都会重新写出全字段主文件，重跑拆分脚本即可恢复；脚本幂等。`preloadLevels` 默认仍加载 detail，只有 `preloadCoreOnly` 跳过。
 7. **产品需求勿覆盖**：`docs/PRODUCT-SPEC.md` 是需求规格；本文件是 agent 工作指南。
 8. **Git**：未明确要求不要 commit/push；仓库已用 worktree 时避免在主工作树做跨分支 git 操作。
-9. **APK 版本号与产物命名**：`android/version.properties` 的 `versionCode` **每次打包必须递增**（Android 拒绝非递增升级 → 要求卸载 → 丢数据）；`versionName` 走 `major.minor.patch`，`npm run version:apk-bump` 只递增 patch。产物命名规则与"缺资产会静默出残包"的完整清单见 [build-release.md](./docs/modules/build-release.md) §2、§5.2。
+9. **APK 版本号与产物命名**：`android/version.properties` 的 `versionCode` **每次打包必须递增**（Android 拒绝非递增升级 → 要求卸载 → 丢数据）；`versionName` 走 `major.minor.patch`。**`package:apk` 的第一步已经自带 bump —— 别再手动 `version:apk-bump` 前置**，否则 versionCode 白跳一格（2026-11-01 就这么烧掉一个 151；单独只想改版本号时才用它）。产物命名规则与"缺资产会静默出残包"的完整清单见 [build-release.md](./docs/modules/build-release.md) §2、§5.2。
 10. **验证要真**：改完要跑对应守卫；语义变了就**重新推导断言**而不是放宽它，元判据要带正对照。断言"过了"之前先问这条断言在实现被故意改坏时会不会红（见 [verification.md](./docs/modules/verification.md) §4）。
 11. **文档也要核实**：本轮模块文档写作中，本文件的三处旧说法被推翻并已修正 —— 云同步前缀过滤的真实作用、学习数据实际走 `safeStorage`、自动朗读键的实际生效范围（快速闪卡**不读**它）。
 

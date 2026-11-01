@@ -1,7 +1,7 @@
 # NativeThink 项目交接手册（Agent Handover）
 
 > 面向**接手的 AI agent / 新同事**：只读这一份就能开工。
-> 最后校准：2026-11-01（当前 **2.0.106 / versionCode 151**；本轮三笔功能改动（思维迁移趋势卡 + 首页真实断点 + 成就进度与真实计数）已分组提交并 **push 到 main**；**9 种背单词模式、38 条契约守卫 / 10,365 断言**；APK 按 2.0.106 重打中。下方 §9 的 2026-09 条目按时间保留作沿革，**当前状态以本行 + `AGENTS.md` + [modules/verification.md](./modules/verification.md) 为准**）。
+> 最后校准：2026-11-01（当前 **2.0.107 / versionCode 152**；本轮三笔功能改动（思维迁移趋势卡 + 首页真实断点 + 成就进度与真实计数）已分组提交并 **push 到 main**；**9 种背单词模式、38 条契约守卫 / 10,365 断言**；APK 已按 2.0.107 / 152 打好（`release/NativeThink-mobile-debug.apk`，850MB）。下方 §9 的 2026-09 条目按时间保留作沿革，**当前状态以本行 + `AGENTS.md` + [modules/verification.md](./modules/verification.md) 为准**）。
 > 相关文档：`AGENTS.md`（**索引**：跨模块约定 + 模块文档导航）、[`docs/modules/`](./modules/)（**每模块一篇：功能 / 实现方法 / 注意事项，带 `文件:行号`**）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
 
 ---
@@ -17,7 +17,7 @@
 | 现在改哪 | 主要战场是 **`/think`（母语思维主轴）**、`src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-10 已完成模式大厅、拼写题池、学习记录图表与设置页学习数据 |
 | 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 38 条可跑的 `scripts/verify-*.mjs` 断言脚本（另有 verify-wordbank-split 需基线参数、verify-all 是全量跑法）（当前 10,365 断言；完整表与最近全绿记录见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
 | 改某个模块前 | 读 [`docs/modules/`](./modules/) 里对应那一篇 —— 功能、实现方法、以及**逐条读代码核实过**的注意事项（本手册与 AGENTS.md 的若干旧说法在那里被推翻并已修正） |
-| 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
+| 怎么装机 | `npm run package:apk`（第一步自带 version bump）→ `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
 | 最容易踩的坑 | ①改动 TTS 切片上限会让云端链路静默失败 ②ref 不随组件重挂载归零 ③`public/` 不能放大文件 ④推送用 SSH over 443 ⑤洗牌列表 + 下标定位当前题必须用 `use-stable-shuffle`（否则当前题悄悄漂移） |
 
@@ -75,7 +75,7 @@
 | Git 钩子 | `core.hooksPath=.githooks`。`pre-commit` 跑 `npm run precommit`（typecheck + eslint，失败即阻断，**不要 `--no-verify`**）；`post-commit` 把提交标题追加进 `CHANGELOG.md` + `public/CHANGELOG.md` 并 `git add` |
 | 钩子缺陷史 | 日期标题 `###`/`##` 不一致**已修**（写与查都是 `## $COMMIT_DATE`）；空行堆积**已修（2026-10-05）**：旧 `sed i\` 每插入一个新日期就多堆一行空行（曾堆到 10 行），现改为一次全文件 awk 重写 —— 连续空行压成一行、新日期标题插在首个日期标题前且两侧各留一空行，存量空行已清 |
 | 稳态现象 | 每次提交后 `CHANGELOG.md` / `public/CHANGELOG.md` 会留下**供下一提交使用的已暂存日志**（提交 N 的日志落入提交 N+1），这是预期 |
-| 版本线 | APK **2.x**（`android/version.properties` 现为 **2.0.106 / versionCode 151**，2026-11-01 bump 一次）。`versionCode` 每次打包必须递增 |
+| 版本线 | APK **2.x**（`android/version.properties` 现为 **2.0.107 / versionCode 152**，2026-11-01 由 `package:apk` 自动递增）。`versionCode` 每次打包必须递增 |
 
 ### 2.1 APK / 桌面产物约定
 
@@ -196,9 +196,9 @@ node scripts/clean-wordbank-mojibake.mjs # 清 U+FFFD 乱码（幂等）
 # 品牌视觉资产（APK 图标 + 启动图 + favicon + icon.ico）
 pwsh -File scripts/gen-app-brand.ps1 -Preview docs/brand-assets-preview.png
 
-# 打包（版本号必须先递增！）
-npm run version:apk-bump    # 只 +patch，如 2.0.25 → 2.0.26
-npm run package:apk         # 校验音色 → capacitor copy → 拷模型 → gradle → 落 release/
+# 打包（versionCode 由 package:apk 自己递增，别再手动先 bump）
+npm run package:apk         # bump → ensure-web-build → 校验音色 → capacitor copy → 拷模型 → gradle → 落 release/
+npm run version:apk-bump    # 只在不打包、只想改版本号时用（2.0.25 → 2.0.26）；紧接着再跑 package:apk 会白跳一格
 npm run package:desktop
 npm run package:all         # web 只构建一次，APK 与桌面并行（约 45s）
 
@@ -371,7 +371,7 @@ node scripts/device-eval.mjs back
 - `e7dd3c3`：「读英文」输入训练（24 题）
 - `9fe0c63`：跨模块守卫、文档与开发日志收口
 
-验证：`npm run verify:all` **39 项全绿**（38 条守卫 + typecheck，`verify-wordbank-split` 跳过），断言合计 **10,365**（含 2026-11-01 未提交三笔的 +77）。**待发布**：push `main` → Pages → `version:apk-bump` 一次 → `package:apk` / `package:apk:emu` → 真机/模拟器走查。
+验证：`npm run verify:all` **39 项全绿**（38 条守卫 + typecheck，`verify-wordbank-split` 跳过），断言合计 **10,365**（含本轮三笔的 +77）。**发布状态**：三笔已分组提交并 push `main`（Pages 已上线）；APK 打的是 **2.0.107 / versionCode 152**（151 被我手动 bump + `package:apk` 自带 bump 连跳两格烧掉了 —— 见 build-release.md 那条警告），随后走查。
 
 ### 2026-11-01 未提交批次（三笔，都已全量验证）
 
@@ -433,7 +433,7 @@ node scripts/device-eval.mjs back
 
 ### 当前开放项（2026-10-31）
 
-1. **发布收尾（进行中）**：本轮 17 个 commit 已 push `main` → Pages 构建；APK 按 2.0.106 / versionCode 151 重打（发布包 + 模拟器包），随后走查。
+1. **发布收尾（进行中）**：本轮 commit 已 push `main` → Pages 已上线；APK 发布包已打（2.0.107 / 152），模拟器包与装机走查在跑。
 2. **学习提醒**（Capacitor 本地通知）：系统级唯一缺口。
 3. **词库真人发音包**：需要先定预录体积与打包方案。
 4. **语料回填**：语法条目、导入书离线翻译、书籍译文空段，剩余量需重新盘点。
@@ -539,7 +539,7 @@ node scripts/device-eval.mjs back
 - [ ] 真机装机验证（涉及 safe-area / 原生 TTS / 手势 / 持久化的改动**必须**真机验；动手前先报备，收尾 `force-stop`）
 
 **交付前**
-- [ ] `npm run version:apk-bump` 后再 `package:apk`（versionCode 必须递增）
+- [ ] `npm run package:apk`（**它自己第一步就 bump**，别再手动 `version:apk-bump` 前置，否则版本 code 白跳一格 —— 2026-11-01 就烧掉了一个 151）；打完用 aapt 核对内嵌版本与 `version.properties` 一致
 - [ ] `aapt dump badging` 核验内嵌版本
 - [ ] 确认没有大文件进 `public/`
 - [ ] 确认站点 functions 没被改坏 —— APK 的 `/api/*` 打的就是线上站点
