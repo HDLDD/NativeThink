@@ -88,13 +88,17 @@ node scripts/device-eval.mjs tap 400 1630    # 物理像素，自动折算 CSS
 node scripts/device-eval.mjs shot .screen.png
 ```
 
-五条真机通道自己的坑（2026-09-30 / 10-01 两次走查踩到，都是"脚本没错、通道错了"那类）：
+七条真机通道自己的坑（2026-09-30 / 10-01 / 11-01 三次走查踩到，都是"脚本没错、通道错了"那类）：
 
 1. **收尾脚本里不要发 `Browser.close`** —— 在本机无头 Chrome 上它只是关浏览器，但在真机 WebView 上它把**整个 WebView 一起关掉**，于是转发指向的 socket 立刻消失，下一个脚本报 `ECONNREFUSED ::1:9223`，看起来像"设备掉线"。收尾用 `ws.close()`；要真的归位就发 `adb shell am force-stop`。
 2. **整页导航会销毁执行上下文**：`location.href=…` / `location.reload()` 之后注入过的 `window.__X` 全没了。任何 `waitFor` 在导航后引用它都是假失败 —— 判据要么只用原生 DOM 表达式，要么导航后**重新注入**helpers。
 3. **走查不许拿用户进度当测量代价**：复习检测概览页有两个入口 —— 「开始复习（N 张）」**重建本轮队列并覆盖断点**，「接着上次（还剩 M 张）」保留原队列。帧测这类只读走查一律点「接着上次」；会写 SM-2 与学习时长的评分，走查完要**如实报数**。
 4. **`settings put global` 两条通道都拒不（WRITE_SECURE_SETTINGS）**，`svc power stayon usb` 是空操作 —— 屏幕超时改不了，只能让脚本适应：**息屏会停摆 rAF、但不停 setTimeout**，所有轮询/等待一律 setTimeout（字号采样就是息屏状态下跑完的）；input 系全被拒（USB 也一样），重开应用用 `monkey -p com.nativethink.app -c android.intent.category.LAUNCHER 1`。
 5. **CDP `Page.captureScreenshot` 在这台 WebView 上经常 20s 超时** → 截图退化到 `adb exec-out screencap -p`（Node 里用 `execFileSync(ADB, [argv 数组])`，别拼 shell 字符串）；设备半路掉线时 **WebSocket 静默死亡会让顶层 await 悬空、Node 无提示退出** —— harness 定型：`setInterval(()=>{},1000)` 保命 + 每次 send 带超时 + `ws.onclose` 打日志，让掉线变成超时报错而不是静默死。
+6. **两份 adb 抢同一台设备 = 永远 `offline`**（2026-11-01）：SDK 的 `platform-tools/adb` 是 **37.0.0**，而 `B:/tools/scrcpy/scrcpy-win64-v5.0.1/adb.exe` 是 **37.0.1**；只要有一个 server 是另一版本起的，`adb devices` 就一直停在 `offline`（`kill-server` 换边重启也不一定恢复）。判据很简单：**换 scrcpy 那份 adb 立刻 `device`**。所以真机走查一律先确认"当前 server 是哪份 adb 起的"，别再拿 SDK 那份去 `forward`（`phone-emu.mjs` 里写的是 SDK 路径，模拟器不受影响）。
+7. **App 退到后台，WebView 的 devtools 就不应答**：`/json/list` 直接挂住、`Runtime.evaluate` 超时，看起来像"通道坏了"。实际是渲染进程被冻结 + **该 socket 只允许一个客户端**（被挂死的 node 连接占着也一样）。恢复顺序：`am start -n com.nativethink.app/.MainActivity`（或 `monkey … LAUNCHER 1`）把它带回前台 → 再 `forward` → 先 `curl /json/list` 确认有响应，才谈得上跑表达式；仍无响应就 `force-stop` 重启 App（socket 名带 pid，重启后要按新 pid 重新转发）。
+
+2026-11-01 真机凭据（Redmi Turbo 3 / 主力机带真实数据，**只升级安装 + 只读核验，不灌夹具**）：`install -r -d` 从 **2.0.70 / 115** 升到 **2.0.107 / 152**，`dumpsys package` 复核内嵌版本、数据未清；App 起来后 `meta[app-version]=2.0.107`、布局视口 **406 CSS / dpr 3**、`scrollWidth - innerWidth = 0`。三处新功能在真机上逐项看到：① 进一次词汇页后，首页续学条写出**真实断点**「快速闪卡 · 中考 · 第 1/20 张」（此前这条只说得出"词汇深度"）；② 学习记录页「思维迁移趋势」卡在他没有模式记录时显示**空态 + 去模式训练**，`data-transfer-attempts=0` 且**折线条数为 0**（不画假趋势）；③ 成就徽章页「已解锁 1 / 12」+ 11 张锁定卡各自报真实差值（`streak_3` 还差 2 天 · 1/3 天、`first_conversation` 0/1 次、`goal_hit` 还差 30 分钟 · 0/30 分钟），证明**外壳挂载的判定真的在跑**（2.0.107 之前它根本没有调用点）。截图 `D:/Temp/phone-achievements.png`、`D:/Temp/phone-trend.png`。
 
 2026-10-01 实测：字号档位本机 51/51（逐张绝对值 36/30/48）、真机 53/53（15 张样本，缩放系数 z ∈ [1.100, 1.100]，48→52.8 · 36→39.6 · 30→33，同档一致 + 跨档严格有序）；零提示验收真机 29/29（复习检测/每日学习/快速闪卡三模式的评分（含答错重排路径）/ 翻面 / ★收藏 / 自动发音开关 / 续学入口，**每条交互都带"点击真的落到地"的正对照**，收藏与开关净零还原并复验）。两条真机通道（无线、USB）各独立跑完一轮，结果一致（53/53 + 29/29 ×2）。
 

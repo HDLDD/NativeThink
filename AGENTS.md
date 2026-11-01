@@ -156,6 +156,8 @@ node scripts/fetch-android-tts.cjs         # 拉 TTS 资产（幂等，--force �
 pwsh -File scripts/gen-app-brand.ps1 -Preview docs/brand-assets-preview.png
 
 # 真机 WebView 调试（该 ROM 对 adb shell 拒 INJECT_EVENTS，USB/无线都一样，CDP 是唯一通道）
+# ⚠️ 两份 adb 会抢设备：SDK 的是 37.0.0、B:/tools/scrcpy/scrcpy-win64-v5.0.1/adb.exe 是 37.0.1 —— 版本不一致时
+#    adb devices 永远 offline；真机一律用 scrcpy 那份 adb。App 退后台后 devtools 不应答，先 am start 带回前台再转发
 # 先建转发：adb forward tcp:9223 localabstract:webview_devtools_remote_<pid>
 # （socket 名：adb shell cat /proc/net/unix | grep webview_devtools_remote）
 node scripts/device-eval.mjs eval "document.title"
