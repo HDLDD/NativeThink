@@ -142,58 +142,57 @@ ok(spellStore && spellStore.n === 1 && spellStore.sample && spellStore.sample.le
 const flipped = truthy(ev(`(()=>[...document.querySelectorAll('button')].some(x=>/这句已在句子拼写库里/.test(x.title||'')))()`));
 ok(flipped, '③ 按钮 title 翻成「这句已在句子拼写库里」（UI 上的落库回执）', '');
 nav('/spelling');
-ok(has('句子拼写') || has('开始'), '③ 拼写页打开正常', '');
 /**
- * 词库下拉的触发器有稳定 title（SpellingPage.tsx:1259 `title="切换词书"`），
- * 而「全部词库」这串字同时是触发器文案和下拉项文案 —— 按文案点会点错，必须按 title 点。
+ * 词库要走 IndexedDB 预载，APK 冷 profile 下「正在加载词书…」要挂十几秒 ——
+ * 固定 sleep 会把"页面还没出控件"误报成"页面打不开"（2026-11-01 走查 7 条红的真因之一）。
+ * 所以先轮询到题池触发器出现，再判这条。
  */
-const opened = ev(`(()=>{const b=document.querySelector('button[title="切换词书"]');if(!b)return 'NOTRIGGER';
-  // Radix 的下拉在 pointerdown 上开，合成 .click() 打不开它（实测 NOITEM 的真正原因）
-  b.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true,button:0,pointerId:1}));
-  b.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,cancelable:true,button:0,pointerId:1}));
-  b.click();
-  return 'opened:'+(b.innerText||'').trim();})()`);
-console.log(`  开词库下拉 → ${JSON.stringify(opened)}`);
-sleep(1200);
-ok(has('纠偏表达'), '③ 词库下拉里有「纠偏表达」这一档', JSON.stringify(opened));
-const chose = ev(`(()=>{const it=[...document.querySelectorAll('[role="menuitem"]')].find(e=>/纠偏表达/.test(e.innerText||'')&&e.offsetParent);if(!it)return 'NOITEM';it.click();return 'chose';})()`);
+const TRIGGER = 'button[title="切换词书与题池"]';
+let ready = 0;
+for (let i = 0; i < 40; i += 1) {
+  ready = ev(`(()=>document.querySelector(${JSON.stringify(TRIGGER)})?1:0)()`);
+  if (ready) break;
+  sleep(1500);
+}
+ok(!!ready && has('句子拼写'), '③ 拼写页打开正常（轮询到题池触发器才算打开，不再拿固定 sleep 当就绪）', `trigger=${JSON.stringify(ready)}`);
+/**
+ * 2026-11-01 起题池切换是**显式按钮 + Dialog 里的题池卡片**（`SpellingPoolPicker`，
+ * 稳定钩子 `[data-spelling-pool="<key>"]`），不再是右上角下拉的 `[role="menuitem"]`。
+ * 触发器带 `disabled={building || levelLoading}`，预载那几秒点不动 → openPicker 回 -1，靠重试扛。
+ */
+const openPicker = () => ev(`(()=>{const b=document.querySelector(${JSON.stringify(TRIGGER)});if(!b)return 0;if(b.disabled)return -1;b.click();return 1;})()`);
+const pickPool = (key) => ev(`(()=>{const it=document.querySelector('[data-spelling-pool="${key}"]');if(!it||!it.offsetParent)return 'NOITEM';it.click();return 'chose';})()`);
+const triggerLabel = () => ev(`(()=>{const b=document.querySelector(${JSON.stringify(TRIGGER)});return b?(b.innerText||'').replace(/\\s+/g,' ').trim():'NOTRIGGER';})()`);
+ok(openPicker() === 1, '③ 点「词书与题池」开得出题池选择器');
+sleep(900);
+ok(truthy(ev(`(()=>{const it=document.querySelector('[data-spelling-pool="correction"]');return !!(it&&/纠偏表达/.test(it.innerText||'')&&it.offsetParent);})()`)),
+  '③ 题池卡里有「纠偏表达」这一档');
+const chose = pickPool('correction');
 sleep(2500);
-ok(chose === 'chose', '③ 点得到「纠偏表达」那一项', JSON.stringify(chose));
-const triggerLabel = ev(`(()=>{const b=document.querySelector('button[title="切换词书"]');return b?(b.innerText||'').trim():'NOTRIGGER';})()`);
-ok(/纠偏表达/.test(String(triggerLabel)), '③ 触发器已切到「纠偏表达」（不是只显示、状态没跟上）', JSON.stringify(triggerLabel));
+ok(chose === 'chose', '③ 点得到「纠偏表达」那张卡', JSON.stringify(chose));
+ok(/纠偏表达/.test(String(triggerLabel())), '③ 触发器已切到「纠偏表达」（不是只显示、状态没跟上）', JSON.stringify(triggerLabel()));
 const poolExpr = `(()=>{const t=(document.body.innerText||'');const i=t.indexOf('共');const j=t.indexOf('句',i);return i>=0&&j>i?t.slice(i,j+1).replace(/[^0-9]/g,''):null;})()`;
 const pool = ev(poolExpr);
-ok(same(pool, 1), '③ 纠偏桶题池=1 句（只含送进来的那句）', `共 ${pool} 句`);
+ok(same(pool, 1), '③ 纠偏桶题池=1 句（只含送进来的那句）', `共 ${JSON.stringify(pool)} 句`);
 // 正对照：切到「四级」（真词库），题池必须明显变大 —— 否则"共 1 句"可能只是页面本来就只报 1。
-// 词库要走 IndexedDB 预载，APK 冷 profile 下这一步要十几秒，所以**轮询**而不是固定 sleep。
-const openMenu = () => ev(`(()=>{const b=document.querySelector('button[title="切换词书"]');if(!b)return 0;
-  b.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true,button:0,pointerId:1}));
-  b.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,cancelable:true,button:0,pointerId:1}));b.click();return 1;})()`);
-const pickItem = (label) => ev(`(()=>{const it=[...document.querySelectorAll('[role="menuitem"]')].find(e=>new RegExp(${JSON.stringify(label)}).test(e.innerText||'')&&e.offsetParent);if(!it)return 'NOITEM';it.click();return 'ok';})()`);
-/**
- * 正对照要能扛住"切书正在预载"：触发器带 `disabled={building || levelLoading}`
- * （SpellingPage.tsx:1257），预载那几秒点不动 —— 第一版点一次就判失败，红得莫名其妙。
- */
 let chose4 = 'never';
-for (let i = 0; i < 6 && chose4 !== 'ok'; i++) {
-  openMenu();
+for (let i = 0; i < 12 && chose4 !== 'chose'; i += 1) {
+  const opened = openPicker();
   sleep(1200);
-  chose4 = pickItem('^四级');
-  if (chose4 !== 'ok') {
-    const st = ev(`(()=>{const b=document.querySelector('button[title="切换词书"]');return b?(b.disabled?'DISABLED(预载中)':'ENABLED-NOTFOUND'):'NOTRIGGER';})()`);
-    console.log(`  重试 ${i + 1}：${chose4} · 触发器 ${JSON.stringify(st)}`);
+  chose4 = pickPool('cet4');
+  if (chose4 !== 'chose') {
+    console.log(`  重试 ${i + 1}：${chose4} · 开框 ${JSON.stringify(opened)} · 触发器 ${JSON.stringify(triggerLabel())}`);
     sleep(2500);
   }
 }
 let poolCet4 = null;
-for (let i = 0; i < 30; i++) {
+for (let i = 0; i < 40; i += 1) {
   sleep(1500);
   poolCet4 = ev(poolExpr);
   if (Number(poolCet4) > Number(pool)) break;
 }
-const label4 = ev(`(()=>{const b=document.querySelector('button[title="切换词书"]');return b?(b.innerText||'').trim():'NOTRIGGER';})()`);
-ok(chose4 === 'ok' && /四级/.test(String(label4)), '③ 正对照：能切到真词库「四级」（触发器文案跟着变）', `${JSON.stringify(chose4)} / ${JSON.stringify(label4)}`);
-ok(Number(poolCet4) > Number(pool), '③ 正对照：四级题池远大于纠偏桶（证明纠偏桶是真过滤，不是页面永远报同一个数）', `四级 ${poolCet4} 句 vs 纠偏 ${pool} 句`);
+ok(chose4 === 'chose' && /四级/.test(String(triggerLabel())), '③ 正对照：能切到真词库「四级」（触发器文案跟着变）', `${JSON.stringify(chose4)} / ${JSON.stringify(triggerLabel())}`);
+ok(Number(poolCet4) > Number(pool), '③ 正对照：四级题池远大于纠偏桶（证明纠偏桶是真过滤，不是页面永远报同一个数）', `四级 ${JSON.stringify(poolCet4)} 句 vs 纠偏 ${JSON.stringify(pool)} 句`);
 
 /* ── 5. 走查②：纠偏重考按类筛选 + 答后类别反馈 + 完成页汇总 ── */
 nav('/vocabulary?tab=correction');
