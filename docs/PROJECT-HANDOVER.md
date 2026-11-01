@@ -1,7 +1,7 @@
 # NativeThink 项目交接手册（Agent Handover）
 
 > 面向**接手的 AI agent / 新同事**：只读这一份就能开工。
-> 最后校准：2026-11-01（当前 **2.0.105 / versionCode 150**；功能批次末 commit `9d3cad3`；**9 种背单词模式、38 条契约守卫 / 10,365 断言**；本轮 8 个功能/文档 commit 已提交，另有三笔**未提交**改动（思维迁移趋势卡 + 首页真实断点 + 成就进度与真实计数）；**尚未 push、APK 未重打**。下方 §9 的 2026-09 条目按时间保留作沿革，**当前状态以本行 + `AGENTS.md` + [modules/verification.md](./modules/verification.md) 为准**）。
+> 最后校准：2026-11-01（当前 **2.0.106 / versionCode 151**；本轮三笔功能改动（思维迁移趋势卡 + 首页真实断点 + 成就进度与真实计数）已分组提交并 **push 到 main**；**9 种背单词模式、38 条契约守卫 / 10,365 断言**；APK 按 2.0.106 重打中。下方 §9 的 2026-09 条目按时间保留作沿革，**当前状态以本行 + `AGENTS.md` + [modules/verification.md](./modules/verification.md) 为准**）。
 > 相关文档：`AGENTS.md`（**索引**：跨模块约定 + 模块文档导航）、[`docs/modules/`](./modules/)（**每模块一篇：功能 / 实现方法 / 注意事项，带 `文件:行号`**）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
 
 ---
@@ -75,7 +75,7 @@
 | Git 钩子 | `core.hooksPath=.githooks`。`pre-commit` 跑 `npm run precommit`（typecheck + eslint，失败即阻断，**不要 `--no-verify`**）；`post-commit` 把提交标题追加进 `CHANGELOG.md` + `public/CHANGELOG.md` 并 `git add` |
 | 钩子缺陷史 | 日期标题 `###`/`##` 不一致**已修**（写与查都是 `## $COMMIT_DATE`）；空行堆积**已修（2026-10-05）**：旧 `sed i\` 每插入一个新日期就多堆一行空行（曾堆到 10 行），现改为一次全文件 awk 重写 —— 连续空行压成一行、新日期标题插在首个日期标题前且两侧各留一空行，存量空行已清 |
 | 稳态现象 | 每次提交后 `CHANGELOG.md` / `public/CHANGELOG.md` 会留下**供下一提交使用的已暂存日志**（提交 N 的日志落入提交 N+1），这是预期 |
-| 版本线 | APK **2.x**（`android/version.properties` 现为 **2.0.105 / versionCode 150**，本轮未打包）。`versionCode` 每次打包必须递增 |
+| 版本线 | APK **2.x**（`android/version.properties` 现为 **2.0.106 / versionCode 151**，2026-11-01 bump 一次）。`versionCode` 每次打包必须递增 |
 
 ### 2.1 APK / 桌面产物约定
 
@@ -433,7 +433,7 @@ node scripts/device-eval.mjs back
 
 ### 当前开放项（2026-10-31）
 
-1. **发布收尾**：12 个 commit 未 push；APK 仍 2.0.105/150，未重打、未做本轮真机/模拟器走查。
+1. **发布收尾（进行中）**：本轮 17 个 commit 已 push `main` → Pages 构建；APK 按 2.0.106 / versionCode 151 重打（发布包 + 模拟器包），随后走查。
 2. **学习提醒**（Capacitor 本地通知）：系统级唯一缺口。
 3. **词库真人发音包**：需要先定预录体积与打包方案。
 4. **语料回填**：语法条目、导入书离线翻译、书籍译文空段，剩余量需重新盘点。

@@ -1,6 +1,6 @@
 # NativeThink 开发路线
 
-> 校准：2026-11-01（当前 **2.0.105 / versionCode 150**；9 种背单词模式、38 条契约守卫 / 10,365 断言。本轮功能批次末领先 `origin/main` 13 个 commit；另有三笔未提交改动（`TransferTrendCard` 迁移趋势卡 + `resume-overview` 首页真实断点 + `achievements-data` 成就进度与真实计数）。**尚未 push、APK 未重打** —— **push 即上线**，发版前先跑全量验证）。
+> 校准：2026-11-01（当前 **2.0.106 / versionCode 151**，本轮 bump 一次；9 种背单词模式、38 条契约守卫 / 10,365 断言。本轮三笔功能改动已提交并 **push 到 main**（Cloudflare Pages 构建中），APK 正在按新版本重打 —— **push 即改线上**，发版前先跑全量验证）。
 > **收尾必跑 `npm run verify:all`**（typecheck + 全部 `verify-*.mjs`；只跑"自己那条"会漏掉引用同一份源码的其他守卫 —— 2026-09-30 真翻过一次）。
 > 现状细节与坑表见 [`docs/PROJECT-HANDOVER.md`](./docs/PROJECT-HANDOVER.md)，跨模块约定与文档导航见 [`AGENTS.md`](./AGENTS.md)，**每模块的功能/实现/注意事项见 [`docs/modules/`](./docs/modules/)**，产品与 UI 规范见 [`docs/PRODUCT-SPEC.md`](./docs/PRODUCT-SPEC.md)。
 > **重点研发的两条线是 APK 与网站**（Electron 桌面只是顺带产物）；站点 `functions/api/*` 同时是 APK 的线上后端 —— APK 内 `/api/*` 被重写到 `https://nativethink.pages.dev`。
