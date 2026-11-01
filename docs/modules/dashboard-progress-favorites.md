@@ -12,11 +12,13 @@
 
 **今日待复习（`ReviewDueCard.tsx`）**：横幅复用侧边栏角标同一数据源 `useGlobalDueCount`（`DashboardPage.tsx:18,51,336` 直扫 SM-2 存储，不挂完整学习状态实例）。**口径：`dueCount <= 0` 时整卡 `return null`（`ReviewDueCard.tsx:17`）**—— 没有复习义务就不渲染"已清零"占位卡；点击进 `/vocabulary`。外层行 gate 现在是三卡版 `(lastVisit || dueCount > 0 || pendingCorrections > 0)`（`DashboardPage.tsx:324`），都空时整行不占位。
 
+**继续上次学习 = 真实断点（`src/lib/resume-overview.ts`，2026-11-01）**：这条此前只说得出**模块名**（`__nativethink_last_visit` 里只有路由 + 时间戳），点进去还要自己找回上次那本书、那个模式。现在把各模块**早就落盘的会话断点**汇成一行（`复习检测 · 四级 · 第 12/20 张`）：词汇五个模式（`vocab-page` 的 level + tab → 对应会话键）、句子拼写（`..._resume_last` + 本轮队列）、语块复习（`ids` + `index`）、母语思维三稿会话（复用 `loadPatternResume` + `resumeStepLabel`，含两天有效期）。三条口径：① **解析一律复用模块自己的读盘函数**（`parseOrderedSession` / `parseDailySession` / `loadPatternResume`），首页不另立一套 —— 否则显示的位置和真正续学的位置会漂移；② 读不到就 `detail: null`，界面**不渲染位置行**（`DashboardPage.tsx:345-349`），不拿 0 或「上次」充数，坏数据（下标越界 / 老断点缺 queue / 快照过期）一律按没断点处理；③ 能定位到模式的 `href` 带 `?tab=` 深链（`DashboardPage.tsx:337`），点一次直接落回那个模式。标签表（词书名 + 纠偏/精听两个题池名）由页面注入（`:37` `RESUME_LABELS`），`resume-overview` 因此**零数据依赖**、守卫能直接真跑。守卫 `npm run verify-dashboard-glance`（61 断言：21 项真跑 + 接线静态 + 16 条静态变异 + 3 条真跑变异）—— 其中**六个断点键在写入方与读取方各查一遍**：写入方改键名时首页只会静默退回"只写模块名"，这条就是防它。
+
 **今日模式（`TodayPatternCard.tsx`，2026-10-25）**：独立于三张横幅行，挂在「每日一句 / 本周概览」之后。`useThinkPatterns()` 读模式进度；`stats.tracked === 0` 整卡 `return null`（没学过模式不占位）。显示到期/延迟计数、下一个到期模式、近 7 天迁移柱（`trend`，七天补零）与 `passes/attempts`，点击进 `/think`。到期为 0 但有进度时显示「今天已完成，下次到期再来」，不退场。
 
-**表达纠偏待重考（`NoteDrillCard.tsx`，2026-10-17）**：纠偏本三处自动收集 + 收藏页回看 + 词汇页重考 + 句子拼写是一条完整链路，但**入口原本藏在词汇页九个模式的最后一屏**，用户不会每天去翻，所以首页给一条横幅。计数口径是**还没重考过的条数**（`corrNotes.filter((n) => !n.review).length`，`DashboardPage.tsx:56`）—— 与待复习卡同一种语义：考过就退场，不把已处理的常驻催用户；`pendingCount <= 0` 整卡 `return null`。点击带深链 **`/vocabulary?tab=correction`**，由词汇页一步落进该模式（`DeepVocabularyPage.tsx:946-963`：只认 `MODES` 里的 key、`setupDone`/向导未完时不强进、进去后 `setSearchParams({}, {replace:true})` 抹参数 —— 留着刷新会再抢一次焦点）。**只 `setTab` 不 `setImmersed` 是这模块的老坑**（用户仍停在模式列表），守卫把它钉成"必须走 `enterMode`"。守卫 `npm run verify-dashboard-glance`（25 断言，变异 11 条）。
+**表达纠偏待重考（`NoteDrillCard.tsx`，2026-10-17）**：纠偏本三处自动收集 + 收藏页回看 + 词汇页重考 + 句子拼写是一条完整链路，但**入口原本藏在词汇页九个模式的最后一屏**，用户不会每天去翻，所以首页给一条横幅。计数口径是**还没重考过的条数**（`corrNotes.filter((n) => !n.review).length`，`DashboardPage.tsx:56`）—— 与待复习卡同一种语义：考过就退场，不把已处理的常驻催用户；`pendingCount <= 0` 整卡 `return null`。点击带深链 **`/vocabulary?tab=correction`**，由词汇页一步落进该模式（`DeepVocabularyPage.tsx:946-963`：只认 `MODES` 里的 key、`setupDone`/向导未完时不强进、进去后 `setSearchParams({}, {replace:true})` 抹参数 —— 留着刷新会再抢一次焦点）。**只 `setTab` 不 `setImmersed` 是这模块的老坑**（用户仍停在模式列表），守卫把它钉成"必须走 `enterMode`"。守卫 `npm run verify-dashboard-glance`（61 断言，静态变异 16 条 + 真跑变异 3 条）。
 
-**本周学习概览（`WeekGlanceCard.tsx`）**：`calendar`（`__nativethink_calendar`，`useLearningStats` 直接暴露）取近 7 个自然日分钟画柱状 + 周合计/打卡天数/达标天数，点击进 `/progress`（`:405` 接线）。**日期一律 `formatDate` 循环生成再按字符串查表（`:26-29`）**—— 不能 `slice(-7)` 取数组尾：calendar 只在跨出 31 天窗口后才 push 新条目，跨天当天没学习时尾部是昨天，柱状会整体错位一天。柱状容器固定高度（当前 `h-20`，`:65`），标题/柱/星期三层不互压；守卫接受任意 `h-*` 固定高度，但不许省。`npm run verify-dashboard-glance` 共 25 断言 / 11 条变异。
+**本周学习概览（`WeekGlanceCard.tsx`）**：`calendar`（`__nativethink_calendar`，`useLearningStats` 直接暴露）取近 7 个自然日分钟画柱状 + 周合计/打卡天数/达标天数，点击进 `/progress`（`:405` 接线）。**日期一律 `formatDate` 循环生成再按字符串查表（`:26-29`）**—— 不能 `slice(-7)` 取数组尾：calendar 只在跨出 31 天窗口后才 push 新条目，跨天当天没学习时尾部是昨天，柱状会整体错位一天。柱状容器固定高度（当前 `h-20`，`:65`），标题/柱/星期三层不互压；守卫接受任意 `h-*` 固定高度，但不许省。`npm run verify-dashboard-glance` 共 61 断言 / 16 条静态变异 + 3 条真跑变异。
 
 **每日一句（daily chunk）**：
 
@@ -24,8 +26,8 @@
 |-----|------|------|
 | `__nativethink_daily_chunk` | `:66` 读 / `:76` 写 | `{date, chunk}`，按本地日期换 |
 | `__nativethink_daily_history` | `:100` 读 / `:91`、`:138` 写 | 生成过的语块，`id: ai_<ts>` |
-| `__nativethink_last_visit` | `:249` | 上次访问（回访问候/断点提示）。**「继续上次学习」的 labels 表（`DashboardPage.tsx:277-289`）是"路径 → 文案"的穷举映射，不在新增页面六件套里** —— 每上一个新路由要补一行，漏了该页访问后续学条静默不出现（`/sentences` 真实漏过，2026-10-10 补上，守卫 `verify-dashboard-glance` ① 钉住） |
-| `__nativethink_achievements` | `use-achievements.ts:5,121,135` | 成就解锁列表 |
+| `__nativethink_last_visit` | `:249` | 上次访问（回访问候/断点提示）。**「继续上次学习」的 labels 表（`DashboardPage.tsx:277-289`）是"路径 → 文案"的穷举映射，不在新增页面六件套里** —— 每上一个新路由要补一行，漏了该页访问后续学条静默不出现（`/sentences` 真实漏过，2026-10-10 补上，守卫 `verify-dashboard-glance` ① 钉住）。2026-11-01 起这条只决定**去哪个模块**，位置由 `resume-overview.ts` 现读各模块自己的会话键（词汇 `vocab-page` + 五个模式断点键 / 拼写 `..._resume_last` + 队列 / 语块 `..._chunk_review_session` / 思维 `..._think_session_resume`） |
+| `__nativethink_achievements` | `use-achievements.ts:16,29,49` | 成就解锁列表（判定入口 `useAchievementCheck`，挂在 `Layout.tsx:90`） |
 
 AI 生成：`aiChat`（`:154`），system 要求**只返回一个 JSON 对象**（`{content, meaning, example, exampleZh, category, difficulty}`）。
 
@@ -37,10 +39,15 @@ AI 生成：`aiChat`（`:154`），system 要求**只返回一个 JSON 对象**�
 
 - **模块占比图的单一来源是 `src/lib/progress-page.ts`**（2026-10-31）：`MODULE_COLORS` / `MODULE_NAMES` 按 key 取色；`buildModuleShares()` 先过滤 0/负数/NaN，再用**最大余数法**把舍入补到余数最大的项上，保证非空项相加恰好 100。`ProgressCharts.tsx` 只消费 `{name, value: percent, color}`，tooltip 的 `${value}%` 才是真份额 —— 旧实现把 `moduleProgress` 原始分直接塞给 Recharts，三个模块各 50 分时会显示三个 50%，实际份额各 33%。缺 key 时回落 key 名 + `#94A3B8`，不丢数据。
 - 饼图没有进度时显示空态（`data-chart-empty="pie"`）：「还没有模块进度 / 去任意模块学几分钟 / 回首页开始学习」。两张柱/线图的网格线改用 `var(--border)`（旧 `hsl(215 28% 20%)` 在浅色模式下是深灰线），卡片圆角回 24px。图表模块仍懒加载（recharts ~400KB）。
+- **思维迁移趋势卡**（2026-11-01）：`TransferTrendCard.tsx` 只在「学习统计」tab 渲染，数据**只从 `useThinkPatterns()` 的已清洗 `dailyStats` 来**（`TransferTrendCard.tsx:31,34`），不自己读 storage —— 坏行（缺校准字段等）在 store 读盘边界就被丢掉，卡片上的数字与 `/think` 同源。窗口 14 天（`:28`），比 `/think` 的 7 天窗更长；两条线分别是「迁移尝试 / 迁移通过」，顶部三个胶囊是**真实汇总**：通过率、有尝试的天数、校准命中（`summarizeTransferTrend`，`progress-page.ts:111`）。一次都没练时**不画全 0 假折线**，只给 `data-chart-empty="transfer"` 空态与 `/think` 入口（`:77`）；x 轴标签 `月/日` 由 `formatTransferTrendLabel`（`progress-page.ts:97`）生成，末尾始终包含今天。挂载点在 `ProgressCharts.tsx:298`。
 - 重置是分类型的：学习统计 `:111`、句子拼写 `:119`、阅读 `:124-143`、词汇 `:174`、按词书 `:200`、短语库 `:208`、全部 `:277`。多数提示带「刷新页面后生效」—— 因为这些模块的 hook 不在本页，内存态还在（见 `cloud-sync.md` 的陈旧内存态问题）。
 - **窄屏分类条**（2026-10-28）：`ProgressPage.tsx` 在 `<sm` 隐藏四个 tab 的图标（`hidden sm:inline`）并给 `TabsList` 加 `max-w-full overflow-x-auto`。393px + 120% 字体下四个标签必须完整可见；退回原先的 `w-fit` 单行会把「成就徽章」裁出视口。
 - **日历不再能翻到未来**（2026-10-31）：`isCurrentMonth` / `canGoToNextMonth` 纯函数在 `progress-page.ts`；本月时下个月按钮禁用（`disabled={!canNextMonth}`），离开本月后出现「回到本月」；`nextMonth` 自己也有一道闸门，防键盘/程序触发绕过按钮态。
 - **成就已解锁排前**（2026-10-31）：`sortAchievements(definitions, unlocked ids)` 把已解锁放前、组内保持定义表原顺序；不再让解锁的和锁定的混排。未解锁卡仍有 🔒 与灰度样式。
+- **成就区：进度提示 + 真实计数（2026-11-01）**，三件事一起修的：
+  ① **解锁判定此前没有调用点** —— `checkAndUnlock` 只被一个同样没人引用的 `use-learning-with-achievements.ts` 调，成就页永远是一排 🔒。现在 `useAchievementCheck()`（`use-achievements.ts:113-127`）挂在 `Layout.tsx:90`，学习时长或真实计数一变就重判（两个 `loaded` 门都要过，否则首屏拿空值判一轮），那个死 hook 已删。
+  ② **两条计数成就在拿进度分当次数** —— `moduleProgress.conversation` 是「分钟 × 0.5、上限 100」的分值，不是对话次数，于是「完成 10 次 AI 对话」实际是「对话练够 20 分进度分」。现在 `src/lib/achievement-sources.ts` 直接数 `__nativethink_conversation_history` / `__nativethink_shadowing_completed` 两个数组的条目数（一条 = 一次对话 / 一句跟读），坏数据一律 0 不猜。
+  ③ **锁定卡说清还差多少** —— 定义与阈值搬进纯模块 `src/lib/achievements-data.ts`：每条成就同时给 `achieved(s)` 与 `progressOf(s)`，守卫拿同一组夹具比对「进度到没到 ⟺ 判没判解锁」（84 组），所以界面显示的阈值不可能和真正解锁用的阈值漂移。`formatAchievementGap` 到目标返回 null（不写「还差 0 天」），量词（天/分钟/次/句）必须出现在描述里。`goal_hit` 另修一处白送：旧写法 `todayMinutes >= dailyGoalMinutes` 在**每日目标关掉（0）+ 当天 0 分钟**时恒真，新用户第一次记账就白拿一个成就，现在要求目标 > 0。渲染在 `ProgressPage.tsx:962`（`data-achievement-progress` + 1px 细条 + 「还差 4 天 · 3/7 天」），给不出真实进度的成就才退回 🔒。
 - **收藏本 tab 只留总览**（2026-10-31）：类型计数 + 最近 3 条 + 「去收藏页管理」；完整列表、搜索、类型筛选、12 条增量与「开始回顾」只在 `/favorites`。`data-favorites-summary` / `data-favorites-entry="manage"` 是稳定钩子。入口没有删——只是不再在 `/progress` 维护第二套完整收藏界面。
 - **重置学习统计不再虚报成功**（2026-10-29）：`use-learning-stats` 的 `resetAll()` 现在返回 stats/calendar 两次真实写入的与；`ProgressPage.tsx:112-119` 只在两者都成功时提示「学习统计已重置」，否则提示检查可用空间。「重置全部」同样按 `statsOk` 分流（`:251-287`）。核心进度写入统一走 `persistText`，守卫 `verify-vocab-caches` ⑧。
 
@@ -105,4 +112,4 @@ LEGACY_KEY      = __nativethink_favorites_v2     （裸 localStorage，读一次
    **守卫：`npm run verify:backup-idb`（106 断言，18 组变异）** —— 真跑译文导出、IDB 提交、导入书往返与共享 hook 的恢复 callback，另钉两页挂载、LAST_BACKUP 时间戳、本地占用统计与 reset 深链。书库失败夹具保留全 `abort`，另用 `readonly` 成功 / `readwrite` abort（`verify-backup-idb.mjs:192-208,305-313`）明确断言写入已尝试、未提交且 `failedBooks=1`；否则失败停在 `loadImportedBooks`，根本测不到 `persist`。页面判据（`:328-358`）钉恢复结束→通知重读→报告的顺序，部分失败不刷新且保留报告，完整成功再刷新。新增 M13–M18（`:416-430`）分别检出漏通知、仅成功通知、提前通知、延后通知、清空失败报告、吞掉 `persist` 错误；每组均有基线真与变异假两条断言。
 5. **`importBackup` 会覆盖同键进度**，拿旧备份恢复仍可能让进度回退；页面已明示。导入书按 id 合并而非整库替换，坏格式在任何写入前拒绝，存储错误则如实报告部分恢复，不声称跨 localStorage/IDB 原子回滚。
 6. **收藏的判重是 `content + type`**，所以想给同一句英文做"跨模块统一收藏"需要显式设计，不是把 `type` 改一改就能合并 —— 历史数据已经按 type 分开了。
-7. **`use-achievements` 只在自身文件里读写**（`:5,121,135`），不订阅 `nativethink-sync-down`（订阅者只有 3 个，见 `cloud-sync.md`）→ 云同步下来的新成就要点开首页才重算。
+7. **成就的读盘与判定分两处**：`use-achievements.ts` 订阅 `nativethink-sync-down`（下行后重读解锁列表），而**判定**由 `Layout.tsx:90` 的 `useAchievementCheck()` 触发 —— 二者都在这一个文件里（`use-achievements.ts:29,49,113-127`）。2026-11-01 之前它是"订阅了但没人判定"，成就页永远一排 🔒；守卫 `verify-progress-page` 的 M20 专门盯"外壳不再挂判定"这种回退。

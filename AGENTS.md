@@ -42,7 +42,7 @@ NativeThink 是面向中文母语者的英语思维训练应用：摆脱中式�
 | 句子学习 `/sentences` | [modules/sentence-lab.md](./docs/modules/sentence-lab.md) | 158 句语料、意群运行时定位；主干候选与评分**同一来源**（`verify:sentence-lab` 守）；跟读评价与影子跟读共用 `speech-analysis` |
 | 句子拼写 `/spelling` | [modules/spelling.md](./docs/modules/spelling.md) | 2×2 玩法、**五条题目来源**（含纠偏本 / 精听页两个句子库桶）、断点按 level 分键（`spelling-resume.ts`）、**题池大厅**（纠偏/精听/11 本词书同表可搜，首屏与练习页共用 `SpellingPoolPicker`） |
 | 视频精听 `/video` | [modules/video-lab.md](./docs/modules/video-lab.md) | 导入字幕（+可选媒体）逐句学：SRT/VTT/转录 JSON 三解析、IDB `media` 独立表三键分片、索引封顶连媒体一起删、点词查词、跟读用 LCS 且**无识别通道时不许假分数**、AI 双语三档降级、**三形态统一走导入（不接本机转录服务）** |
-| 首页 / 记录 / 收藏 / 备份 | [modules/dashboard-progress-favorites.md](./docs/modules/dashboard-progress-favorites.md) | 每日一句、分项重置、收藏判重口径、三张首页横幅（待复习 / 纠偏待重考 + `?tab=` 深链）；学习记录页**模块占比归一（最大余数，和为 100）/ 日历禁未来 + 回到本月 / 成就解锁优先 / 收藏本只留总览**；**设置页「学习数据」区与记录页共用 `use-backup-actions` 导出/恢复，显示本地占用与上次备份，`/progress?reset=1` 打开现有重置弹窗**；导入书正文与整书译文随备份导出、恢复按真实计数由 `verify:backup-idb` 守 |
+| 首页 / 记录 / 收藏 / 备份 | [modules/dashboard-progress-favorites.md](./docs/modules/dashboard-progress-favorites.md) | 每日一句、分项重置、收藏判重口径、三张首页横幅（待复习 / 纠偏待重考 + `?tab=` 深链）；学习记录页**模块占比归一（最大余数，和为 100）/ 日历禁未来 + 回到本月 / 成就解锁优先 / 收藏本只留总览 / 思维迁移趋势（14 天，走 think store 的已清洗 dailyStats，没练过不画全 0 折线）**；**设置页「学习数据」区与记录页共用 `use-backup-actions` 导出/恢复，显示本地占用与上次备份，`/progress?reset=1` 打开现有重置弹窗**；导入书正文与整书译文随备份导出、恢复按真实计数由 `verify:backup-idb` 守 |
 | 外壳与导航 | [modules/shell-and-navigation.md](./docs/modules/shell-and-navigation.md) | 启动顺序、双层 ErrorBoundary、预取时机、**新增页面实际是六处** |
 | 交互反馈层（跨模块） | [modules/interaction-fx.md](./docs/modules/interaction-fx.md) | 全站"按下去有什么反应"的唯一答案：按压词汇（**裸 `<button>`/`<a href>`/`[role=button]` 默认可点，`off` 才例外**；`scale` 独立属性 / 两档涟漪按底色挑色）、结果图形件（纯 CSS，不碰 motion；四个练习面的弧/色点/连击环）、奖励时刻（唯一 canvas 出口）、入场档（`.page-enter`/`.stagger` 与 `--fx-ease` 同源）、reduce 在委托层判 |
 | 存储与学习统计 | [modules/storage-and-stats.md](./docs/modules/storage-and-stats.md) | 四套存储、safeStorage 前缀自愈、`addStudyMinutes` 真实语义、同步边界 |
@@ -114,7 +114,7 @@ node scripts/verify-vocab-caches.mjs              # 213  缓存封顶 + 存储�
 node scripts/verify-overlay-fit.mjs               # 41   窄视口浮层契约 + 全屏层自带 safe-area + 全站唯一 Toaster 出口 + ⑥ 手机抽屉导航后必须关 + ⑦ 每个 useFramerMotion 组件的每个宿主都包 LazyFramerProvider
 node scripts/verify-bundle-budget.mjs             # 10   首屏下载预算（先 build:web）
 node scripts/verify-list-scaling.mjs              # 27   长列表必须折叠/分页（写作题库 12+增量 + 文章 AI 列表 + 跟读语料/精听课表 + 收藏页 + 句子精讲 + 句型/语法搜索 + 词库浏览 + 短语库字母段 + 记录页收藏总览去重）
-node scripts/verify-progress-page.mjs             # 40   学习记录页：模块占比归一（最大余数补到 100）/ 饼图空态与真百分比 / 日历禁未来+回到本月 / 成就解锁优先 / 收藏本只留总览 + 7 条接线变异
+node scripts/verify-progress-page.mjs             # 81   学习记录页：模块占比归一（最大余数补到 100）/ 饼图空态与真百分比 / 日历禁未来+回到本月 / 成就解锁优先 / 收藏本只留总览 / 迁移趋势汇总（无尝试不造假 0%）/ **成就进度与判定同源**（7 组夹具 × 12 成就比对「progressOf ⟺ achieved」、两个真实计数键在写读两侧各查、外壳没挂判定也红）+ 20 条接线变异
 node scripts/verify-shadowing-completion.mjs      # 27   跟读完成标记的索引契约（纯函数真跑 + 接线）+ 语音标注 <u> 渲染接线
 node scripts/verify-shadowing-asr.mjs             # 51   跟读音频链路：WAV 编码/provider 顺序/响应归一真跑 + 页面接线 + 旧 Web Speech 必须消失
 node scripts/verify-speech-analysis.mjs           # 39   离线跟读分析：合成波形的音量/停顿/音高/语速 + SpeakBack/跟读页共用 analyzeBlob
@@ -127,7 +127,7 @@ node scripts/verify-spelling-hall.mjs             # 45   拼写题池大厅：�
 node scripts/verify-video-lab.mjs                 # 155  视频精听：字幕三解析真跑 + 假 IDB 真跑存储层（封顶连媒体删/写失败不谎报/译文分键）+ LCS 跟读比对真跑 + **批次翻译调度真跑（批次切分/串行增量/坏批退队尾重试一次/连坏两批收摊/stopped 停取新活）** + **拖拽文件分类 splitImportFiles 真跑** + 六件套与页面接线 + **第 ⑩ 节把"用户视角"那批逐条钉住（两段式删课/删课清进度/选视频反馈与反悔/拖拽/课表展开/重播真播/释义卡进视野/单句与 A-B 双向互斥/已听与学完态/快捷键/课时取自 durationOf 而非整片时长/学习时长按课分键）**（⚠️ 剥注释走转译器，正则会被 accept="video/*" 骗到）
 node scripts/verify-chain-verdict.mjs             # 36   语块接龙判定三档（未判定不计分也不判错）
 node scripts/verify-ai-parse.mjs                  # 11   AI 解析约定：30 个解析点判空 + 无贪婪正则（元判据固件自证 + PatternReviewMode 三处具名站点）
-node scripts/verify-dashboard-glance.mjs            # 25   首页内容扩展：续学标签表穷举（/sentences 漏过）+ 三张横幅 0 义务整卡不渲染（待复习 / 纠偏待重考，行门控含第三张）+ 本周柱状日期与高度 + ?tab= 深链三道门（只认 MODES key / 不强进向导 / 走 enterMode 并抹参数）
+node scripts/verify-dashboard-glance.mjs            # 61   首页四条契约：续学标签表穷举（/sentences 漏过）+ 三张横幅 0 义务整卡不渲染（待复习 / 纠偏待重考，行门控含第三张）+ 本周柱状日期与高度 + ?tab= 深链三道门（只认 MODES key / 不强进向导 / 走 enterMode 并抹参数）+ **续学条的真实断点**（resume-overview 连同依赖编译后真跑 21 项；六个断点键在写入方与读取方各查一遍；静态变异 16 + 真跑变异 3）
 node scripts/verify-correction-notes.mjs            # 93   表达纠偏本：Markdown 表格抽取真跑（三源列序/表头噪声/错=对跳过）+ store 整段真跑（去重/review 记账/删除/只拒不裁/写失败可见）+ orderForDrill 排序真跑 + 三处收集接线 + 收藏页折叠列表 + 第 9 模式接线总闸（MODES 每个 key 必须有 TabsContent）与重考卡面契约（不写 SM-2、零 toast、干扰项取自整本）+ ⑦ 送进句子拼写（correctionToSpellingItem 真跑、两处入口接线、纠偏桶不许走词库加载路、空收藏也要有纠偏本入口）+ ⑨ 错点归纳（十类规则各自命中、规则顺序与证据优先级两条口径、计数之和=条目数、两处按类筛选接线）
 node scripts/verify-guard-shape.mjs                 # 7    元守卫：AST 扫全部 verify-*.mjs，抓"恒真断言"（`ok(/re/, src, name)` 这种第一实参是字面量本体的写法）与漏名字的断言；自带双向自证 + inspectedTotal 防空转
 node scripts/verify-interaction-fx.mjs              # 110  交互反馈层：token 单点定义与数值、缩放必须走独立 `scale`（含反向断言）、transition 白名单要带颜色项（否则顶掉 hover 变色）、9 个练习面不许有 ad-hoc active:scale 且 data-press 覆盖数只许涨、基座档位由 variant 推导、委托层四条边界（键盘不画/reduce 不建节点/无尺寸不画/在飞上限 3）、涟漪两档不许回到 currentColor、奖励层全仓唯一出口、结果层不引 motion 不弹 toast、闪卡接线 4 条（含两条正对照）、**⑩ 按压态投递机制 12 条**（`[data-pressing]` 无条件生效且钉到 token、`:active` 必须收在 `@media (hover: hover) and (pointer: fine)` 里、反向"媒体门之外不许出现 `[data-press]:active`"——真机实测触摸抬手后 :active 被平台多按住 ~400ms，按钮回弹晚、门槛→挂属性→判降级→画涟漪的顺序、收回按"清全站"、pointerup/pointercancel 既挂又撤、失焦也撤、反向"除委托层全站不许自己写 data-pressing"、降级块覆盖新机制）、**⑪ 默认可点层 15 条**（裸 `<button>`/`<a href>`/`[role=button]` 默认参与且**只给按下态**——层外规则无视特异性赢过 `@layer utilities`，写 `transition-property` 或基态 `scale:1` 会静默顶掉全站 219/142/28/21 处过渡与 hover 缩放；默认层的 `:active` 同样收在 hover 门里；委托 `closest` 与 CSS 同源、off 门的位置、涟漪宿主的 inline/static 两条兜底排在量尺寸之前、全站 `off` ≤5 处、两条走查脚本的选择器同源）、**⑫ 入场档 6 条**（`cubic-bezier(` 字面量全站只许一次、组件里不许自带曲线、`.page-enter`/`.stagger > *` 用 `var(--fx-ease)` 且 fill 是 `backwards`、reduce 停入场、≥10 个挂载点、路由级入场挂在 Layout 的 keyed 包装上）。⚠️ 全仓扫描的五条判据**共用一次转译**（`codeOf()` 记忆化），各扫各的会拖到 3m40s；一律用剥注释版本（注释里提 `data-press="off"` 也算数过一次）。⚠️ 变异 M3/M11(rAF)/M11(soft 档) 第一次都是绿的：前两条改成钉"顺序"与"cleanup 两件事"才红；第三条是正则被**降级块里同形的那条选择器**替它答了，必须把选择器一路钉到 `var(--fx-press-soft)` 那一身
@@ -250,6 +250,9 @@ src/
 │   ├── use-stable-shuffle.ts   # 稳定洗牌（洗牌列表 + 下标定位当前题必须用它）
 │   ├── capped-cache.ts         # localStorage JSON 缓存统一读写 + FIFO 封顶 + 键迁移
 │   ├── colloc-ai-cache.ts      # 搭配 AI 翻译缓存单点归属
+│   ├── resume-overview.ts      # 首页「继续上次学习」：只读汇总各模块会话断点
+│   ├── achievements-data.ts    # 成就定义：achieved 与 progressOf 同源（纯逻辑）
+│   ├── achievement-sources.ts  # 成就用的真实次数（对话条数 / 跟读完成句数）
 │   ├── app-env.ts              # 版本与运行平台单一来源
 │   ├── safe-storage.ts         # 带用户前缀的 localStorage 封装（云同步双写挂在这）
 │   ├── use-cloud-sync.ts       # 上行/下行/防抖双写
@@ -276,7 +279,7 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 - `moduleProgress` 键必须与 `MODULES[].key` 一一对应；写不存在的键**静默无效**（`if (modKey in …)`）。
 - `addStudyMinutes(minutes, key)` 实际是 `moduleProgress[key] += minutes * 0.5`，**上限 100**。
 - 各实例须订阅 `STATE_EVENT` 重读（hook 内已接，带防回环），否则模式首页角标学完一轮不刷新。
-- 断点续学按（模式, level）分键：`__nativethink_vocab_session_<level>` / `_daily_session_` / `_quickcard_session_` / `__nativethink_chunk_review_session` / `__nativethink_spelling_resume_<level>`（拼写那份可注入替身真跑，见 `verify:spelling-resume`）。
+- 断点续学按（模式, level）分键：`__nativethink_vocab_session_<level>` / `_daily_session_` / `_quickcard_session_` / `__nativethink_chunk_review_session` / `__nativethink_spelling_resume_<level>`（拼写那份可注入替身真跑，见 `verify:spelling-resume`）。**首页「继续上次学习」是这些键的只读汇总方**（`src/lib/resume-overview.ts`，2026-11-01）：它不写任何键，解析一律复用各模块自己的读盘函数；改键名会让续学条静默退回"只写模块名"，`verify-dashboard-glance` ④ 在写入方与读取方各查一遍。
 
 ---
 
@@ -355,14 +358,14 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 ## 提交前清单
 
 - [ ] `npm run typecheck`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 492 · vocab-hall **79** · vocab-caches 213 · tts-progress 6175 · tts-hardening **31** · **native-tts 45** · chunks-data **55** · overlay-fit **42** · bundle-budget 10 · list-scaling 27 · progress-page **40** · shadowing 27 · **shadowing-asr 51** · **speech-analysis 39** · backup-idb **106** · cloud-sync **73** · sentence-lab 16 · spelling-resume **35** · spelling-logic **41** · **spelling-hall 45** · **video-lab 155** · ai-parse **11** · app-version 11 · brand-fonts 35 · char-hygiene 9 · rv-articles 104 · study-credit **89** · **think-patterns 1592** · think-abort **36** · chain-verdict 36 · dashboard-glance 25 · correction-notes **93** · guard-shape **7** · **interaction-fx 110** · **imports-tracked 8** · **settings-themes 45**；合计 **10,288**，2026-10-31 复测，38 条守卫，wordbank-split 需参数单跑）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；**收尾一律 `npm run verify:all`**（只跑"自己那条"会让引用同一份源码的其他守卫悄悄失效，2026-09-30 真翻过一次）（当前基线，按脚本名查表更准：loading 53 · books-meta 227 · vocab-cards 492 · vocab-hall **79** · vocab-caches 213 · tts-progress 6175 · tts-hardening **31** · **native-tts 45** · chunks-data **55** · overlay-fit **42** · bundle-budget 10 · list-scaling 27 · progress-page **81** · shadowing 27 · **shadowing-asr 51** · **speech-analysis 39** · backup-idb **106** · cloud-sync **73** · sentence-lab 16 · spelling-resume **35** · spelling-logic **41** · **spelling-hall 45** · **video-lab 155** · ai-parse **11** · app-version 11 · brand-fonts 35 · char-hygiene 9 · rv-articles 104 · study-credit **89** · **think-patterns 1592** · think-abort **36** · chain-verdict 36 · dashboard-glance **61** · correction-notes **93** · guard-shape **7** · **interaction-fx 110** · **imports-tracked 8** · **settings-themes 45**；合计 **10,365**，2026-11-01 复测，38 条守卫，wordbank-split 需参数单跑）
 - [ ] 改过词库 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs` + `node scripts/verify-char-hygiene.mjs`（清了坏字符还要递增 `CACHE_VERSION`，否则老缓存挡住修复）
 - [ ] 改过语块库数据（`chunks.ts` / `chunks-extra.ts`）或去重接线 → `node scripts/verify-chunks-data.mjs`（**手改要写进 `chunks-extra.ts`**，`chunks.ts` 会被生成脚本整体重写；新增重复要在守卫的基线里显式登记）
 - [ ] 改过 `android/app/build.gradle` 的 `abiFilters` 或任何打包脚本 → 至少跑一次 `npm run package:apk:emu`（它收尾会读 APK 自己的 zip 中央目录自证：x86_64 的 sherpa `.so` 在、www/books/piper/tts 资产在、arm 0 条）；模拟器装机走 `node scripts/phone-emu.mjs check`
 - [ ] 改过音色/模型 → `npm run check:tts-voices`；改过切片/进度 → `verify-tts-progress`；改过降级**或内置引擎的入队顺序** → `verify-tts-hardening`（裸跑，它没有 npm script）；**改过任何取用 Capacitor 插件的地方（`native-tts.ts` / `use-tts.ts`）→ `verify-native-tts`**
 - [ ] 改过 `vite.config` 的 chunk 或壳里的静态 import → `npm run build:web` + `npm run verify:bundle-budget`
 - [ ] 改过 `ui/dialog` 基座或设置面板 → `verify-overlay-fit`
-- [ ] 改过学习记录页的图表/日历/成就/收藏总览（`progress-page.ts`、`ProgressCharts.tsx`、`ProgressPage` 的收藏 tab）→ `node scripts/verify-progress-page.mjs` + `node scripts/verify-list-scaling.mjs`（后者钉「本页不再复制完整收藏列表」）
+- [ ] 改过学习记录页的图表/日历/成就/收藏总览/迁移趋势（`progress-page.ts`、`ProgressCharts.tsx`、`TransferTrendCard.tsx`、`ProgressPage` 的收藏 tab）→ `node scripts/verify-progress-page.mjs` + `node scripts/verify-list-scaling.mjs`（后者钉「本页不再复制完整收藏列表」）
 - [ ] 改过设置页「学习数据」/备份动作（`use-backup-actions.ts`、`BackupFileInput.tsx`、`SettingsPage` 数据区、`ProgressPage` 的 `reset=1` 深链）→ `node scripts/verify-backup-idb.mjs` + `node scripts/verify-overlay-fit.mjs`
 - [ ] 改过影子跟读录音/转写链路（`ShadowingPage` / `asr-service` / `transcribe.js`）→ `node scripts/verify-shadowing-asr.mjs`；真链路用 `node scripts/probe-shadowing-asr.mjs --via-function`（需要 Key）。改过离线跟读分析（`speech-analysis.ts` / `wav.ts` / `SpeakBack`）→ `node scripts/verify-speech-analysis.mjs`
 - [ ] 改过拼写题面/判分/排队（`spelling-words.ts`、`planSessionQueue`、`importDirty` 接线、空桶/切模式）或断点/本轮队列（`spelling-resume.ts`）→ `node scripts/verify-spelling-logic.mjs` + `node scripts/verify-spelling-resume.mjs`
@@ -372,4 +375,6 @@ docs/                       # PRODUCT-SPEC / PROJECT-HANDOVER / modules/
 - [ ] 改过 `use-tts` 的**取消/降级链**（speak/cancel/stopAudio/playUrl/playChunkWithFallback）→ `node scripts/verify-tts-hardening.mjs`（E 节 10 条）+ 设备取证 `node scripts/walk-quickcard-tts.mjs --port 9226 --level cet4 --fixture <词表.json>`（静态守卫看不见"被自己掐掉"这类竞态，只有真装机能看见）
 - [ ] 改过 `functions/` → 想清楚网页/APK/桌面三条路；改过 index.html 版本 meta 或 `version.properties` → `node scripts/verify-app-version.mjs`（产物段先 build:web）
 - [ ] 改过 index.html 的字体/图标引用或 `public/fonts/` → `node scripts/verify-brand-fonts.mjs`（产物段先 build:web；**不许再引入外链字体域名与 icon**）
+- [ ] 改过成就（`achievements-data.ts` 的阈值/描述、`achievement-sources.ts` 的计数键、`Layout.tsx` 的 `useAchievementCheck`）→ `node scripts/verify-progress-page.mjs`（G 段真跑「进度 ⟺ 判定」同源；改计数键要同步写入方 `ConversationPage` / `ShadowingPage`）
+- [ ] 改过首页续学条，或**任何会话断点键的写入方**（`use-word-learning` / `DailyLearningMode` / `ChineseToEnglishMode` / `quickcard-history` / `use-phrase-learning` / `ChunkTrainingPage` 的复习断点 / `spelling-resume` / `think-session-resume`）→ `node scripts/verify-dashboard-glance.mjs`（`src/lib/resume-overview.ts` 在写读两侧各查一遍键名，改键名必须同步它）
 - [ ] 新增/修改模块行为 → 同步更新 `docs/modules/` 对应那篇（**带 `文件:行号`**）

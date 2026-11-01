@@ -1,7 +1,7 @@
 # NativeThink 项目交接手册（Agent Handover）
 
 > 面向**接手的 AI agent / 新同事**：只读这一份就能开工。
-> 最后校准：2026-10-31（当前 **2.0.105 / versionCode 150**；功能批次末 commit `9fe0c63`，文档清理随后；**9 种背单词模式、38 条契约守卫 / 10,288 断言**；本轮 7 个功能 commit 已提交，但**尚未 push、APK 未重打**。下方 §9 的 2026-09 条目按时间保留作沿革，**当前状态以本行 + `AGENTS.md` + [modules/verification.md](./modules/verification.md) 为准**）。
+> 最后校准：2026-11-01（当前 **2.0.105 / versionCode 150**；功能批次末 commit `9d3cad3`；**9 种背单词模式、38 条契约守卫 / 10,365 断言**；本轮 8 个功能/文档 commit 已提交，另有三笔**未提交**改动（思维迁移趋势卡 + 首页真实断点 + 成就进度与真实计数）；**尚未 push、APK 未重打**。下方 §9 的 2026-09 条目按时间保留作沿革，**当前状态以本行 + `AGENTS.md` + [modules/verification.md](./modules/verification.md) 为准**）。
 > 相关文档：`AGENTS.md`（**索引**：跨模块约定 + 模块文档导航）、[`docs/modules/`](./modules/)（**每模块一篇：功能 / 实现方法 / 注意事项，带 `文件:行号`**）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
 
 ---
@@ -15,7 +15,7 @@
 | 重点在哪 | **APK 与网站是两条重点研发线**，Electron 桌面只是顺带产物。两端共用 `dist/client`，但 APK 的 `/api/*` 打到线上站点 —— 改 functions 会同时影响两端 |
 | 技术栈 | React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui；状态存 localStorage / IndexedDB |
 | 现在改哪 | 主要战场是 **`/think`（母语思维主轴）**、`src/pages/DeepVocabularyPage/`（背单词）与 `src/pages/ArticlePage/`（阅读器 + 朗读）；2026-10 已完成模式大厅、拼写题池、学习记录图表与设置页学习数据 |
-| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 38 条可跑的 `scripts/verify-*.mjs` 断言脚本（另有 verify-wordbank-split 需基线参数、verify-all 是全量跑法）（当前 10,288 断言；完整表与最近全绿记录见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
+| 怎么验 | **没有测试框架**。`npm run typecheck` + `npm run lint:eslint` + `npm run build:web` + 38 条可跑的 `scripts/verify-*.mjs` 断言脚本（另有 verify-wordbank-split 需基线参数、verify-all 是全量跑法）（当前 10,365 断言；完整表与最近全绿记录见 [modules/verification.md](./modules/verification.md)）。**typecheck 是弱守卫**（继承 `strict:false`） |
 | 改某个模块前 | 读 [`docs/modules/`](./modules/) 里对应那一篇 —— 功能、实现方法、以及**逐条读代码核实过**的注意事项（本手册与 AGENTS.md 的若干旧说法在那里被推翻并已修正） |
 | 怎么装机 | `npm run version:apk-bump` → `npm run package:apk` → `adb install -r release/NativeThink-mobile-debug.apk`（产物约 804MB，装一次 1~2 分钟；`node scripts/report-apk-size.cjs` 看真实构成） |
 | 部署 | Cloudflare Pages 从 GitHub `main` 构建（`nativethink.pages.dev`），`pages_build_output_dir = "dist/client"`。**站点 functions 同时是 APK 的线上后端**（`index.html` 把 APK 内 `/api/*` 重写到 pages.dev） |
@@ -371,7 +371,14 @@ node scripts/device-eval.mjs back
 - `e7dd3c3`：「读英文」输入训练（24 题）
 - `9fe0c63`：跨模块守卫、文档与开发日志收口
 
-验证：`npm run verify:all` **39 项全绿**（38 条守卫 + typecheck，`verify-wordbank-split` 跳过），断言合计 **10,288**。**待发布**：push `main` → Pages → `version:apk-bump` 一次 → `package:apk` / `package:apk:emu` → 真机/模拟器走查。
+验证：`npm run verify:all` **39 项全绿**（38 条守卫 + typecheck，`verify-wordbank-split` 跳过），断言合计 **10,365**（含 2026-11-01 未提交三笔的 +77）。**待发布**：push `main` → Pages → `version:apk-bump` 一次 → `package:apk` / `package:apk:emu` → 真机/模拟器走查。
+
+### 2026-11-01 未提交批次（三笔，都已全量验证）
+
+- 学习记录页「思维迁移趋势」：`src/pages/ProgressPage/components/TransferTrendCard.tsx`（新）+ `progress-page.ts` 的 `summarizeTransferTrend` / `formatTransferTrendLabel`；14 天双折线、通过率 / 有尝试天数 / 校准命中；数据只取 `useThinkPatterns()` 已清洗的 `dailyStats`，没练过不画全 0 折线。`verify-progress-page` 40 → 59。
+- 首页「继续上次学习」真实断点：`src/lib/resume-overview.ts`（新）现读各模块已落盘的会话键（词汇五个模式 / 拼写队列 / 语块复习 / 三稿会话），续学条写成「复习检测 · 四级 · 第 12/20 张」并带 `?tab=` 深链；读不到就 `detail: null`（不拿 0 或「上次」充数）。`verify-dashboard-glance` 25 → 61（第一次给这条守卫加真跑段）。
+- 成就区（`achievements-data.ts` + `achievement-sources.ts` 两个新纯模块）：锁定卡显示「还差 4 天 · 3/7 天」；两条计数成就改读真实条数（不再拿进度分当次数）；**成就判定此前没有调用点**，现挂到 `Layout.tsx` 并删掉没人 import 的 `use-learning-with-achievements.ts`；`goal_hit` 不再在"每日目标=0"时白送。`verify-progress-page` 59 → 81。
+- 三笔的行为凭据与变异记录见 [modules/verification.md](./modules/verification.md) 的 2026-11-01 三条实测（A/B/C）。
 
 ### 历史已完成（到 2.0.28 / `f1ddeb7`，2026-09 沿革）
 - **书库三层拆分（2026-09-29）**：`books-meta.ts`（元数据 5KB，书单用）/ `books.ts`（22 本节选正文 604KB，点开某本才下载）/ `book-clean.ts`（Gutenberg 清洗纯函数）。
@@ -527,7 +534,7 @@ node scripts/device-eval.mjs back
 
 **改完代码**
 - [ ] `npm run typecheck`、`npm run lint:eslint`、`npm run build:web`
-- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言（断言数以 [modules/verification.md](./modules/verification.md) 表格为准；当前全量 10,288 断言）
+- [ ] 跑与改动相关的 `scripts/verify-*.mjs`；语义变了要**重新推导**断言（断言数以 [modules/verification.md](./modules/verification.md) 表格为准；当前全量 10,365 断言）
 - [ ] 改过词库文件 → `npm run wordbank:split` + `node scripts/verify-wordbank-loading.mjs`
 - [ ] 真机装机验证（涉及 safe-area / 原生 TTS / 手势 / 持久化的改动**必须**真机验；动手前先报备，收尾 `force-stop`）
 

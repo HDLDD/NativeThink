@@ -1,6 +1,6 @@
 # NativeThink 开发路线
 
-> 校准：2026-10-31（当前 **2.0.105 / versionCode 150**；9 种背单词模式、38 条契约守卫 / 10,288 断言。本轮功能批次末领先 `origin/main` 12 个 commit，文档清理随后；**尚未 push、APK 未重打** —— **push 即上线**，发版前先跑全量验证）。
+> 校准：2026-11-01（当前 **2.0.105 / versionCode 150**；9 种背单词模式、38 条契约守卫 / 10,365 断言。本轮功能批次末领先 `origin/main` 13 个 commit；另有三笔未提交改动（`TransferTrendCard` 迁移趋势卡 + `resume-overview` 首页真实断点 + `achievements-data` 成就进度与真实计数）。**尚未 push、APK 未重打** —— **push 即上线**，发版前先跑全量验证）。
 > **收尾必跑 `npm run verify:all`**（typecheck + 全部 `verify-*.mjs`；只跑"自己那条"会漏掉引用同一份源码的其他守卫 —— 2026-09-30 真翻过一次）。
 > 现状细节与坑表见 [`docs/PROJECT-HANDOVER.md`](./docs/PROJECT-HANDOVER.md)，跨模块约定与文档导航见 [`AGENTS.md`](./AGENTS.md)，**每模块的功能/实现/注意事项见 [`docs/modules/`](./docs/modules/)**，产品与 UI 规范见 [`docs/PRODUCT-SPEC.md`](./docs/PRODUCT-SPEC.md)。
 > **重点研发的两条线是 APK 与网站**（Electron 桌面只是顺带产物）；站点 `functions/api/*` 同时是 APK 的线上后端 —— APK 内 `/api/*` 被重写到 `https://nativethink.pages.dev`。
@@ -17,18 +17,18 @@
 - **句子学习**：158 句语料（手写 24 + 补充 12 + 脚本自动标注 122），拆句 / 句型 / 造句 / 语法，含错句复习队列与跟读评价。
 - **端侧 AI 兜底**：随包 Qwen2.5-0.5B-Instruct（q4）+ Xenova/opus-mt-en-zh（q8）；打包版同源 `/models/` 零下载，网页版回落 hf-mirror。云端 AI 失败时 `streamChat/chat` 自动切端侧小模型。
 - **视频精听**（`/video`，2026-10-18）：导入字幕（SRT / VTT / 转录伴侣 JSON）+ 可选视频音频，逐句跳转 / 单句循环 / A-B 复读 / 倍速 / 点词查词 / 收藏句 / 送进拼写的 `video` 桶 / LCS 跟读比对 / AI 批量双语字幕。媒体与字幕在 IndexedDB 独立 `media` 表（三键分片，索引 50 课封顶且淘汰连媒体一起删），进度走 safeStorage → 云同步与备份。**三形态统一走导入**：网页版是 https 源，抓本机 http 转录服务属混合内容会被拦，APK/桌面也没有那个进程 —— 所以这不是"没接上"的缺陷。守卫 `verify-video-lab`（155 条）+ 真界面走查 `walk-video`（56 条，APK 侧同一脚本换端口与 origin）。
-- **验证体系**：没有测试框架，靠 `typecheck` + `lint:eslint` + `build:web` + 38 条可跑的 `scripts/verify-*.mjs`（收尾用 `npm run verify:all` 一次跑完）（当前 10,288 断言；完整表与最近复测记录见 [docs/modules/verification.md](./docs/modules/verification.md)，计数以那张表为准），再加**本机无头 Chrome + CDP 真点一遍**的行为验收（静态检查看不见"入口在但状态不写回"那类缺陷）。
+- **验证体系**：没有测试框架，靠 `typecheck` + `lint:eslint` + `build:web` + 38 条可跑的 `scripts/verify-*.mjs`（收尾用 `npm run verify:all` 一次跑完）（当前 10,365 断言；完整表与最近复测记录见 [docs/modules/verification.md](./docs/modules/verification.md)，计数以那张表为准），再加**本机无头 Chrome + CDP 真点一遍**的行为验收（静态检查看不见"入口在但状态不写回"那类缺陷）。
 - **学习数据**：设置页与学习记录页共用同一套导出/恢复；设置页显示本地占用、浏览器存储估算、上次备份，`/progress?reset=1` 打开现有重置弹窗。
 
 ## 当前待办（2026-10-31）
 
-1. **发布收尾**：push `main` → 等 Cloudflare Pages → `version:apk-bump` 一次 → `package:apk` / `package:apk:emu` → 真机/模拟器走查。当前 12 个 commit 未推送、APK 仍是旧包。
+1. **发布收尾**：push `main` → 等 Cloudflare Pages → `version:apk-bump` 一次 → `package:apk` / `package:apk:emu` → 真机/模拟器走查。当前 13 个 commit 未推送、APK 仍是旧包。
 2. **学习提醒**（Capacitor 本地通知）—— 系统级唯一缺口，仓库目前没有通知插件。
 3. **词库真人发音包**：单词集合有限、可预录；先定体积与打包方案，不能塞进 `public/`。
 4. **语料回填**：语法条目、导入书离线翻译、书籍译文待回填空段；剩余量需重新盘点。
 5. **帮助中心长介绍审计**：九模式与备份入口已校准，其余模块逐条对当前功能面。
 6. **音素级朗读评测**（路线 3：Azure/讯飞/腾讯）—— 已调研，暂不实现；需先定“不把 ASR 命中率当发音分”的产品口径。
-7. **跨模块主轴**：学习记录页增加「模式迁移」折线；首页「继续上次学习」升级为真实断点（现在只记路由）。
+7. **跨模块主轴**：~~学习记录页增加「模式迁移」折线~~（2026-11-01 已做：`TransferTrendCard`，14 天双折线 + 通过率/校准命中，走 think store 的已清洗 `dailyStats`）；~~首页「继续上次学习」升级为真实断点~~（2026-11-01 已做：`src/lib/resume-overview.ts` 现读各模块会话键，续学条写成「复习检测 · 四级 · 第 12/20 张」并带 `?tab=` 深链）。
 
 ## 历史路线快照（2026-09-30，保留作沿革）
 

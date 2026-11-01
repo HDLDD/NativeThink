@@ -68,11 +68,11 @@
 
 **模式详情**（`PatternDetail.tsx`）：从焦点卡的「看看…的中文默认与反例」或模式库任一行进入。只读展示中文默认 / 英语默认 / 线索 / 反例与改法（优先取带 `off` 项的识别题；没有 `off` 时退回非最佳项并标「还能更直接」）/ 当前排期与最近反馈；底部「练这个模式」走 `startPractice([id])`。**不调 `grade`、不写 SM-2**。
 
-**断点续练**：三稿会话的队列、阶段、当前题号、已选答案、自评档位、草稿与已出反馈写进裸 `localStorage` 的 `__nativethink_think_session_resume`（**不走 safeStorage、不参与云同步**）。输入去抖 350ms；`pagehide` 与「退出」各补一次落盘，完成一卡时 `clearPatternResume()`。概览读 `loadPatternResume()` → `isResumeUsable`，显示「继续上次训练 · 第 x/5 步」；点「放弃」清键。恢复时沿用原队列与识别/迁移题号，不重新抽题；超过 2 天、队列为空、`queue[index]` 与模式不一致、反馈阶段缺结果、未知阶段/模式 id 一律整份丢弃（`sanitizePatternResume` 真跑）。
+**断点续练**：三稿会话的队列、阶段、当前题号、已选答案、自评档位、草稿与已出反馈写进裸 `localStorage` 的 `__nativethink_think_session_resume`（**不走 safeStorage、不参与云同步**）。输入去抖 350ms；`pagehide` 与「退出」各补一次落盘，完成一卡时 `clearPatternResume()`。概览读 `loadPatternResume()` → `isResumeUsable`，显示「继续上次训练 · 第 x/5 步」；点「放弃」清键。恢复时沿用原队列与识别/迁移题号，不重新抽题；超过 2 天、队列为空、`queue[index]` 与模式不一致、反馈阶段缺结果、未知阶段/模式 id 一律整份丢弃（`sanitizePatternResume` 真跑）。**第二个读者是首页续学条**（`src/lib/resume-overview.ts`，2026-11-01）：它只调 `loadPatternResume()` + `resumeStepLabel()`，不另写一套有效期判断，所以首页显示「第 4/5 步 · 改写」和点进去看到的步骤必然同一份口径。
 
 **首页今日模式**（`DashboardPage/TodayPatternCard.tsx`）：有模式进度才渲染（`stats.tracked === 0` 整卡 `return null`，与三张 0 义务横幅同口径）。显示今日到期/延迟计数、下一个模式名、近 7 天迁移柱与 `passes/attempts`，点击进 `/think`。趋势来自 store 的 `trend`（`buildTransferTrend` 七天补零），不在组件里另算一套。
 
-**趋势与体检复测**：`grade` 在同一个 updater 里累计 `dailyStats[today] = { attempts, passes, calibrationAttempts, calibrationHits }`，落盘保留 `diagnostic / realTask / 历史`（`...prev`）；`saveDiagnostic` 同步追加 `diagnosticHistory`（同日只留最新，最多 10 次）。概览「趋势」面板显示 7 天柱、迁移合计、校准合计与 `体检复测：8/15 → 12/15`，不造百分比。
+**趋势与体检复测**：`grade` 在同一个 updater 里累计 `dailyStats[today] = { attempts, passes, calibrationAttempts, calibrationHits }`，落盘保留 `diagnostic / realTask / 历史`（`...prev`）；`saveDiagnostic` 同步追加 `diagnosticHistory`（同日只留最新，最多 10 次）。趋势**不在 `/think` 概览里另画一套**（2026-10-31 起「练习」tab 只放玩法，避免同一份进度两处各说一遍）：首页 `TodayPatternCard` 用 store 的 7 天 `trend` 画迁移柱；学习记录页的「思维迁移趋势」卡（`ProgressPage/components/TransferTrendCard.tsx`，2026-11-01）用同一份已清洗 `dailyStats` 画 14 天双折线 + 通过率 / 校准命中，没有数据时只给 `/think` 入口，不造百分比。
 
 **跨模块证据**（`think-evidence.ts` 纯函数）：读纠偏本（写作/对话/检测三来源），按原因里的线索词归到最可能的模式（如「主语/话题/句首」→ `subject-first`，「请求/礼貌/台阶」→ `polite-request`），作为**待诊断候选**；同一条可命中多个模式，按命中条目数排序取 Top 3。概览「薄弱报告」面板内显示来源计数、最近 3 条 `原句 → 地道说法` 与候选 chip，点 chip 进模式详情。**不写 SM-2、不改纠偏本**。
 
