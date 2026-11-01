@@ -1,7 +1,7 @@
 # NativeThink 项目交接手册（Agent Handover）
 
 > 面向**接手的 AI agent / 新同事**：只读这一份就能开工。
-> 最后校准：2026-11-01（当前 **2.0.107 / versionCode 152**；本轮三笔功能改动（思维迁移趋势卡 + 首页真实断点 + 成就进度与真实计数）已分组提交并 **push 到 main**；**9 种背单词模式、38 条契约守卫 / 10,365 断言**；APK 已按 2.0.107 / 152 打好（`release/NativeThink-mobile-debug.apk`，850MB）。下方 §9 的 2026-09 条目按时间保留作沿革，**当前状态以本行 + `AGENTS.md` + [modules/verification.md](./modules/verification.md) 为准**）。
+> 最后校准：2026-11-01（当前 **2.0.107 / versionCode 152**；本轮三笔功能改动（思维迁移趋势卡 + 首页真实断点 + 成就进度与真实计数）已分组提交并 **push 到 main**；**9 种背单词模式、38 条契约守卫 / 10,365 断言**；APK 已按 2.0.107 / 152 打好（`release/NativeThink-mobile-debug.apk`，850MB），线上 `app-version` 同为 2.0.107，装机走查 37/37。下方 §9 的 2026-09 条目按时间保留作沿革，**当前状态以本行 + `AGENTS.md` + [modules/verification.md](./modules/verification.md) 为准**）。
 > 相关文档：`AGENTS.md`（**索引**：跨模块约定 + 模块文档导航）、[`docs/modules/`](./modules/)（**每模块一篇：功能 / 实现方法 / 注意事项，带 `文件:行号`**）、`ROADMAP.md`（路线）、`docs/PRODUCT-SPEC.md`（需求与 UI 规范）、`CHANGELOG.md`（提交级日志）。
 
 ---
@@ -371,7 +371,7 @@ node scripts/device-eval.mjs back
 - `e7dd3c3`：「读英文」输入训练（24 题）
 - `9fe0c63`：跨模块守卫、文档与开发日志收口
 
-验证：`npm run verify:all` **39 项全绿**（38 条守卫 + typecheck，`verify-wordbank-split` 跳过），断言合计 **10,365**（含本轮三笔的 +77）。**发布状态**：三笔已分组提交并 push `main`（Pages 已上线）；APK 打的是 **2.0.107 / versionCode 152**（151 被我手动 bump + `package:apk` 自带 bump 连跳两格烧掉了 —— 见 build-release.md 那条警告），随后走查。
+验证：`npm run verify:all` **39 项全绿**（38 条守卫 + typecheck，`verify-wordbank-split` 跳过），断言合计 **10,365**（含本轮三笔的 +77）。**发布状态**：三笔已分组提交并 push `main`（Pages 已上线）；APK 打的是 **2.0.107 / versionCode 152**（151 被"手动 bump + `package:apk` 自带 bump"连跳两格烧掉了 —— 见 build-release.md 那条警告），模拟器装机走查 37/37 全绿。
 
 ### 2026-11-01 未提交批次（三笔，都已全量验证）
 
@@ -433,7 +433,7 @@ node scripts/device-eval.mjs back
 
 ### 当前开放项（2026-10-31）
 
-1. **发布收尾（进行中）**：本轮 commit 已 push `main` → Pages 已上线；APK 发布包已打（2.0.107 / 152），模拟器包与装机走查在跑。
+1. **发布收尾（2026-11-01 已完成）**：本轮 commit 全部 push `main` → 线上 `app-version` = **2.0.107**；APK 发布包与模拟器包都按 2.0.107 / versionCode 152 打好（模拟器包自证：x86_64 .so 在、www/模型 389 条、arm 0 条），装机走查 **37/37**、三处新功能在 APK 里逐项核过。**用户侧唯一动作**：把 `release/NativeThink-mobile-debug.apk`（850MB）装到手机上（升级安装，不会清数据）。
 2. **学习提醒**（Capacitor 本地通知）：系统级唯一缺口。
 3. **词库真人发音包**：需要先定预录体积与打包方案。
 4. **语料回填**：语法条目、导入书离线翻译、书籍译文空段，剩余量需重新盘点。

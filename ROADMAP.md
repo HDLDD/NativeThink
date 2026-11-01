@@ -1,6 +1,6 @@
 # NativeThink 开发路线
 
-> 校准：2026-11-01（当前 **2.0.107 / versionCode 152**，由 `package:apk` 自动递增；9 种背单词模式、38 条契约守卫 / 10,365 断言。本轮三笔功能改动已分组提交并 **push 到 main**（Pages 已上线），APK 发布包已按 2.0.107 打好，模拟器包与走查在跑 —— **push 即改线上**，发版前先跑全量验证）。
+> 校准：2026-11-01（当前 **2.0.107 / versionCode 152**，由 `package:apk` 自动递增；9 种背单词模式、38 条契约守卫 / 10,365 断言。本轮三笔功能改动已分组提交并 **push 到 main**，线上 `app-version` 已是 2.0.107；APK 发布包 + 模拟器包已打，装机走查 **37/37 全绿** —— **push 即改线上**，发版前先跑全量验证）。
 > **收尾必跑 `npm run verify:all`**（typecheck + 全部 `verify-*.mjs`；只跑"自己那条"会漏掉引用同一份源码的其他守卫 —— 2026-09-30 真翻过一次）。
 > 现状细节与坑表见 [`docs/PROJECT-HANDOVER.md`](./docs/PROJECT-HANDOVER.md)，跨模块约定与文档导航见 [`AGENTS.md`](./AGENTS.md)，**每模块的功能/实现/注意事项见 [`docs/modules/`](./docs/modules/)**，产品与 UI 规范见 [`docs/PRODUCT-SPEC.md`](./docs/PRODUCT-SPEC.md)。
 > **重点研发的两条线是 APK 与网站**（Electron 桌面只是顺带产物）；站点 `functions/api/*` 同时是 APK 的线上后端 —— APK 内 `/api/*` 被重写到 `https://nativethink.pages.dev`。

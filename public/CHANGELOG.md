@@ -1,6 +1,7 @@
 # NativeThink 开发日志
 
 ## 2026-11-01
+- test(device): 走查 ③ 段跟着题池大厅重写（36 → 37 项） (`b699776`)
 - chore(release): 对齐 APK 实际版本 2.0.107 / versionCode 152 并修掉误导性的手动 bump 前置说明 (`d9aa6d9`)
 - chore(release): bump APK 到 2.0.106 / versionCode 151 并同步版本线 (`16f6c9d`)
 - docs(changelog): 补记本轮三笔提交到开发日志 (`047d12a`)
